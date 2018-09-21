@@ -12,4 +12,6 @@ dependencies:
   - partd
   - bokeh
   - dask
+  - root
+  
   
