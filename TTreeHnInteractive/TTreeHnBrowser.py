@@ -1,10 +1,10 @@
 # import
 from __future__ import print_function
-#from ipywidgets import interact, interactive, fixed, interact_manual
+# from ipywidgets import interact, interactive, fixed, interact_manual
 import ipywidgets as widgets
 from ipywidgets import Button, Layout
-#import numpy as np
-#from IPython.display import display
+# import numpy as np
+# from IPython.display import display
 import ROOT
 
 ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
@@ -91,6 +91,7 @@ class TTreeHnBrowser:
         self.addSliderButton.on_click(self.funAddSlider)
         self.regExpButton.on_click(self.funUpdateMask)
         self.drawSliderButton.on_click(self.funAddNewSlider)
+        self.drawQueryButton.on_click(self.funAddNewQuery)
         # self.branchMaskWidget.observe(funUpdateMask,branchMaskWidget.value) # looks like not working
         return 0
 
@@ -120,30 +121,32 @@ class TTreeHnBrowser:
         self.friendDropDown.options = self.friendList
         self.branchDropDown.options = self.branchList
 
-    def funAddQuery(self):
+    def funAddQuery(self, b):
         self.drawQuery.value += self.friendDropDown.value
         self.drawQuery.value += '.'
         self.drawQuery.value += self.branchDropDown.value
 
-    def funAddSelection(self):
+    def funAddSelection(self, b):
         self.drawCut.value += self.friendDropDown.value
         self.drawCut.value += '.'
         self.drawCut.value += self.branchDropDown.value
 
-    def funAddSlider(self):
+    def funAddSlider(self, b):
         self.drawSlider.value += self.friendDropDown.value
         self.drawSlider.value += '.'
         self.drawSlider.value += self.branchDropDown.value
 
-    def funUpdateMask(self):
+    def funUpdateMask(self, b):
         self.branchRegExp = str(self.branchRegExpWidget.value)
         self.friendRegExp = str(self.friendRegExpWidget.value)
         # print(branchMask)
         self.funUpdateList()
 
-    def funAddNewSlider(self):
-        newSlider = widgets.FloatRangeSlider(description=str(self.drawSlider.value), layout=Layout(width='66%'))
-        self.sliderWidgets.children += (newSlider,)
+    def funAddNewSlider(self, b):
+        self.sliderArray.addSlider(self.drawSlider.value)
+
+    def funAddNewQuery(self, b):
+        self.drawVarArray.addVariable(self.drawQuery.value)
 
     # data members
     # root tree
