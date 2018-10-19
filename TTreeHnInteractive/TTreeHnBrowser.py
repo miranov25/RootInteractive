@@ -9,15 +9,14 @@ import ROOT
 ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
 
-#
-# x1(1:2:0.1:1.5:1.75)
+# Slider array:
+#   x1(1:2:0.1:1.5:1.75)
 # TODO:
 #   1.) switch edit mode  with syntax x1(1:2:0.1:1.5:1.75) <-> slider mode
 #   2.) syntax for the min,max, mean, median, rms pointer to array needed
 class TSliderArray:
     def __init__(self):
         pass
-
     def addSlider(self, sliderDescription):
         # parse slider description title(<min>:<max>:<step:<valueMin>:<valueMax>)
         sliderDesc0=ROOT.AliParser.ExtractBetween(sliderDescription,'(',')') # tokenize space between ()
@@ -48,9 +47,25 @@ class TSliderArray:
     fSliderWidgets=widgets.VBox(layout=Layout(width='100%'))
     fSliderDictionary={'':''}
 
-
-
-
+#
+#
+class TDrawVarArray:
+    def __init__(self):
+        pass
+    def addVariable(self, variableDescription):
+        variables=widgets.Text(description='', value=variableDescription)
+        newButton=widgets.Button(description='Remove',tooltip="Remove slider")
+        enableButton=widgets.ToggleButton(description='Status',tooltip="Enable/disable")
+        newBox=widgets.HBox([variables,enableButton,newButton],layout=Layout(width='100%'))
+        self.fDrawVarWidgets.children+=(newBox,)
+        self.fDrawVarDictionary.update({newButton:newBox})
+        newButton.on_click(self.removeVariable)
+    def removeVariable(self,b):
+        box=self.fDrawVarDictionary.get(b)
+        box.close()
+        self.fDrawVarWidgets.children=[x for x in self.fDrawVarWidgets.children  if x !=box]  #tuple  build again removing box
+    fDrawVarWidgets=widgets.VBox(layout=Layout(width='100%'))
+    fDrawVarDictionary={'':''}
 
 # TTree browser - using the python interactive widgets in Jupyter notebook
 #
