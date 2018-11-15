@@ -33,6 +33,9 @@ pip install jupyter jupyterlab
 ```
 
 ````
+pip install sklearn
+pip install scikit-garden
+
 pip install beakerx pandas ipywidgets
 pip install plot runtime
 pip install plotly
