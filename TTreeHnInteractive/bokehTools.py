@@ -1,10 +1,10 @@
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar
-from bokeh.palettes import *
+# from bokeh.palettes import *
 from bokeh.transform import *
-from bokehTools import *
-from bokeh.layouts import *
-from bokeh.palettes import *
+# from bokehTools import *
+# from bokeh.layouts import *
+# from bokeh.palettes import *
 from bokeh.io import push_notebook
 
 
@@ -62,14 +62,14 @@ def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
 
 
 def testExample():
-    df2=treeBrowser.sliderArray.queryDataFrame(treeBrowser.fDataFrame)
-    df2=df2.query("EN")
+    df2 = treeBrowser.sliderArray.queryDataFrame(treeBrowser.fDataFrame)
+    df2 = df2.query("EN")
     source = ColumnDataSource(df2)
-    #Use the field name of the column source
-    mapper = linear_cmap(field_name='Z', palette=Spectral6 ,low=min(df2["Z"]) ,high=max(df2["Z"]))
+    # Use the field name of the column source
+    mapper = linear_cmap(field_name='Z', palette=Spectral6, low=min(df2["Z"]), high=max(df2["Z"]))
     p = figure(plot_width=500, plot_height=500, title="XXX")
-    p.circle(x='E', y='dEdx', line_color=mapper,color=mapper, fill_alpha=1, size=2, source=source)
-    color_bar = ColorBar(color_mapper=mapper['transform'], width=8,  location=(0,0))
+    p.circle(x='E', y='dEdx', line_color=mapper, color=mapper, fill_alpha=1, size=2, source=source)
+    color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
     p.add_layout(color_bar, 'right')
-    #p.y_axis_type="log"
+    # p.y_axis_type="log"
     show(p)
