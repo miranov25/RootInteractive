@@ -2,9 +2,9 @@ from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar
 # from bokeh.palettes import *
 from bokeh.transform import *
-# from bokehTools import *
-# from bokeh.layouts import *
-# from bokeh.palettes import *
+from bokehTools import *
+from bokeh.layouts import *
+from bokeh.palettes import *
 from bokeh.io import push_notebook
 
 
