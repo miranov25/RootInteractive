@@ -3,21 +3,14 @@
 # In[1]:
 
 
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
-from sklearn import metrics
-
-from matplotlib import pyplot as plt
-
-from keras.models import Sequential, load_model
-from keras.layers import Dense, Dropout, BatchNormalization
-from keras.layers.advanced_activations import LeakyReLU
-from keras import losses
-
-from sklearn.model_selection import train_test_split
-
 import numpy as np
-import math
+from keras.layers import Dense, Dropout
+from keras.models import Sequential
+from matplotlib import pyplot as plt
+from sklearn import metrics
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 
 
 # In[2]:

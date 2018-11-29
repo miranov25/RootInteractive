@@ -8,7 +8,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook
 
 
-def drawColz(dataFrame, query, varX, varY, varColor):
+def drawColz(dataFrame, query, varX, varY, varColor, p=0):
     """
     drawing example - functionality like the tree->Draw colz
     :param dataFrame:   data frame
@@ -21,11 +21,13 @@ def drawColz(dataFrame, query, varX, varY, varColor):
     dfQuery = dataFrame.query(query)
     source = ColumnDataSource(dfQuery)
     mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
-    p = figure(plot_width=500, plot_height=500, title="XXX")
+    if p == 0:
+        p = figure(plot_width=500, plot_height=500, title="XXX")
     p.circle(x=varX, y=varY, line_color=mapper, color=mapper, fill_alpha=1, size=2, source=source)
-    color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
+    fig = color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
     p.add_layout(color_bar, 'right')
     show(p)
+    return fig
 
 
 def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):

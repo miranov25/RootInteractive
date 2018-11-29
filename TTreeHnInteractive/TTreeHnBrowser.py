@@ -40,7 +40,7 @@ def readCSV(fName, withHeader):
 
 def readDataFrame(fName):
     line = open(fName).readline().rstrip()  # get header - using root cvs convention
-    names=line.replace("/D", "").split(":")
+    names=line.replace("/D", "").replace("/I", "").split(":")
     variables = []
     for a in names: variables.append(a.split('\t')[0])  #
     dataFrame = pd.read_csv(fName, sep='\t', index_col=False, names=variables, skiprows=1)
