@@ -19,13 +19,13 @@ from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 class RandomForest:
 
     def __init__(self, switch, X_train, y_train, **RF_params):
-        if (switch == 'Classifier'):
+        if switch == 'Classifier':
             clf = RandomForestClassifier(**RF_params)
-        elif (switch == 'Regressor'):
+        elif switch == 'Regressor':
             clf = RandomForestRegressor(**RF_params)
         else:
             print('specify Classifier or Regressor (first argument)')
-            return 0
+            return
         clf.fit(X_train, y_train)
         self.model = clf
 
@@ -48,10 +48,10 @@ class KerasModel:
         else:
             epochs = options['epochs']
 
-        if not 'batchsize' in options.keys():
-            batchsize = 50
+        if not 'batchSize' in options.keys():
+            batchSize = 50
         else:
-            batchsize = options['batchsize']
+            batchSize = options['batchSize']
 
         if not 'layout' in options.keys():
             layout = [50, 50]
@@ -60,26 +60,26 @@ class KerasModel:
 
         model = Sequential()
         for idx, val in enumerate(layout):
-            if (idx == 0):
+            if idx == 0:
                 model.add(Dense(val, input_dim=len(X_train.columns), activation='relu'))
                 model.add(Dropout(0.2))
                 continue
-            if (idx > 0):
+            if idx > 0:
                 model.add(Dense(val, activation='relu'))
                 model.add(Dropout(0.2))
-        if (switch == 'Classifier'):
+        if switch == 'Classifier':
             model.add(Dense(1, activation='sigmoid'))
             model.compile(loss='binary_crossentropy', optimizer='ADAM', metrics=['accuracy'])
-            model.fit(X_train, y_train, epochs=epochs, batch_size=batchsize)
-        elif (switch == 'Regressor' or switch == 'Compressor'):
+            model.fit(X_train, y_train, epochs=epochs, batch_size=batchSize)
+        elif switch == 'Regressor' or switch == 'Compressor':
             model.add(Dense(1, activation='linear'))
             model.compile(loss='mean_absolute_error', optimizer='ADAM', metrics=['mse'])
-            if (switch == 'Regressor'):
-                model.fit(X_train, y_train, epochs=epochs, batch_size=batchsize)
+            if switch == 'Regressor':
+                model.fit(X_train, y_train, epochs=epochs, batch_size=batchSize)
             else:
-                model.fit(X_train, y_train.predict(X_train), epochs=epochs, batch_size=batchsize)
+                model.fit(X_train, y_train.predict(X_train), epochs=epochs, batch_size=batchSize)
         else:
-            return 0
+            return
         self.model = model
 
     def predict(self, data):
@@ -103,6 +103,11 @@ class KNeighbors:
         self.model = clf
 
     def predict(self, data):
+        """
+        predict
+        :param data:  panda or numpy array (the same granularity as used for fit)
+        :return:  numpy
+        """
         if 'Classifier' in str(self.model):
             return self.model.predict_proba(data)[:, 1]
         else:
