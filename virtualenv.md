@@ -1,3 +1,10 @@
+# Install RootInteractive package
+* add line to your .bashr to define python path. E.g 
+```
+export PYTHONPATH=$PYTHONPATH:$HOME/github/RootInteractive
+```
+* WITHOUT defining path -  classes can not be used
+
 ### Install virtualenv:
 
 I used to install virtualenvwrapper:
