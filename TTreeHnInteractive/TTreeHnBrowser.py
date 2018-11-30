@@ -38,9 +38,10 @@ def readCSV(fName, withHeader):
         csv = np.genfromtxt(fName, delimiter="\t", skip_header=1)
     return csv
 
+
 def readDataFrame(fName):
     line = open(fName).readline().rstrip()  # get header - using root cvs convention
-    names=line.replace("/D", "").replace("/I", "").split(":")
+    names = line.replace("/D", "").replace("/I", "").split(":")
     variables = []
     for a in names: variables.append(a.split('\t')[0])  #
     dataFrame = pd.read_csv(fName, sep='\t', index_col=False, names=variables, skiprows=1)
@@ -99,12 +100,12 @@ class TSliderArray:
         query python data frame
         :return: result of query
         '''
-        query=""
+        query = ""
         for box in self.fSliderWidgets.children:
-            query0= box.children[0].description +"<" +str(box.children[0].value[1]) +"&" +box.children[0].description +">" +str(box.children[0].value[0])
-            query+= query0+"&"
-        query= query[:-1]
-        df2=dataFrame.query(query)
+            query0 = box.children[0].description + "<" + str(box.children[0].value[1]) + "&" + box.children[0].description + ">" + str(box.children[0].value[0])
+            query += query0 + "&"
+        query = query[:-1]
+        df2 = dataFrame.query(query)
         return df2
 
     fSliderWidgets = widgets.VBox(layout=Layout(width='100%'))  # slider widget
@@ -115,6 +116,10 @@ class TSliderArray:
 #
 #
 class TDrawVarArray:
+    """
+    TDrawVarArray
+    """
+
     def __init__(self):
         pass
 
@@ -122,6 +127,11 @@ class TDrawVarArray:
         for var in variableList: self.addVariable(var)
 
     def addVariable(self, variableDescription):
+        """
+        addVariable
+        :param variableDescription:
+        :return:
+        """
         variables = widgets.Text(description='', value=variableDescription, layout=Layout(width='66%'))
         newButton = widgets.Button(description='Remove', tooltip="Remove slider")
         enableButton = widgets.ToggleButton(description='Status', tooltip="Enable/disable")
@@ -184,9 +194,9 @@ class TTreeHnBrowser:
         value = ROOT.AliTreePlayer.selectWhatWhereOrderBy(self.fTree, str(variables), str(self.drawSelection.value), "", 0, 10000000, "csvroot", "data.csv")
         print(value)
         if value <= 0: return value
-        self.fDataFrame=readDataFrame('data.csv')
+        self.fDataFrame = readDataFrame('data.csv')
         self.boxAll.children = [x for x in self.boxAll.children if x != self.fQgrid]
-        self.fQgrid=qgrid.show_grid(self.fDataFrame)
+        self.fQgrid = qgrid.show_grid(self.fDataFrame)
         self.boxAll.children += (self.fQgrid,)
 
     def loadMetadata(self, tree):
@@ -209,7 +219,7 @@ class TTreeHnBrowser:
         friendMaskReg = ROOT.TPRegexp(self.friendRegExp)
         branchMaskReg = ROOT.TPRegexp(self.branchRegExp)
         self.friendList[:] = ['']
-        if (self.friendListROOT!=None):
+        if (self.friendListROOT != None):
             for i in range(0, self.friendListROOT.GetEntries()):
                 if friendMaskReg.GetPattern().Length() > 0:
                     if friendMaskReg.Match(self.friendListROOT.At(i).GetName()):
@@ -304,8 +314,7 @@ class TTreeHnBrowser:
     sliderArray = TSliderArray()
     drawVarArray = TDrawVarArray()
     fTree = ROOT.TTree()
-    fDataFrame=0
-    fQgrid= 0
+    fDataFrame = 0
+    fQgrid = 0
     fOut = widgets.Output()
     boxAll = widgets.VBox([boxMask, boxSelect, boxDraw, drawVarArray.fDrawVarWidgets, sliderArray.fSliderWidgets, fOut])
-

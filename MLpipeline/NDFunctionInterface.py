@@ -1,6 +1,7 @@
 import numpy as np
 from keras.layers import Dense, Dropout
 from keras.models import Sequential
+from keras import regularizers
 from matplotlib import pyplot as plt
 from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
@@ -45,12 +46,10 @@ class RandomForest:
             return self.model.predict(data)
 
 
-
 class KerasModel:
     """
     Allows a fast usage of fully connected neural networks from Keras with predefined options.
     """
-
 
     def __init__(self, switch, X_train, y_train, **options):
         """
@@ -80,7 +79,6 @@ class KerasModel:
         else:
             layout = options['layout']
 
-
         if not 'loss' in options.keys():
             if switch == 'Classifier':
                 loss = 'binary_crossentropy'
@@ -89,15 +87,37 @@ class KerasModel:
         else:
             loss = options['loss']
 
+        if not 'dropout' in options.keys():
+            dropout = 0.2
+
+        else:
+            dropout = options['dropout']
+
+#        if not 'l2' in options.keys():
+#            l2 = 0
+#        else:
+#            l2 = options['l2']
+        if not 'l1' in options.keys():
+            l1 = 0
+        else:
+            l1 = options['l1']
         model = Sequential()
         for idx, val in enumerate(layout):
             if idx == 0:
-                model.add(Dense(val, input_dim=len(X_train.columns), activation='relu'))
-                model.add(Dropout(0.2))
+                model.add(Dense(val, input_dim=len(X_train.columns), activation='relu', kernel_regularizer=regularizers.l1(l1)))
+                if dropout > 0:
+                    model.add(Dropout(dropout))
+#                if l2 > 0:
+#                    model.add(kernel_regularizer=regularizers.l2(l2))
+#                if l1 > 0:
+#                    model.add(kernel_regularizer=regularizers.l1(l1))
                 continue
             if idx > 0:
-                model.add(Dense(val, activation='relu'))
-                model.add(Dropout(0.2))
+                model.add(Dense(val, activation='relu',kernel_regularizer=regularizers.l1(l1)))
+                if dropout > 0:
+                    model.add(Dropout(dropout))
+#                if l2 > 0:
+#                    model.add(kernel_regularizer=regularizers.l2(l2))
         if switch == 'Classifier':
             model.add(Dense(1, activation='sigmoid'))
             model.compile(loss=loss, optimizer='ADAM', metrics=['accuracy'])
@@ -120,8 +140,6 @@ class KerasModel:
         :return: array of the predicted values.
         """
         return self.model.predict(data)[:, 0]
-
-
 
 
 class KNeighbors:
@@ -158,7 +176,6 @@ class KNeighbors:
             return self.model.predict_proba(data)[:, 1]
         else:
             return self.model.predict(data)
-
 
 
 class DataContainer:
@@ -211,7 +228,6 @@ class DataContainer:
         self.Test_sample = Test_sample
         self.X_values = X
         self.y_values = y
-
 
 
 class Bootstrapper:
@@ -278,7 +294,8 @@ class Bootstrapper:
             print(i)
         mean = np.mean(np.array(predictions), axis=0)
         std = np.std(np.array(predictions), axis=0)
-        return mean, std
+        median = np.median(np.array(predictions), axis=0)
+        return mean, std, median
 
     def predict(self, data):
         """
@@ -319,8 +336,6 @@ class Bootstrapper:
         final_out = final_out.assign(std_BS=final_out[ColumnNameList].std(axis=1, skipna=True))
         final_out = final_out.drop(ColumnNameList, axis=1)
         return final_out
-
-
 
 
 class Fitter:

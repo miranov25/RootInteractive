@@ -8,6 +8,19 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook
 
 
+def SetAlias(data, column_name, formula ):
+    """
+    :param data:            panda data frame
+    :param column_name:     name of column for futher query
+    :param formula:         alias formula
+    :return:                new panda datata frame
+    """
+    newCol = data.eval(formula)
+    out = data.assign(column=newCol)
+    out = out.rename(columns={'column': column_name})
+    return out
+
+
 def drawColz(dataFrame, query, varX, varY, varColor, p=0):
     """
     drawing example - functionality like the tree->Draw colz
@@ -62,16 +75,3 @@ def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
         myfigure.add_layout(color_bar, 'right')
     push_notebook()
 
-
-def testExample():
-    df2 = treeBrowser.sliderArray.queryDataFrame(treeBrowser.fDataFrame)
-    df2 = df2.query("EN")
-    source = ColumnDataSource(df2)
-    # Use the field name of the column source
-    mapper = linear_cmap(field_name='Z', palette=Spectral6, low=min(df2["Z"]), high=max(df2["Z"]))
-    p = figure(plot_width=500, plot_height=500, title="XXX")
-    p.circle(x='E', y='dEdx', line_color=mapper, color=mapper, fill_alpha=1, size=2, source=source)
-    color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
-    p.add_layout(color_bar, 'right')
-    # p.y_axis_type="log"
-    show(p)
