@@ -28,16 +28,32 @@ def splitDistortionFrame(df):
     for iSector in sectors:
         global pandaList
         query = "isIROC&isec==" + str(iSector)
-        dfsec = df.query(query)[['drphiSmoothedQ95']].reset_index(drop=True)
-        dfsec.columns = ["drphiSector" + str(iSector)]
-        pandaList.append(dfsec)
-    pall = pd.concat(pandaList, axis=1)
-    pall.dropna(inplace=True)  # skip non full rows
+        dfSec = df.query(query)[['drphiSmoothedQ95']].reset_index(drop=True)
+        dfSec.columns = ["drphiSector" + str(iSector)]
+        pandaList.append(dfSec)
+    pAll = pd.concat(pandaList, axis=1)
+    pAll.dropna(inplace=True)  # skip non full rows
     meanQuery = "("
-    for iSector in sectors: meanQuery += "drphiSector" + str(iSector) +"+";
+    for iSector in sectors: meanQuery += "drphiSector" + str(iSector) +"+"
     meanQuery=meanQuery[0:-1]
     meanQuery += ")/"+str(len(sectors))
-    pall=SetAlias(pall,"drphiMean",meanQuery)
+    pAll=SetAlias(pAll,"drphiMean",meanQuery)
     for iSector in sectors:
-        pall=SetAlias(pall,"drphiNorm"+ str(iSector), "drphiSector"+ str(iSector)+"/drphiMean")
-    return pall
+        pAll=SetAlias(pAll,"drphiNorm"+ str(iSector), "drphiSector"+ str(iSector)+"/drphiMean")
+    pAll=makeAliases(pAll)
+    return pAll
+
+def makeAliases(df):
+    """
+    add distortion aliases
+    :param df:
+    :return:
+    """
+    # TRD current variables
+    df=SetAlias(df,"meanTRDCurrent","(trdMeanMedianL0+trdMeanMedianL1+trdMeanMedianL2+trdMeanMedianL3+trdMeanMedianL4+trdMeanMedianL5)/6")
+    df=SetAlias(df,"invTRDCurrent","(trdMeanMedianL0-trdMeanMedianL1+trdMeanMedianL2-trdMeanMedianL3+trdMeanMedianL4-trdMeanMedianL5)/6")
+    df=SetAlias(df,"deltaTRDCurrent","(trdMeanMedianL0+trdMeanMedianL1-trdMeanMedianL4-trdMeanMedianL5)/6")
+
+    df=SetAlias(df,"invTRDCurrentNorm","invTRDCurrent / meanTRDCurrent")
+    df=SetAlias(df,"deltaTRDCurrentNorm","deltaTRDCurrent / meanTRDCurrent")
+    return df

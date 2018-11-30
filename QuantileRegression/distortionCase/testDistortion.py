@@ -18,7 +18,7 @@ variableX = [x for x in deltaColumns if (x != 'drphiNorm2') & (x != 'drphiNorm20
 variableX += factorColumns
 
 #
-x = DataContainer(dfSplit, variableX, ['drphiSector2'], [500, 500])
+x = DataContainer(dfSplit, variableX, ['drphiSector2'], [1000, 1000])
 fitter = Fitter(x)  # type: Fitter 
 fitter.Register_Method('KM', 'KerasModel', 'Regressor', layout = [100, 100, 100], loss='mean_absolute_error')
 fitter.Register_Method('KMLog', 'KerasModel', 'Regressor', layout = [100, 100, 100], loss='mean_squared_logarithmic_error')
@@ -30,7 +30,7 @@ print("HALLO WORLD")
 ##
 fitter.Fit()
 fitter.Compress('KM')
-
+#
 
 for method in ['RF', 'KNN', 'RF200', 'KM' , 'KMLog']:
     dfSplit = fitter.AppendOtherPandas(method, dfSplit)
