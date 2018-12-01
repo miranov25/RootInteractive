@@ -45,6 +45,16 @@ class RandomForest:
         else:
             return self.model.predict(data)
 
+    def printImportance(self, varNames):
+        """
+        print sorted importance
+        :param varNames:
+        :return:
+        """
+        importance = self.model.feature_importances_
+        indices = np.argsort(importance)
+        for i in indices:
+            print varNames[i], importance[i]
 
 class KerasModel:
     """
@@ -457,6 +467,11 @@ class Fitter:
         self.options.append(options)
         self.ClassOrReg.append(ClassOrReg)
         self.Models.append(b)
+
+    def printImportance(self):
+        for model in self.Models:
+            if "printImportance" in dir(model):
+                model.printImportance(self.data.X_values)
 
     def PlotRocs(self):
         """
