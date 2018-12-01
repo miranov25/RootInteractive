@@ -7,7 +7,7 @@ from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
-
+from skgarden import RandomForestQuantileRegressor
 
 class RandomForest:
     """
@@ -28,22 +28,36 @@ class RandomForest:
             clf = RandomForestClassifier(**RF_params)
         elif switch == 'Regressor':
             clf = RandomForestRegressor(**RF_params)
+        elif switch == 'RegressorQuantile':
+            clf=RandomForestQuantileRegressor(**RF_params)
         else:
             print('specify Classifier or Regressor (first argument)')
             return
         clf.fit(X_train, y_train)
         self.model = clf
 
-    def predict(self, data):
+    def predict(self, data, **options):
         """
         Returns the output of the RF to the provided data.
         :param data: array of the features to get the prediction for.
         :return: array of the predicted values.
         """
+        if  'quantile' in options.keys():
+            return self.model.predict(data,quantile=options['quantile'])
         if 'Classifier' in str(self.model):
             return self.model.predict_proba(data)[:, 1]
         else:
             return self.model.predict(data)
+
+    def predictStat(self, data):
+        """
+        :param data  - input matrix
+        :return: predict statistic mean, median, rms over trees
+        """
+        allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
+        for i, tree in enumerate(self.model.estimators_):
+            allRF[i] = tree.predict(data)
+        return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
 
     def printImportance(self, varNames):
         """
@@ -55,6 +69,7 @@ class RandomForest:
         indices = np.argsort(importance)
         for i in indices:
             print varNames[i], importance[i]
+
 
 class KerasModel:
     """
@@ -103,10 +118,10 @@ class KerasModel:
         else:
             dropout = options['dropout']
 
-#        if not 'l2' in options.keys():
-#            l2 = 0
-#        else:
-#            l2 = options['l2']
+        #        if not 'l2' in options.keys():
+        #            l2 = 0
+        #        else:
+        #            l2 = options['l2']
         if not 'l1' in options.keys():
             l1 = 0
         else:
@@ -117,17 +132,17 @@ class KerasModel:
                 model.add(Dense(val, input_dim=len(X_train.columns), activation='relu', kernel_regularizer=regularizers.l1(l1)))
                 if dropout > 0:
                     model.add(Dropout(dropout))
-#                if l2 > 0:
-#                    model.add(kernel_regularizer=regularizers.l2(l2))
-#                if l1 > 0:
-#                    model.add(kernel_regularizer=regularizers.l1(l1))
+                #                if l2 > 0:
+                #                    model.add(kernel_regularizer=regularizers.l2(l2))
+                #                if l1 > 0:
+                #                    model.add(kernel_regularizer=regularizers.l1(l1))
                 continue
             if idx > 0:
-                model.add(Dense(val, activation='relu',kernel_regularizer=regularizers.l1(l1)))
+                model.add(Dense(val, activation='relu', kernel_regularizer=regularizers.l1(l1)))
                 if dropout > 0:
                     model.add(Dropout(dropout))
-#                if l2 > 0:
-#                    model.add(kernel_regularizer=regularizers.l2(l2))
+        #                if l2 > 0:
+        #                    model.add(kernel_regularizer=regularizers.l2(l2))
         if switch == 'Classifier':
             model.add(Dense(1, activation='sigmoid'))
             model.compile(loss=loss, optimizer='ADAM', metrics=['accuracy'])
@@ -526,7 +541,7 @@ class Fitter:
 
         return out
 
-    def AppendOtherPandas(self, method_name, data):
+    def AppendOtherPandas(self, method_name, data, ):
         """
         The selected method (chosen via user defined method_name) is added to a data frame provided by the user.
         :param method_name: selected method (chosen via user defined method_name)
@@ -536,7 +551,6 @@ class Fitter:
         """
 
         i = self.method_name.index(method_name)
-
         out = data
         if 'Bootstrapped' not in self.method[i]:
             out = data.assign(method_out=self.Predict(data[self.data.X_values].values, method_name))
@@ -548,6 +562,22 @@ class Fitter:
             out = out.rename(columns={'method_outmu': method_name + '_mu'})
             out = out.rename(columns={'method_outstd': method_name + '_std'})
 
+        return out
+
+    def AppendStatPandas(self, method_name, data, ):
+        """
+        append statisctic colimns from "??? estomators ***" - random forrst or NN with dropout
+        :param method_name:
+        :param data:
+        :return:
+        """
+        i = self.method_name.index(method_name)
+        model = self.Models[i]
+        cols = model.predictStat(data[self.data.X_values].values)
+        out = data
+        out[method_name + 'Mean'] = cols[0]
+        out[method_name + 'Median'] = cols[1]
+        out[method_name + 'RMS'] = cols[2]
         return out
 
     def RemoveMethod(self, method_name):
