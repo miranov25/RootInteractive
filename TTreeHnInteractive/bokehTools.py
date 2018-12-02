@@ -6,9 +6,10 @@ from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook
+import copy
 
 
-def SetAlias(data, column_name, formula ):
+def SetAlias(data, column_name, formula):
     """
     :param data:            panda data frame
     :param column_name:     name of column for futher query
@@ -43,6 +44,56 @@ def drawColz(dataFrame, query, varX, varY, varColor, p=0):
     return fig
 
 
+def drawColzArray(dataFrame, query, varX, varY, varColor, p=None, **options):
+    """
+    drawing example - functionality like the tree->Draw colz
+
+    :param dataFrame:   data frame
+    :param query:
+    :param varX:        x query
+    :param varY:        y query array of queries
+    :param varColor:    z query
+    :param p:           figure template TODO - check if some easier way to pass parameters -CSS string ?
+    :return:
+    TODO  use other options if specified: size file and line color - p.circle(x, factors, size=15, fill_color="orange", line_color="green", line_width=3)
+    """
+    dfQuery = dataFrame.query(query)
+    source = ColumnDataSource(dfQuery)
+    mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
+    #
+    varYArray = varY.split(":")
+    plotArray = []
+    pFirst = None
+    for y in varYArray:
+        if p:
+            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor)
+        else:
+            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor)
+        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, size=2, source=source)
+        if pFirst:
+            if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
+            if 'commonY' in options.keys(): p2.y_range = pFirst.y_range
+        else:
+            pFirst = p2
+        plotArray.append(p2)
+        color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
+        p2.add_layout(color_bar, 'right')
+    ncols = 1
+    if 'ncols' in options.keys():
+        ncols = options['ncols']
+    nRows=len(plotArray)/ncols+1
+    plotArray2D = []
+    for i, plot in enumerate(plotArray):
+        pRow = i / ncols
+        pCol = i % ncols
+        if pCol==0 : plotArray2D.append([])
+        plotArray2D[pRow].append(plot)
+    pAll = gridplot(plotArray2D)
+#    print(plotArray2D)
+    show(pAll)
+    return pAll
+
+
 def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
     """
     draw interactive colz figure in notebook
@@ -74,4 +125,3 @@ def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
         color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0), name=barName)
         myfigure.add_layout(color_bar, 'right')
     push_notebook()
-
