@@ -1,27 +1,27 @@
-from bokeh.palettes import *
+#from bokeh.palettes import *
 import re
 from bokeh.models import *
 from bokehTools import *
 from ipywidgets import *
-from functools import partial
+#from functools import partial
 from IPython.display import display
 
 
 class bokehDrawPanda(object):
 
     def __init__(self, source, query, varX, varY, varColor, sliderString, p, **options):
-        '''
-        :param source:           input dataframe
+        """
+        :param source:           input data frame
         :param query:            query string
         :param varX:             X variable name
-        :param varY:             : separated list of the Y varaibles
+        :param varY:             : separated list of the Y variables
         :param varColor:         color map variable name
         :param sliderString:     :  separated sting - list of sliders var(min,max,step, minValue,maxValue)
         :param p:                template figure
         :param options:          optional drawing parameters
                                  - ncols - number fo columns in drawing
                                  - commonX=?,commonY=? - switch share axis
-        '''
+        """
         self.query = query
         self.dataSource = source.query(query)
         self.sliderWidgets = 0
@@ -60,15 +60,3 @@ class bokehDrawPanda(object):
         self.bokehSource.data = newSource.data
         print(sliderQuery)
         push_notebook(self.handle)
-
-    # query = 0  # init query
-    # dataSource = 0  # original data source
-    # bokehSource = 0  # source used for bokeh
-    # sliderWidgets = 0  # slider widgets to interact with figures
-    # sliderArray=[]
-    # handle = 0  # handle to interact with the jupyter
-    # figure = 0  # master figure
-    # varX = 0  # x axis variable name
-    # varY = 0  # y axis variable names
-    # varColor = 0  # color variable name
-    # options = 0  # drawing options

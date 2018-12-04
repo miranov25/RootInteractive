@@ -44,10 +44,11 @@ def drawColz(dataFrame, query, varX, varY, varColor, p=0):
     return fig
 
 
-def drawColzArray(dataFrame, query, varX, varY, varColor, p=None, **options):
+def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     """
     drawing example - functionality like the tree->Draw colz
 
+    :param options1:
     :param dataFrame:   data frame
     :param query:
     :param varX:        x query
@@ -81,7 +82,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p=None, **options):
     ncols = 1
     if 'ncols' in options.keys():
         ncols = options['ncols']
-    nRows=len(plotArray)/ncols+1
+    #nRows=len(plotArray)/ncols+1
     plotArray2D = []
     for i, plot in enumerate(plotArray):
         pRow = i / ncols
@@ -90,8 +91,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p=None, **options):
         plotArray2D[pRow].append(plot)
     pAll = gridplot(plotArray2D)
 #    print(plotArray2D)
-    show(pAll)
-    return pAll
+    handle=show(pAll, notebook_handle=True) #### TODO make it OPTIONAL
+    return pAll, handle, source
 
 
 def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
