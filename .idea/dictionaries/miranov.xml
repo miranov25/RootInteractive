@@ -1,9 +1,11 @@
 <component name="ProjectDictionaryState">
   <dictionary name="miranov">
     <words>
+      <w>bokeh</w>
       <w>csvroot</w>
       <w>ipywidget</w>
       <w>jupyter</w>
+      <w>ncols</w>
       <w>qgrid</w>
     </words>
   </dictionary>
