@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool
 # from bokeh.palettes import *
 from bokeh.transform import *
 from bokehTools import *
@@ -55,6 +55,12 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     :param varY:        y query array of queries
     :param varColor:    z query
     :param p:           figure template TODO - check if some easier way to pass parameters -CSS string ?
+    :param options      optional drawing parameteters
+      option - ncols - number fo columns in drawing
+      option - commonX=?,commonY=? - switch share axis
+      option - size
+      option tooltip - tootip to show
+
     :return:
     TODO  use other options if specified: size file and line color - p.circle(x, factors, size=15, fill_color="orange", line_color="green", line_width=3)
     """
@@ -65,12 +71,17 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     varYArray = varY.split(":")
     plotArray = []
     pFirst = None
+    size=2
+    if 'size' in options.keys(): size=options['size']
+    tools='pan,wheel_zoom,box_select,lasso_select'
+    if 'tooltip' in options.keys(): tools=[HoverTool(tooltips=options['tooltip']), tools]
+
     for y in varYArray:
         if p:
-            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor)
+            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor,tools=tools)
         else:
-            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor)
-        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, size=2, source=source)
+            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor,tools=tools)
+        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size )
         if pFirst:
             if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
             if 'commonY' in options.keys(): p2.y_range = pFirst.y_range

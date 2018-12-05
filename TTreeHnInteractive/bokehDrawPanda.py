@@ -21,6 +21,7 @@ class bokehDrawPanda(object):
         :param options:          optional drawing parameters
                                  - ncols - number fo columns in drawing
                                  - commonX=?,commonY=? - switch share axis
+                                 - size
         """
         self.query = query
         self.dataSource = source.query(query)
