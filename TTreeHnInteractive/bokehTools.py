@@ -73,7 +73,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     pFirst = None
     size=2
     if 'size' in options.keys(): size=options['size']
-    tools='pan,wheel_zoom,box_select,lasso_select'
+    tools='pan,wheel_zoom,box_select,lasso_select,reset'
     if 'tooltip' in options.keys(): tools=[HoverTool(tooltips=options['tooltip']), tools]
 
     for y in varYArray:

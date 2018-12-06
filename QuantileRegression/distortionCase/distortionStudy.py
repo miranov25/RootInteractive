@@ -55,5 +55,5 @@ def makeAliases(df):
     df=SetAlias(df,"deltaTRDCurrent","(trdMeanMedianL0+trdMeanMedianL1-trdMeanMedianL4-trdMeanMedianL5)/6")
 
     df=SetAlias(df,"invTRDCurrentNorm","invTRDCurrent / meanTRDCurrent")
-    df=SetAlias(df,"deltaTRDCurrentNorm","deltaTRDCurrent / meanTRDCurrent")
+    df=SetAlias(df,"deltaTRDCurrentNorm","100*deltaTRDCurrent / meanTRDCurrent")
     return df
