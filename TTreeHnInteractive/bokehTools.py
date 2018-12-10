@@ -73,14 +73,15 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     pFirst = None
     size=2
     if 'size' in options.keys(): size=options['size']
-    tools='pan,wheel_zoom,box_select,lasso_select,reset'
+    tools='pan,box_zoom, wheel_zoom,box_select,lasso_select,reset'
     if 'tooltip' in options.keys(): tools=[HoverTool(tooltips=options['tooltip']), tools]
-
+    if 'x_axis_type' in options.keys():  x_axis_type='datetime'
+    else:  x_axis_type='auto'
     for y in varYArray:
         if p:
-            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor,tools=tools)
+            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor,tools=tools, x_axis_type=x_axis_type)
         else:
-            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor,tools=tools)
+            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor,tools=tools, x_axis_type=x_axis_type)
         p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size )
         if pFirst:
             if 'commonX' in options.keys(): p2.x_range = pFirst.x_range

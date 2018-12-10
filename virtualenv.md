@@ -36,13 +36,11 @@ https://alice.its.cern.ch/jira/browse/PWGPP-485
 
 ```
 pip install jupyter jupyterlab
-
 ```
-
 ````
+pip install tensorflow keras
 pip install sklearn
 pip install scikit-garden
-
 pip install beakerx pandas ipywidgets
 pip install plot runtime
 pip install plotly
@@ -58,6 +56,9 @@ pip install ipympl
  jupyter labextension list
 
 * first - node js had to be installed
+  * installin  using nvm  - in case of not root access
+    * https://www.digitalocean.com/community/tutorials/how-to-install-node-js-on-ubuntu-18-04
+  * standart apt installation
 ```
 # Using Ubuntu
 curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
