@@ -48,6 +48,7 @@ pip install request
 pip install bqplot
 pip install qgrid
 pip install ipympl
+pip install bokeh
 ````
 
 

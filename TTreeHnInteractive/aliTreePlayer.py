@@ -5,7 +5,7 @@ import numpy as np
 def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='default'):
     """
     convert selected items from the tree into panda table
-    TODO - import fail (infinite loop) - to check the reason
+    TODO - import fail in case of number of entries>2x10^6  (infinite loop) - to check the reason
     :param tree:            input tree
     :param variables:
     :param selection:
