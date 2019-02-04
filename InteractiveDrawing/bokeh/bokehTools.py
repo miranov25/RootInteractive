@@ -9,19 +9,6 @@ from bokeh.io import push_notebook
 import copy
 
 
-def SetAlias(data, column_name, formula):
-    """
-    :param data:            panda data frame
-    :param column_name:     name of column for futher query
-    :param formula:         alias formula
-    :return:                new panda data frame
-    """
-    newCol = data.eval(formula)
-    out = data.assign(column=newCol)
-    out = out.rename(columns={'column': column_name})
-    return out
-
-
 def drawColz(dataFrame, query, varX, varY, varColor, p=0):
     """
     drawing example - functionality like the tree->Draw colz

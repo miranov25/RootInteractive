@@ -1,6 +1,19 @@
 import pandas as pd
 import numpy as np
 
+def SetAlias(data, column_name, formula):
+    """
+    :param data:            panda data frame
+    :param column_name:     name of column for futher query
+    :param formula:         alias formula
+    :return:                new panda data frame
+    """
+    newCol = data.eval(formula)
+    out = data.assign(column=newCol)
+    out = out.rename(columns={'column': column_name})
+    return out
+
+
 
 def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='default'):
     """
