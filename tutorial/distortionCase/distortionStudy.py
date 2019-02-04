@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import List, Any, Union
-from TTreeHnInteractive.bokehTools import *
+from Tools.aliTreePlayer import *
 
 
 def readDataFrame2(fName):

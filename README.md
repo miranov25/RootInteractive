@@ -1,6 +1,7 @@
 # RootInteractive
+See issue tracker in JIRA:
+* Jupyter notebooks for interactive n-dimensional analysis. Ipywidgets + bokeh. RootInteractive
+https://alice.its.cern.ch/jira/browse/PWGPP-485
+...
 
-Using as a starting point project from https://github.com/binder-examples/conda
 
-## Test binder example
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/miranov25/RootInteractive/master)
