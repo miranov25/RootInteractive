@@ -14,7 +14,7 @@ def SetAlias(data, column_name, formula):
     :param data:            panda data frame
     :param column_name:     name of column for futher query
     :param formula:         alias formula
-    :return:                new panda datata frame
+    :return:                new panda data frame
     """
     newCol = data.eval(formula)
     out = data.assign(column=newCol)
@@ -53,13 +53,16 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     :param query:
     :param varX:        x query
     :param varY:        y query array of queries
+    :param varYerr:     errors on y query array of queries
     :param varColor:    z query
     :param p:           figure template TODO - check if some easier way to pass parameters -CSS string ?
-    :param options      optional drawing parameteters
+    :param options      optional drawing parameters
       option - ncols - number fo columns in drawing
       option - commonX=?,commonY=? - switch share axis
       option - size
-      option tooltip - tootip to show
+      option errX  - query for errors on X
+      option errY  - array of queries for errors on Y
+      option tooltip - tooltip to show
 
     :return:
     TODO  use other options if specified: size file and line color - p.circle(x, factors, size=15, fill_color="orange", line_color="green", line_width=3)
@@ -71,18 +74,39 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     varYArray = varY.split(":")
     plotArray = []
     pFirst = None
-    size=2
-    if 'size' in options.keys(): size=options['size']
-    tools='pan,box_zoom, wheel_zoom,box_select,lasso_select,reset'
-    if 'tooltip' in options.keys(): tools=[HoverTool(tooltips=options['tooltip']), tools]
-    if 'x_axis_type' in options.keys():  x_axis_type='datetime'
-    else:  x_axis_type='auto'
-    for y in varYArray:
+    size = 2
+    if 'size' in options.keys(): size = options['size']
+    tools = 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset'
+    if 'tooltip' in options.keys(): tools = [HoverTool(tooltips=options['tooltip']), tools]
+    if 'x_axis_type' in options.keys():
+        x_axis_type = 'datetime'
+    else:
+        x_axis_type = 'auto'
+    if 'errX' in options.keys(): varXerr = options['errX']
+    if 'errY' in options.keys():
+        varYerrArray = options['errY'].split(":")
+    else:
+        varYerrArray = varYArray
+    for y, yerr in zip(varYArray, varYerrArray):
         if p:
-            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor,tools=tools, x_axis_type=x_axis_type)
+            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type)
         else:
-            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor,tools=tools, x_axis_type=x_axis_type)
-        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size )
+            p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type)
+        if 'varXerr' in locals():
+            err_x_x = []
+            err_x_y = []
+            for coord_x, coord_y, x_err in zip(source.data[varX], source.data[y], source.data[varXerr]):
+                err_x_y.append((coord_y, coord_y))
+                err_x_x.append((coord_x - x_err, coord_x + x_err))
+            p2.multi_line(err_x_x, err_x_y)
+        if 'errY' in options.keys():
+            err_y_x = []
+            err_y_y = []
+            for coord_x, coord_y, y_err in zip(source.data[varX], source.data[y], source.data[yerr]):
+                err_y_x.append((coord_x, coord_x))
+                err_y_y.append((coord_y - y_err, coord_y + y_err))
+            p2.multi_line(err_y_x, err_y_y)
+        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size)
         if pFirst:
             if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
             if 'commonY' in options.keys(): p2.y_range = pFirst.y_range
@@ -94,16 +118,16 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     ncols = 1
     if 'ncols' in options.keys():
         ncols = options['ncols']
-    #nRows=len(plotArray)/ncols+1
+    # nRows=len(plotArray)/ncols+1
     plotArray2D = []
     for i, plot in enumerate(plotArray):
         pRow = i / ncols
         pCol = i % ncols
-        if pCol==0 : plotArray2D.append([])
+        if pCol == 0: plotArray2D.append([])
         plotArray2D[pRow].append(plot)
     pAll = gridplot(plotArray2D)
-#    print(plotArray2D)
-    handle=show(pAll, notebook_handle=True) #### TODO make it OPTIONAL
+    #    print(plotArray2D)
+    handle = show(pAll, notebook_handle=True)  # TODO make it OPTIONAL
     return pAll, handle, source
 
 
