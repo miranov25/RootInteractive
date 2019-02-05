@@ -63,7 +63,7 @@ class bokehDrawPanda(object):
     def updateInteractive(self, b):
         sliderQuery = ""
         for slider in self.sliderArray:
-            sliderQuery += str(str(slider.description) + ">" + str(slider.value[0]) + "&" + str(slider.description) + "<" + str(slider.value[1]) + "&")
+            sliderQuery += str(str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(slider.value[1]) + "&")
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
@@ -148,7 +148,7 @@ class bokehDrawTree(object):
     def updateInteractive(self, b):
         sliderQuery = ""
         for slider in self.sliderArray:
-            sliderQuery += str(str(slider.description) + ">" + str(slider.value[0]) + "&" + str(slider.description) + "<" + str(slider.value[1]) + "&")
+            sliderQuery += str(str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(slider.value[1]) + "&")
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
