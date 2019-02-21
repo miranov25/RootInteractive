@@ -30,16 +30,20 @@ class bokehDraw(object):
                                  - errX=?  - query for errors on X-axis 
                                  - errY=?  - array of queries for errors on Y
                                  Tree options:
-                                 - variables    - List of variables which will extract from ROOT File 
-                                 - nEntries     - number of entries which will extract from ROOT File
-                                 - firstEntry   - Starting entry number 
-                                 - mask         - mask for variable names
+                                 - variables     - List of variables which will extract from ROOT File 
+                                 - nEntries      - number of entries which will extract from ROOT File
+                                 - firstEntry    - Starting entry number 
+                                 - mask          - mask for variable names
+                                 - verbosity     - first bit: verbosity for querry for every update
+                                                 - second bit: verbosity for source file.
         """
         if isinstance(source, pd.DataFrame):
-            print('Panda Dataframe is parsing...')
+            if (self.verbosity>>1)&1:
+                print('Panda Dataframe is parsing...')
             df=source
         else:
-            print('source is not a Panda Dataframe, assuming it is ROOT::TTree')
+            if (self.verbosity>>1)&1:
+                print('source is not a Panda Dataframe, assuming it is ROOT::TTree')
             if 'variables' in options.keys():  vari=options['variables']
             else:   vari=str(re.sub(r'\([^)]*\)', '', widgetString)+":"+varColor+":"+varX+":"+varY)                
             if 'nEntries' in options.keys():  nEntries=options['nEntries']
@@ -48,6 +52,8 @@ class bokehDraw(object):
             else:   firstEntry=0
             if 'mask' in options.keys():  columnMask=options['mask']
             else:  columnMask='default'
+            if 'verbosity' in options.keys():  self.verbosity=options['verbosity']
+            else:  self.verbosity=0
             df=self.tree2Panda(source, vari, query, nEntries, firstEntry, columnMask)
         
         self.query = query
@@ -62,7 +68,6 @@ class bokehDraw(object):
         self.options = options
         self.initWidgets(widgetString)
         self.figure, self.handle, self.bokehSource = drawColzArray(df, query, varX, varY, varColor, p, **options)
-        print(self.accordArray)
         display(self.Widgets)
         
     def initWidgets(self, widgetString):
@@ -125,7 +130,6 @@ class bokehDraw(object):
         allWidgets = []
         for wdgt in [item[1:] for item in self.accordArray] + [item[1:] for item in self.tabArray]: allWidgets += wdgt
         allWidgets += self.widgetArray 
-        print(allWidgets)
         for widget in allWidgets:
             if isinstance(widget, widgets.FloatRangeSlider):
                 sliderQuery += str(str(widget.description) + ">=" + str(widget.value[0]) + "&" + str(widget.description) + "<=" + str(widget.value[1]) + "&")
@@ -134,6 +138,8 @@ class bokehDraw(object):
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
+        if(self.verbosity&1):
+            print(sliderQuery)
         push_notebook(self.handle)
 
     def tree2Panda(self, tree, variables, selection, nEntries, firstEntry, columnMask):
