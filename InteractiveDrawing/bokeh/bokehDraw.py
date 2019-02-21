@@ -37,6 +37,8 @@ class bokehDraw(object):
                                  - verbosity     - first bit: verbosity for querry for every update
                                                  - second bit: verbosity for source file.
         """
+        #if 'verbosity' in options.keys():  verbose=options['verbosity']
+        #else:  self.verbosity=0
         if isinstance(source, pd.DataFrame):
             if (self.verbosity>>1)&1:
                 print('Panda Dataframe is parsing...')
@@ -52,8 +54,8 @@ class bokehDraw(object):
             else:   firstEntry=0
             if 'mask' in options.keys():  columnMask=options['mask']
             else:  columnMask='default'
-            if 'verbosity' in options.keys():  self.verbosity=options['verbosity']
-            else:  self.verbosity=0
+            
+            
             df=self.tree2Panda(source, vari, query, nEntries, firstEntry, columnMask)
         
         self.query = query
@@ -179,7 +181,6 @@ class bokehDraw(object):
         widgetList0 = parens.parseString(toParse)[0]
         for title,wdgt in izip(*[iter(widgetList0)]*2):
             name = title.split('.')
-            print(name)
             if name[0] == 'accordion':
                 if self.findInList(name[1],self.accordArray) == -1:
                     self.accordArray.append([name[1]])
@@ -192,3 +193,5 @@ class bokehDraw(object):
                     self.fillArray([name,widget], self.tabArray[self.findInList(name[1],self.tabArray)]) 
             else:
                 self.fillArray([title,wdgt],self.widgetArray)
+                
+    verbosity=0
