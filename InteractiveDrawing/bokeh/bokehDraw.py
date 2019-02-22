@@ -20,7 +20,28 @@ class bokehDraw(object):
         :param varXerr:          variable name of the errors on X 
         :param varYerr:          : separated list of the errors on Y variables
         :param varColor:         color map variable name
-        :param widgetString:     :  separated sting - list of sliders var(min,max,step, minValue,maxValue)     /// TODO - add detailed description
+        :param widgetString:     :  separated string - list of wigets seperated by ','
+                                 widget options: dropdown, checkbox, slider
+                                     slider:
+                                         Requires 4 or 5 numbers as parameters
+                                         for single valued sliders: slider.name(min,max,step,initial value)
+                                             Ex: slider.commonF(0,15,5,0)
+                                         for Ranged sliders:   slider.name(min,max,step,initial start value, initial end value)
+                                             Ex: slider.commonF(0,15,5,0,10)
+                                     checkbox:
+                                         Requires 1 or none parameters. Allowed parameters are: 0,1,True,False
+                                         checkbox.name(initial value default=False)
+                                             Ex: checkbox.isMax(True)
+                                     dropdown menu:
+                                         Requires 1 or more parameters.
+                                         dropdown.name(option1,option2,....)
+                                             Ex: dropdown.MB(0,0.5,1)
+                                             
+                                 to group widget you can use accordion or tab:
+                                     Ex: 
+                                         accordion.group1(widget1,widget2...), accordion.group2(widget1,widget2...)
+                                         tab.group1(widget1,widget2...), tab.group2(widget1,widget2...)
+                                         
         :param p:                template figure
         :param options:          optional drawing parameters
                                  - ncols - number fo columns in drawing
@@ -74,6 +95,7 @@ class bokehDraw(object):
         self.options = options
         self.initWidgets(widgetString)
         self.figure, self.handle, self.bokehSource = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.updateInteractive("")
         display(self.Widgets)
 
     def initWidgets(self, widgetString):
@@ -109,20 +131,41 @@ class bokehDraw(object):
         self.Widgets = widgets.VBox(self.all, layout=Layout(width='66%'))
 
     def fillArray(self, widget, array):
+        """
+        Gets create the specified widget and append it into the given widget array.
+        :param widget:          is a list with 2 entry: 1.entry is a string: "type.name"
+                                                        2.entry is a list of parameters
+        :param array:           is the list of widgets to be added
+        """
         title = widget[0].split('.')
         localWidget = 0
         if title[0] == "checkbox":
-            localWidget = widgets.Checkbox(description=title[1], layout=Layout(width='66%'), value=False, disabled=False)
+            if len(widget[1])==0:
+                value=False
+            else:
+                if widget[1][0] in ['True', 'true', '1' ]:
+                    value = True
+                elif widget[1][0] in ['False', 'false', '0']:
+                    value = False
+                else:
+                    raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". The parameter for the checkbox {} was:{}".format(title[1],widget[1][0]))
+            localWidget = widgets.Checkbox(description=title[1], layout=Layout(width='66%'), value=value, disabled=False)
         elif title[0] == "dropdown":
             values = list(widget[1])
+            if len(values)==0:
+                raise ValueError("dropdown menu requires at least 1 option. The dropdown menu {} has no options", format(title[1])
             localWidget = widgets.Dropdown(description=title[1], options=values, layout=Layout(width='66%'), values=values[0])
         elif title[0] == "slider":
             if len(widget[1]) == 4:
-                localWidget = widgets.FloatSlider(description=title[1], layout=Layout(width='66%'), min=float(widget[1][0]), max=float(widget[1][1]), step=float(widget[1][2]),
-                                                  value=float(widget[1][3]))
-            if len(widget[1]) == 5:
-                localWidget = widgets.FloatRangeSlider(description=title[1], layout=Layout(width='66%'), min=float(widget[1][0]), max=float(widget[1][1]), step=float(widget[1][2]),
-                                                       value=[float(widget[1][3]), float(widget[1][4])])
+                localWidget = widgets.FloatSlider(description=title[1], layout=Layout(width='66%'), min=float(widget[1][0]), max=float(widget[1][1]), step=float(widget[1][2]), value=float(widget[1][3]))
+            elif len(widget[1]) == 5:
+                localWidget = widgets.FloatRangeSlider(description=title[1], layout=Layout(width='66%'), min=float(widget[1][0]), max=float(widget[1][1]), step=float(widget[1][2]), value=[float(widget[1][3]), float(widget[1][4])])
+            else:
+                raise SyntaxError("The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. Slider {} has {} parameters.".format(title[1],len(widget[1])))
+        else:
+            if (self.verbosity >> 1) & 1:
+                print("type of the widget\""+title[0]+"\" is not specified. Assuming it is a slider.")
+            self.fillArray(["slider."+title[0],widget[1]],array)  #For backward compatibility, it can parse sliders defined as: name(min,max,step,value)
         if localWidget != 0:
             localWidget.observe(self.updateInteractive, names='value')
             array.append(localWidget)
