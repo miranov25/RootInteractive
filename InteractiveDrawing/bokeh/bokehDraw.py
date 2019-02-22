@@ -3,6 +3,8 @@ import re
 from itertools import izip
 import pyparsing
 from bokeh.models import *
+from bokeh.models import ColumnDataSource
+
 from bokehTools import *
 from ipywidgets import *
 from Tools.aliTreePlayer import *
@@ -20,7 +22,7 @@ class bokehDraw(object):
         :param varXerr:          variable name of the errors on X 
         :param varYerr:          : separated list of the errors on Y variables
         :param varColor:         color map variable name
-        :param widgetString:     :  separated string - list of wigets seperated by ','
+        :param widgetString:     :  separated string - list of widgets seperated by ','
                                  widget options: dropdown, checkbox, slider
                                      slider:
                                          Requires 4 or 5 numbers as parameters
@@ -59,7 +61,7 @@ class bokehDraw(object):
         """
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
-                print('Panda Dataframe is parsing...')
+                print("Panda Dataframe is parsing...")
             df = source
         else:
             if (self.verbosity >> 1) & 1:
@@ -81,7 +83,7 @@ class bokehDraw(object):
             else:
                 columnMask = 'default'
 
-            df = self.tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
+            df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
 
         self.query = query
         self.dataSource = df.query(query)
@@ -89,6 +91,10 @@ class bokehDraw(object):
         self.accordArray = []
         self.tabArray = []
         self.widgetArray = []
+        self.all = []
+        self.accordion = widgets.Accordion()
+        self.tab = widgets.Tab()
+        self.Widgets = widgets.VBox()
         self.varX = varX
         self.varY = varY
         self.varColor = varColor
@@ -99,6 +105,7 @@ class bokehDraw(object):
         display(self.Widgets)
 
     def initWidgets(self, widgetString):
+        # type: (str) -> None
         """
         parse widgetString string and create widgets
         :param widgetString:   example string - slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
@@ -137,6 +144,7 @@ class bokehDraw(object):
                                                         2.entry is a list of parameters
         :param array:           is the list of widgets to be added
         """
+        global title
         title = widget[0].split('.')
         localWidget = 0
         if title[0] == "checkbox":
@@ -153,7 +161,7 @@ class bokehDraw(object):
         elif title[0] == "dropdown":
             values = list(widget[1])
             if len(values)==0:
-                raise ValueError("dropdown menu requires at least 1 option. The dropdown menu {} has no options", format(title[1])
+                raise ValueError("dropdown menu requires at least 1 option. The dropdown menu {} has no options", format(title[1]))
             localWidget = widgets.Dropdown(description=title[1], options=values, layout=Layout(width='66%'), values=values[0])
         elif title[0] == "slider":
             if len(widget[1]) == 4:
@@ -187,56 +195,56 @@ class bokehDraw(object):
             print(sliderQuery)
         push_notebook(self.handle)
 
-    @staticmethod
-    def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
-        entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
-        columns = variables.split(":")
-        # replace column names
-        #    1.) pandas does not allow dots in names
-        #    2.) user can specified own mask
-        for i, column in enumerate(columns):
-            if columnMask == 'default':
-                column = column.replace(".fElements", "").replace(".fX$", "X").replace(".fY$", "Y")
-            else:
-                masks = columnMask.split(":")
-                for mask in masks:
-                    column = column.replace(mask, "")
-            columns[i] = column.replace(".", "_")
-        #    print(i, column)
-        # print(columns)
-        ex_dict = {}
-        for i, a in enumerate(columns):
-            # print(i,a)
-            val = tree.GetVal(i)
-            ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
-        df = pd.DataFrame(ex_dict, columns=columns)
-        return df
-
-    @staticmethod
-    def findInList(c, classes):
-        for i, sublist in enumerate(classes):
-            if c in sublist:
-                return i
-        return -1
-
     def parseWidgetString(self, widgetString):
         toParse = "(" + widgetString + ")"
         theContent = pyparsing.Word(pyparsing.alphanums + ".+-") | '#' | pyparsing.Suppress(',') | ':'
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
         widgetList0 = widgetParser.parseString(toParse)[0]
-        for title, wdgt in izip(*[iter(widgetList0)] * 2):
+        for title,widget in izip(*[iter(widgetList0)] * 2):
             name = title.split('.')
             if name[0] == 'accordion':
-                if self.findInList(name[1], self.accordArray) == -1:
+                if findInList(name[1], self.accordArray) == -1:
                     self.accordArray.append([name[1]])
-                for name, widget in izip(*[iter(wdgt)] * 2):
-                    self.fillArray([name, widget], self.accordArray[self.findInList(name[1], self.accordArray)])
+                for name, param in izip(*[iter(widget)] * 2):
+                    self.fillArray([name, param], self.accordArray[findInList(name[1], self.accordArray)])
             elif name[0] == 'tab':
-                if self.findInList(name[1], self.tabArray) == -1:
+                if findInList(name[1], self.tabArray) == -1:
                     self.tabArray.append([name[1]])
-                for name, widget in izip(*[iter(wdgt)] * 2):
-                    self.fillArray([name, widget], self.tabArray[self.findInList(name[1], self.tabArray)])
+                for name, param in izip(*[iter(widget)] * 2):
+                    self.fillArray([name, param], self.tabArray[findInList(name[1], self.tabArray)])
             else:
-                self.fillArray([title, wdgt], self.widgetArray)
+                self.fillArray([title, widget], self.widgetArray)
 
     verbosity = 0
+
+
+def findInList(c, classes):
+    for i, sublist in enumerate(classes):
+        if c in sublist:
+            return i
+    return -1
+
+
+def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
+    entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
+    columns = variables.split(":")
+    # replace column names
+    #    1.) pandas does not allow dots in names
+    #    2.) user can specified own mask
+    for i, column in enumerate(columns):
+        if columnMask == 'default':
+            column = column.replace(".fElements", "").replace(".fX$", "X").replace(".fY$", "Y")
+        else:
+            masks = columnMask.split(":")
+            for mask in masks:
+                column = column.replace(mask, "")
+        columns[i] = column.replace(".", "_")
+    #    print(i, column)
+    # print(columns)
+    ex_dict = {}
+    for i, a in enumerate(columns):
+        # print(i,a)
+        val = tree.GetVal(i)
+        ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+    df = pd.DataFrame(ex_dict, columns=columns)
+    return df
