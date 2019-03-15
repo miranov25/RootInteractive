@@ -57,14 +57,18 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     dfQuery = dataFrame.query(query)
     source = ColumnDataSource(dfQuery)
     mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
-    #
+    
     varYArray = varY.split(":")
     plotArray = []
     pFirst = None
     size = 2
+    if 'line' in options.keys(): line = options['line']
+    else: line=0
     if 'size' in options.keys(): size = options['size']
     tools = 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset'
     if 'tooltip' in options.keys(): tools = [HoverTool(tooltips=options['tooltip']), tools]
+    if 'y_axis_type' in options.keys(): y_axis_type=options['y_axis_type']
+    else: y_axis_type='auto'
     if 'x_axis_type' in options.keys():
         x_axis_type = 'datetime'
     else:
@@ -76,7 +80,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
         varYerrArray = varYArray
     for y, yerr in zip(varYArray, varYerrArray):
         if p:
-            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type)
+            p2 = figure(plot_width=p.plot_width, plot_height=p.plot_height, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type, y_axis_type=y_axis_type)
         else:
             p2 = figure(plot_width=500, plot_height=500, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type)
         if 'varXerr' in locals():
@@ -94,6 +98,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
                 err_y_y.append((coord_y - y_err, coord_y + y_err))
             p2.multi_line(err_y_x, err_y_y)
         p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size)
+        if line ==1: p2.line(x=varX, y=y, source=source)
         if pFirst:
             if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
             if 'commonY' in options.keys(): p2.y_range = pFirst.y_range
@@ -116,6 +121,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     #    print(plotArray2D)
     handle = show(pAll, notebook_handle=True)  # TODO make it OPTIONAL
     return pAll, handle, source
+
 
 
 def drawColzNotebook(myfigure, dataFrame, query, varX, varY, varColor):
