@@ -19,8 +19,6 @@ class bokehDraw(object):
         :param query:            query string
         :param varX:             X variable name
         :param varY:             : separated list of the Y variables
-        :param varXerr:          variable name of the errors on X 
-        :param varYerr:          : separated list of the errors on Y variables
         :param varColor:         color map variable name
         :param widgetString:     :  separated string - list of widgets separated by ','
                                  widget options: dropdown, checkbox, slider
@@ -87,6 +85,7 @@ class bokehDraw(object):
 
         self.query = query
         self.dataSource = df.query(query)
+        self.dataSource.sort_values(varX,inplace=True)
         self.sliderWidgets = 0
         self.accordArray = []
         self.tabArray = []
@@ -200,6 +199,9 @@ class bokehDraw(object):
                 sliderQuery += str(
                     "{0}>={1}&{2}<={3}&".format(str(iWidget.description), str(iWidget.value[0]),
                                                 str(iWidget.description), str(iWidget.value[1])))
+            elif isinstance(iWidget, widgets.FloatSlider):
+                sliderQuery += str(
+                    "{0}>={1}-{2}&{3}<={4}+{5}&".format(str(iWidget.description), str(iWidget.value), str(iWidget.step), str(iWidget.description), str(iWidget.value), str(iWidget.step)))
             else:
                 sliderQuery += str(str(iWidget.description) + "==" + str(iWidget.value) + "&")
         sliderQuery = sliderQuery[:-1]
@@ -211,7 +213,7 @@ class bokehDraw(object):
 
     def parseWidgetString(self, widgetString):
         toParse = "(" + widgetString + ")"
-        theContent = pyparsing.Word(pyparsing.alphanums + ".+-") | '#' | pyparsing.Suppress(',') | ':'
+        theContent = pyparsing.Word(pyparsing.alphanums + ".+-") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
         widgetList0 = widgetParser.parseString(toParse)[0]
         for widgetTitle, iWidget in izip(*[iter(widgetList0)] * 2):
