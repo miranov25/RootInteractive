@@ -213,7 +213,7 @@ class bokehDraw(object):
 
     def parseWidgetString(self, widgetString):
         toParse = "(" + widgetString + ")"
-        theContent = pyparsing.Word(pyparsing.alphanums + ".+-") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
+        theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
         widgetList0 = widgetParser.parseString(toParse)[0]
         for widgetTitle, iWidget in izip(*[iter(widgetList0)] * 2):
