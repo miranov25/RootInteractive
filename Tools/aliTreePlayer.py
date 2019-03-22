@@ -4,7 +4,10 @@ import urllib2 as urllib2
 
 
 def readDataFrameURL(fName, nrows=0):
-    line = urllib2.urlopen(fName).readline().rstrip()  # get header - using root cvs convention
+    if 'http' in fName:
+        line = urllib2.urlopen(fName).readline().rstrip()  # get header - using root cvs convention
+    else:
+        line = open(fName).readline().rstrip()  # get header - using root cvs convention
     names = line.replace("/D", "").replace("/I", "").split(":")
     variables = []
     for a in names: variables.append(a.split('\t')[0])  #
@@ -15,7 +18,7 @@ def readDataFrameURL(fName, nrows=0):
 def SetAlias(data, column_name, formula):
     """
     :param data:            panda data frame
-    :param column_name:     name of column for futher query
+    :param column_name:     name of column for further query
     :param formula:         alias formula
     :return:                new panda data frame
     """
