@@ -1,5 +1,16 @@
 import pandas as pd
 import numpy as np
+import urllib2 as urllib2
+
+
+def readDataFrameURL(fName, nrows=0):
+    line = urllib2.urlopen(fName).readline().rstrip()  # get header - using root cvs convention
+    names = line.replace("/D", "").replace("/I", "").split(":")
+    variables = []
+    for a in names: variables.append(a.split('\t')[0])  #
+    dataFrame = pd.read_csv(fName, sep='\t', index_col=False, names=variables, skiprows=1, nrows=nrows)
+    return dataFrame
+
 
 def SetAlias(data, column_name, formula):
     """
@@ -12,7 +23,6 @@ def SetAlias(data, column_name, formula):
     out = data.assign(column=newCol)
     out = out.rename(columns={'column': column_name})
     return out
-
 
 
 def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='default'):
