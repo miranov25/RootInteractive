@@ -9,7 +9,7 @@ from bokehTools import *
 from ipywidgets import *
 from Tools.aliTreePlayer import *
 from IPython.display import display
-
+import ROOT
 
 class bokehDraw(object):
 
@@ -263,4 +263,8 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
+    for i, a in enumerate(columns):  # change type to time format if specified
+        if  (ROOT.TStatToolkit.GetMetadata(tree,a+".isTime")):
+            print(a,"isTime")
+            df[a]=pd.to_datetime(df[a], unit='s')
     return df
