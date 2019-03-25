@@ -9,7 +9,7 @@ def test_AliExternalInfo():
     info.fVerbose = 0
     tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
     # tree.Show(0)
-    assert tree.GetEntries() < 0;
+    assert tree.GetEntries() > 0;
 
 
 def test_TTreeSredirectorWrite():
