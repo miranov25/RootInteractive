@@ -6,15 +6,15 @@ from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook
-import copy
+#import copy
 import pyparsing
 
 
-def processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
+def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
     if verbose > 0: print("Raw", layoutRow)
     array = []
     layoutList.append(array)
-    option = processBokehLayoutOption(layoutRow)
+    option = __processBokehLayoutOption(layoutRow)
     if verbose > 0: print("Option", option)
     for key in optionsMother:
         if not (key in option):
@@ -50,7 +50,7 @@ def processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verb
             fig.plot_height = int(option["plot_height"])
 
 
-def processBokehLayoutOption(layoutOptions):  # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
+def __processBokehLayoutOption(layoutOptions):  # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
     options = {}
     for x in layoutOptions:
         if not (type(x) == str): continue
@@ -93,11 +93,11 @@ def processBokehLayout(layoutString, figList, verbose=0):
     res = parents.parseString(layoutString)[0]
     layoutList = []
     if verbose > 0: print(res)
-    options = processBokehLayoutOption(res)
+    options = __processBokehLayoutOption(res)
     if verbose > 0: print(options)
     for x in res:
         if type(x) != str:
-            processBokehLayoutRow(x, figList, layoutList, options, verbose)
+            __processBokehLayoutRow(x, figList, layoutList, options, verbose)
     for key in optionsParse:
         if key in options: del options[key]
     return res.asList(), layoutList, options
@@ -110,7 +110,6 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     :param query:
     :param varX:        x query
     :param varY:        y query array of queries
-    :param varYerr:     errors on y query array of queries
     :param varColor:    z query
     :param p:           figure template TODO - check if some easier way to pass parameters -CSS string ?
     :param options      optional drawing parameters
@@ -187,9 +186,9 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
         color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
         p2.add_layout(color_bar, 'right')
 
-    if 'layout' in options.keys():   # make figure according layout
-        x,layoutList,optionsLayout=processBokehLayout(options["layout"],plotArray)
-        pAll=gridplot(layoutList,**optionsLayout)
+    if 'layout' in options.keys():  # make figure according layout
+        x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
+        pAll = gridplot(layoutList, **optionsLayout)
         handle = show(pAll, notebook_handle=True)
         return pAll, handle, source
 

@@ -1,7 +1,7 @@
 from MLpipeline.NDFunctionInterface import DataContainer, Fitter
 from TTreeHnInteractive.TTreeHnBrowser import *
-from TTreeHnInteractive.bokehTools import *
-from TTreeHnInteractive.bokehDrawPanda import *
+from  InteractiveDrawing.bokeh.bokehTools import *
+from  InteractiveDrawing.bokeh.bokehDrawPanda import *
 from distortionStudy import *
 
 ###
