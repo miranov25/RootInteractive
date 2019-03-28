@@ -68,15 +68,17 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
     return df
 
 
+#  Dictionary processing
+
 def aliasToDictionary(tree):
     aliases = {}
     for a in tree.GetListOfAliases(): aliases[a.GetName()] = a.GetTitle()
     return aliases
 
 
-def processAnyTreeBranch(branch0, parent):
+def __processAnyTreeBranch(branch0, parent):
     for branch in branch0.GetListOfBranches():
-        processAnyTreeBranch(branch, parent)
+        __processAnyTreeBranch(branch, parent)
 
 
 def treeToAnyTree(tree):
@@ -84,8 +86,8 @@ def treeToAnyTree(tree):
     treeToAntTree representation
     :param tree:  input TTree
     :return:  parent node of the anytree object
-    Example usage:
-        branchTree=getListOfBranches(treeQA)
+    Example usage: see test_aliTreePlayer.py::test_AnyTree()
+        branchTree=treeToAnyTree(treeQA)
         print(findall(branchTree, filter_=lambda node: re.match("bz", node.name)))
         print(findall(branchTree, filter_=lambda node: re.match("MIP.*Warning$", node.name)))
         (Node('/tree/bz'),)
@@ -94,14 +96,14 @@ def treeToAnyTree(tree):
     parent = Node("tree")
     for branch in tree.GetListOfBranches():
         branchT = Node(branch.GetName(), parent)
-        processAnyTreeBranch(branch, branchT)
+        __processAnyTreeBranch(branch, branchT)
     for alias in tree.GetListOfAliases():
         Node(alias.GetName(), parent)
     for friend in tree.GetListOfFriends():
         treeF = tree.GetFriend(friend.GetName())
         nodeF = Node(friend.GetName(), parent)
         for branch in treeF.GetListOfBranches():
-            processAnyTreeBranch(branch, nodeF)
+            __processAnyTreeBranch(branch, nodeF)
     return parent
 
 
@@ -110,7 +112,11 @@ def findSelectedBranch(anyTree, regexp):
     return array of selected branches
     :param anyTree:
     :param regexp:
-    :return:
+    :return: selected anyTree branches
+    Example usage: test_aliTreePlayer.py::test_AnyTree()
+    branchTree = treeToAnyTree(tree)
+    print(findSelectedBranch(branchTree, "MIP.*Warning"))
+    ==> (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
     return findall(anyTree, filter_=lambda nodeF: re.match(regexp, nodeF.name))
 
@@ -150,3 +156,100 @@ def getTreeInfo(tree):
         table = ROOT.TStatToolkit.GetMetadata(tree)
         for a in table: metaTable[a.GetName()] = a.GetTitle()
     return treeInfo
+
+
+def __parseVariableList(parserOut, varList):
+    """
+    :param parserOut:
+    :param varList:
+    :return:
+    """
+    for a in parserOut:
+        if type(a) == pyparsing.ParseResults:
+            __parseVariableList(a, varList)
+            continue
+        try:
+            float(a)
+            continue
+        except ValueError:
+            pass
+        varList.append(a)
+    return varList
+
+
+def parseTreeVariables(expression, counts=None):
+    """
+        parseTreeExpression and fill flat list with tree variable needed for evaluation
+    Used in  getAndTestVariableList
+    :param expression:  expression to parse e.g. expr="x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1"
+    :param counts:
+    :return:
+        :type counts: dict
+    Example usage:
+        parseVariables("x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1")
+         ==>
+        {'sin': 1, 'x': 4, 'x1': 1, 'x2': 1, 'y': 1}
+    """
+    if counts is None:
+        counts = dict()
+    varList = []
+    theContent = pyparsing.Word(pyparsing.alphanums + "._") | pyparsing.Suppress(',') | pyparsing.Suppress('|') | pyparsing.Suppress('&') | pyparsing.Suppress('!') \
+                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
+                 | pyparsing.Suppress('*') | pyparsing.Suppress(':')
+    parents = pyparsing.nestedExpr('(', ')', content=theContent)
+    res = parents.parseString("(" + expression + ")")
+    __parseVariableList(res, varList)
+    for i in varList:
+        counts[i] = counts.get(i, 0) + 1
+    return counts
+
+
+def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None):
+    """
+    getAndTest variable list - decompose expression and extract the list of variables/branches/aliases  which should be extracted from trees
+    :type toReplace: list
+    :type toRemove: list
+    :param expressions:      - list of expressions
+    :param toRemove:         - list of regular expression to be ignored
+    :param toReplace:        - list of regular expression to be replaced
+    :param tree:             - tree
+    :return:                 - list of the trivial expression to export
+    Example: - see also test_aliTreePlayer.py:test_TreeParsing():
+        selection="meanMIP>0&resolutionMIP>0"
+        varDraw="meanMIP:meanMIPele:resolutionMIP:xxx"
+        widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+        widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+        widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+        toRemove=["^tab\..*"]
+        toReplace=["^slider.","^checkbox."]
+        #
+        getAndTestVariableList([selection,varDraw,widgets],toRemove,toReplace)
+        ==>
+        ('Not existing tree variable', 'xxx')
+        {'meanMIP': 1, 'global_Warning': 1, 'MIPquality_Outlier': 1, 'resolutionMIP': 1, 'MIPquality_Warning': 1, 'global_Outlier': 1, 'time': 1, 'meanMIPele': 1, 'MIPquality_PhysAcc': 1}
+    Usage: general - but it is used for the bokeDraw from tree to export varaibles to bokeh format
+
+    """
+    if toReplace is None:
+        toReplace = []
+    if toRemove is None:
+        toRemove = []
+    counts = dict()
+    for expression in expressions:
+        parseTreeVariables(expression, counts)
+    for mask in toRemove:
+        for a in counts.keys():
+            if re.findall(mask, a):
+                del (counts[a])
+    for mask in toReplace:
+        for key in counts.keys():
+            if re.findall(mask, key):
+                newKey = re.sub(mask, "", key)
+                counts[newKey] = counts.pop(key)
+    if tree:
+        dictionary = treeToAnyTree(tree)
+        for key in counts.keys():
+            if findSelectedBranch(dictionary, key + "$") == ():
+                print("Not existing tree variable", key)
+                del (counts[key])
+    return counts
