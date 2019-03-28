@@ -63,11 +63,19 @@ class bokehDraw(object):
             df = source
         else:
             if (self.verbosity >> 1) & 1:
-                print('source is not a Panda Dataframe, assuming it is ROOT::TTree')
+                print('source is not a Panda DataFrame, assuming it is ROOT::TTree')
+            varList=[]
             if 'variables' in options.keys():
-                variableList = options['variables']
-            else:
-                variableList = str(re.sub(r'\([^)]*\)', '', widgetString) + ":" + varColor + ":" + varX + ":" + varY)
+                varList = options['variables'].split(":")
+            varSource=[varColor,varX,varY, widgetString, query]
+            toRemove=["^tab\..*"]
+            toReplace=["^slider.","^checkbox."]
+            varList+=getAndTestVariableList(varSource,toRemove,toReplace,source)
+            variableList=""
+            for var in set(varList):
+                if len(variableList)>0: variableList+=":"
+                variableList+=var
+
             if 'nEntries' in options.keys():
                 nEntries = options['nEntries']
             else:
