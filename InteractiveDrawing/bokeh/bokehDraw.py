@@ -90,7 +90,10 @@ class bokehDraw(object):
                 columnMask = 'default'
 
             df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
-
+        if 'standAlone' in options.keys():
+            self.standAlone = options['standAlone']
+        else:
+            self.standAlone = False
         self.query = query
         self.dataSource = df.query(query)
         self.dataSource.sort_values(varX,inplace=True)
@@ -118,7 +121,8 @@ class bokehDraw(object):
         :param widgetString:   example string - slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
         :return: s sliders
         """
-        self.parseWidgetString(widgetString)
+        widgetList=self.parseWidgetString(widgetString)
+        self.createWidgets(widgetList)
         accordBox = []
         tabBox = []
         for acc in self.accordArray:
@@ -144,6 +148,21 @@ class bokehDraw(object):
 
         self.Widgets = widgets.VBox(self.all, layout=Layout(width='66%'))
 
+    def createWidgets(self,widgetList):
+        for accordion in widgetList[0]:
+            self.accordArray.append([accordion[0]])
+            for widget in accordion[1:]:
+                self.fillArray(widget,self.accordArray[-1])
+            print(self.accordArray)
+        for tab in widgetList[1]:
+            self.tabArray.append([tab[0]])
+            for widget in tab[1:]:
+                self.fillArray(widget,self.tabArray[-1])
+        for widget in widgetList[2]:
+            self.fillArray(widget,self.widgetArray)
+            
+        
+        
     def fillArray(self, iWidget, array):
         """
         Gets create the specified widget and append it into the given widget array.
@@ -220,6 +239,9 @@ class bokehDraw(object):
         push_notebook(self.handle)
 
     def parseWidgetString(self, widgetString):
+        accordList = []
+        tabList = []
+        widgetList = []
         toParse = "(" + widgetString + ")"
         theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
@@ -227,18 +249,21 @@ class bokehDraw(object):
         for widgetTitle, iWidget in izip(*[iter(widgetList0)] * 2):
             name = widgetTitle.split('.')
             if name[0] == 'accordion':
-                if findInList(name[1], self.accordArray) == -1:
-                    self.accordArray.append([name[1]])
+                if findInList(name[1], accordList) == -1:
+                    accordList.append([name[1]])
                 for name, param in izip(*[iter(iWidget)] * 2):
-                    self.fillArray([name, param], self.accordArray[findInList(name[1], self.accordArray)])
+                    accordList[findInList(name[1], accordList)].append([name, param])
+                    #self.fillArray([name, param], self.accordArray[findInList(name[1], self.accordArray)])
             elif name[0] == 'tab':
-                if findInList(name[1], self.tabArray) == -1:
-                    self.tabArray.append([name[1]])
+                if findInList(name[1], tabList) == -1:
+                    tabList.append([name[1]])
                 for name, param in izip(*[iter(iWidget)] * 2):
-                    self.fillArray([name, param], self.tabArray[findInList(name[1], self.tabArray)])
+                    tabList[findInList(name[1], tabList)].append([name, param])
+                    #self.fillArray([name, param], self.tabArray[findInList(name[1], self.tabArray)])
             else:
-                self.fillArray([widgetTitle, iWidget], self.widgetArray)
-
+                widgetList.append([widgetTitle, iWidget])
+                #self.fillArray([widgetTitle, iWidget], self.widgetArray)
+        return [accordList,tabList,widgetList]
     verbosity = 0
 
 

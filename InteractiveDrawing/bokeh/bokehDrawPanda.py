@@ -1,14 +1,13 @@
-#from bokeh.palettes import *
+# from bokeh.palettes import *
 import re
 from bokeh.models import *
 from bokehTools import *
 from ipywidgets import *
 from Tools.aliTreePlayer import *
-#from functools import partial
+# from functools import partial
 from IPython.display import display
 
-    
-       
+
 class bokehDrawPanda(object):
 
     def __init__(self, source, query, varX, varY, varColor, sliderString, p, **options):
@@ -54,7 +53,8 @@ class bokehDrawPanda(object):
         for i, slider in enumerate(sliderList0):
             values = re.split('[(,)]', slider)
             # slider = RangeSlider(start=float(values[1]), end=float(values[2]), step=float(values[3]), value=(float(values[4]), float(values[5])), title=values[0])
-            slider = widgets.FloatRangeSlider(description=values[0], layout=Layout(width='66%'), min=float(values[1]), max=float(values[2]), step=float(values[3]),
+            slider = widgets.FloatRangeSlider(description=values[0], layout=Layout(width='66%'), min=float(values[1]),
+                                              max=float(values[2]), step=float(values[3]),
                                               value=[float(values[4]), float(values[5])])
             slider.observe(self.updateInteractive, names='value')
             self.sliderArray.append(slider)
@@ -63,14 +63,16 @@ class bokehDrawPanda(object):
     def updateInteractive(self, b):
         sliderQuery = ""
         for slider in self.sliderArray:
-            sliderQuery += str(str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(slider.value[1]) + "&")
+            sliderQuery += str(
+                str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(
+                    slider.value[1]) + "&")
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
         print(sliderQuery)
         push_notebook(self.handle)
 
-   
+
 class bokehDrawTree(object):
 
     def __init__(self, source, query, varX, varY, varColor, sliderString, p, **options):
@@ -98,24 +100,32 @@ class bokehDrawTree(object):
         """
         if isinstance(source, pd.DataFrame):
             print('Panda Dataframe is parsing...')
-            df=source
+            df = source
         else:
             print('source is not a Panda Dataframe, assuming it is ROOT::TTree')
-            if 'variables' in options.keys():  vari=options['variables']
-            else: vari=str(re.sub(r'\([^)]*\)', '', sliderString)+":"+varColor+":"+varX+":"+varY)                
-            if 'nEntries' in options.keys():  nEntries=options['nEntries']
-            else:   nEntries=source.GetEntries()
-            if 'firstEntry' in options.keys():  firstEntry=options['firstEntry']
-            else:   firstEntry=0
-            if 'mask' in options.keys():  columnMask=options['mask']
-            else:  columnMask='default'
+            if 'variables' in options.keys():
+                vari = options['variables']
+            else:
+                vari = str(re.sub(r'\([^)]*\)', '', sliderString) + ":" + varColor + ":" + varX + ":" + varY)
+            if 'nEntries' in options.keys():
+                nEntries = options['nEntries']
+            else:
+                nEntries = source.GetEntries()
+            if 'firstEntry' in options.keys():
+                firstEntry = options['firstEntry']
+            else:
+                firstEntry = 0
+            if 'mask' in options.keys():
+                columnMask = options['mask']
+            else:
+                columnMask = 'default'
             print(re.sub(r'\([^)]*\)', '', sliderString))
             print(varColor)
             print(varX)
             print(varY)
             print(vari)
-            df=self.tree2Panda(source, vari, query, nEntries, firstEntry, columnMask)
-            
+            df = self.tree2Panda(source, vari, query, nEntries, firstEntry, columnMask)
+
         self.query = query
         self.dataSource = df.query(query)
         self.sliderWidgets = 0
@@ -139,7 +149,8 @@ class bokehDrawTree(object):
         for i, slider in enumerate(sliderList0):
             values = re.split('[(,)]', slider)
             # slider = RangeSlider(start=float(values[1]), end=float(values[2]), step=float(values[3]), value=(float(values[4]), float(values[5])), title=values[0])
-            slider = widgets.FloatRangeSlider(description=values[0], layout=Layout(width='66%'), min=float(values[1]), max=float(values[2]), step=float(values[3]),
+            slider = widgets.FloatRangeSlider(description=values[0], layout=Layout(width='66%'), min=float(values[1]),
+                                              max=float(values[2]), step=float(values[3]),
                                               value=[float(values[4]), float(values[5])])
             slider.observe(self.updateInteractive, names='value')
             self.sliderArray.append(slider)
@@ -148,7 +159,9 @@ class bokehDrawTree(object):
     def updateInteractive(self, b):
         sliderQuery = ""
         for slider in self.sliderArray:
-            sliderQuery += str(str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(slider.value[1]) + "&")
+            sliderQuery += str(
+                str(slider.description) + ">=" + str(slider.value[0]) + "&" + str(slider.description) + "<=" + str(
+                    slider.value[1]) + "&")
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
