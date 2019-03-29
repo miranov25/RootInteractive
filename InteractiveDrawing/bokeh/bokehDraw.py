@@ -68,9 +68,9 @@ class bokehDraw(object):
             if 'variables' in options.keys():
                 varList = options['variables'].split(":")
             varSource=[varColor,varX,varY, widgetString, query]
-            toRemove=["^tab\..*"]
-            toReplace=["^slider.","^checkbox."]
-            varList+=getAndTestVariableList(varSource,toRemove,toReplace,source)
+            toRemove=["^tab\..*","^accordion\..*","^False","^True","^false","^true"]
+            toReplace=["^slider.","^checkbox.","^dropdown."]
+            varList+=getAndTestVariableList(varSource,toRemove,toReplace,source,self.verbosity)
             variableList=""
             for var in set(varList):
                 if len(variableList)>0: variableList+=":"

@@ -177,24 +177,26 @@ def __parseVariableList(parserOut, varList):
     return varList
 
 
-def parseTreeVariables(expression, counts=None):
+def parseTreeVariables(expression, counts=None, verbose=0):
     """
         parseTreeExpression and fill flat list with tree variable needed for evaluation
     Used in  getAndTestVariableList
+    :param verbose:     verbosity
     :param expression:  expression to parse e.g. expr="x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1"
     :param counts:
     :return:
         :type counts: dict
     Example usage:
-        parseVariables("x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1")
+        :parseVariables("x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1")
          ==>
         {'sin': 1, 'x': 4, 'x1': 1, 'x2': 1, 'y': 1}
     """
+    if verbose: print("expression", expression)
     if counts is None:
         counts = dict()
     varList = []
     theContent = pyparsing.Word(pyparsing.alphanums + "._") | pyparsing.Suppress(',') | pyparsing.Suppress('|') | pyparsing.Suppress('&') | pyparsing.Suppress('!') \
-                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
+                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') |pyparsing.Suppress('-') |  pyparsing.Suppress('<') | pyparsing.Suppress('*') \
                  | pyparsing.Suppress('*') | pyparsing.Suppress(':')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString("(" + expression + ")")
@@ -204,9 +206,10 @@ def parseTreeVariables(expression, counts=None):
     return counts
 
 
-def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None):
+def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None, verbose=0):
     """
     getAndTest variable list - decompose expression and extract the list of variables/branches/aliases  which should be extracted from trees
+    :param verbose:
     :type toReplace: list
     :type toRemove: list
     :param expressions:      - list of expressions
@@ -236,7 +239,7 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
         toRemove = []
     counts = dict()
     for expression in expressions:
-        parseTreeVariables(expression, counts)
+        parseTreeVariables(expression, counts, verbose)
     for mask in toRemove:
         for a in counts.keys():
             if re.findall(mask, a):
