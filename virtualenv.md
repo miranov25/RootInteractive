@@ -49,9 +49,17 @@ pip install bqplot
 pip install qgrid
 pip install ipympl
 pip install bokeh
+pip install anytree
+pip install forestci
 ````
 
-
+### additional dependency on tkinter
+* not clear how to install it
+* for ubunt we used:
+````
+apt-get install python-tk
+````
+* generic solution to be find  - or dependency to be removed
 
 ### Install lab extension
  jupyter labextension list
