@@ -60,5 +60,23 @@ def test_TreeParsing():
     toReplace=["^slider.","^checkbox."]
     print(getAndTestVariableList([selection,varDraw,widgets,"xxx"],toRemove,toReplace,tree))
 
-test_AnyTree()
-test_Aliases()
+def test_Parsing():
+    query="tailF>1"
+    variables="pileUp:tailF:commonF:typeF:fraction:norm:slope:isMax:MB:P0:P1:PA"
+    tooltips=[('Is maximum','@isMax'),("Pad type","@typeF")]
+    slider="accordion.first(slider.P0(0,1,0.5,0,1),slider.commonF(0,15,5,0,5)),accordion.second(dropdown.MB(0,0.5,1)),accordion.second(checkbox.isMax(False)),slider.typeF(0,4,1,0)"
+    varSource=["x","varX","varY", slider, query]
+    toRemove=["^tab\..*","^accordion\..*","False","True"]
+    toReplace=["^slider.","^checkbox.","^dropdown."]
+    #getAndTestVariableList(varSource,toRemove,toReplace,variables,slider)
+    counts = dict()
+    for expression in varSource:
+        parseTreeVariables(expression, counts)
+
+
+
+
+#test_AnyTree()
+#test_Aliases()
+
+test_Parsing()

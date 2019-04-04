@@ -97,8 +97,9 @@ def treeToAnyTree(tree):
     for branch in tree.GetListOfBranches():
         branchT = Node(branch.GetName(), parent)
         __processAnyTreeBranch(branch, branchT)
-    for alias in tree.GetListOfAliases():
-        Node(alias.GetName(), parent)
+    if  tree.GetListOfAliases():
+        for alias in tree.GetListOfAliases():
+            Node(alias.GetName(), parent)
     for friend in tree.GetListOfFriends():
         treeF = tree.GetFriend(friend.GetName())
         nodeF = Node(friend.GetName(), parent)
