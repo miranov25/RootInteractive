@@ -6,8 +6,11 @@ from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook
-#import copy
+# import copy
 import pyparsing
+
+# tuple of Bokeh markers
+bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle",  "asterisk", "squareX","X"]
 
 
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
@@ -192,14 +195,14 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
         handle = show(pAll, notebook_handle=True)
         return pAll, handle, source
 
-    ncols = 1
+    nCols = 1
     if 'ncols' in options.keys():
-        ncols = options['ncols']
+        nCols = options['ncols']
     # nRows=len(plotArray)/ncols+1
     plotArray2D = []
     for i, plot in enumerate(plotArray):
-        pRow = i / ncols
-        pCol = i % ncols
+        pRow = i / nCols
+        pCol = i % nCols
         if pCol == 0: plotArray2D.append([])
         plotArray2D[pRow].append(plot)
     pAll = gridplot(plotArray2D)
