@@ -22,7 +22,6 @@ def BetheBlochGeantNP(lnbg, kp0=2.33, kp1=0.20, kp2=3.00, kp3=173e-9, kp4=0.4984
     mZA = kp4
     bg2 = bg * bg
     maxT = 2 * me * bg2
-
     d2 = 0.
     x = np.log(bg)
     lhwI = np.log(28.816 * 1e-9 * np.sqrt(rho * mZA) / mI)
