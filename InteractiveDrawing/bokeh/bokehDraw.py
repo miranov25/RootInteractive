@@ -11,6 +11,7 @@ from Tools.aliTreePlayer import *
 from IPython.display import display
 import ROOT
 
+
 class bokehDraw(object):
 
     def __init__(self, source, query, varX, varY, varColor, widgetString, p, **options):
@@ -64,17 +65,20 @@ class bokehDraw(object):
         else:
             if (self.verbosity >> 1) & 1:
                 print('source is not a Panda DataFrame, assuming it is ROOT::TTree')
-            varList=[]
+            varList = []
             if 'variables' in options.keys():
                 varList = options['variables'].split(":")
-            varSource=[varColor,varX,varY, widgetString, query]
-            toRemove=["^tab\..*","^accordion\..*","^False","^True","^false","^true"]
-            toReplace=["^slider.","^checkbox.","^dropdown."]
-            varList+=getAndTestVariableList(varSource,toRemove,toReplace,source,self.verbosity)
-            variableList=""
+            varSource = [varColor, varX, varY, widgetString, query]
+            toRemove = ["^tab\..*", "^accordion\..*", "^False", "^True", "^false", "^true"]
+            toReplace = ["^slider.", "^checkbox.", "^dropdown."]
+            varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
+            if 'tooltip' in options.keys():
+                tool = str([str(a[1]) for a in options["tooltip"]])
+                varList += filter(None, re.split('[^a-zA-Z0-9_]', tool))
+            variableList = ""
             for var in set(varList):
-                if len(variableList)>0: variableList+=":"
-                variableList+=var
+                if len(variableList) > 0: variableList += ":"
+                variableList += var
 
             if 'nEntries' in options.keys():
                 nEntries = options['nEntries']
@@ -93,7 +97,7 @@ class bokehDraw(object):
 
         self.query = query
         self.dataSource = df.query(query)
-        self.dataSource.sort_values(varX,inplace=True)
+        self.dataSource.sort_values(varX, inplace=True)
         self.sliderWidgets = 0
         self.accordArray = []
         self.tabArray = []
@@ -209,7 +213,8 @@ class bokehDraw(object):
                                                 str(iWidget.description), str(iWidget.value[1])))
             elif isinstance(iWidget, widgets.FloatSlider):
                 sliderQuery += str(
-                    "{0}>={1}-{2}&{3}<={4}+{5}&".format(str(iWidget.description), str(iWidget.value), str(iWidget.step), str(iWidget.description), str(iWidget.value), str(iWidget.step)))
+                    "{0}>={1}-{2}&{3}<={4}+{5}&".format(str(iWidget.description), str(iWidget.value), str(iWidget.step), str(iWidget.description), str(iWidget.value),
+                                                        str(iWidget.step)))
             else:
                 sliderQuery += str(str(iWidget.description) + "==" + str(iWidget.value) + "&")
         sliderQuery = sliderQuery[:-1]
@@ -272,7 +277,7 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):  # change type to time format if specified
-        if  (ROOT.TStatToolkit.GetMetadata(tree,a+".isTime")):
-            print(a,"isTime")
-            df[a]=pd.to_datetime(df[a], unit='s')
+        if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
+            print(a, "isTime")
+            df[a] = pd.to_datetime(df[a], unit='s')
     return df

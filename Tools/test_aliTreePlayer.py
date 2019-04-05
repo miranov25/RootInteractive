@@ -40,8 +40,7 @@ def test_Aliases():
     info.fVerbose = 0
     tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
     aliases = aliasToDictionary(tree)
-    base = Node("global_Warning")
-    makeAliasAnyTree("global_Warning", base, aliases)
+    base=makeAliasAnyTree("global_Warning",  aliases)
     print(RenderTree(base))
     print(findSelectedBranch(base, ".*PID.*"))
 

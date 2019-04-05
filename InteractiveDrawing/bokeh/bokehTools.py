@@ -162,24 +162,30 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     if 'plot_width' in options.keys(): plot_width = options['plot_width']
     if 'plot_height' in options.keys(): plot_height = options['plot_height']
 
-    for y, yerr in zip(varYArray, varYerrArray):
-        p2 = figure(plot_width=plot_width, plot_height=plot_height, title=y + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type, y_axis_type=y_axis_type)
-        if 'varXerr' in locals():
-            err_x_x = []
-            err_x_y = []
-            for coord_x, coord_y, x_err in zip(source.data[varX], source.data[y], source.data[varXerr]):
-                err_x_y.append((coord_y, coord_y))
-                err_x_x.append((coord_x - x_err, coord_x + x_err))
-            p2.multi_line(err_x_x, err_x_y)
-        if 'errY' in options.keys():
-            err_y_x = []
-            err_y_y = []
-            for coord_x, coord_y, y_err in zip(source.data[varX], source.data[y], source.data[yerr]):
-                err_y_x.append((coord_x, coord_x))
-                err_y_y.append((coord_y - y_err, coord_y + y_err))
-            p2.multi_line(err_y_x, err_y_y)
-        p2.circle(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size)
-        if line == 1: p2.line(x=varX, y=y, source=source)
+    for yS, yErrorS in zip(varYArray, varYerrArray):
+        yArray=yS.strip('()').split(",")
+        yArrayErr=yErrorS.strip('[]').split(",")
+        p2 = figure(plot_width=plot_width, plot_height=plot_height, title=yS + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type, y_axis_type=y_axis_type)
+        fIndex=0
+        for y, yError in zip(yArray, yArrayErr):
+            if 'varXerr' in locals():
+                err_x_x = []
+                err_x_y = []
+                for coord_x, coord_y, x_err in zip(source.data[varX], source.data[y], source.data[varXerr]):
+                    err_x_y.append((coord_y, coord_y))
+                    err_x_x.append((coord_x - x_err, coord_x + x_err))
+                p2.multi_line(err_x_x, err_x_y)
+            if 'errY' in options.keys():
+                err_y_x = []
+                err_y_y = []
+                for coord_x, coord_y, y_err in zip(source.data[varX], source.data[y], source.data[yError]):
+                    err_y_x.append((coord_x, coord_x))
+                    err_y_y.append((coord_y - y_err, coord_y + y_err))
+                p2.multi_line(err_y_x, err_y_y)
+            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size, marker=bokehMarkers[fIndex % 4])
+            if line == 1: p2.line(x=varX, y=y, source=source)
+            fIndex+=1
+
         if pFirst:
             if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
             if 'commonY' in options.keys(): p2.y_range = pFirst.y_range
