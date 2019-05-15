@@ -131,6 +131,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
 
     varYArray = varY.split(":")
+    varXArray = varX.split(":")
     plotArray = []
     pFirst = None
     size = 2
@@ -162,11 +163,13 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     if 'plot_width' in options.keys(): plot_width = options['plot_width']
     if 'plot_height' in options.keys(): plot_height = options['plot_height']
 
-    for yS, yErrorS in zip(varYArray, varYerrArray):
+    for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
         yArray=yS.strip('()').split(",")
         yArrayErr=yErrorS.strip('[]').split(",")
         p2 = figure(plot_width=plot_width, plot_height=plot_height, title=yS + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type, y_axis_type=y_axis_type)
         fIndex=0
+        varX=varXArray[min(idx,len(varXArray)-1)]
+
         for y, yError in zip(yArray, yArrayErr):
             if 'varXerr' in locals():
                 err_x_x = []

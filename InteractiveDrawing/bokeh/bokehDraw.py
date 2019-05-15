@@ -97,7 +97,8 @@ class bokehDraw(object):
 
         self.query = query
         self.dataSource = df.query(query)
-        self.dataSource.sort_values(varX, inplace=True)
+        if ":" not in varX:
+            self.dataSource.sort_values(varX, inplace=True)
         self.sliderWidgets = 0
         self.accordArray = []
         self.tabArray = []
