@@ -97,7 +97,7 @@ def treeToAnyTree(tree):
     for branch in tree.GetListOfBranches():
         branchT = Node(branch.GetName(), parent)
         __processAnyTreeBranch(branch, branchT)
-    if  tree.GetListOfAliases():
+    if tree.GetListOfAliases():
         for alias in tree.GetListOfAliases():
             Node(alias.GetName(), parent)
     for friend in tree.GetListOfFriends():
@@ -108,21 +108,22 @@ def treeToAnyTree(tree):
     return parent
 
 
-def findSelectedBranch(anyTree, regexp):
+def findSelectedBranch(anyTree, regexp, **findOption):
     """
     return array of selected branches
     :param anyTree:
     :param regexp:
+    :param findOption   -   from list = stop=None, maxlevel=None, mincount=None, maxcount=None
     :return: selected anyTree branches
     Example usage: test_aliTreePlayer.py::test_AnyTree()
     branchTree = treeToAnyTree(tree)
     print(findSelectedBranch(branchTree, "MIP.*Warning"))
     ==> (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
-    return findall(anyTree, filter_=lambda nodeF: re.match(regexp, nodeF.name))
+    return findall(anyTree, filter_=lambda nodeF: re.match(regexp, nodeF.name), **findOption)
 
 
-def makeAliasAnyTree(key, parent, aliases):
+def makeAliasAnyTree(key, aliases, parent=None):
     """
     build recursive alias anytree
     :param key:          - start key
@@ -130,6 +131,8 @@ def makeAliasAnyTree(key, parent, aliases):
     :param aliases:      - alias dictionary
     :return:               anytree object
     """
+    if (parent == None):
+        parent = Node(key)
     theContent = pyparsing.Word(pyparsing.alphanums + ".+-=_><") | pyparsing.Suppress(',') | pyparsing.Suppress('||') | pyparsing.Suppress('&&') | pyparsing.Suppress('!')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString("(" + aliases[key] + ")")[0]
@@ -138,9 +141,14 @@ def makeAliasAnyTree(key, parent, aliases):
         for a in subExpression:
             if a in aliases:
                 newNode = Node(a, parent=parent, content=aliases[a])
-                makeAliasAnyTree(a, newNode, aliases)
+                makeAliasAnyTree(a, aliases, newNode,)
             else:
                 Node(a, parent=parent)
+    return parent
+
+
+def getAliasAnyTreee(base, regexp, **findOption):
+    return [a.name for a in findall(base, filter_=lambda node: re.match(regexp, node.name), **findOption)]
 
 
 def getTreeInfo(tree):
@@ -197,7 +205,7 @@ def parseTreeVariables(expression, counts=None, verbose=0):
         counts = dict()
     varList = []
     theContent = pyparsing.Word(pyparsing.alphanums + "._") | pyparsing.Suppress(',') | pyparsing.Suppress('|') | pyparsing.Suppress('&') | pyparsing.Suppress('!') \
-                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') |pyparsing.Suppress('-') |  pyparsing.Suppress('<') | pyparsing.Suppress('*') \
+                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress('-') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
                  | pyparsing.Suppress('*') | pyparsing.Suppress(':')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString("(" + expression + ")")
