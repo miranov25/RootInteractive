@@ -1,7 +1,7 @@
 #from bokeh.palettes import *
 import re
 from bokeh.models import *
-from bokehTools import *
+from .bokehTools import *
 from ipywidgets import *
 from Tools.aliTreePlayer import *
 #from functools import partial

@@ -1,11 +1,11 @@
 # from bokeh.palettes import *
 import re
-from itertools import izip
+#from itertools import izip
 import pyparsing
 from bokeh.models import *
 from bokeh.models import ColumnDataSource
 
-from bokehTools import *
+from .bokehTools import *
 from ipywidgets import *
 from Tools.aliTreePlayer import *
 from IPython.display import display
@@ -230,17 +230,17 @@ class bokehDraw(object):
         theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
         widgetList0 = widgetParser.parseString(toParse)[0]
-        for widgetTitle, iWidget in izip(*[iter(widgetList0)] * 2):
+        for widgetTitle, iWidget in zip(*[iter(widgetList0)] * 2):
             name = widgetTitle.split('.')
             if name[0] == 'accordion':
                 if findInList(name[1], self.accordArray) == -1:
                     self.accordArray.append([name[1]])
-                for name, param in izip(*[iter(iWidget)] * 2):
+                for name, param in zip(*[iter(iWidget)] * 2):
                     self.fillArray([name, param], self.accordArray[findInList(name[1], self.accordArray)])
             elif name[0] == 'tab':
                 if findInList(name[1], self.tabArray) == -1:
                     self.tabArray.append([name[1]])
-                for name, param in izip(*[iter(iWidget)] * 2):
+                for name, param in zip(*[iter(iWidget)] * 2):
                     self.fillArray([name, param], self.tabArray[findInList(name[1], self.tabArray)])
             else:
                 self.fillArray([widgetTitle, iWidget], self.widgetArray)

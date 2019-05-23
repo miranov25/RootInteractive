@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import urllib2 as urllib2
+import urllib.request as urlopen
 import pyparsing
 from anytree import *
 import ROOT
@@ -9,7 +9,7 @@ import re
 
 def readDataFrameURL(fName, nrows=0):
     if 'http' in fName:
-        line = urllib2.urlopen(fName).readline().rstrip()  # get header - using root cvs convention
+        line = urlopen(fName).readline().rstrip()  # get header - using root cvs convention
     else:
         line = open(fName).readline().rstrip()  # get header - using root cvs convention
     names = line.replace("/D", "").replace("/I", "").split(":")

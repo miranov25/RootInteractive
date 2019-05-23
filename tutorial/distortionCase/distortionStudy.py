@@ -24,9 +24,9 @@ def splitDistortionFrame(df):
     """
     sectors = [2, 4, 6, 7, 9, 16, 20, 30]
     dfAll = df.query("isec==2&isIROC").reset_index(drop=True)  # type: object
+    global pandaList
     pandaList = [dfAll]  # type: List[Union[object, pandaList]]
     for iSector in sectors:
-        global pandaList
         query = "isIROC&isec==" + str(iSector)
         dfSec = df.query(query)[['drphiSmoothedQ95']].reset_index(drop=True)
         dfSec.columns = ["drphiSector" + str(iSector)]

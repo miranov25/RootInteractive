@@ -68,7 +68,7 @@ class RandomForest:
         importance = self.model.feature_importances_
         indices = np.argsort(importance)
         for i in indices:
-            print varNames[i], importance[i]
+            print(varNames[i], importance[i])
 
 
 class KerasModel:
