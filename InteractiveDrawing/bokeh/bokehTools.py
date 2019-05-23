@@ -48,7 +48,7 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
     nCols = len(array)
     for fig in array:
         if 'plot_width' in option:
-            fig.plot_width = int(option["plot_width"]) / nCols
+            fig.plot_width = int(option["plot_width"]/ nCols)
         if 'plot_height' in option:
             fig.plot_height = int(option["plot_height"])
 
