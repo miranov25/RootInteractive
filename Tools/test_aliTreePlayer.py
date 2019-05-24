@@ -18,11 +18,11 @@ def test_TTreeSredirectorWrite():
     return 0
 
 
-def test_Tree():
-    """test reading and dumping example tree"""
-    f = ROOT.TFile.Open("data/mapOutputEvent.root")
-    tree = f.Get("hisTPCOnElectronDist")
-    assert tree.GetEntries() > 0
+#def test_Tree():
+#    """test reading and dumping example tree"""
+#    f = ROOT.TFile.Open("data/mapOutputEvent.root")
+#    tree = f.Get("hisTPCOnElectronDist")
+#    assert tree.GetEntries() > 0
 
 
 def test_AnyTree():
