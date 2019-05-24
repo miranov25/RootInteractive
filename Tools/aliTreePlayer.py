@@ -277,5 +277,5 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
                 pop_list.append(key)
                 #del (counts[key])
     for x in pop_list:
-        pop_list.pop(x)
+        counts.pop(x)
     return counts

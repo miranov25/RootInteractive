@@ -4,7 +4,7 @@ from  InteractiveDrawing.bokeh.bokehTools import *
 from  InteractiveDrawing.bokeh.bokehDrawPanda import *
 from distortionStudy import *
 
-def testDistortion():
+def Distortion():
     ###
     inputPath = os.path.expandvars("$NOTESData/JIRA/ATO-336/DistortionsTimeSeries/distortionAll.csv")
     df = readDataFrame(inputPath)
