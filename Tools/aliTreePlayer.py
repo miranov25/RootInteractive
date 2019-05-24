@@ -249,19 +249,33 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
     counts = dict()
     for expression in expressions:
         parseTreeVariables(expression, counts, verbose)
+    pop_list = []
     for mask in toRemove:
         for a in counts.keys():
             if re.findall(mask, a):
-                del (counts[a])
+                #del (counts[a])
+                pop_list.append(a)
+    for x in pop_list:
+        counts.pop(x)
+    
     for mask in toReplace:
+        pop_list = []
         for key in counts.keys():
             if re.findall(mask, key):
-                newKey = re.sub(mask, "", key)
-                counts[newKey] = counts.pop(key)
+                #newKey = re.sub(mask, "", key)
+                pop_list.append(key)
+                #counts[newKey] = counts.pop(key)
+        for x in pop_list:
+            newKey = re.sub(mask,"",x)
+            counts[newKey] = counts.pop(x)
+    pop_list = []
     if tree:
         dictionary = treeToAnyTree(tree)
         for key in counts.keys():
             if findSelectedBranch(dictionary, key + "$") == ():
                 print("Not existing tree variable", key)
-                del (counts[key])
+                pop_list.append(key)
+                #del (counts[key])
+    for x in pop_list:
+        pop_list.pop(x)
     return counts
