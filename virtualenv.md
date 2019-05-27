@@ -1,21 +1,41 @@
 # Install RootInteractive package
+Steps:
+* install appropriate python environment
+  * activate envirnment
+* install AliRoot/AliPh
+* install RootInteractive from github 
+  * https://github.com/miranov25/RootInteractive
+  * https://github.com/miranov25/RootInteractiveTest
+
+
+
 * add line to your .bashr to define python path. E.g 
 ```
 export PYTHONPATH=$PYTHONPATH:$HOME/github/RootInteractive
 ```
 * WITHOUT defining path -  classes can not be used
 
-### Install virtualenv:
+### Install virtualenv for python3:
 
-I used to install virtualenvwrapper:
+In the past (for python2) I used to install virtualenvwrapper
+Since aliBuild move to the Python3 - this recipe did not work.
 
-https://virtualenvwrapper.readthedocs.io/en/latest/
+For new aliBuild I install virtual env in software directory:
+* create python3 virtual environment with name virtualenv3
+```
+python3 -m venv virtualenv3
+```
+* activate environment
+```
+source virtualenv3/bin/activate
+```
+* or use alias
+```
+    alias venv3="source $HOME/software/virtualenv3/bin/activate"
+```
 
-````
-source /home/miranov/.local/bin/virtualenvwrapper.sh
-mkvirtualenv  our_new_env
-workon our_new_env
-````
+
+
 
 ### Install root python dependencies
 Following instruction in
@@ -32,7 +52,7 @@ pip install matplotlib numpy certifi ipython==5.1.0 ipywidgets ipykernel noteboo
 Following instructions in:
 https://alice.its.cern.ch/jira/browse/PWGPP-485
 
-**all done in virtual environment to do not mess wtih system unusable pip**
+**all done in virtual environment to do not mess with system unusable pip**
 
 ```
 pip install jupyter jupyterlab
@@ -51,6 +71,7 @@ pip install ipympl
 pip install bokeh
 pip install anytree
 pip install forestci
+pip install pytest
 ````
 
 ### additional dependency on tkinter
