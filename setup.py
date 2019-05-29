@@ -1,9 +1,17 @@
 from distutils.core import setup
+import setuptools
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
+    author_email='marian.ivanov@cern.ch',
+    author='Marian Ivanov',
+    url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0-00-01dev',
-    packages=['RootInteractive',],
+    version='v0.00.02',
+    packages=setuptools.find_packages(),
     license='Not define yet. Most probably similar to ALICE (CERN)  license',
-    long_description=open('README.md').read(),
+    long_description=long_description,
+    long_description_content_type="text/markdown",
 )
