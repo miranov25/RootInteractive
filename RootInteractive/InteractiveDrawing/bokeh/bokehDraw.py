@@ -7,7 +7,7 @@ from bokeh.models import ColumnDataSource
 
 from .bokehTools import *
 from ipywidgets import *
-from Tools.aliTreePlayer import *
+from RootInteractive.Tools.aliTreePlayer import *
 from IPython.display import display
 import ROOT
 

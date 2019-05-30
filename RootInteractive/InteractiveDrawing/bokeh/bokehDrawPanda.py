@@ -3,7 +3,7 @@ import re
 from bokeh.models import *
 from .bokehTools import *
 from ipywidgets import *
-from Tools.aliTreePlayer import *
+from RootInteractive.Tools.aliTreePlayer import *
 #from functools import partial
 from IPython.display import display
 
