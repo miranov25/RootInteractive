@@ -1,19 +1,22 @@
 numpy
 scipy
-matplotlib
 pandas
-sklearn
-scikit-garden
+anytree
+pytest
+##---------------------   graphics  dependencies
+bokeh
+matplotlib
+plotly
+qgrid
+bqplot
 beakerx
+# ----------------------   jupyter notebook dependencies
 ipywidgets
 runtime
-plotly
 request
-bqplot
-qgrid
-bokeh
-anytree
+# ---------------------    machine learning dependencies
+sklearn
+scikit-garden
 forestci
-pytest
 tensorflow
 keras

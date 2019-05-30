@@ -9,9 +9,33 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.02',
+    version='v0.00.05',
     packages=setuptools.find_packages(),
     license='Not define yet. Most probably similar to ALICE (CERN)  license',
     long_description=long_description,
     long_description_content_type="text/markdown",
+    install_requires=[
+        'numpy',
+        'scipy',
+        'pandas',
+        'anytree',
+        'pytest',
+        ##---------------------   graphics  dependencies
+        'bokeh',
+        'matplotlib',
+        'plotly',
+        'qgrid',
+        'bqplot',
+        'beakerx',
+        # ----------------------   jupyter notebook dependencies
+        'ipywidgets',
+        'runtime',
+        'request',
+        # ---------------------    machine learning dependencies
+        'sklearn',
+        'scikit-garden',
+        'forestci',
+        'tensorflow',
+        'keras'
+    ]
 )
