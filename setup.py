@@ -12,7 +12,6 @@ setup(
     version='v0.00.06',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
-    package_data=setuptools.get_package_data(),
     license='Not define yet. Most probably similar to ALICE (CERN)  license',
     long_description=long_description,
     long_description_content_type="text/markdown",
