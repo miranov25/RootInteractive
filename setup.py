@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.06',
+    version='v0.00.07',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
     license='Not define yet. Most probably similar to ALICE (CERN)  license',
