@@ -1,6 +1,5 @@
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool
-# from bokeh.palettes import *
 from bokeh.transform import *
 #from bokehTools import *
 from bokeh.layouts import *
@@ -8,12 +7,21 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook
 # import copy
 import pyparsing
+from IPython import get_ipython
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle",  "asterisk", "squareX","X"]
 
 
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
+    """
+    :param layoutRow:
+    :param figureList:
+    :param layoutList:
+    :param optionsMother:
+    :param verbose:
+    :return:
+    """
     if verbose > 0: print("Raw", layoutRow)
     array = []
     layoutList.append(array)
@@ -53,7 +61,12 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             fig.plot_height = int(option["plot_height"])
 
 
-def __processBokehLayoutOption(layoutOptions):  # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
+def __processBokehLayoutOption(layoutOptions):
+    """
+    :param layoutOptions:
+    :return:
+    """
+    # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
     options = {}
     for x in layoutOptions:
         if not (type(x) == str): continue
@@ -74,20 +87,22 @@ def __processBokehLayoutOption(layoutOptions):  # https://stackoverflow.com/ques
 
 
 def processBokehLayout(layoutString, figList, verbose=0):
-    """
-    :param layoutString:    layout string   see example https://github.com/miranov25/RootInteractiveTest/blob/870533dee18e528d0716a7e6feff8c8289c172dc/JIRA/PWGPP-485/parseLayout.ipynb
-           syntax:
-                layout=((row0),<(row1)>, ..., globalOptions)
-                rowX=(id0,<id1>, ...,rowOptions)
-           raw option derived from the global option, could be locally overwritten
-           option :
-                ["plot_width", "plot_height", "commonX", "commonY", "x_visible", "y_visible"]
-           Example syntax:
-                layout="((0,2,3,x_visible=1,y_visible=0), (1,plot_height=80, x_visible=0),"
-                layout+="(4,plot_height=80), plot_width=900, plot_height=200, commonY=1,commonX=1,x_visible=0)"
+    r"""
+    :param layoutString:
+        * layout string   see example
+            https://github.com/miranov25/RootInteractiveTest/blob/870533dee18e528d0716a7e6feff8c8289c172dc/JIRA/PWGPP-485/parseLayout.ipynb
+        * syntax:
+            >>> layout="((row0),<(row1)>, ..., globalOptions)"
+            >>> rowX="(id0,<id1>, ...,rowOptions)"
+        * raw option derived from the global option, could be locally overwritten
+        * layout options :
+            >>> ["plot_width", "plot_height", "commonX", "commonY", "x_visible", "y_visible"]
+        * Example layout syntax:
+            >>> layout="((0,2,3,x_visible=1,y_visible=0), (1,plot_height=80, x_visible=0),"
+            >>> layout+="(4,plot_height=80), plot_width=900, plot_height=200, commonY=1,commonX=1,x_visible=0)"
     :param figList:         array of figures to draw
     :param verbose:  verbosity
-    :return:
+    :return: result as a string, layout list, options
     """
     # optionParse are propagated to daughter and than removed from global list
     optionsParse = ["plot_width", "plot_height", "commonX", "commonY", "x_visible", "y_visible"]
@@ -107,29 +122,38 @@ def processBokehLayout(layoutString, figList, verbose=0):
 
 
 def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
-    """
-    drawing example - functionality like the tree->Draw colz
-    :param dataFrame:   data frame
+    r"""
+    drawColzArray
+    :param dataFrame: data frame
     :param query:
-    :param varX:        x query
-    :param varY:        y query array of queries
-    :param varColor:    z query
-    :param p:           figure template TODO - check if some easier way to pass parameters -CSS string ?
-    :param options      optional drawing parameters
-      option - ncols - number fo columns in drawing
-      option - commonX=?,commonY=? - switch share axis
-      option - size
-      option errX  - query for errors on X
-      option errY  - array of queries for errors on Y
-      option tooltip - tooltip to show
-
+        selection e.g:
+            >>> "varX>1&abs(varY)<2&A>0"
+    :param varX:      x query
+    :param varY:
+        y query array of queries
+            >>> "A:B:C:D:A"
+    :param varColor:  z query
+    :param p:         figure template
+    :param options:
+        optional drawing parameters
+            * option - ncols - number fo columns in drawing
+            * option - commonX=?,commonY=? - switch share axis
+            * option - size
+            * option errX  - query for errors on X
+            * option errY  - array of queries for errors on Y
+            * option tooltip - tooltip to show
     :return:
-    TODO  use other options if specified: size file and line color - p.circle(x, factors, size=15, fill_color="orange", line_color="green", line_width=3)
+        figure, handle (for bokeh notebook), bokeh CDS
+        drawing example - functionality like the tree->Draw( colz)
+    :Example:
+        https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/PWGPP-518/layoutPlay.ipynb
+            >>>  df = pd.DataFrame(np.random.randint(0,100,size=(200, 4)), columns=list('ABCD'))
+            >>>  drawColzArray(df,"A>0","A","A:B:C:D:A","C",None,ncols=2,plot_width=400,commonX=1, plot_height=200)
     """
     dfQuery = dataFrame.query(query)
     source = ColumnDataSource(dfQuery)
     mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
-
+    isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
     varYArray = varY.split(":")
     varXArray = varX.split(":")
     plotArray = []
@@ -201,8 +225,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     if 'layout' in options.keys():  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplot(layoutList, **optionsLayout)
-        handle = show(pAll, notebook_handle=True)
-        return pAll, handle, source
+        handle = show(pAll, notebook_handle=isNotebook)
+        return pAll, handle, source, plotArray
 
     nCols = 1
     if 'ncols' in options.keys():
@@ -210,11 +234,11 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     # nRows=len(plotArray)/ncols+1
     plotArray2D = []
     for i, plot in enumerate(plotArray):
-        pRow = i / nCols
+        pRow = int(i / nCols)
         pCol = i % nCols
         if pCol == 0: plotArray2D.append([])
-        plotArray2D[pRow].append(plot)
+        plotArray2D[int(pRow)].append(plot)
     pAll = gridplot(plotArray2D)
-    #    print(plotArray2D)
-    handle = show(pAll, notebook_handle=True)  # TODO make it OPTIONAL
-    return pAll, handle, source
+    #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
+    handle = show(pAll, notebook_handle=isNotebook)  # TODO make it OPTIONAL
+    return pAll, handle, source, plotArray

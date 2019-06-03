@@ -1,16 +1,14 @@
 # from bokeh.palettes import *
 import re
-#from itertools import izip
-import pyparsing
 from bokeh.models import *
-from bokeh.models import ColumnDataSource
+# from bokeh.models import ColumnDataSource
 
 from .bokehTools import *
 from ipywidgets import *
 from RootInteractive.Tools.aliTreePlayer import *
 from IPython.display import display
+from IPython import get_ipython
 import ROOT
-
 
 class bokehDraw(object):
 
@@ -60,7 +58,7 @@ class bokehDraw(object):
         """
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
-                print("Panda Dataframe is parsing...")
+                print("Panda DataFrame is parsing...")
             df = source
         else:
             if (self.verbosity >> 1) & 1:
@@ -112,16 +110,18 @@ class bokehDraw(object):
         self.varColor = varColor
         self.options = options
         self.initWidgets(widgetString)
-        self.figure, self.handle, self.bokehSource = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
         self.updateInteractive("")
         display(self.Widgets)
 
     def initWidgets(self, widgetString):
-        # type: (str) -> None
-        """
-        parse widgetString string and create widgets
-        :param widgetString:   example string - slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
-        :return: s sliders
+        r"""
+        Fill  structure self.widgets (master widget)
+
+        :param widgetString:
+            example string
+                >>>  slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
+        :return: none
         """
         self.parseWidgetString(widgetString)
         accordBox = []
@@ -150,11 +150,17 @@ class bokehDraw(object):
         self.Widgets = widgets.VBox(self.all, layout=Layout(width='66%'))
 
     def fillArray(self, iWidget, array):
-        """
-        Gets create the specified widget and append it into the given widget array.
-        :param iWidget:          is a list with 2 entry: 1.entry is a string: "type.name"
-                                                        2.entry is a list of parameters
-        :param array:           is the list of widgets to be added
+        r"""
+        Internal function, filling widgets. Create the specified widget and append it into the given widget *array*.
+
+        :param iWidget:
+            is a list with 2 entry [typeName,[parameter list]]
+                * 1.) entry is a string: type.name - e.g:
+                    >>> "slider.meanMIP"
+                * 2.) entry is a list of parameters - e.g:
+                    >>> [45,55,0.1,45,55]
+        :param array: is the array where the where the widgets will be appended
+        :return: none
         """
         global title
         title = iWidget[0].split('.')
@@ -202,6 +208,12 @@ class bokehDraw(object):
             array.append(localWidget)
 
     def updateInteractive(self, b):
+        """
+        callback function to update drawing CDS (Column data source) of drawing object
+
+        :param b: not used
+        :return: none
+        """
         sliderQuery = ""
         allWidgets = []
         for iWidget in [item[1:] for item in self.accordArray] + [item[1:] for item in
@@ -223,9 +235,30 @@ class bokehDraw(object):
         self.bokehSource.data = newSource.data
         if self.verbosity & 1:
             print(sliderQuery)
-        push_notebook(self.handle)
+        isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
+        if isNotebook:
+            push_notebook(self.handle)
 
     def parseWidgetString(self, widgetString):
+        r'''
+        Build widgets and connect observe function of the bokehDraw object
+
+        :param widgetString:
+            Example:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
+                >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+                >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+                >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+        :return:
+            fill widgets arrays  to be shown in the Notebook
+                * widgetArray
+                * accordArray
+                * tabArray
+
+        Algorithm:
+            * make a tree representation of widgets (recursive list of lists)
+            * create an recursive widget structure
+            * assign
+        '''
         toParse = "(" + widgetString + ")"
         theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
         widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
@@ -256,6 +289,15 @@ def findInList(c, classes):
 
 
 def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
+    """
+    :param tree:
+    :param variables:
+    :param selection:
+    :param nEntries:
+    :param firstEntry:
+    :param columnMask:
+    :return:
+    """
     entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
     columns = variables.split(":")
     # replace column names

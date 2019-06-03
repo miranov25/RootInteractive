@@ -76,7 +76,7 @@ def test_Parsing():
         parseTreeVariables(expression, counts)
 
 
-# test_AnyTree()
+test_AnyTree()
 # test_Aliases()
 
 test_Parsing()

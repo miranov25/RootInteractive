@@ -3,28 +3,33 @@ import pandas as pd
 import logging
 from bokeh.models import *
 from bokeh.palettes import *
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool
+# from bokeh.models import ColumnDataSource, ColorBar, HoverTool
 # from bokeh.palettes import *
-from bokeh.transform import *
-from bokehTools import *
-from bokeh.layouts import *
+# from bokeh.transform import *
+from .bokehTools import *
+# from bokeh.layouts import *
 from bokeh.palettes import *
-from bokeh.io import push_notebook
+
+
+# from bokeh.io import push_notebook
 
 
 def makeHistogram(data, hisString, verbose):
-    """
+    r"""
     Make N dimensional numpy histograms for given histogram string
+
     :param data:            input panda
     :param hisString:       histogram setup string
     :param verbose:         verbosity flag
-    :return: dictionary with histogram information
-            H              - ndarrray
-            axis           - axis description
-            varNames       - variable Names
-            name           - histogram name
+    :return:
+        dictionary with histogram information
+            * H              - ndarrray
+            * axis           - axis description
+            * varNames       - variable Names
+            * name           - histogram name
+
     Example usage:
-        makeHistogram(MCdata,"TRD:pmeas:particle:#TRD>0>>hisTRDPP(50,0.5,3,20,0.3,5,5,0,5)",3)
+        >>> makeHistogram(MCdata,"TRD:pmeas:particle:#TRD>0>>hisTRDPP(50,0.5,3,20,0.3,5,5,0,5)",3)
     """
     if verbose & 0x1:
         logging.info("makeHistogram   :%s", hisString)
@@ -76,13 +81,17 @@ def makeHistogramPanda(data, hisString, verbose):
 def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, figOption, graphOption):
     """
     Draw slices of histogram
-    :param histo:                 - hestogram dictionary - see description in makeHistogram
-    :param hSlice:                - slice to visualize (see numpy slice decumatiation)  e.g np.index_exp[:, 1:3,3:5]
+        prototype usage in https://github.com/miranov25/RootInteractiveTest/blob/394a934ac206da8a7ae8da582fa9e0ae7efd686f/JIRA/PWGPP-517/pandaHistoPrototype.ipynb
+
+    :param histo:                 - histogram dictionary - see description in makeHistogram
+    :param hSlice:
+        - slice to visualize (see numpy slice documentation)  e.g:
+            >>> np.index_exp[:, 1:3,3:5]
     :param axisX:                 - variable index - projection to draw
     :param axisColor:             - variable index to scan
     :param figOption:             - options (python dictionary)  for figure
     :param graphOption:           - option (dictionary) for figure
-    :return:
+    :return:                       histogram figure
     """
     #
     sliceString = str(hSlice).replace("slice", "")
@@ -119,8 +128,8 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, figOption, graphOpt
 
 
 class bokehDrawHistoND(object):
-     def __init__(self, source, query, varX, varY, varColor, widgetString, p, **options):
-         """
+    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **options):
+        """
          :param source:            panda data source  or tree
          :param query:             selection
          :param variableList
@@ -128,4 +137,4 @@ class bokehDrawHistoND(object):
          :param graphOption
          :param figOption
          """
-         print(source)
+        print(source)

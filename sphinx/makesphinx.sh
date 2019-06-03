@@ -1,7 +1,7 @@
 # 1.)
 echo "1.) create documentation directory"
 echo "1.) sphinx-apidoc RootInteractive -o ./docs"
-sphinx-apidoc RootInteractive -o ./docs
+sphinx-apidoc RootInteractive -o ./docs -d 3 -P -A "Marian Ivanov" -V "v0.0.07"
 # 2.)
 echo "2.) cp sphinx/conf.py docs/"
 cp sphinx/conf.py docs/

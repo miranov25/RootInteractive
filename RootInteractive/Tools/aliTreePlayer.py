@@ -33,16 +33,19 @@ def SetAlias(data, column_name, formula):
 
 
 def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='default'):
-    """
-    convert selected items from the tree into panda table
-    TODO - import fail in case of number of entries>2x10^6  (infinite loop) - to check the reason
+    r"""
+    Convert selected items from the tree into panda table
+        TODO:
+            * import fail in case of number of entries>2x10^6  (infinite loop) - to check the reason
+            * use data source and aliases to enable characters forbidden in Pandas .[]() which are allowd in ROOT trees
+
     :param tree:            input tree
-    :param variables:
-    :param selection:
-    :param nEntries:
-    :param firstEntry:
-    :param columnMask:
-    :return:
+    :param variables:       ":" separiated variable list
+    :param selection:       tree selection ()
+    :param nEntries:        number of entries to query
+    :param firstEntry:      first entry to query
+    :param columnMask:      mask - replace variable
+    :return:                panda data frame
     """
     entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
     columns = variables.split(":")
@@ -71,8 +74,13 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
 #  Dictionary processing
 
 def aliasToDictionary(tree):
+    """
+    :param tree: input tree
+    :return: dictionary of aliases
+    """
     aliases = {}
-    for a in tree.GetListOfAliases(): aliases[a.GetName()] = a.GetTitle()
+    if tree.GetListOfAliases()!=None:
+        for a in tree.GetListOfAliases(): aliases[a.GetName()] = a.GetTitle()
     return aliases
 
 
@@ -82,16 +90,19 @@ def __processAnyTreeBranch(branch0, parent):
 
 
 def treeToAnyTree(tree):
-    """
-    treeToAntTree representation
+    r"""
     :param tree:  input TTree
     :return:  parent node of the anytree object
-    Example usage: see test_aliTreePlayer.py::test_AnyTree()
-        branchTree=treeToAnyTree(treeQA)
-        print(findall(branchTree, filter_=lambda node: re.match("bz", node.name)))
-        print(findall(branchTree, filter_=lambda node: re.match("MIP.*Warning$", node.name)))
-        (Node('/tree/bz'),)
-        (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
+
+    Example usage:
+        see test_aliTreePlayer.py::test_AnyTree()
+
+            >>> branchTree=treeToAnyTree(treeQA)
+            >>> print(findall(branchTree, filter_=lambda node: re.match("bz", node.name)))
+            >>> print(findall(branchTree, filter_=lambda node: re.match("MIP.*Warning$", node.name)))
+            ==>
+            (Node('/tree/bz'),)
+            (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
     parent = Node("tree")
     for branch in tree.GetListOfBranches():
@@ -110,22 +121,29 @@ def treeToAnyTree(tree):
 
 def findSelectedBranch(anyTree, regexp, **findOption):
     """
-    return array of selected branches
     :param anyTree:
     :param regexp:
-    :param findOption   -   from list = stop=None, maxlevel=None, mincount=None, maxcount=None
-    :return: selected anyTree branches
-    Example usage: test_aliTreePlayer.py::test_AnyTree()
-    branchTree = treeToAnyTree(tree)
-    print(findSelectedBranch(branchTree, "MIP.*Warning"))
-    ==> (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
+    :param findOption:
+        * stop=None
+        * maxlevel=None
+        * mincount=None
+        * maxcount=None
+    :return:
+        selected anyTree branches
+
+    Example usage:
+        >>>   test_aliTreePlayer.py::test_AnyTree()
+        >>>   branchTree = treeToAnyTree(tree)
+        >>> print(findSelectedBranch(branchTree, "MIP.*Warning"))
+        ==> (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
     return findall(anyTree, filter_=lambda nodeF: re.match(regexp, nodeF.name), **findOption)
 
 
 def makeAliasAnyTree(key, aliases, parent=None):
     """
-    build recursive alias anytree
+    Build recursive alias anytree
+
     :param key:          - start key
     :param parent:       - initial node
     :param aliases:      - alias dictionary
@@ -147,15 +165,26 @@ def makeAliasAnyTree(key, aliases, parent=None):
     return parent
 
 
-def getAliasAnyTreee(base, regexp, **findOption):
+def getAliasAnyTree(base, regexp, **findOption):
+    """
+    :param base:        base node
+    :param regexp:      regular expression
+    :param findOption:   see https://anytree.readthedocs.io/en/latest/api/anytree.search.html
+    :return: liast of aliases fulfilling
+    """
     return [a.name for a in findall(base, filter_=lambda node: re.match(regexp, node.name), **findOption)]
 
 
 def getTreeInfo(tree):
     """
     GetTree information description
-    :param tree: input tree
-    :return: dictionary with all branches,
+
+    :param tree:        input tree
+    :return:
+        * dictionary with tree information
+            * friends
+            * aliases
+            * metaTable
     """
     treeInfo = {'aliases': aliasToDictionary(tree)}
     friends = treeInfo['friends'] = {}
@@ -187,17 +216,19 @@ def __parseVariableList(parserOut, varList):
 
 
 def parseTreeVariables(expression, counts=None, verbose=0):
-    """
-        parseTreeExpression and fill flat list with tree variable needed for evaluation
-    Used in  getAndTestVariableList
+    r"""
+    ParseTreeExpression and fill flat list with tree variable needed for evaluation
+        * Used in  getAndTestVariableList
+
     :param verbose:     verbosity
-    :param expression:  expression to parse e.g. expr="x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1"
+    :param expression: expression to parse
     :param counts:
-    :return:
+    :return: dictionary with pairs variable:count
         :type counts: dict
+
     Example usage:
-        :parseVariables("x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1")
-         ==>
+        >>> parseVariables("x>1 & x>0 | y==1 |x+1>2| (x2<2) | (x1*2)<2| sin(x)<1")
+        ==>
         {'sin': 1, 'x': 4, 'x1': 1, 'x2': 1, 'y': 1}
     """
     if verbose: print("expression", expression)
@@ -216,8 +247,7 @@ def parseTreeVariables(expression, counts=None, verbose=0):
 
 
 def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None, verbose=0):
-    """
-    getAndTest variable list - decompose expression and extract the list of variables/branches/aliases  which should be extracted from trees
+    r"""
     :param verbose:
     :type toReplace: list
     :type toRemove: list
@@ -225,22 +255,27 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
     :param toRemove:         - list of regular expression to be ignored
     :param toReplace:        - list of regular expression to be replaced
     :param tree:             - tree
-    :return:                 - list of the trivial expression to export
-    Example: - see also test_aliTreePlayer.py:test_TreeParsing():
-        selection="meanMIP>0&resolutionMIP>0"
-        varDraw="meanMIP:meanMIPele:resolutionMIP:xxx"
-        widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-        widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-        widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
-        toRemove=["^tab\..*"]
-        toReplace=["^slider.","^checkbox."]
-        #
-        getAndTestVariableList([selection,varDraw,widgets],toRemove,toReplace)
-        ==>
-        ('Not existing tree variable', 'xxx')
-        {'meanMIP': 1, 'global_Warning': 1, 'MIPquality_Outlier': 1, 'resolutionMIP': 1, 'MIPquality_Warning': 1, 'global_Outlier': 1, 'time': 1, 'meanMIPele': 1, 'MIPquality_PhysAcc': 1}
-    Usage: general - but it is used for the bokeDraw from tree to export varaibles to bokeh format
+    :return:
+        list of the trivial expression to export
+            * getAndTest variable list
+            * decompose expression and extract the list of variables/branches/aliases  which should be extracted from trees
 
+    Example usage:
+        * see also test_aliTreePlayer.py:test_TreeParsing()
+            >>> selection="meanMIP>0&resolutionMIP>0"
+            >>> varDraw="meanMIP:meanMIPele:resolutionMIP:xxx"
+            >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+            >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+            >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+            >>> toRemove=["^tab\..*"]
+            >>> toReplace=["^slider.","^checkbox."]
+            >>>
+            >>> getAndTestVariableList([selection,varDraw,widgets],toRemove,toReplace)
+            ==>
+            ('Not existing tree variable', 'xxx')
+            {'meanMIP': 1, 'global_Warning': 1, 'MIPquality_Outlier': 1, 'resolutionMIP': 1, 'MIPquality_Warning': 1, 'global_Outlier': 1, 'time': 1, 'meanMIPele': 1, 'MIPquality_PhysAcc': 1}
+    Usage:
+        general - but it is used for the bokeDhraw from tree to export variables to bokeh format
     """
     if toReplace is None:
         toReplace = []
