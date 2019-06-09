@@ -5,6 +5,7 @@ import pyparsing
 from anytree import *
 import ROOT
 import re
+import logging
 
 
 def readDataFrameURL(fName, nrows=0):
@@ -60,11 +61,9 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
             for mask in masks:
                 column = column.replace(mask, "")
         columns[i] = column.replace(".", "_")
-    #    print(i, column)
-    # print(columns)
+
     ex_dict = {}
     for i, a in enumerate(columns):
-        # print(i,a)
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
@@ -231,7 +230,7 @@ def parseTreeVariables(expression, counts=None, verbose=0):
         ==>
         {'sin': 1, 'x': 4, 'x1': 1, 'x2': 1, 'y': 1}
     """
-    if verbose: print("expression", expression)
+    if verbose: logging.info("expression", expression)
     if counts is None:
         counts = dict()
     varList = []
@@ -239,8 +238,11 @@ def parseTreeVariables(expression, counts=None, verbose=0):
                  | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress('-') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
                  | pyparsing.Suppress('*') | pyparsing.Suppress(':')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
-    res = parents.parseString("(" + expression + ")")
-    __parseVariableList(res, varList)
+    try:
+        res = parents.parseString("(" + expression + ")")
+        __parseVariableList(res, varList)
+    except :
+        logging.error("Oops!  That was no valid number.  Try again...", expression)
     for i in varList:
         counts[i] = counts.get(i, 0) + 1
     return counts
@@ -283,7 +285,8 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
         toRemove = []
     counts = dict()
     for expression in expressions:
-        parseTreeVariables(expression, counts, verbose)
+        if type(expression)== str:
+            parseTreeVariables(expression, counts, verbose)
     pop_list = []
     for mask in toRemove:
         for a in counts.keys():
@@ -308,7 +311,7 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
         dictionary = treeToAnyTree(tree)
         for key in counts.keys():
             if findSelectedBranch(dictionary, key + "$") == ():
-                print("Not existing tree variable", key)
+                logging.info("Not existing tree variable", key)
                 pop_list.append(key)
                 #del (counts[key])
     for x in pop_list:

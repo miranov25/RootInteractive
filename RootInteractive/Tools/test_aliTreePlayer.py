@@ -1,6 +1,10 @@
-from RootInteractive.Tools.aliTreePlayer import *
-import ROOT
 
+import ROOT
+import logging
+from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
+from RootInteractive.Tools.aliTreePlayer import *
+ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+from bokeh.io import curdoc
 
 def test_AliExternalInfo():
     """ test if the tree could be read """
@@ -59,7 +63,7 @@ def test_TreeParsing():
     widgets += "tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
     toRemove = [r"^tab\..*"]
     toReplace = ["^slider.", "^checkbox."]
-    print(getAndTestVariableList([selection, varDraw, widgets, "xxx"], toRemove, toReplace, tree))
+    logging.info(getAndTestVariableList([selection, varDraw, widgets, "xxx"], toRemove, toReplace, tree))
 
 
 def test_Parsing():

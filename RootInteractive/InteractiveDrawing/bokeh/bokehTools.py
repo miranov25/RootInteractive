@@ -1,16 +1,16 @@
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool
 from bokeh.transform import *
-#from bokehTools import *
+# from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook
-# import copy
+import logging
 import pyparsing
 from IPython import get_ipython
 
 # tuple of Bokeh markers
-bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle",  "asterisk", "squareX","X"]
+bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
 
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
@@ -22,11 +22,11 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
     :param verbose:
     :return:
     """
-    if verbose > 0: print("Raw", layoutRow)
+    if verbose > 0: logging.info("Raw", layoutRow)
     array = []
     layoutList.append(array)
     option = __processBokehLayoutOption(layoutRow)
-    if verbose > 0: print("Option", option)
+    if verbose > 0: logging.info("Option", option)
     for key in optionsMother:
         if not (key in option):
             option[key] = optionsMother[key]
@@ -49,14 +49,14 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
                 try:
                     fig.x_range = figureList[int(option["commonX"])].x_range
                 except ValueError:
-                    if verbose > 0: print('Failed: to process option ' + option["commonX"])
+                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
 
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
     nCols = len(array)
     for fig in array:
         if 'plot_width' in option:
-            fig.plot_width = int(option["plot_width"]/ nCols)
+            fig.plot_width = int(option["plot_width"] / nCols)
         if 'plot_height' in option:
             fig.plot_height = int(option["plot_height"])
 
@@ -110,9 +110,9 @@ def processBokehLayout(layoutString, figList, verbose=0):
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString(layoutString)[0]
     layoutList = []
-    if verbose > 0: print(res)
+    if verbose > 0: logging.info(res)
     options = __processBokehLayoutOption(res)
-    if verbose > 0: print(options)
+    if verbose > 0: logging.info(options)
     for x in res:
         if type(x) != str:
             __processBokehLayoutRow(x, figList, layoutList, options, verbose)
@@ -121,7 +121,7 @@ def processBokehLayout(layoutString, figList, verbose=0):
     return res.asList(), layoutList, options
 
 
-def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
+def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     r"""
     drawColzArray
     :param dataFrame: data frame
@@ -134,14 +134,14 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
             >>> "A:B:C:D:A"
     :param varColor:  z query
     :param p:         figure template
-    :param options:
+    :param kwargs:
         optional drawing parameters
-            * option - ncols - number fo columns in drawing
-            * option - commonX=?,commonY=? - switch share axis
-            * option - size
-            * option errX  - query for errors on X
-            * option errY  - array of queries for errors on Y
-            * option tooltip - tooltip to show
+            * option           - ncols - number fo columns in drawing
+            * option           - commonX=?,commonY=? - switch share axis
+            * option           - size
+            * option errX      - query for errors on X
+            * option errY      - array of queries for errors on Y
+            * option tooltip   - tooltip to show
     :return:
         figure, handle (for bokeh notebook), bokeh CDS
         drawing example - functionality like the tree->Draw( colz)
@@ -152,47 +152,45 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
     """
     dfQuery = dataFrame.query(query)
     source = ColumnDataSource(dfQuery)
-    mapper = linear_cmap(field_name=varColor, palette=Spectral6, low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
-    isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
+    # define default options
+    options = {
+        'line': -1,
+        'size': 2,
+        'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'y_axis_type': 'auto',
+        'x_axis_type': 'auto',
+        'plot_width': 600,
+        'plot_height': 400,
+        'errX': '',
+        'errY': '',
+        'commonX': -1,
+        'commonY': -1,
+        'ncols': -1,
+        'layout': '',
+        'palette': Spectral6
+    }
+    options.update(kwargs)
+
+    mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
+    isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
     varYArray = varY.split(":")
     varXArray = varX.split(":")
     plotArray = []
     pFirst = None
-    size = 2
-    if 'line' in options.keys():
-        line = options['line']
-    else:
-        line = 0
-    if 'size' in options.keys(): size = options['size']
-    tools = 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset'
-    if 'tooltip' in options.keys(): tools = [HoverTool(tooltips=options['tooltip']), tools]
-    if 'y_axis_type' in options.keys():
-        y_axis_type = options['y_axis_type']
-    else:
-        y_axis_type = 'auto'
-    if 'x_axis_type' in options.keys():
-        x_axis_type = 'datetime'
-    else:
-        x_axis_type = 'auto'
-    if 'errX' in options.keys(): varXerr = options['errX']
-    if 'errY' in options.keys():
+
+    if len(options['errX']) > 1: varXerr = options['errX']
+    if len(options['errY']) > 1:
         varYerrArray = options['errY'].split(":")
     else:
         varYerrArray = varYArray
-    plot_width = 400
-    plot_height = 400
-    if p:
-        plot_width = p.plot_width
-        plot_height = p.plot_height
-    if 'plot_width' in options.keys(): plot_width = options['plot_width']
-    if 'plot_height' in options.keys(): plot_height = options['plot_height']
 
     for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
-        yArray=yS.strip('()').split(",")
-        yArrayErr=yErrorS.strip('[]').split(",")
-        p2 = figure(plot_width=plot_width, plot_height=plot_height, title=yS + " vs " + varX + "  Color=" + varColor, tools=tools, x_axis_type=x_axis_type, y_axis_type=y_axis_type)
-        fIndex=0
-        varX=varXArray[min(idx,len(varXArray)-1)]
+        yArray = yS.strip('()').split(",")
+        yArrayErr = yErrorS.strip('[]').split(",")
+        p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
+                    tools=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+        fIndex = 0
+        varX = varXArray[min(idx, len(varXArray) - 1)]
 
         for y, yError in zip(yArray, yArrayErr):
             if 'varXerr' in locals():
@@ -202,43 +200,39 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **options):
                     err_x_y.append((coord_y, coord_y))
                     err_x_x.append((coord_x - x_err, coord_x + x_err))
                 p2.multi_line(err_x_x, err_x_y)
-            if 'errY' in options.keys():
+            if 'errY' in kwargs.keys():
                 err_y_x = []
                 err_y_y = []
                 for coord_x, coord_y, y_err in zip(source.data[varX], source.data[y], source.data[yError]):
                     err_y_x.append((coord_x, coord_x))
                     err_y_y.append((coord_y - y_err, coord_y + y_err))
                 p2.multi_line(err_y_x, err_y_y)
-            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=size, marker=bokehMarkers[fIndex % 4])
-            if line == 1: p2.line(x=varX, y=y, source=source)
-            fIndex+=1
+            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'], marker=bokehMarkers[fIndex % 4])
+            if options['line'] > 0: p2.line(x=varX, y=y, source=source)
+            fIndex += 1
 
-        if pFirst:
-            if 'commonX' in options.keys(): p2.x_range = pFirst.x_range
-            if 'commonY' in options.keys(): p2.y_range = pFirst.y_range
+        if pFirst:  # set common X resp Y if specified. NOTE usage of layout options is more flexible
+            if options['commonX'] > 0: p2.x_range = pFirst.x_range
+            if options['commonY'] > 0: p2.y_range = pFirst.y_range
         else:
             pFirst = p2
         plotArray.append(p2)
         color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
         p2.add_layout(color_bar, 'right')
 
-    if 'layout' in options.keys():  # make figure according layout
+    if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplot(layoutList, **optionsLayout)
         handle = show(pAll, notebook_handle=isNotebook)
         return pAll, handle, source, plotArray
 
-    nCols = 1
-    if 'ncols' in options.keys():
-        nCols = options['ncols']
-    # nRows=len(plotArray)/ncols+1
     plotArray2D = []
     for i, plot in enumerate(plotArray):
-        pRow = int(i / nCols)
-        pCol = i % nCols
+        pRow = int(i / options['ncols'])
+        pCol = i % options['ncols']
         if pCol == 0: plotArray2D.append([])
         plotArray2D[int(pRow)].append(plot)
     pAll = gridplot(plotArray2D)
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
-    handle = show(pAll, notebook_handle=isNotebook)  # TODO make it OPTIONAL
+    handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, handle, source, plotArray

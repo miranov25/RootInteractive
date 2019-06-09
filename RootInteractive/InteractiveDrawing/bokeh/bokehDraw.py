@@ -9,6 +9,7 @@ from RootInteractive.Tools.aliTreePlayer import *
 from IPython.display import display
 from IPython import get_ipython
 import ROOT
+import logging
 
 class bokehDraw(object):
 
@@ -58,16 +59,18 @@ class bokehDraw(object):
         """
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
-                print("Panda DataFrame is parsing...")
+                logging.info("Panda DataFrame is parsing...")
             df = source
         else:
             if (self.verbosity >> 1) & 1:
-                print('source is not a Panda DataFrame, assuming it is ROOT::TTree')
+                logging.info('source is not a Panda DataFrame, assuming it is ROOT::TTree')
             varList = []
             if 'variables' in options.keys():
                 varList = options['variables'].split(":")
             varSource = [varColor, varX, varY, widgetString, query]
-            toRemove = ["^tab\..*", "^accordion\..*", "^False", "^True", "^false", "^true"]
+            if 'errY' in options.keys():
+                varSource.append(options['errY'])
+            toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
             toReplace = ["^slider.", "^checkbox.", "^dropdown."]
             varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
             if 'tooltip' in options.keys():
@@ -123,7 +126,10 @@ class bokehDraw(object):
                 >>>  slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
         :return: none
         """
-        self.parseWidgetString(widgetString)
+        try:
+            self.parseWidgetString(widgetString)
+        except:
+            logging.error("Invalid widget string", widgetString)
         accordBox = []
         tabBox = []
         for acc in self.accordArray:
@@ -201,7 +207,7 @@ class bokehDraw(object):
                     "Slider {} has {} parameters.".format(title[1], len(iWidget[1])))
         else:
             if (self.verbosity >> 1) & 1:
-                print("type of the widget\"" + title[0] + "\" is not specified. Assuming it is a slider.")
+                logging.info("type of the widget\"" + title[0] + "\" is not specified. Assuming it is a slider.")
             self.fillArray(["slider." + title[0], iWidget[1]], array)  # For backward compatibility
         if localWidget != 0:
             localWidget.observe(self.updateInteractive, names='value')
@@ -234,7 +240,7 @@ class bokehDraw(object):
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
         if self.verbosity & 1:
-            print(sliderQuery)
+            logging.info(sliderQuery)
         isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
         if isNotebook:
             push_notebook(self.handle)
@@ -311,16 +317,13 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
             for mask in masks:
                 iColumn = iColumn.replace(mask, "")
         columns[i] = iColumn.replace(".", "_")
-    #    print(i, column)
-    # print(columns)
+
     ex_dict = {}
     for i, a in enumerate(columns):
-        # print(i,a)
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):  # change type to time format if specified
         if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
-            print(a, "isTime")
             df[a] = pd.to_datetime(df[a], unit='s')
     return df

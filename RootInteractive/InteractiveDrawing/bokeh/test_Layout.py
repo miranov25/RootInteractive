@@ -21,5 +21,5 @@ def test_Layout():
     fig2=drawColzArray(df, "A>0", "A", "A:B:C:D", "C", None, layout=testLayout2)
 
 
-test_Draw()
-test_Layout()
+#test_Draw()
+#test_Layout()
