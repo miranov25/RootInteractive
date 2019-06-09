@@ -3,6 +3,7 @@ scipy
 pandas
 anytree
 pytest
+nbval
 ##---------------------   graphics  dependencies
 bokeh
 matplotlib
