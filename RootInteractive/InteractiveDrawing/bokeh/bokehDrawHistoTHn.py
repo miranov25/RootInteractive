@@ -7,7 +7,7 @@ from bokeh.io import push_notebook
 from ipywidgets import *
 import pyparsing
 
-class drawHisto(object):
+class bokehDrawHistoTHn(object):
     def __init__(self, histograms, selection, **options):
         """
         :param histograms:      TObjArray consists of multidimensional TTree's ( THnT )
