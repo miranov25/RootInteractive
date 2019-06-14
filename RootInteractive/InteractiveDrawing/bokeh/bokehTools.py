@@ -151,7 +151,10 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
             >>>  drawColzArray(df,"A>0","A","A:B:C:D:A","C",None,ncols=2,plot_width=400,commonX=1, plot_height=200)
     """
     dfQuery = dataFrame.query(query)
-    source = ColumnDataSource(dfQuery)
+    try:
+        source = ColumnDataSource(dfQuery)
+    except:
+        logging.error("Invalid source:", source)
     # define default options
     options = {
         'line': -1,
@@ -185,7 +188,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         varYerrArray = varYArray
 
     for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
-        yArray = yS.strip('()').split(",")
+        yArray = yS.strip('[]').split(",")
         yArrayErr = yErrorS.strip('[]').split(",")
         p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
                     tools=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
@@ -236,3 +239,5 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, handle, source, plotArray
+
+
