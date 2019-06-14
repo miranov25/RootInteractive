@@ -70,6 +70,9 @@ class bokehDraw(object):
             varSource = [varColor, varX, varY, widgetString, query]
             if 'errY' in options.keys():
                 varSource.append(options['errY'])
+            if 'tooltips' in options.keys():
+                for tip in options["tooltips"]:
+                    varSource.append(tip[1].replace("@",""))
             toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
             toReplace = ["^slider.", "^checkbox.", "^dropdown."]
             varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
