@@ -159,7 +159,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     options = {
         'line': -1,
         'size': 2,
-        'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tooltips': [],
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
         'plot_width': 600,
@@ -172,6 +173,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'layout': '',
         'palette': Spectral6
     }
+    if 'tooltip' in kwargs:                     # bug fix - to be compatible with old interface (tooltip instead of tooltips)
+        options['tooltips']=kwargs['tooltip']
     options.update(kwargs)
 
     mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
@@ -191,7 +194,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         yArray = yS.strip('()').split(",")
         yArrayErr = yErrorS.strip('[]').split(",")
         p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
-                    tools=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+                    tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
         fIndex = 0
         varX = varXArray[min(idx, len(varXArray) - 1)]
 
@@ -239,5 +242,3 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, handle, source, plotArray
-
-
