@@ -188,7 +188,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         varYerrArray = varYArray
 
     for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
-        yArray = yS.strip('[]').split(",")
+        yArray = yS.strip('()').split(",")
         yArrayErr = yErrorS.strip('[]').split(",")
         p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
                     tools=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
