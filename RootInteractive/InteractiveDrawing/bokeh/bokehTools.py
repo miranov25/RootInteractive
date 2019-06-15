@@ -22,6 +22,7 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
     :param verbose:
     :return:
     """
+    # TODO - add option for margin
     if verbose > 0: logging.info("Raw", layoutRow)
     array = []
     layoutList.append(array)
@@ -54,9 +55,12 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
     nCols = len(array)
-    for fig in array:
+    for fig in array:   #TODO handle margin
+        margin=0
+        if nCols>1:
+            margin=int(0.05*option["plot_width"]/nCols+3)
         if 'plot_width' in option:
-            fig.plot_width = int(option["plot_width"] / nCols)
+            fig.plot_width = int(option["plot_width"] / nCols) - margin
         if 'plot_height' in option:
             fig.plot_height = int(option["plot_height"])
 
@@ -173,8 +177,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'layout': '',
         'palette': Spectral6
     }
-    if 'tooltip' in kwargs:                     # bug fix - to be compatible with old interface (tooltip instead of tooltips)
-        options['tooltips']=kwargs['tooltip']
+    if 'tooltip' in kwargs:  # bug fix - to be compatible with old interface (tooltip instead of tooltips)
+        options['tooltips'] = kwargs['tooltip']
     options.update(kwargs)
 
     mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
@@ -213,8 +217,9 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
                     err_y_x.append((coord_x, coord_x))
                     err_y_y.append((coord_y - y_err, coord_y + y_err))
                 p2.multi_line(err_y_x, err_y_y)
-            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'], marker=bokehMarkers[fIndex % 4])
+            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'], marker=bokehMarkers[fIndex % 4], legend=varX + y)
             if options['line'] > 0: p2.line(x=varX, y=y, source=source)
+            p2.legend.click_policy = "hide"
             fIndex += 1
 
         if pFirst:  # set common X resp Y if specified. NOTE usage of layout options is more flexible
