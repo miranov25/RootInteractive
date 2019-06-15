@@ -13,6 +13,7 @@ class bokehDrawPanda(object):
 
     def __init__(self, source, query, varX, varY, varColor, sliderString, p, **options):
         """
+        DEPRECATED - in the future onnly bokehDraw will be used
         :param source:           input data frame
         :param query:            query string
         :param varX:             X variable name
@@ -40,7 +41,7 @@ class bokehDrawPanda(object):
         self.varColor = varColor
         self.options = options
         self.initSliders(sliderString)
-        self.figure, self.handle, self.bokehSource = drawColzArray(source, query, varX, varY, varColor, p, **options)
+        self.figure, self.handle, self.bokehSource, dummy = drawColzArray(source, query, varX, varY, varColor, p, **options)
         display(self.sliderWidgets)
 
     def initSliders(self, sliderString):
