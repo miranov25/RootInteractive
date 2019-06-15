@@ -1,6 +1,7 @@
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool
 from bokeh.transform import *
+from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
@@ -159,7 +160,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     options = {
         'line': -1,
         'size': 2,
-        'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tooltips': [],
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
         'plot_width': 600,
@@ -172,6 +174,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'layout': '',
         'palette': Spectral6
     }
+    if 'tooltip' in kwargs:                     # bug fix - to be compatible with old interface (tooltip instead of tooltips)
+        options['tooltips']=kwargs['tooltip']
     options.update(kwargs)
 
     mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
@@ -188,10 +192,10 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         varYerrArray = varYArray
 
     for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
-        yArray = yS.strip('[]').split(",")
+        yArray = yS.strip('()').split(",")
         yArrayErr = yErrorS.strip('[]').split(",")
         p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
-                    tools=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+                    tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
         fIndex = 0
         varX = varXArray[min(idx, len(varXArray) - 1)]
 
@@ -241,3 +245,57 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     return pAll, handle, source, plotArray
 
 
+def parseWidgetString(widgetString):
+    r'''
+    Parse widget string and convert it ti nested lists
+
+    :param widgetString:
+    Example:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
+        >>> from InteractiveDrawing.bokeh.bokehTools import *
+        >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+        >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+        >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+        >>> print(parseWidgetString(widgets))
+        ['tab.sliders', ['slider.meanMIP', ['45', '55', '0.1', '45', '55'], 'slider.meanMIPele', ['50', '80', '0.2', '50', '80'], 'slider.resolutionMIP', ['0', '0.15', '0.01', '0', '0.15']], 'tab.checkboxGlobal', ['slider.global_Warning', ['0', '1', '1', '0', '1'], 'checkbox.global_Outlier', ['0']], 'tab.checkboxMIP', ['slider.MIPquality_Warning', ['0', '1', '1', '0', '1'], 'checkbox.MIPquality_Outlier', ['0'], 'checkbox.MIPquality_PhysAcc', ['1']]]           
+    :return:
+        Nested lists of strings to create widgets
+    '''
+    toParse = "(" + widgetString + ")"
+    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
+    widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
+    widgetList = widgetParser.parseString(toParse)[0]
+    return widgetList
+
+def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
+    """
+    :param tree:
+    :param variables:
+    :param selection:
+    :param nEntries:
+    :param firstEntry:
+    :param columnMask:
+    :return:
+    """
+    entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
+    columns = variables.split(":")
+    # replace column names
+    #    1.) pandas does not allow dots in names
+    #    2.) user can specified own mask
+    for i, iColumn in enumerate(columns):
+        if columnMask == 'default':
+            iColumn = iColumn.replace(".fElements", "").replace(".fX$", "X").replace(".fY$", "Y")
+        else:
+            masks = columnMask.split(":")
+            for mask in masks:
+                iColumn = iColumn.replace(mask, "")
+        columns[i] = iColumn.replace(".", "_")
+
+    ex_dict = {}
+    for i, a in enumerate(columns):
+        val = tree.GetVal(i)
+        ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+    df = pd.DataFrame(ex_dict, columns=columns)
+    for i, a in enumerate(columns):  # change type to time format if specified
+        if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
+            df[a] = pd.to_datetime(df[a], unit='s')
+    return df
