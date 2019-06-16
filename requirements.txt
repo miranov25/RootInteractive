@@ -2,8 +2,6 @@ numpy
 scipy
 pandas
 anytree
-pytest
-nbval
 ##---------------------   graphics  dependencies
 bokeh
 matplotlib
@@ -21,3 +19,7 @@ scikit-garden
 forestci
 tensorflow
 keras
+# tests and tutorials
+pytest
+nbval
+nb-clean
