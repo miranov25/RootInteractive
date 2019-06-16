@@ -8,6 +8,7 @@ from bokeh.io import push_notebook
 import logging
 import pyparsing
 from IPython import get_ipython
+from bokeh.models.widgets import DataTable, DateFormatter, TableColumn
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
@@ -35,6 +36,9 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if not y.isdigit(): continue
         fig = figureList[int(y)]
         array.append(fig)
+        if type(fig).__name__ == 'DataTable':
+            print("DataTable");
+            continue
         if 'commonY' in option:
             if type(option["commonY"]) == str:
                 fig.y_range = array[0].y_range
@@ -55,14 +59,17 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
     nCols = len(array)
-    for fig in array:   #TODO handle margin
-        margin=0
-        if nCols>1:
-            margin=int(0.05*option["plot_width"]/nCols+3)
-        if 'plot_width' in option:
-            fig.plot_width = int(option["plot_width"] / nCols) - margin
-        if 'plot_height' in option:
-            fig.plot_height = int(option["plot_height"])
+    for fig in array:
+        if type(fig).__name__ == 'Figure':
+            if 'plot_width' in option:
+                fig.plot_width = int(option["plot_width"] / nCols)
+            if 'plot_height' in option:
+                fig.plot_height = int(option["plot_height"])
+        if type(fig).__name__ == 'DataTable':
+            if 'plot_width' in option:
+                fig.width = int(option["plot_width"] / nCols)
+            if 'plot_height' in option:
+                fig.height = int(option["plot_height"])
 
 
 def __processBokehLayoutOption(layoutOptions):
@@ -123,6 +130,36 @@ def processBokehLayout(layoutString, figList, verbose=0):
     for key in optionsParse:
         if key in options: del options[key]
     return res.asList(), layoutList, options
+
+
+def gridplotRow(figList0, **options):
+    """
+    Make gridplot -resizing properly rows
+    :param figList0: input array of figures
+    :param options:
+    :return:
+    """
+    figList = []
+    for frow in figList0:
+        figList.append([row(frow)])
+    pAll = gridplot(figList, **options)
+    return pAll
+
+
+def makeBokehDataTable(dataFrame, source, **options):
+    """
+    Create widget for datatable
+    :param dataFrame:
+    input data frame
+    :param source:
+    :return:
+    """
+    columns = []
+    for col in dataFrame.columns.values:
+        title = dataFrame.metaData.get(col + ".OrigName", col);
+        columns.append(TableColumn(field=col, title=title))
+    data_table = DataTable(source=source, columns=columns)
+    return data_table
 
 
 def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
@@ -233,7 +270,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
 
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
-        pAll = gridplot(layoutList, **optionsLayout)
+        pAll = gridplotRow(layoutList, **optionsLayout)
         handle = show(pAll, notebook_handle=isNotebook)
         return pAll, handle, source, plotArray
 
