@@ -9,6 +9,9 @@ from bokeh.io import push_notebook
 import logging
 import pyparsing
 from IPython import get_ipython
+from bokeh.models.widgets import DataTable, DateFormatter, TableColumn
+from RootInteractive.Tools.pandaTools import *
+import copy
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
@@ -36,6 +39,9 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if not y.isdigit(): continue
         fig = figureList[int(y)]
         array.append(fig)
+        if type(fig).__name__ == 'DataTable':
+            print("DataTable")
+            continue
         if 'commonY' in option:
             if type(option["commonY"]) == str:
                 fig.y_range = array[0].y_range
@@ -56,14 +62,17 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
     nCols = len(array)
-    for fig in array:   #TODO handle margin
-        margin=0
-        if nCols>1:
-            margin=int(0.05*option["plot_width"]/nCols+3)
-        if 'plot_width' in option:
-            fig.plot_width = int(option["plot_width"] / nCols) - margin
-        if 'plot_height' in option:
-            fig.plot_height = int(option["plot_height"])
+    for fig in array:
+        if type(fig).__name__ == 'Figure':
+            if 'plot_width' in option:
+                fig.plot_width = int(option["plot_width"] / nCols)
+            if 'plot_height' in option:
+                fig.plot_height = int(option["plot_height"])
+        if type(fig).__name__ == 'DataTable':
+            if 'plot_width' in option:
+                fig.width = int(option["plot_width"] / nCols)
+            if 'plot_height' in option:
+                fig.height = int(option["plot_height"])
 
 
 def __processBokehLayoutOption(layoutOptions):
@@ -124,6 +133,36 @@ def processBokehLayout(layoutString, figList, verbose=0):
     for key in optionsParse:
         if key in options: del options[key]
     return res.asList(), layoutList, options
+
+
+def gridplotRow(figList0, **options):
+    """
+    Make gridplot -resizing properly rows
+    :param figList0: input array of figures
+    :param options:
+    :return:
+    """
+    figList = []
+    for frow in figList0:
+        figList.append([row(frow)])
+    pAll = gridplot(figList, **options)
+    return pAll
+
+
+def makeBokehDataTable(dataFrame, source, **options):
+    """
+    Create widget for datatable
+    :param dataFrame:
+    input data frame
+    :param source:
+    :return:
+    """
+    columns = []
+    for col in dataFrame.columns.values:
+        title = dataFrame.metaData.get(col + ".OrigName", col);
+        columns.append(TableColumn(field=col, title=title))
+    data_table = DataTable(source=source, columns=columns, **options)
+    return data_table
 
 
 def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
@@ -234,7 +273,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
 
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
-        pAll = gridplot(layoutList, **optionsLayout)
+        pAll = gridplotRow(layoutList, **optionsLayout)
         handle = show(pAll, notebook_handle=isNotebook)
         return pAll, handle, source, plotArray
 
@@ -249,11 +288,9 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, handle, source, plotArray
 
-
 def parseWidgetString(widgetString):
     r'''
     Parse widget string and convert it ti nested lists
-
     :param widgetString:
     Example:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
         >>> from InteractiveDrawing.bokeh.bokehTools import *
@@ -270,6 +307,9 @@ def parseWidgetString(widgetString):
     widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
     widgetList = widgetParser.parseString(toParse)[0]
     return widgetList
+
+
+
 
 def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
     """
@@ -304,3 +344,95 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
         if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
             df[a] = pd.to_datetime(df[a], unit='s')
     return df
+
+
+
+
+
+def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
+    """
+    Wrapper bokeh draw array of figures
+    :param dataFrame:         - input data frame
+    :param query:             - query
+    :param figureArray:       - figure array
+    :param kwargs:
+    :return:
+
+    Example:
+        >>>
+    """
+    options = {
+        'line': -1,
+        'size': 2,
+        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tooltips': [],
+        'y_axis_type': 'auto',
+        'x_axis_type': 'auto',
+        'plot_width': 600,
+        'plot_height': 400,
+        'errX': '',
+        'errY': '',
+        'commonX': -1,
+        'commonY': -1,
+        'ncols': -1,
+        'layout': '',
+        'palette': Spectral6,
+        "marker": "square",
+        "color": "#000000",
+        "colors": 'Category10'
+    }
+    options.update(kwargs)
+    dfQuery = dataFrame.query(query)
+    dfQuery.metaData = dataFrame.metaData
+    print(dfQuery.metaData)
+    # Check/resp. load derived variables
+    i: int
+    for i, variables in enumerate(figureArray):
+        if len(variables) > 1:
+            lengthX = len(variables[0])
+            lengthY = len(variables[1])
+            length = max(len(variables[0]), len(variables[1]))
+            for j in range(0, length):
+                dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+
+    try:
+        source = ColumnDataSource(dfQuery)
+    except:
+        logging.error("Invalid source:", source)
+    # define default options
+
+    plotArray = []
+    colorAll = all_palettes[options['colors']]
+    for i, variables in enumerate(figureArray):
+        print(i, variables)
+        if variables[0] == 'table':
+            plotArray.append(makeBokehDataTable(dfQuery, source))
+            continue
+        figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title="xxx",
+                         tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+
+        # graphArray=drawGraphArray(df, variables)
+        lengthX = len(variables[0])
+        lengthY = len(variables[1])
+        length = max(len(variables[0]), len(variables[1]))
+        for i in range(0, length):
+            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
+            optionLocal = copy.copy(options)
+            optionLocal['color'] = colorAll[max(length, 4)][i]
+            if len(variables) > 2:
+                print("Option", variables[2])
+                optionLocal.update(variables[2])
+            varX = variables[0][i % lengthX]
+            varY = variables[1][i % lengthY]
+            figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
+                            marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX]);
+            figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
+            figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
+
+        figureI.legend.click_policy = "hide"
+        plotArray.append(figureI)
+    if len(options['layout']) > 0:  # make figure according layout
+        x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
+        pAll = gridplotRow(layoutList, **optionsLayout)
+        show(pAll)
