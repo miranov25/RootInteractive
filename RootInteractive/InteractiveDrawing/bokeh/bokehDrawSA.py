@@ -1,8 +1,8 @@
 # from bokeh.palettes import *
 import re
 
-#from bokeh.io import show
-from bokeh.plotting import figure, show
+from bokeh.io import show
+from bokeh.plotting import figure
 from bokeh.layouts import column, row
 from bokeh.models import *
 from .bokehTools import *
@@ -81,7 +81,6 @@ class bokehDrawSA(object):
             for var in set(varList):
                 if len(variableList) > 0: variableList += ":"
                 variableList += var
-
             if 'nEntries' in options.keys():
                 nEntries = options['nEntries']
             else:
@@ -94,17 +93,18 @@ class bokehDrawSA(object):
                 columnMask = options['mask']
             else:
                 columnMask = 'default'
-
             df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
 
         self.query = query
         self.dataSource = df.query(query)
         if ":" not in varX:
             self.dataSource.sort_values(varX, inplace=True)
-        self.Widgets = self.initWidgets(widgetString)
         self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.Widgets = column(self.initWidgets(widgetString))
+        self.initWidgets(widgetString)
         self.updateInteractive("")
-        show(self.Widgets)
+        print(type(self.Widgets))
+#        show(self.Widgets)
 
     def initWidgets(self, widgetString):
         r"""
@@ -120,7 +120,9 @@ class bokehDrawSA(object):
             widgetList = parseWidgetString(widgetString)
         except:
             logging.error("Invalid widget string", widgetString)
-        return column(self.createWidgets(widgetList))
+        self.Widgets=column(self.createWidgets(widgetList))
+        show(column(self.createWidgets(widgetList)))
+#        return self.createWidgets(widgetList)
            
     def createWidgets(self, widgetList0):
         r'''
@@ -167,7 +169,6 @@ class bokehDrawSA(object):
                 iWidget = self.createWidgets([["slider." + name[0], subList]])         # For backward compatibility
             widgetSubList.append(iWidget)
         self.allWidgets += widgetSubList
-        print(widgetSubList)
         return widgetSubList       
 
     
@@ -211,7 +212,7 @@ class bokehDrawSA(object):
         
         for iWidget in self.allWidgets:
             iWidget.js_on_change('value', update_graph)
-
+        print(update_graph.code)
         if self.verbosity & 1:
             logging.info(widgetQuery)
         isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
