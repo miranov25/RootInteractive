@@ -357,9 +357,12 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     :param figureArray:       - figure array
     :param kwargs:
     :return:
+        * pAll
+        * handle
+        * source
+        * plotArray
 
     Example:
-        >>>
     """
     options = {
         'line': -1,
@@ -384,7 +387,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
     dfQuery.metaData = dataFrame.metaData
-    print(dfQuery.metaData)
+    logging.info(dfQuery.metaData)
     # Check/resp. load derived variables
     i: int
     for i, variables in enumerate(figureArray):
@@ -405,7 +408,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     plotArray = []
     colorAll = all_palettes[options['colors']]
     for i, variables in enumerate(figureArray):
-        print(i, variables)
+        logging.info(i, variables)
         if variables[0] == 'table':
             plotArray.append(makeBokehDataTable(dfQuery, source))
             continue
@@ -421,7 +424,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             optionLocal = copy.copy(options)
             optionLocal['color'] = colorAll[max(length, 4)][i]
             if len(variables) > 2:
-                print("Option", variables[2])
+                logging.info("Option", variables[2])
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
@@ -435,4 +438,5 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
-        show(pAll)
+
+    return pAll, source, layoutList
