@@ -10,11 +10,55 @@ import logging
 import pyparsing
 from IPython import get_ipython
 from bokeh.models.widgets import DataTable, DateFormatter, TableColumn
+from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 import copy
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
+
+
+def makeJScallback(widgetDict):
+    size = widgetDict['cdsOrig'].data["index"].size
+    code = \
+        """
+    var dataOrig = cdsOrig.data;
+    var dataSel = cdsSel.data;
+    console.log('%f\t%f\t',dataOrig["A"].length, dataSel["A"].length);
+    """
+    for a in widgetDict['cdsOrig'].data:
+        code += f"dataSel[\'{a}\']=[];\n"
+    code += f"""var arraySize={size};\n"""
+    code += """var nSelected=0;\n"""
+    code += f"""for (var i = 0; i < {size}; i++)\n"""
+    code += " {\n"
+    code += """var isSelected=1;\n"""
+    for key, value in widgetDict.items():
+        if type(value).__name__ == "RangeSlider":
+            dataName = key.replace("Range", "")
+            code += f"      var {key}Value={key}.value;\n"
+            code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{dataName}\"][i]);\n"
+            code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]>={key}Value[0])\n"
+            code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]<={key}Value[1])\n"
+            # print(value)
+    code += """      
+        console.log(\"isSelected:%d\t%d\",i,isSelected);
+        if (isSelected) nSelected++;
+        if (isSelected){
+    """
+    for a in widgetDict['cdsOrig'].data:
+        code += f"dataSel[\'{a}\'].push(dataOrig[\'{a}\'][i]);\n"
+    code += """
+        }
+    }
+    console.log(\"nSelected:%d\",nSelected); 
+    cdsSel.change.emit();
+    """
+    print(code)
+    callback = CustomJS(args=widgetDict, code=code)
+    # print(callback)
+    # display(widgetDict)
+    return callback
 
 
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
