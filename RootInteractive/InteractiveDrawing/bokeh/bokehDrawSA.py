@@ -1,13 +1,7 @@
-# from bokeh.palettes import *
-import re
-
-from bokeh.io import show
-from bokeh.plotting import figure
-from bokeh.layouts import column, row
 from bokeh.models import *
 from .bokehTools import *
-import ROOT
 import logging
+
 
 class bokehDrawSA(object):
 
@@ -70,7 +64,7 @@ class bokehDrawSA(object):
                 varSource.append(options['errY'])
             if 'tooltips' in options.keys():
                 for tip in options["tooltips"]:
-                    varSource.append(tip[1].replace("@",""))
+                    varSource.append(tip[1].replace("@", ""))
             toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
             toReplace = ["^slider.", "^checkbox.", "^dropdown."]
             varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
@@ -96,15 +90,17 @@ class bokehDrawSA(object):
             df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
 
         self.query = query
-        self.dataSource = df.query(query)
+        dataSource = df.query(query)
         if ":" not in varX:
-            self.dataSource.sort_values(varX, inplace=True)
-        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
-        self.Widgets = column(self.initWidgets(widgetString))
-        self.initWidgets(widgetString)
-        self.updateInteractive("")
-        print(type(self.Widgets))
-#        show(self.Widgets)
+            dataSource.sort_values(varX, inplace=True)
+        self.cds = ColumnDataSource(dataSource)
+        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p,
+                                                                                   **options)
+        #        self.Widgets = column(self.initWidgets(widgetString))
+        self.pAll = self.initWidgets(widgetString)
+        #        self.updateInteractive("")
+        #        self.pAll.append(self.figure)
+        show(gridplotRow(self.pAll))
 
     def initWidgets(self, widgetString):
         r"""
@@ -115,15 +111,21 @@ class bokehDrawSA(object):
                 >>>  slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
         :return: VBox includes all widgets
         """
-        self.allWidgets = []
+        widgetList = []
         try:
             widgetList = parseWidgetString(widgetString)
         except:
             logging.error("Invalid widget string", widgetString)
-        self.Widgets=column(self.createWidgets(widgetList))
-        show(column(self.createWidgets(widgetList)))
-#        return self.createWidgets(widgetList)
-           
+        widgetDict = {"cdsOrig":self.cds, "cdsSel":self.bokehSource}
+        widgetList=self.createWidgets(widgetList)
+        for iWidget in widgetList:
+            widgetDict[iWidget.title]=iWidget
+        callback=CustomJS(args=widgetDict,code="alert(\"domdom\")")   # There will be a callback creation function
+        for iWidget in widgetList:
+            iWidget.js_on_change("value", callback)
+
+        return widgetList
+
     def createWidgets(self, widgetList0):
         r'''
         Build widgets and connect observe function of the bokehDraw object
@@ -150,15 +152,32 @@ class bokehDrawSA(object):
             if name[0] == "dropdown":
                 values = list(subList)
                 if len(values) == 0:
-                    raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",format(name[1]))
+                    raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",
+                                     format(name[1]))
                 iWidget = widgets.Select(title=name[1], value=values[0], options=values)
+#            elif name[0] == "checkbox":
+#                if len(subList) == 0:
+#                    active = []
+#                elif len(subList) == 1:
+#                    if subList[0] in ['True', 'true', '1']:
+#                        active = [0]
+#                    elif subList[0] in ['False', 'false', '0']:
+#                        active = []
+#                    else:
+#                        raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". "
+#                                         "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
+#                else:
+#                    raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
+#                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
+#                values = list(subList)
+#                iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
             elif name[0] == "slider":
                 if len(subList) == 4:
                     iWidget = widgets.Slider(title=name[1], start=float(subList[0]), end=float(subList[1]),
-                                                step=float(subList[2]), value=float(subList[3]))
+                                             step=float(subList[2]), value=float(subList[3]))
                 elif len(subList) == 5:
                     iWidget = widgets.RangeSlider(title=name[1], start=float(subList[0]), end=float(subList[1]),
-                                                step=float(subList[2]), value=(float(subList[3]), float(subList[4])))
+                                                  step=float(subList[2]), value=(float(subList[3]), float(subList[4])))
                 else:
                     raise SyntaxError(
                         "The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. "
@@ -166,58 +185,56 @@ class bokehDrawSA(object):
             else:
                 if (self.verbosity >> 1) & 1:
                     logging.info("type of the widget\"" + name[0] + "\" is not specified. Assuming it is a slider.")
-                iWidget = self.createWidgets([["slider." + name[0], subList]])         # For backward compatibility
+                iWidget = self.createWidgets([["slider." + name[0], subList]])  # For backward compatibility
             widgetSubList.append(iWidget)
-        self.allWidgets += widgetSubList
-        return widgetSubList       
+#        self.allWidgets += widgetSubList
+        return widgetSubList
 
-    
-    
-    def updateInteractive(self, b):
-        """
-        callback function to update drawing CDS (Column data source) of drawing object
-
-        :param b: not used
-        :return: none
-        """
-        widgetQuery = ""
-        
-        update_graph=CustomJS()
-        update_graph.args=dict(fig=self.bokehSource, orj=self.dataSource)
-        title=""
-        loop=""
-        for iWidget in self.allWidgets:
-            update_graph.code += "fig.data['{0}']=[];\n".format(str(iWidget.title))
-            loop+= "\t\tfig.data['{0}'].push(orj.data['{0}'][i]);\n".format(str(iWidget.title))
-            title=iWidget.title
-            if isinstance(iWidget, widgets.RangeSlider):
-                update_graph.args.update({str(iWidget.title):iWidget})
-                widgetQuery += str(
-                    "orj.data['{0}'][i]>={0}.value[0]&orj.data['{0}'][i]<={0}.value[1]&".format(str(iWidget.title)))
-            elif isinstance(iWidget, widgets.Slider):
-                update_graph.args.update({str(iWidget.title):iWidget})
-                widgetQuery += str(
-                    "orj.data['{0}'][i]>{0}.value-{0}.step&orj.data['{0}'][i]<{0}.value+{0}.step&".format(str(iWidget.title)))
-            elif isinstance(iWidget, widgets.Select):
-                update_graph.args.update({str(iWidget.title):iWidget})
-                widgetQuery += str(
-                    "orj.data['{0}'] == {0}.value &".format(str(iWidget.title)))
-            else:
-                raise TypeError("{} is unimplemented widget type.".format(type(iWidget)))
-        widgetQuery = widgetQuery[:-1]
-        update_graph.code  += "for(i=0;i<orj.data['"+title+"'];i++)"
-        update_graph.code  += "{\n\t if("+widgetQuery+"){\n"
-        update_graph.code  += loop
-        update_graph.code  +="}}\nfig.change.emit()"
-        
-        for iWidget in self.allWidgets:
-            iWidget.js_on_change('value', update_graph)
-        print(update_graph.code)
-        if self.verbosity & 1:
-            logging.info(widgetQuery)
-        isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
-        if isNotebook:
-            push_notebook(self.handle)
-                 
-
-    verbosity = 0
+##    def updateInteractive(self, b):
+#        """
+#        callback function to update drawing CDS (Column data source) of drawing object
+#
+#        :param b: not used
+#        :return: none
+#        """
+#        widgetQuery = ""
+#
+#        update_graph = CustomJS()
+#        update_graph.args = dict(fig=self.bokehSource, orj=self.dataSource)
+#        title = ""
+#        loop = ""
+#        for iWidget in self.allWidgets:
+#            update_graph.code += "fig.data['{0}']=[];\n".format(str(iWidget.title))
+#            loop += "\t\tfig.data['{0}'].push(orj.data['{0}'][i]);\n".format(str(iWidget.title))
+#            title = iWidget.title
+#            if isinstance(iWidget, widgets.RangeSlider):
+#                update_graph.args.update({str(iWidget.title): iWidget})
+#                widgetQuery += str(
+#                    "orj.data['{0}'][i]>={0}.value[0]&orj.data['{0}'][i]<={0}.value[1]&".format(str(iWidget.title)))
+#            elif isinstance(iWidget, widgets.Slider):
+#                update_graph.args.update({str(iWidget.title): iWidget})
+#                widgetQuery += str(
+#                    "orj.data['{0}'][i]>{0}.value-{0}.step&orj.data['{0}'][i]<{0}.value+{0}.step&".format(
+#                        str(iWidget.title)))
+#            elif isinstance(iWidget, widgets.Select):
+#                update_graph.args.update({str(iWidget.title): iWidget})
+#                widgetQuery += str(
+#                    "orj.data['{0}'] == {0}.value &".format(str(iWidget.title)))
+#            else:
+#                raise TypeError("{} is unimplemented widget type.".format(type(iWidget)))
+#        widgetQuery = widgetQuery[:-1]
+#        update_graph.code += "for(i=0;i<orj.data['" + title + "'];i++)"
+#        update_graph.code += "{\n\t if(" + widgetQuery + "){\n"
+#        update_graph.code += loop
+#        update_graph.code += "}}\nfig.change.emit()"
+#
+#        for iWidget in self.allWidgets:
+#            iWidget.js_on_change('value', update_graph)
+#        print(update_graph.code)
+#        if self.verbosity & 1:
+#            logging.info(widgetQuery)
+#        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
+#        if isNotebook:
+#            push_notebook(self.handle)
+#
+#    verbosity = 0
