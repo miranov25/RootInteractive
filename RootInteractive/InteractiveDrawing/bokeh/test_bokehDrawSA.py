@@ -1,4 +1,4 @@
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA_2 import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 output_file("test_bokehDrawSA.html")
 # import logging
 
