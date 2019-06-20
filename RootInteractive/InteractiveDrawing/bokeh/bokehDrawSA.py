@@ -13,26 +13,13 @@ class bokehDrawSA(object):
         :param varY:             : separated list of the Y variables
         :param varColor:         color map variable name
         :param widgetString:     :  separated string - list of widgets separated by ','
-                                 widget options: dropdown, checkbox, slider
                                   slider:
                                     Requires 4 or 5 numbers as parameters
                                     for single valued sliders: slider.name(min,max,step,initial value)
                                       Ex: slider.commonF(0,15,5,0)
                                     for Ranged sliders: slider.name(min,max,step,initial start value, initial end value)
                                       Ex: slider.commonF(0,15,5,0,10)
-                                  checkbox:
-                                    Requires 1 or none parameters. Allowed parameters are: 0,1,True,False
-                                    checkbox.name(initial value default=False)
-                                      Ex: checkbox.isMax(True)
-                                  dropdown menu:
-                                    Requires 1 or more parameters.
-                                    dropdown.name(option1,option2,....)
-                                      Ex: dropdown.MB(0,0.5,1)
-                                             
-                                 to group widget you can use accordion or tab:
-                                   Ex:
-                                     accordion.group1(widget1,widget2...), accordion.group2(widget1,widget2...)
-                                     tab.group1(widget1,widget2...), tab.group2(widget1,widget2...)
+
                                          
         :param p:                template figure
         :param options:          optional drawing parameters
@@ -48,6 +35,8 @@ class bokehDrawSA(object):
                                  - mask          - mask for variable names
                                  - verbosity     - first bit: verbosity for query for every update
                                                  - second bit: verbosity for source file.
+        Example usage in:
+            test_bokehDrawArray.py
         """
         self.isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isinstance(source, pd.DataFrame):
@@ -104,8 +93,11 @@ class bokehDrawSA(object):
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetString, **kwargs):
-        """
-        Constructor of  figure array
+        r"""
+        * Constructor of  interactive standalone figure array
+        * :Example usage in:
+            * test_bokehDrawArray.py
+
         :param widgetInput:
         :param dataFrame:
         :param query:
@@ -129,7 +121,7 @@ class bokehDrawSA(object):
 
         :param widgetString:
             example string
-                >>>  slider.name0(min,max,step,valMin,valMax),tab.tabName(checkbox.name1())
+                >>>  widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
         :return: VBox includes all widgets
         """
         widgetList = []
@@ -154,10 +146,10 @@ class bokehDrawSA(object):
         Build widgets and connect observe function of the bokehDraw object
 
         :param widgetString:
-            Example:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
-                >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-                >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-                >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+            Example:
+                RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py
+            >>> widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
+
         :return:
             fill widgets arrays  to be shown in the Notebook
                 * widgetArray

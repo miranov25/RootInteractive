@@ -187,6 +187,7 @@ def processBokehLayout(layoutString, figList, verbose=0):
 def gridplotRow(figList0, **options):
     """
     Make gridplot -resizing properly rows
+
     :param figList0: input array of figures
     :param options:
     :return:
@@ -201,6 +202,7 @@ def gridplotRow(figList0, **options):
 def makeBokehDataTable(dataFrame, source, **options):
     """
     Create widget for datatable
+
     :param dataFrame:
     input data frame
     :param source:
@@ -217,6 +219,7 @@ def makeBokehDataTable(dataFrame, source, **options):
 def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     r"""
     drawColzArray
+
     :param dataFrame: data frame
     :param query:
         selection e.g:
@@ -340,15 +343,18 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
 
 def parseWidgetString(widgetString):
     r'''
-    Parse widget string and convert it ti nested lists
+    Parse widget string and convert it to  nested lists
     :param widgetString:
-    Example:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
-        >>> from InteractiveDrawing.bokeh.bokehTools import *
-        >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-        >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-        >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
-        >>> print(parseWidgetString(widgets))
-        ['tab.sliders', ['slider.meanMIP', ['45', '55', '0.1', '45', '55'], 'slider.meanMIPele', ['50', '80', '0.2', '50', '80'], 'slider.resolutionMIP', ['0', '0.15', '0.01', '0', '0.15']], 'tab.checkboxGlobal', ['slider.global_Warning', ['0', '1', '1', '0', '1'], 'checkbox.global_Outlier', ['0']], 'tab.checkboxMIP', ['slider.MIPquality_Warning', ['0', '1', '1', '0', '1'], 'checkbox.MIPquality_Outlier', ['0'], 'checkbox.MIPquality_PhysAcc', ['1']]]           
+
+    Example:
+        https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
+            >>> from InteractiveDrawing.bokeh.bokehTools import *
+            >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+            >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+            >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+            >>> print(parseWidgetString(widgets))
+            >>> ['tab.sliders', ['slider.meanMIP', ['45', '55', '0.1', '45', '55'], 'slider.meanMIPele', ['50', '80', '0.2', '50', '80'], ....]
+
     :return:
         Nested lists of strings to create widgets
     '''
@@ -397,17 +403,20 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
 def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     """
     Wrapper bokeh draw array of figures
+
     :param dataFrame:         - input data frame
     :param query:             - query
     :param figureArray:       - figure array
     :param kwargs:
     :return:
-        * pAll
-        * handle
-        * source
-        * plotArray
+        variable list:
+            * pAll
+            * handle
+            * source
+            * plotArray
 
-    Example:
+    See example test:
+        RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py
     """
     options = {
         'line': -1,
