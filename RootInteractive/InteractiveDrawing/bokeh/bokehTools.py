@@ -18,7 +18,11 @@ import copy
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
 
-def makeJScallback(widgetDict):
+def makeJScallback(widgetDict, **kwargs):
+    options = {
+        "verbose": 0
+    }
+    options.update(kwargs)
     size = widgetDict['cdsOrig'].data["index"].size
     code = \
         """
@@ -54,10 +58,9 @@ def makeJScallback(widgetDict):
     console.log(\"nSelected:%d\",nSelected); 
     cdsSel.change.emit();
     """
-    print(code)
+    if options["verbose"]>0:
+        logging.info("makeJScallback:\n",code)
     callback = CustomJS(args=widgetDict, code=code)
-    # print(callback)
-    # display(widgetDict)
     return callback
 
 
@@ -70,7 +73,6 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
     :param verbose:
     :return:
     """
-    # TODO - add option for margin
     if verbose > 0: logging.info("Raw", layoutRow)
     array = []
     layoutList.append(array)
@@ -332,6 +334,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, handle, source, plotArray
 
+
 def parseWidgetString(widgetString):
     r'''
     Parse widget string and convert it ti nested lists
@@ -351,8 +354,6 @@ def parseWidgetString(widgetString):
     widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
     widgetList = widgetParser.parseString(toParse)[0]
     return widgetList
-
-
 
 
 def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
@@ -388,9 +389,6 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
         if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
             df[a] = pd.to_datetime(df[a], unit='s')
     return df
-
-
-
 
 
 def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
@@ -483,4 +481,4 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
 
-    return pAll, source, layoutList
+    return pAll, source, layoutList, dfQuery
