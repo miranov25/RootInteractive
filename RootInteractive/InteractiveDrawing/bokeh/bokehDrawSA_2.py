@@ -49,6 +49,7 @@ class bokehDrawSA(object):
                                  - verbosity     - first bit: verbosity for query for every update
                                                  - second bit: verbosity for source file.
         """
+        self.isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
                 logging.info("Panda DataFrame is parsing...")
@@ -91,16 +92,36 @@ class bokehDrawSA(object):
 
         self.query = query
         dataSource = df.query(query)
+        if len(varX)==0:
+            return
         if ":" not in varX:
             dataSource.sort_values(varX, inplace=True)
-        self.cds = ColumnDataSource(dataSource)
-        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p,
-                                                                                   **options)
-        #        self.Widgets = column(self.initWidgets(widgetString))
-        self.pAll = [self.figure] + self.initWidgets(widgetString)
-        #        self.updateInteractive("")
-        #        self.pAll.append(self.figure)
-        show(gridplotRow(self.pAll))
+        self.cdsOrig = ColumnDataSource(dataSource)
+        self.figure, self.cdsSel, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.plotArray.append(self.initWidgets(widgetString))
+        pAll=gridplotRow(self.plotArray)
+        self.handle=show(pAll,notebook_handle=self.isNotebook)
+
+    @classmethod
+    def fromArray(cls, dataFrame, query, figureArray, widgetString, **kwargs):
+        """
+        Constructor of  figure array
+        :param widgetInput:
+        :param dataFrame:
+        :param query:
+        :param figureArray:
+        :param kwargs:
+        :return:
+        """
+        self=cls(dataFrame,query,"","","","",None)
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(dataFrame, query, figureArray, **kwargs)
+        self.cdsOrig=ColumnDataSource(dataFrameOrig)
+        self.plotArray.append(self.initWidgets(widgetString))
+        pAll=gridplotRow(self.plotArray)
+        self.handle=show(pAll,notebook_handle=self.isNotebook)
+        return self
+
+
 
     def initWidgets(self, widgetString):
         r"""
@@ -116,7 +137,7 @@ class bokehDrawSA(object):
             widgetList = parseWidgetString(widgetString)
         except:
             logging.error("Invalid widget string", widgetString)
-        widgetDict = {"cdsOrig":self.cds, "cdsSel":self.bokehSource}
+        widgetDict = {"cdsOrig":self.cdsOrig, "cdsSel":self.cdsSel}
         widgetList=self.createWidgets(widgetList)
         for iWidget in widgetList:
             widgetDict[iWidget.title]=iWidget
@@ -125,7 +146,7 @@ class bokehDrawSA(object):
         for iWidget in widgetList:
             iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
-        display(callback.code)
+        #display(callback.code)
         return widgetList
 
     def createWidgets(self, widgetList0):
@@ -191,52 +212,4 @@ class bokehDrawSA(object):
             widgetSubList.append(iWidget)
 #        self.allWidgets += widgetSubList
         return widgetSubList
-
-##    def updateInteractive(self, b):
-#        """
-#        callback function to update drawing CDS (Column data source) of drawing object
-#
-#        :param b: not used
-#        :return: none
-#        """
-#        widgetQuery = ""
-#
-#        update_graph = CustomJS()
-#        update_graph.args = dict(fig=self.bokehSource, orj=self.dataSource)
-#        title = ""
-#        loop = ""
-#        for iWidget in self.allWidgets:
-#            update_graph.code += "fig.data['{0}']=[];\n".format(str(iWidget.title))
-#            loop += "\t\tfig.data['{0}'].push(orj.data['{0}'][i]);\n".format(str(iWidget.title))
-#            title = iWidget.title
-#            if isinstance(iWidget, widgets.RangeSlider):
-#                update_graph.args.update({str(iWidget.title): iWidget})
-#                widgetQuery += str(
-#                    "orj.data['{0}'][i]>={0}.value[0]&orj.data['{0}'][i]<={0}.value[1]&".format(str(iWidget.title)))
-#            elif isinstance(iWidget, widgets.Slider):
-#                update_graph.args.update({str(iWidget.title): iWidget})
-#                widgetQuery += str(
-#                    "orj.data['{0}'][i]>{0}.value-{0}.step&orj.data['{0}'][i]<{0}.value+{0}.step&".format(
-#                        str(iWidget.title)))
-#            elif isinstance(iWidget, widgets.Select):
-#                update_graph.args.update({str(iWidget.title): iWidget})
-#                widgetQuery += str(
-#                    "orj.data['{0}'] == {0}.value &".format(str(iWidget.title)))
-#            else:
-#                raise TypeError("{} is unimplemented widget type.".format(type(iWidget)))
-#        widgetQuery = widgetQuery[:-1]
-#        update_graph.code += "for(i=0;i<orj.data['" + title + "'];i++)"
-#        update_graph.code += "{\n\t if(" + widgetQuery + "){\n"
-#        update_graph.code += loop
-#        update_graph.code += "}}\nfig.change.emit()"
-#
-#        for iWidget in self.allWidgets:
-#            iWidget.js_on_change('value', update_graph)
-#        print(update_graph.code)
-#        if self.verbosity & 1:
-#            logging.info(widgetQuery)
-#        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
-#        if isNotebook:
-#            push_notebook(self.handle)
-#
-#    verbosity = 0
+    verbosity=0

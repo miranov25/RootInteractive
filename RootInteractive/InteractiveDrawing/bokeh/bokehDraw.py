@@ -108,7 +108,8 @@ class bokehDraw(object):
         if ":" not in varX:
             self.dataSource.sort_values(varX, inplace=True)
         self.Widgets = self.initWidgets(widgetString)
-        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.figure, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.handle = show(self.figure,notebook_handle=True)
         self.updateInteractive("")
         display(self.Widgets)
 

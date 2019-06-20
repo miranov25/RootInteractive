@@ -30,5 +30,5 @@ def test_DrawfromArray():
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     fig=bokehDraw.fromArray(df, "A>0", figureArray,"slider.A(0,100,0,0,100)",tooltips=tooltips, layout=figureLayout)
 
-test_DrawFormula()
+#test_DrawFormula()
 #test_DrawfromArray()

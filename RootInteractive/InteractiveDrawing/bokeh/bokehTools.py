@@ -83,7 +83,10 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             option[key] = optionsMother[key]
     for idx, y in enumerate(layoutRow):
         if not y.isdigit(): continue
-        fig = figureList[int(y)]
+        try:
+            fig = figureList[int(y)]
+        except:
+            logging.error("out of range index", y)
         array.append(fig)
         if type(fig).__name__ == 'DataTable':
             print("DataTable")
@@ -320,8 +323,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
-        handle = show(pAll, notebook_handle=isNotebook)
-        return pAll, handle, source, plotArray
+        #handle = show(pAll, notebook_handle=isNotebook)
+        return pAll, source, layoutList
 
     plotArray2D = []
     for i, plot in enumerate(plotArray):
@@ -331,8 +334,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         plotArray2D[int(pRow)].append(plot)
     pAll = gridplot(plotArray2D)
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
-    handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
-    return pAll, handle, source, plotArray
+    #handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
+    return pAll, source, plotArray
 
 
 def parseWidgetString(widgetString):
