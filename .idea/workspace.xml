@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true" buildAllGenerated="false">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
     <generated />
   </component>
   <component name="CMakeSettings">
@@ -10,14 +10,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6ca62c89-c35a-4475-aeca-cb45b265966e" name="Default" comment="PWGPP-485 - moving to new directories">
-      <change afterPath="$PROJECT_DIR$/Tools/test_aliTreePlayer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehDrawPanda.py" beforeDir="false" afterPath="$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehDrawPanda.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/MLpipeline/plotRegressionForestError.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/MLpipeline/plotRegressionForestError.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/QuantileRegression/distortionCase/distortionCheck0.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/QuantileRegression/distortionCase/distortionCheck0.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/TTreeHnInteractive/TTreeHNInteractiveV4.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/TTreeHnInteractive/TTreeHNInteractiveV4.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/distortionCase/distortionStudy.py" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/distortionCase/distortionStudy.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/distortionCase/pandaTools/distortionDraw.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/distortionCase/pandaTools/distortionDraw.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/RootInteractive.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RootInteractive.iml" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -25,106 +18,37 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="FUSProjectUsageTrigger">
-    <session id="-712445521">
-      <usages-collector id="statistics.lifecycle.project">
-        <counts>
-          <entry key="project.closed" value="16" />
-          <entry key="project.open.time.16" value="3" />
-          <entry key="project.open.time.18" value="4" />
-          <entry key="project.open.time.19" value="4" />
-          <entry key="project.open.time.20" value="10" />
-          <entry key="project.open.time.21" value="13" />
-          <entry key="project.open.time.22" value="16" />
-          <entry key="project.open.time.23" value="5" />
-          <entry key="project.open.time.24" value="5" />
-          <entry key="project.open.time.25" value="3" />
-          <entry key="project.open.time.26" value="1" />
-          <entry key="project.open.time.29" value="2" />
-          <entry key="project.open.time.30" value="2" />
-          <entry key="project.open.time.31" value="1" />
-          <entry key="project.open.time.4" value="3" />
-          <entry key="project.open.time.40" value="1" />
-          <entry key="project.open.time.41" value="1" />
-          <entry key="project.open.time.5" value="2" />
-          <entry key="project.open.time.51" value="1" />
-          <entry key="project.open.time.52" value="1" />
-          <entry key="project.open.time.55" value="1" />
-          <entry key="project.open.time.59" value="1" />
-          <entry key="project.open.time.8" value="1" />
-          <entry key="project.opened" value="81" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.extensions.edit">
-        <counts>
-          <entry key="md" value="368" />
-          <entry key="py" value="8497" />
-          <entry key="sh" value="95" />
-          <entry key="txt" value="2240" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.types.edit">
-        <counts>
-          <entry key="Bash" value="95" />
-          <entry key="Markdown" value="368" />
-          <entry key="PLAIN_TEXT" value="2240" />
-          <entry key="Python" value="8497" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.extensions.open">
-        <counts>
-          <entry key="C" value="1" />
-          <entry key="ipynb" value="15" />
-          <entry key="list" value="1" />
-          <entry key="md" value="3" />
-          <entry key="py" value="25" />
-          <entry key="sh" value="1" />
-          <entry key="yml" value="1" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.types.open">
-        <counts>
-          <entry key="Bash" value="1" />
-          <entry key="Markdown" value="2" />
-          <entry key="ObjectiveC" value="1" />
-          <entry key="PLAIN_TEXT" value="17" />
-          <entry key="Python" value="25" />
-          <entry key="YAML" value="1" />
-        </counts>
-      </usages-collector>
-    </session>
-  </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/Tools/aliTreePlayer.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDraw.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="208">
-              <caret line="14" selection-start-line="14" selection-end-line="14" />
+            <state relative-caret-position="389">
+              <caret line="124" column="16" selection-start-line="124" selection-start-column="16" selection-end-line="124" selection-end-column="16" />
               <folding>
-                <element signature="e#0#19#0" expanded="true" />
+                <element signature="e#31#40#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehDrawPanda.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawSA.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="240">
-              <caret line="21" column="56" selection-start-line="21" selection-start-column="56" selection-end-line="21" selection-end-column="56" />
+            <state relative-caret-position="2704">
+              <caret line="169" column="13" selection-start-line="169" selection-start-column="13" selection-end-line="169" selection-end-column="13" />
               <folding>
-                <element signature="e#30#39#0" expanded="true" />
+                <element signature="e#0#26#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehTools.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehTools.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="992">
-              <caret line="70" column="28" selection-start-line="70" selection-start-column="28" selection-end-line="70" selection-end-column="28" />
+            <state relative-caret-position="279">
+              <caret line="273" column="4" selection-start-line="273" selection-start-column="4" selection-end-line="273" selection-end-column="74" />
               <folding>
                 <element signature="e#0#52#0" expanded="true" />
               </folding>
@@ -133,60 +57,51 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/tutorial/distortionCase/distortionStudy.py">
+        <entry file="file://$USER_HOME$/software/alicesw3/sw/ubuntu1804_x86-64/ROOT/8eaaad62f4-1/lib/ROOT.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="400">
-              <caret line="27" column="27" selection-start-line="27" selection-start-column="27" selection-end-line="27" selection-end-column="27" />
-              <folding>
-                <element signature="e#0#19#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="241">
+              <caret line="462" selection-start-line="462" selection-end-line="462" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/MLpipeline/NDFunctionInterface.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="176">
-              <caret line="20" selection-start-line="20" selection-end-line="20" />
-              <folding>
-                <element signature="e#0#18#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/README.md">
-          <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-            <state split_layout="SPLIT">
-              <first_editor relative-caret-position="112">
-                <caret line="7" selection-start-line="7" selection-end-line="7" />
-              </first_editor>
-              <second_editor />
+            <state relative-caret-position="435">
+              <caret line="32" column="1" selection-start-line="32" selection-start-column="1" selection-end-line="32" selection-end-column="1" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/Tools/test_aliTreePlayer.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="400">
-              <caret line="25" lean-forward="true" selection-start-line="25" selection-end-line="25" />
+            <state relative-caret-position="-43">
+              <caret column="57" selection-start-column="57" selection-end-column="57" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="419">
+              <caret line="34" column="14" selection-start-line="34" selection-start-column="14" selection-end-line="34" selection-end-column="14" />
               <folding>
-                <element signature="e#0#13#0" expanded="true" />
+                <element signature="e#0#64#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHnBrowser.py">
+        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/testBokehClient0.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="400">
-              <caret line="41" column="18" selection-start-line="41" selection-start-column="4" selection-end-line="41" selection-end-column="18" />
+            <state relative-caret-position="464">
+              <caret line="47" column="1" selection-start-line="47" selection-start-column="1" selection-end-line="47" selection-end-column="1" />
               <folding>
-                <element signature="e#9#46#0" expanded="true" />
+                <element signature="e#0#55#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -275,12 +190,6 @@
       </list>
     </option>
   </component>
-  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
-  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER" />
-  <component name="JsGulpfileManager">
-    <detection-done>true</detection-done>
-    <sorting>DEFINITION_ORDER</sorting>
-  </component>
   <component name="ProjectFrameBounds" extendedState="6">
     <option name="y" value="-2" />
     <option name="width" value="2560" />
@@ -311,53 +220,12 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="ProjectPane" />
       <pane id="Scope" />
-      <pane id="ProjectPane">
-        <subPane>
-          <expand>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="InteractiveDrawing" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="InteractiveDrawing" type="462c0819:PsiDirectoryNode" />
-              <item name="bokeh" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="Tools" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="TTreeHnInteractive" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="tutorial" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="tutorial" type="462c0819:PsiDirectoryNode" />
-              <item name="distortionCase" type="462c0819:PsiDirectoryNode" />
-            </path>
-          </expand>
-          <select />
-        </subPane>
-      </pane>
     </panes>
   </component>
   <component name="PropertiesComponent">
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$USER_HOME$/software/aliceGSI" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
@@ -802,18 +670,17 @@
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="361577000" />
+    <option name="totallyTimeSpent" value="361703000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="45" y="25" width="1875" height="1055" extended-state="6" />
-    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.36222222" visible="true" weight="0.3138327" />
-      <window_info id="Structure" order="1" sideWeight="0.6377778" side_tool="true" visible="true" weight="0.3138327" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.35927153" visible="true" weight="0.13449973" />
+      <window_info id="Structure" order="1" sideWeight="0.6407285" side_tool="true" visible="true" weight="0.13449973" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.3297414" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.3288889" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.32814237" />
       <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.8965705" weight="0.39777777" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -866,9 +733,6 @@
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
-  </component>
-  <component name="VcsContentAnnotationSettings">
-    <option name="myLimit" value="2678400000" />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="PWGPP-485 - recover notebooks from old laptop" />
@@ -967,13 +831,7 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHnInteractive.ipynb" />
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TestSliderArray.ipynb" />
-    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHNtest.C">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="48">
-          <caret line="3" selection-start-line="2" selection-end-line="3" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHNtest.C" />
     <entry file="file://$PROJECT_DIR$/environment.yml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="272">
@@ -984,20 +842,10 @@
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/bokehTest/bokehInteractive.ipynb" />
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/BokehJupyterInteractor.ipynb" />
     <entry file="file://$PROJECT_DIR$/QuantileRegression/__init__.py" />
-    <entry file="file://$PROJECT_DIR$/MLpipeline/__init__.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/__init__.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/MLpipeline/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/__init__.py" />
     <entry file="file://$PROJECT_DIR$/MLpipeline/NDInterfaceTutorial.ipynb" />
-    <entry file="file://$PROJECT_DIR$/MLpipeline/makeList.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="128">
-          <caret line="8" selection-start-line="1" selection-end-line="8" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/MLpipeline/makeList.sh" />
     <entry file="file://$PROJECT_DIR$/QuantileRegression/distortionCase/distortionCheck0.ipynb" />
     <entry file="file://$USER_HOME$/.virtualenvs/our_new_env/local/lib/python2.7/site-packages/pandas/core/frame.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -1028,36 +876,9 @@
     <entry file="file://$PROJECT_DIR$/QuantileRegression/distortionCase/testDistortion.py" />
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/bokehDrawPanda.py" />
     <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/bokehTools.py" />
-    <entry file="file://$PROJECT_DIR$/Tools/aliTreePlayer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="208">
-          <caret line="14" selection-start-line="14" selection-end-line="14" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehDrawPanda.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="21" column="56" selection-start-line="21" selection-start-column="56" selection-end-line="21" selection-end-column="56" />
-          <folding>
-            <element signature="e#30#39#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehTools.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="992">
-          <caret line="70" column="28" selection-start-line="70" selection-start-column="28" selection-end-line="70" selection-end-column="28" />
-          <folding>
-            <element signature="e#0#52#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/Tools/aliTreePlayer.py" />
+    <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehDrawPanda.py" />
+    <entry file="file://$PROJECT_DIR$/InteractiveDrawing/bokeh/bokehTools.py" />
     <entry file="file://$PROJECT_DIR$/tutorial/distortionCase/distortionStudy.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="400">
@@ -1068,16 +889,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/MLpipeline/NDFunctionInterface.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="176">
-          <caret line="20" selection-start-line="20" selection-end-line="20" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/MLpipeline/NDFunctionInterface.py" />
     <entry file="file://$PROJECT_DIR$/README.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
         <state split_layout="SPLIT">
@@ -1088,16 +900,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHnBrowser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="400">
-          <caret line="41" column="18" selection-start-line="41" selection-start-column="4" selection-end-line="41" selection-end-column="18" />
-          <folding>
-            <element signature="e#9#46#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/TTreeHnInteractive/TTreeHnBrowser.py" />
     <entry file="file://$PROJECT_DIR$/virtualenv.md">
       <provider editor-type-id="text-editor">
         <state relative-caret-position="-240" />
@@ -1111,15 +914,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Tools/test_aliTreePlayer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="400">
-          <caret line="25" lean-forward="true" selection-start-line="25" selection-end-line="25" />
-          <folding>
-            <element signature="e#0#13#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/Tools/test_aliTreePlayer.py" />
   </component>
 </project>
