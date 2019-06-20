@@ -6,9 +6,9 @@ df.head(10)
 df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)"}
 
 figureArray = [
-    [['A'], ['C-A'], {"color": "red", "size": 1}],
+    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C"}],
     [['A'], ['C+A', 'C-A']],
-    [['B'], ['C+B', 'D+B']],
+    [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
     [['D'], ['sin(D/10)', 'sin(D/20)*0.5', 'sin(D/40)*0.25'], {"size": 10}],
     ['table']
 ]
@@ -30,5 +30,5 @@ def test_DrawfromArray():
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     fig=bokehDraw.fromArray(df, "A>0", figureArray,"slider.A(0,100,0,0,100)",tooltips=tooltips, layout=figureLayout)
 
-#test_DrawFormula()
-test_DrawfromArray()
+test_DrawFormula()
+#test_DrawfromArray()

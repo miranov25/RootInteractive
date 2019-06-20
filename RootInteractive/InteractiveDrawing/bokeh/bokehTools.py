@@ -28,7 +28,7 @@ def makeJScallback(widgetDict, **kwargs):
         """
     var dataOrig = cdsOrig.data;
     var dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig["A"].length, dataSel["A"].length);
+    console.log('%f\t%f\t',dataOrig["index"].length, dataSel["index"].length);
     """
     for a in widgetDict['cdsOrig'].data:
         code += f"dataSel[\'{a}\']=[];\n"
@@ -423,8 +423,10 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         'layout': '',
         'palette': Spectral6,
         "marker": "square",
+        "markers": bokehMarkers,
         "color": "#000000",
-        "colors": 'Category10'
+        "colors": 'Category10',
+        "colorZvar":''
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -461,20 +463,31 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
+        color_bar=None
+        mapperC=None
         for i in range(0, length):
             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
             optionLocal = copy.copy(options)
             optionLocal['color'] = colorAll[max(length, 4)][i]
+            optionLocal['marker']=optionLocal['markers'][i]
             if len(variables) > 2:
                 logging.info("Option", variables[2])
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
+            if (len(optionLocal["colorZvar"])>0):
+                logging.info(optionLocal["colorZvar"])
+                varColor=optionLocal["colorZvar"]
+                mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
+                optionLocal["color"]=mapperC
+                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
+
             figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX]);
             figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
             figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
-
+        if color_bar!=None:
+            figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
         plotArray.append(figureI)
     if len(options['layout']) > 0:  # make figure according layout
