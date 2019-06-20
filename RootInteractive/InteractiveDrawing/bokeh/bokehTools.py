@@ -24,7 +24,7 @@ def makeJScallback(widgetDict):
         """
     var dataOrig = cdsOrig.data;
     var dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig["A"].length, dataSel["A"].length);
+    console.log('%f\t%f\t',dataOrig["index"].length, dataSel["index"].length);
     """
     for a in widgetDict['cdsOrig'].data:
         code += f"dataSel[\'{a}\']=[];\n"

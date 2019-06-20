@@ -97,7 +97,7 @@ class bokehDrawSA(object):
         self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p,
                                                                                    **options)
         #        self.Widgets = column(self.initWidgets(widgetString))
-        self.pAll = self.initWidgets(widgetString)
+        self.pAll = [self.figure] + self.initWidgets(widgetString)
         #        self.updateInteractive("")
         #        self.pAll.append(self.figure)
         show(gridplotRow(self.pAll))
@@ -120,10 +120,12 @@ class bokehDrawSA(object):
         widgetList=self.createWidgets(widgetList)
         for iWidget in widgetList:
             widgetDict[iWidget.title]=iWidget
-        callback=CustomJS(args=widgetDict,code="alert(\"domdom\")")   # There will be a callback creation function
+        callback=makeJScallback(widgetDict)
+#        callback.code = callback.code.replace("A","PA")     # Contemporary correction until makeJScallback is fixed
         for iWidget in widgetList:
             iWidget.js_on_change("value", callback)
-
+            iWidget.js_on_event("value", callback)
+        display(callback.code)
         return widgetList
 
     def createWidgets(self, widgetList0):
