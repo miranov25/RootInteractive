@@ -45,6 +45,6 @@ def testBokehClient0():
 
 
 
-testBokehClient0()
+#testBokehClient0()
 # customjsForSelections()
 #test2()

@@ -101,12 +101,40 @@ class bokehDraw(object):
 
         self.query = query
         self.dataSource = df.query(query)
+        if hasattr(df, 'metaData'):
+            self.dataSource.metaData=df.metaData
+        if len(varX) == 0:
+            return
         if ":" not in varX:
             self.dataSource.sort_values(varX, inplace=True)
         self.Widgets = self.initWidgets(widgetString)
-        self.figure, self.handle, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.figure, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.handle = show(self.figure,notebook_handle=True)
         self.updateInteractive("")
         display(self.Widgets)
+
+    @classmethod
+    def fromArray(cls, dataFrame, query, figureArray, widgetString, **kwargs):
+        """
+        Constructor of  figure array
+        :param widgetInput:
+        :param dataFrame:
+        :param query:
+        :param figureArray:
+        :param kwargs:
+        :return:
+        """
+        self=cls(dataFrame,query,"","","","",None)
+        self.Widgets = self.initWidgets(widgetString)
+        self.figure, self.bokehSource, self.plotArray, self.dataSource = bokehDrawArray(self.dataSource, query, figureArray, **kwargs)
+        #self.figure = gridplotRow(self.plotArray, **kwargs)
+        #handle = show(pAll, notebook_handle=isNotebook)
+        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
+        self.handle=show(self.figure,notebook_handle=isNotebook)
+        self.updateInteractive("")
+        display(self.Widgets)
+        return self
+
 
     def initWidgets(self, widgetString):
         r"""
@@ -228,7 +256,7 @@ class bokehDraw(object):
         sliderQuery = sliderQuery[:-1]
         newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = newSource.data
-        print(sliderQuery)
+        # print(sliderQuery, newSource.data["index"].size)
         if self.verbosity & 1:
             logging.info(sliderQuery)
         isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'

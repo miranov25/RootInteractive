@@ -1,7 +1,7 @@
 #clean_ipynb */*/*ipynb
 for note in $(ls */*/*ipynb); do
+    echo clean  ${note}
     nb-clean clean < ${note}  > ${note}2
-    echo mv ${note}2 ${note}
     mv ${note}2 ${note}
 done
 
