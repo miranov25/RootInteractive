@@ -139,7 +139,7 @@ class bokehDrawSA(object):
             iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
         #display(callback.code)
-        return widgetList
+        return column(widgetList)
 
     def createWidgets(self, widgetList0):
         r'''
