@@ -79,10 +79,10 @@ class bokehDrawHisto(object):
             Example projection:
                 projection=['hisdY',[0,1], {options+dictionary}]
                 projectionOptions:
-                    projectSlice
-                        ":"   - slice(None, None, None) - use sliders
-                        "::0" - slice(None, None, 0))   - project everything independent of sliders
-                        ""    -  anything else - user defined input
+                    projectSlice - per dimension
+                        None   -  use sliders
+                        ":"    -  use full range
+                        "xxx"     -  anything else - user defined input
                 to be added:
                     CDS  - per projection
         :return:
@@ -98,7 +98,29 @@ class bokehDrawHisto(object):
             self.imageList.append(figureRow)
         return 0
 
-    def processProjection(self, projection, figureRow):
+    def __processProjection(self, projection, figureRow):
+        """
+        see comment above
+        :param projection:
+        :param figureRow:
+        :return:
+        """
+        option=self.classGraphOptions.copy()
+        if len(projection)>1:
+            option.update(projection[2])
+        ## option colz
+        hisName=projection[0]
+        histogram=self.histogramList[hisName]
+        if option['projectSlice']!=None:
+            npIndex=copy(option['projectSlice'])
+        else:
+            npList=[]
+            for i, axisName in enumerate(his["varNames"]):
+                nBins = len(histogram["axes"][i])
+                npList.append(0,nBins,1)
+            npIndex=tuple(npList)
+
+        figdY,sourcedY=bokehDrawHistoSliceColz(self.histogramList[hisName],npIndex, 0,3,1, {'plot_width':800, 'plot_height':300},{'size':5})
         return 0
 
 
@@ -111,4 +133,5 @@ class bokehDrawHisto(object):
         'background_fill_color':None,
     }
     classGraphOptions={
+        "projectSlice":None
     }

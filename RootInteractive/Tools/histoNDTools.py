@@ -184,5 +184,27 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
         p2.xaxis.axis_label=xAxisLabel
         fIndex += 1
     p2.legend.click_policy = "hide"
-    show(p2)
-    return source
+    return p2, source
+
+
+def compileProjection(projection, histogramList):
+    """
+    compile projection string to python list
+    :param histogramList:  list of available histograms
+    :param projection:
+    :return:               list of primitives
+
+    Examples:
+        * Single projection with range
+            >>> hdEdx(0:5,0:10,0)(0)
+            ==>
+            >>> ["hdEdx", (slice(0, 5, None), slice(0, 10, None), 0), 0]
+        * Single projection automatic (full range)
+            >>> hdEdx()(0,1)
+            ==>
+            >>> ["hdEdx",(slice(None, None, None), slice(None, None, None), slice(None, None, None)), 0]
+        * Operation
+            >>>  hdEdx(0:5,0:10,0, 0)(0)/hdEdx()(0)
+
+
+    """
