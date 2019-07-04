@@ -12,7 +12,7 @@ from bokeh.palettes import *
 # Standard
 histoNDOptions = {
     "verbose": 0,
-    "colors":  Category10
+    "colors": Category10
 }
 
 
@@ -32,10 +32,10 @@ def makeHistogram(data, hisString, **kwargs):
     Example usage:
         >>> makeHistogram(MCdata,"TRD:pmeas:particle:#TRD>0>>hisTRDPP(50,0.5,3,20,0.3,5,5,0,5)",3)
     """
-    options={}
+    options = {}
     options.update(histoNDOptions)
     options.update(kwargs)
-    verbose=options['verbose']
+    verbose = options['verbose']
     if verbose & 0x1:
         logging.info("makeHistogram   :%s", hisString)
     varList = hisString.split(":")
@@ -62,16 +62,17 @@ def makeHistogram(data, hisString, **kwargs):
     histogram = {"H": H, "axes": axis, "name": histoInfo[0], "varNames": varList}
     return histogram
 
+
 def thnToNumpyDD(his):
-    tuple=hist2array(his,False,True,True)
-    histogram={"H":tuple[0],  "axes":tuple[1], "name": his.GetName(), "title":his.GetTitle()}
-    varNames=[]
-    varTitles=[]
+    tuple = hist2array(his, False, True, True)
+    histogram = {"H": tuple[0], "axes": tuple[1], "name": his.GetName(), "title": his.GetTitle()}
+    varNames = []
+    varTitles = []
     for axis in range(his.GetNdimensions()):
-        varNames.insert(axis,his.GetAxis(axis).GetName())
-        varTitles.insert(axis,his.GetAxis(axis).GetTitle())
-    histogram["varNames"]=varNames
-    histogram["varTitles"]=varTitles
+        varNames.insert(axis, his.GetAxis(axis).GetName())
+        varTitles.insert(axis, his.GetAxis(axis).GetTitle())
+    histogram["varNames"] = varNames
+    histogram["varTitles"] = varTitles
     return histogram
 
 
@@ -83,10 +84,10 @@ def makeHistogramPanda(data, hisString, **kwargs):
     :param kwargs:
     :return:
     """
-    options={}
+    options = {}
     options.update(histoNDOptions)
     options.update(kwargs)
-    verbose=options['verbose']
+    verbose = options['verbose']
     histo = makeHistogram(data, hisString, **options)
     varList = histo["varNames"]
     varList.append("count")
@@ -105,18 +106,19 @@ def makeHistogramPanda(data, hisString, **kwargs):
     df = pd.DataFrame(rows_list, columns=varList)
     return df
 
+
 def makeHistogramArray(dataSource, histogramStringArray, **kwargs):
     """
     :param dataSource:
     :param histogramStringArray:
     :return:
     """
-    options={}
+    options = {}
     options.update(histoNDOptions)
     options.update(kwargs)
     histogramArray = []
     for histoString in histogramStringArray:
-        histogram = makeHistogram(dataSource, histoString,**options)
+        histogram = makeHistogram(dataSource, histoString, **options)
         histogramArray.append(histogram)
     return histogramArray
 
@@ -137,55 +139,143 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
     :return:                       histogram figure
     """
     #
-    options={}
+    options = {}
     options.update(histoNDOptions)
     options.update(figOption)
     sliceString = str(hSlice).replace("slice", "")
     TOOLTIPS = [
         ("index", "$index"),
-        #("Slice", sliceString)
+        # ("Slice", sliceString)
     ]
     start = hSlice[axisColor].start
     stop = hSlice[axisColor].stop
     step = 1
     hSliceList = list(hSlice)
-    maxColor=len(options['colors'])
-    color = options['colors'][min(stop - start + 2,maxColor)]
+    maxColor = len(options['colors'])
+    color = options['colors'][min(stop - start + 2, maxColor)]
     data = {}
     x = histo["axes"][axisX][hSlice[axisX]]
     data['varX'] = x
     fIndex = 0
-    axis=tuple([a for a in range(0,len(histo["axes"])) if a!=axisX])
-    colorAxisLabel=None
+    axis = tuple([a for a in range(0, len(histo["axes"])) if a != axisX])
+    colorAxisLabel = None
     try:
-        colorAxisLabel=histo["varTitles"][axisColor]
+        colorAxisLabel = histo["varTitles"][axisColor]
     except:
-        colorAxisLabel=histo["varNames"][axisColor]
+        colorAxisLabel = histo["varNames"][axisColor]
     for a in range(start, stop, axisStep):
         hSliceList[axisColor] = slice(a, a + 1, step)
         hSliceLocal = tuple(hSliceList)
         # print a, histo["axes"][axisColor][a]
-        hLocal=histo["H"][hSliceLocal]
+        hLocal = histo["H"][hSliceLocal]
         y = np.sum(histo["H"][hSliceLocal], axis=axis)
         data["varY" + str(fIndex)] = y
-        TOOLTIPS.append((colorAxisLabel+"["+str(a)+"]", "@varY" + str(fIndex)))
+        TOOLTIPS.append((colorAxisLabel + "[" + str(a) + "]", "@varY" + str(fIndex)))
         fIndex += 1
     source = ColumnDataSource(data)
     p2 = figure(title=histo["name"], tooltips=TOOLTIPS, **figOption)
     fIndex = 0
     for a in range(start, stop, axisStep):
-        xAxisLabel=None
+        xAxisLabel = None
         try:
-            xAxisLabel=histo["varTitles"][axisX]
+            xAxisLabel = histo["varTitles"][axisX]
         except:
-            xAxisLabel=histo["varNames"][axisX]
-        p2.scatter("varX", "varY" + str(fIndex), source=source, color=color[fIndex%maxColor],
-                   marker=bokehMarkers[fIndex % 4], legend=colorAxisLabel+"["+str(a)+"]", **graphOption)
-        p2.xaxis.axis_label=xAxisLabel
+            xAxisLabel = histo["varNames"][axisX]
+        p2.scatter("varX", "varY" + str(fIndex), source=source, color=color[fIndex % maxColor],
+                   marker=bokehMarkers[fIndex % 4], legend=colorAxisLabel + "[" + str(a) + "]", **graphOption)
+        p2.xaxis.axis_label = xAxisLabel
         fIndex += 1
     p2.legend.click_policy = "hide"
     return p2, source
 
+
+def parseProjectionExpression(projectionExpression):
+    """
+    
+    :param projectionExpression: (variableExpression)(sliceExpression)(projection)(stat)
+    :return:
+    example:
+        >>> expression=parseExpression("( (TRD-TRD*0.5+ITS-TRD/2) (0:100,1:10,0:10:2) (0,1) () )")
+        >>> print(expression)
+        >>> [['(TRD-TRD*0.5+ITS-TRD/2)', ['0:100,1:10,0:10:2'], ['0,1'], []]]
+    """
+    theContent = pyparsing.Word(pyparsing.alphanums + ":,;+/-*^.\/")
+    parens = pyparsing.nestedExpr("(", ")", content=theContent)
+    res = parens.parseString(projectionExpression)
+    projection = res.asList()
+
+    def buildStr(strToBeBuild):
+        if isinstance(strToBeBuild, str):
+            return strToBeBuild
+        iString = ''
+        iString += '('
+        for sub in strToBeBuild:
+            iString += buildStr(sub)
+        iString += ')'
+        return iString
+
+    projection[0][0] = buildStr(projection[0][0])
+    projection[0][2] = projection[0][2][0].split(",")
+    return projection
+
+
+def evalHistoExpression(expression, histogramArray):
+    """
+
+    :param expression:
+    :param histogramArray:
+    :return:
+    """
+    # expression  hisdY-hisdZ, abs(hisdY-hisdZ)
+    print(expression)
+    histogram = {}
+    axes = []
+    varNames = []
+    query = expression[0][0]
+    keys = list(set(re.findall(r"\w+", expression[0][0])).intersection(list(histogramArray.keys())))
+    func_list = set(re.findall(r"\w+\(", expression[0][0]))  # there still a paranthesis at the end
+
+    for iKey in keys:
+        query = query.replace(iKey, "histogramArray[\'" + iKey + "\'][\'H\']")
+
+        for i, var in enumerate(histogramArray[iKey]["varNames"]):
+            try:
+                varNames[i].append(var)
+            except:
+                varNames.append([var])
+            varNames[i] = list(set(varNames[i]))
+
+        axes.append(histogramArray[iKey]["axes"])
+
+    tmp = axes[0]
+    for axe in axes:
+        for i in range(len(tmp)):
+            if not (axe[i] == tmp[i]).all():
+                raise valueError("histograms have incompatible axeses.")
+    axes = tmp
+
+    for iFunc in func_list:
+        if iFunc[:-1] in dir(np):
+            query = query.replace(iFunc, "np." + iFunc)
+
+    for i, var in enumerate(varNames):
+        varNames[i] = ','.join(var)
+
+    print(query)
+    histogram["H"] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
+    histogram["name"] = expression[0][0][1:-1]
+    print(varNames)
+    histogram["varNames"] = varNames
+    histogram["axes"] = axes
+
+    return histogram
+
+
+def drawHistogramExpression(expression,histogramArray):
+    expressionList=parseProjectionExpression(expression)
+    histo=evalHistoExpression(expressionList, histogramArray)
+    p,d=bokehDrawHistoSliceColz(histo,eval("np.index_exp["+str(expressionList[0][1][0])+"]"), 0,1,1, {'plot_width':800, 'plot_height':700},{'size':10})
+    return p,d
 
 def compileProjection(projection, histogramList):
     """
