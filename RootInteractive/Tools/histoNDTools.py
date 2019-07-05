@@ -251,7 +251,7 @@ def evalHistoExpression(expression, histogramArray):
     for axe in axes:
         for i in range(len(tmp)):
             if not (axe[i] == tmp[i]).all():
-                raise valueError("histograms have incompatible axeses.")
+                raise ValueError("histograms have incompatible axeses.")
     axes = tmp
 
     for iFunc in func_list:
@@ -260,9 +260,21 @@ def evalHistoExpression(expression, histogramArray):
 
     for i, var in enumerate(varNames):
         varNames[i] = ','.join(var)
-
     print(query)
-    histogram["H"] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
+
+    try:
+        nSlice = len(eval("np.index_exp["+str(expression[0][1][0])+"]"))
+    except:
+        raise SyntaxError("Invalid Slice: {}".format(str(expression[0][1][0])))
+
+    nAxes = len(axes)
+    if nSlice != nAxes:
+        raise IndexError("Number of Slices should be equal to number of axes. {} slices requested but {} axes  exist".format(nSlice,nAxes))
+
+    try:
+        histogram['H'] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
+    except:
+        raise ValueError("Invalid Histogram expression: {}".format(expression[0][0]))
     histogram["name"] = expression[0][0][1:-1]
     print(varNames)
     histogram["varNames"] = varNames
@@ -271,11 +283,13 @@ def evalHistoExpression(expression, histogramArray):
     return histogram
 
 
-def drawHistogramExpression(expression,histogramArray):
-    expressionList=parseProjectionExpression(expression)
-    histo=evalHistoExpression(expressionList, histogramArray)
-    p,d=bokehDrawHistoSliceColz(histo,eval("np.index_exp["+str(expressionList[0][1][0])+"]"), 0,1,1, {'plot_width':800, 'plot_height':700},{'size':10})
-    return p,d
+def drawHistogramExpression(expression, histogramArray):
+    expressionList = parseProjectionExpression(expression)
+    histo = evalHistoExpression(expressionList, histogramArray)
+    p, d = bokehDrawHistoSliceColz(histo, eval("np.index_exp[" + str(expressionList[0][1][0]) + "]"), 0, 1, 1,
+                                   {'plot_width': 800, 'plot_height': 700}, {'size': 10})
+    return p, d
+
 
 def compileProjection(projection, histogramList):
     """
