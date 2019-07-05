@@ -41,21 +41,25 @@ def BetheBlochSolidNP(lnbg):
     return BetheBlochGeantNP(lnbg)
 
 
-def toyMC(nPoints=1000000, detectors=["ITS","TPC0","TPC1","TPC2","TRD"]):
-    pdg=ROOT.TDatabasePDG.Instance()
-    particleList=["e+","mu+","pi+","K+","proton"]
-    massList=[ pdg.GetParticle(a).Mass() for a in particleList ]
+def toyMC(nPoints=1000000, detectors=None):
+    if detectors is None:
+        detectors = ["ITS", "TPC0", "TPC1", "TPC2", "TRD"]
+    pdg = ROOT.TDatabasePDG.Instance()
+    particleList = ["e+", "mu+", "pi+", "K+", "proton"]
+    massList = [pdg.GetParticle(a).Mass() for a in particleList]
+
     def GetMass(iPart):
         return [massList[i] for i in iPart]
-    p=np.random.random(nPoints)
-    p*=5
-    p+=0.1
-    particle=np.random.randint(0,5,size=nPoints)
-    mass=np.asarray(GetMass(particle))
-    lbg=np.log(p/mass)
-    data={'p':p, 'particle':particle, 'lbg':lbg}
-    df=pd.DataFrame(data)
+
+    p = np.random.random(nPoints)
+    p *= 5
+    p += 0.1
+    particle = np.random.randint(0, 5, size=nPoints)
+    mass = np.asarray(GetMass(particle))
+    lbg = np.log(p / mass)
+    data = {'p': p, 'particle': particle, 'lbg': lbg}
+    df = pd.DataFrame(data)
     for det in detectors:
-        df[det]=BetheBlochAlephNP(lbg)
-        df[det]*=np.random.normal(1,0.1,nPoints)
+        df[det] = BetheBlochAlephNP(lbg)
+        df[det] *= np.random.normal(1, 0.1, nPoints)
     return df
