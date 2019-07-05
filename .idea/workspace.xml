@@ -8,7 +8,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="PWGPP-517,PWGPP-534 -interactive histograms and projections">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/makeClean.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/miranov.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/miranov.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/notebookTest.sh" beforeDir="false" afterPath="$PROJECT_DIR$/test/notebookTest.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tutorial/bokehDraw/standAlone.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/bokehDraw/standAlone.ipynb" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -21,11 +26,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/.gitignore">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="112">
-              <caret line="7" lean-forward="true" selection-start-line="7" selection-end-line="7" />
+            <state relative-caret-position="80">
+              <caret line="5" selection-start-line="5" selection-end-line="5" />
             </state>
           </provider>
         </entry>
@@ -75,8 +80,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="746">
-              <caret line="57" column="2" selection-start-line="57" selection-start-column="2" selection-end-line="57" selection-end-column="2" />
+            <state relative-caret-position="96">
+              <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="36" />
               <folding>
                 <element signature="e#0#64#0" expanded="true" />
               </folding>
@@ -105,8 +110,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="154">
-              <caret line="54" column="32" selection-start-line="54" selection-start-column="32" selection-end-line="54" selection-end-column="32" />
+            <state relative-caret-position="192">
+              <caret line="22" column="104" selection-start-line="22" selection-start-column="104" selection-end-line="22" selection-end-column="113" />
               <folding>
                 <element signature="e#15#33#0" expanded="true" />
               </folding>
@@ -114,10 +119,10 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="176">
+            <state relative-caret-position="128">
               <caret line="11" column="110" selection-start-line="11" selection-start-column="110" selection-end-line="11" selection-end-column="110" />
               <folding>
                 <element signature="e#0#64#0" expanded="true" />
@@ -141,13 +146,12 @@
       <list>
         <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHistoND.py" />
         <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHisto.py" />
+        <option value="$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py" />
         <option value="$PROJECT_DIR$/RootInteractive/Tools/Alice/BetheBloch.py" />
         <option value="$PROJECT_DIR$/RootInteractive/Tools/histoNDTools.py" />
         <option value="$PROJECT_DIR$/test/notebookTest.sh" />
         <option value="$PROJECT_DIR$/test/makeClean.sh" />
         <option value="$PROJECT_DIR$/.gitignore" />
-        <option value="$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py" />
-        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py" />
       </list>
     </option>
   </component>
@@ -272,7 +276,7 @@
       <workItem from="1562126669346" duration="1336000" />
       <workItem from="1562210694600" duration="599000" />
       <workItem from="1562227860100" duration="4669000" />
-      <workItem from="1562298604097" duration="2343000" />
+      <workItem from="1562298604097" duration="836000" />
     </task>
     <task id="LOCAL-00001" summary="PWGPP-517,PWGPP-534 - tools for histogramming and histogram visualization">
       <created>1561273506207</created>
@@ -306,7 +310,7 @@
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="72834000" />
+    <option name="totallyTimeSpent" value="71327000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="45" y="25" width="1875" height="1055" extended-state="6" />
@@ -545,6 +549,50 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="96">
+          <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="36" />
+          <folding>
+            <element signature="e#0#64#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="80">
+          <caret line="5" column="117" selection-start-line="5" selection-end-line="5" selection-end-column="117" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="160">
+          <caret line="10" column="28" selection-start-line="10" selection-start-column="28" selection-end-line="10" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="192">
+          <caret line="22" column="104" selection-start-line="22" selection-start-column="104" selection-end-line="22" selection-end-column="113" />
+          <folding>
+            <element signature="e#15#33#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="128">
+          <caret line="11" column="110" selection-start-line="11" selection-start-column="110" selection-end-line="11" selection-end-column="110" />
+          <folding>
+            <element signature="e#0#64#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/histoNDTools.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="717">
@@ -571,52 +619,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/.gitignore">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="112">
-          <caret line="7" lean-forward="true" selection-start-line="7" selection-end-line="7" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="746">
-          <caret line="57" column="2" selection-start-line="57" selection-start-column="2" selection-end-line="57" selection-end-column="2" />
-          <folding>
-            <element signature="e#0#64#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py">
-      <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="80">
-          <caret line="5" column="117" selection-start-line="5" selection-end-line="5" selection-end-column="117" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="160">
-          <caret line="10" column="28" selection-start-line="10" selection-start-column="28" selection-end-line="10" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="154">
-          <caret line="54" column="32" selection-start-line="54" selection-start-column="32" selection-end-line="54" selection-end-column="32" />
-          <folding>
-            <element signature="e#15#33#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="176">
-          <caret line="11" column="110" selection-start-line="11" selection-start-column="110" selection-end-line="11" selection-end-column="110" />
-          <folding>
-            <element signature="e#0#64#0" expanded="true" />
-          </folding>
+          <caret line="5" selection-start-line="5" selection-end-line="5" />
         </state>
       </provider>
     </entry>
