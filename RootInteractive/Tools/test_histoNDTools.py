@@ -52,7 +52,7 @@ def runTOYMC(nPoints=100000):
     return df
 
 
-def testHistoPanda(nPoints):
+def testHistoPanda(nPoints=10000):
     dataFrame = runTOYMC(nPoints)
     dataFrame.head(5)
     histoStringArray = [
@@ -88,5 +88,5 @@ def testBokehDrawHistoTHn():
 
 
 #testHistoPanda(1000000)
-testTHnDraw()
+#testTHnDraw()
 #testBokehDrawHistoTHn()
