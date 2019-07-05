@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import ROOT
 
 
 def BetheBlochAlephNP(lnbg, kp1=0.76176e-1, kp2=10.632, kp3=0.13279e-4, kp4=1.8631, kp5=1.9479):
@@ -37,3 +39,27 @@ def BetheBlochGeantNP(lnbg, kp0=2.33, kp1=0.20, kp2=3.00, kp3=173e-9, kp4=0.4984
 
 def BetheBlochSolidNP(lnbg):
     return BetheBlochGeantNP(lnbg)
+
+
+def toyMC(nPoints=1000000, detectors=None):
+    if detectors is None:
+        detectors = ["ITS", "TPC0", "TPC1", "TPC2", "TRD"]
+    pdg = ROOT.TDatabasePDG.Instance()
+    particleList = ["e+", "mu+", "pi+", "K+", "proton"]
+    massList = [pdg.GetParticle(a).Mass() for a in particleList]
+
+    def GetMass(iPart):
+        return [massList[i] for i in iPart]
+
+    p = np.random.random(nPoints)
+    p *= 5
+    p += 0.1
+    particle = np.random.randint(0, 5, size=nPoints)
+    mass = np.asarray(GetMass(particle))
+    lbg = np.log(p / mass)
+    data = {'p': p, 'particle': particle, 'lbg': lbg}
+    df = pd.DataFrame(data)
+    for det in detectors:
+        df[det] = BetheBlochAlephNP(lbg)
+        df[det] *= np.random.normal(1, 0.1, nPoints)
+    return df
