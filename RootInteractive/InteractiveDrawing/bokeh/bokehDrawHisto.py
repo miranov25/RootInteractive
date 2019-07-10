@@ -43,6 +43,7 @@ class bokehDrawHisto(object):
             self.histogramList[his.GetName()] = ddHis
         self.__processSliders()
         self.sliderWidgets = widgets.VBox(self.sliderList)
+        self.__processProjections()
         display(self.sliderWidgets)
         return self
 
@@ -75,7 +76,7 @@ class bokehDrawHisto(object):
         process projectionList and create array/list of figures and CDS
             * >>>  projectionList=[ figureDescription0, figureDecription1, ... options]
             * >>>  figureDescription=[[projection0,projection1, ...], options],
-            * >>>  projection=[hisName,[axisShow],[axisProject]]
+            * >>>  projection=(hisExpression)(slice)(projection)(statistic)
             Example projection:
                 projection=['hisdY',[0,1], {options+dictionary}]
                 projectionOptions:
@@ -88,40 +89,31 @@ class bokehDrawHisto(object):
         :return:
         """
         optionAll=self.figureOptions.copy()
-        optionAll.update(self.projectionList[-1])
+        if isinstance(self.projectionList[-1], dict):
+            optionAll.update(self.projectionList[-1])
         for figureDescription in self.projectionList:
             optionRow=optionAll.copy()
-            optionRow.update(figureDescription[-1])
+            if isinstance(figureDescription[-1], dict):
+                optionRow.update(figureDescription[-1])
             figureRow = figure(title=optionRow['title'], tools=optionAll['tools'], background_fill_color=optionRow['background_fill_color'], y_axis_type=optionRow['y_axis_type'], x_axis_type=optionRow['x_axis_type'])
             for projection in figureDescription:
-                self.processProjection(projection,figureRow)
+                self.__processProjection(projection,figureRow,{"figure":figureRow},optionRow)
             self.imageList.append(figureRow)
         return 0
 
-    def __processProjection(self, projection, figureRow):
+    def __processProjection(self, projection, figureRow, figureOption, graphOption):
         """
         see comment above
         :param projection:
         :param figureRow:
         :return:
         """
-        option=self.classGraphOptions.copy()
-        if len(projection)>1:
-            option.update(projection[2])
-        ## option colz
-        hisName=projection[0]
-        histogram=self.histogramList[hisName]
-        if option['projectSlice']!=None:
-            npIndex=copy(option['projectSlice'])
-        else:
-            npList=[]
-            for i, axisName in enumerate(his["varNames"]):
-                nBins = len(histogram["axes"][i])
-                npList.append(0,nBins,1)
-            npIndex=tuple(npList)
+        expressionList = parseProjectionExpression(projection)
+        histo = evalHistoExpression(expressionList, self.histogramList)
+        if len(expressionList[0][2]) >1:
+            p, d = bokehDrawHistoSliceColz(histo, eval("np.index_exp[" + str(expressionList[0][1][0]) + "]"), expressionList[0][2][0], expressionList[0][2][1], 1, figureOption, graphOption)
+        return p, d
 
-        figdY,sourcedY=bokehDrawHistoSliceColz(self.histogramList[hisName],npIndex, 0,3,1, {'plot_width':800, 'plot_height':300},{'size':5})
-        return 0
 
 
     classFigureOptions={

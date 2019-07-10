@@ -68,7 +68,8 @@ def testHistoPanda(nPoints=10000):
 
 def testTHnDraw():
     output_file("test_histoNDTools_THnDraw.html")
-    finput=ROOT.TFile(" ~/github/RootInteractive3/tutorial/data/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
+    ROOT.TFile.SetCacheFileDir("../data/"),
+    finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
     hisArray=finput.Get("hisArray")
     hisArray.ls()
     hisArray.FindObject("hisdY").Print("all")
@@ -80,13 +81,32 @@ def testTHnDraw():
     figdZ,sourcedY=bokehDrawHistoSliceColz(histogramArray['hisdZ'],np.index_exp[0:100, 0:5, 0:6,1:9,1:3], 0,3,1, {'plot_width':800, 'plot_height':300},{'size':5})
     show(column(figdY,figdZ))
 
+
+def testDrawSlice():
+    output_file("test_histoNDTools_THnDraw.html")
+    ROOT.TFile.SetCacheFileDir("../data/"),
+    finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
+    hisArray=finput.Get("hisArray")
+    hisArray.ls()
+    hisArray.FindObject("hisdY").Print("all")
+    histogramArray={}
+    for his in hisArray:
+        ddHis=thnToNumpyDD(his)
+        histogramArray[ddHis['name']]=ddHis
+    p,d = drawHistogramExpression("((hisdY)(0:100,0:100,0:5,:,:) (0,2)())",histogramArray,{"plotLegendFormat":"%.3f",'plot_width':800, 'plot_height':300},{})
+    #p,d = drawHistogramExpression("((hisdY)() (0,2)())",histogramArray,{"plotLegendFormat":"%.3f",'plot_width':800, 'plot_height':300},{})
+    #show(p)
+    #p,d = drawHistogramExpression("((hisdY)(0:100,:,0:5,:,:) (0,1)())",histogramArray,{"plotLegendFormat":"%.3f",'plot_width':800, 'plot_height':300},{})
+    show(p)
+
 def testBokehDrawHistoTHn():
     output_file("test_histoNDTools_testBokehDrawHistoTHn.html")
     hisArray.ls()
-    bokehDrawHisto.fromTHnArray(hisArray,{},{},{})
+    bokehDrawHisto.fromTHnArray(hisArray,[["hisdY()(0,1)()"], ["hisdZ()(0,1)()"]],{},{})
 
 
 
 #testHistoPanda(1000000)
 #testTHnDraw()
+testDrawSlice()
 #testBokehDrawHistoTHn()
