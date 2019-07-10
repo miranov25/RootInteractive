@@ -12,7 +12,8 @@ from bokeh.palettes import *
 # Standard
 histoNDOptions = {
     "verbose": 0,
-    "colors": Category10
+    "colors": Category10,
+    "plotLegendFormat": "%d"
 }
 
 
@@ -142,6 +143,7 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
     options = {}
     options.update(histoNDOptions)
     options.update(figOption)
+    figOption.pop("plotLegendFormat", None)
     sliceString = str(hSlice).replace("slice", "")
     TOOLTIPS = [
         ("index", "$index"),
@@ -152,7 +154,7 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
     step = 1
     hSliceList = list(hSlice)
     maxColor = len(options['colors'])
-    color = options['colors'][min(stop - start + 2, maxColor)]
+    color = options['colors'][min(stop - start + 3, maxColor)]
     data = {}
     x = histo["axes"][axisX][hSlice[axisX]]
     data['varX'] = x
@@ -173,7 +175,10 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
         TOOLTIPS.append((colorAxisLabel + "[" + str(a) + "]", "@varY" + str(fIndex)))
         fIndex += 1
     source = ColumnDataSource(data)
-    p2 = figure(title=histo["name"], tooltips=TOOLTIPS, **figOption)
+    if "figure" in figOption:
+        p2 = figOption["figure"]
+    else:
+        p2 = figure(title=histo["name"], tooltips=TOOLTIPS, **figOption)
     fIndex = 0
     for a in range(start, stop, axisStep):
         xAxisLabel = None
@@ -181,8 +186,15 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
             xAxisLabel = histo["varTitles"][axisX]
         except:
             xAxisLabel = histo["varNames"][axisX]
+        plotLegend = ""
+        if options['plotLegendFormat'] == "%d":
+            plotLegend = colorAxisLabel + "[" + str(a) + "]"
+        else:
+            if "f" in options['plotLegendFormat']:
+                plotLegendFormat = options['plotLegendFormat']
+                plotLegend = colorAxisLabel + "[" + (plotLegendFormat % histo["axes"][axisColor][a]) + ":" + (plotLegendFormat % histo["axes"][axisColor][a + 1]) + "]"
         p2.scatter("varX", "varY" + str(fIndex), source=source, color=color[fIndex % maxColor],
-                   marker=bokehMarkers[fIndex % 4], legend=colorAxisLabel + "[" + str(a) + "]", **graphOption)
+                   marker=bokehMarkers[fIndex % 4], legend=plotLegend, **graphOption)
         p2.xaxis.axis_label = xAxisLabel
         fIndex += 1
     p2.legend.click_policy = "hide"
@@ -201,7 +213,13 @@ def parseProjectionExpression(projectionExpression):
     """
     theContent = pyparsing.Word(pyparsing.alphanums + ":,;+/-*^.\/")
     parens = pyparsing.nestedExpr("(", ")", content=theContent)
-    res = parens.parseString(projectionExpression)
+    if projectionExpression[0] != "(":
+        projectionExpression = "(" + projectionExpression + ")"
+    try:
+        res = parens.parseString(projectionExpression)
+    except:
+        logging.error("Invalid projection expression", projectionExpression)
+        return
     projection = res.asList()
 
     def buildStr(strToBeBuild):
@@ -215,16 +233,43 @@ def parseProjectionExpression(projectionExpression):
         return iString
 
     projection[0][0] = buildStr(projection[0][0])
-    projection[0][2] = projection[0][2][0].split(",")
+    try:
+        projection[0][2] = [int(i) for i in projection[0][2][0].split(",")]
+    except:
+        logging.error("Invalid syntax for projection slice", projection[0][2][0])
     return projection
+
+
+def autoCompleteSlice(expression, histo):
+    """
+
+    :param expression: build slice for string expression - string
+    :param histo:      reference histogram for slice
+    :return:    numpy slice
+    """
+    axes = histo['axes']
+    maxSize = len(axes)
+    sliceList = expression.split(',')
+    if len(sliceList) > maxSize:
+        logging.error("Size bigger than expected")
+        # raise exception
+    # replace empty slice by full range slice
+    for i in range(len(sliceList), maxSize):
+        sliceList.append(":")
+    for i, rslice in enumerate(sliceList):
+        if len(rslice) == 0:
+            sliceList[i] = ":"
+    sliceString = ",".join(sliceList)
+    npSlice = eval("np.index_exp[" + sliceString + "]")
+    return npSlice
 
 
 def evalHistoExpression(expression, histogramArray):
     """
 
-    :param expression:
+    :param expression:         histogram expression to evaluate
     :param histogramArray:
-    :return:
+    :return: histogram
     """
     # expression  hisdY-hisdZ, abs(hisdY-hisdZ)
     print(expression)
@@ -262,32 +307,40 @@ def evalHistoExpression(expression, histogramArray):
         varNames[i] = ','.join(var)
     print(query)
 
-    try:
-        nSlice = len(eval("np.index_exp["+str(expression[0][1][0])+"]"))
-    except:
-        raise SyntaxError("Invalid Slice: {}".format(str(expression[0][1][0])))
+    #try:
+    #    nSlice = len(eval("np.index_exp[" + str(expression[0][1][0]) + "]"))
+    #except:
+    #    raise SyntaxError("Invalid Slice: {}".format(str(expression[0][1][0])))
 
-    nAxes = len(axes)
-    if nSlice != nAxes:
-        raise IndexError("Number of Slices should be equal to number of axes. {} slices requested but {} axes  exist".format(nSlice,nAxes))
+    #nAxes = len(axes)
+    #if nSlice != nAxes:
+    #    raise IndexError("Number of Slices should be equal to number of axes. {} slices requested but {} axes  exist".format(nSlice, nAxes))
 
     try:
-        histogram['H'] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
+        # histogram['H'] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
+        histogram['H'] = eval(query)
     except:
         raise ValueError("Invalid Histogram expression: {}".format(expression[0][0]))
+
     histogram["name"] = expression[0][0][1:-1]
     print(varNames)
     histogram["varNames"] = varNames
     histogram["axes"] = axes
+    if len(expression[0][1])==0:
+        expression[0][1].append("")
+    histoSlice=autoCompleteSlice(expression[0][1][0],histogram)
+    histogram["sliceSlider"]= histoSlice
 
     return histogram
 
 
-def drawHistogramExpression(expression, histogramArray):
+def drawHistogramExpression(expression, histogramArray, figureOption, graphOption):
     expressionList = parseProjectionExpression(expression)
     histo = evalHistoExpression(expressionList, histogramArray)
-    p, d = bokehDrawHistoSliceColz(histo, eval("np.index_exp[" + str(expressionList[0][1][0]) + "]"), 0, 1, 1,
-                                   {'plot_width': 800, 'plot_height': 700}, {'size': 10})
+    if len(expressionList[0][2]) > 1:
+        #p, d = bokehDrawHistoSliceColz(histo, eval("np.index_exp[" + str(expressionList[0][1][0]) + "]"), expressionList[0][2][0], expressionList[0][2][1], 1, figureOption, graphOption)
+        p, d = bokehDrawHistoSliceColz(histo, histo["sliceSlider"], expressionList[0][2][0], expressionList[0][2][1], 1, figureOption, graphOption)
+
     return p, d
 
 
