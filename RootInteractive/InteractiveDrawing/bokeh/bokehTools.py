@@ -390,10 +390,13 @@ def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
         columns[i] = iColumn.replace(".", "_")
 
     ex_dict = {}
+    meta_dict = {}
     for i, a in enumerate(columns):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+        meta_dict[a+".AxisTitle"] = a
     df = pd.DataFrame(ex_dict, columns=columns)
+    df.metaData = meta_dict
     for i, a in enumerate(columns):  # change type to time format if specified
         if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
             df[a] = pd.to_datetime(df[a], unit='s')
@@ -495,7 +498,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
 
             figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
-                            marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX]);
+                            marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX])
             figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
             figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
         if color_bar!=None:

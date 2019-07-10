@@ -186,6 +186,8 @@ class bokehDrawSA(object):
 #                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
 #                values = list(subList)
 #                iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
+            elif name[0] == "query":
+                iWidget = widgets.TextInput(value="", placeholder="Type a query", title="Query")
             elif name[0] == "slider":
                 if len(subList) == 4:
                     iWidget = widgets.Slider(title=name[1], start=float(subList[0]), end=float(subList[1]),
