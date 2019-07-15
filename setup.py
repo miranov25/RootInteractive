@@ -36,8 +36,13 @@ setup(
         # ---------------------    machine learning dependencies
         'sklearn',
         'scikit-garden',
+        'scikit-hep',
         'forestci',
         'tensorflow',
-        'keras'
+        'keras',
+        # ------------------      test and tutorials
+        'pytest',
+        'nbval',
+        'nb-clean'
     ]
 )
