@@ -17,6 +17,7 @@ request
 # ---------------------    machine learning dependencies
 sklearn
 scikit-garden
+scikit-hep
 forestci
 tensorflow
 keras
