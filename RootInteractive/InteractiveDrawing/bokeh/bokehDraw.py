@@ -1,19 +1,20 @@
-# from bokeh.palettes import *
-import re
+import logging
+
+from IPython import get_ipython
+from IPython.display import display
 from bokeh.models import *
+from ipywidgets import *
+
+from RootInteractive.Tools.aliTreePlayer import *
+from .bokehTools import *
+
+
 # from bokeh.models import ColumnDataSource
 
-from .bokehTools import *
-from ipywidgets import *
-from RootInteractive.Tools.aliTreePlayer import *
-from IPython.display import display
-from IPython import get_ipython
-import ROOT
-import logging
 
 class bokehDraw(object):
 
-    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **options):
+    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **kwargs):
         """
         :param source:           input data frame
         :param query:            query string
@@ -57,6 +58,21 @@ class bokehDraw(object):
                                  - verbosity     - first bit: verbosity for query for every update
                                                  - second bit: verbosity for source file.
         """
+
+        # define default options
+        options = {
+            'nCols': 2,
+            'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+            'y_axis_type': 'auto',
+            'x_axis_type': 'auto',
+            'plot_width': 400,
+            'plot_height': 400,
+            'bg_color': '#fafafa',
+            'color': "navy",
+            'line_color': "white"
+        }
+        options.update(kwargs)
+
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
                 logging.info("Panda DataFrame is parsing...")
@@ -64,52 +80,25 @@ class bokehDraw(object):
         else:
             if (self.verbosity >> 1) & 1:
                 logging.info('source is not a Panda DataFrame, assuming it is ROOT::TTree')
-            varList = []
-            if 'variables' in options.keys():
-                varList = options['variables'].split(":")
-            varSource = [varColor, varX, varY, widgetString, query]
-            if 'errY' in options.keys():
-                varSource.append(options['errY'])
-            if 'tooltips' in options.keys():
-                for tip in options["tooltips"]:
-                    varSource.append(tip[1].replace("@",""))
-            toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
-            toReplace = ["^slider.", "^checkbox.", "^dropdown."]
-            varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
-            if 'tooltip' in options.keys():
-                tool = str([str(a[1]) for a in options["tooltip"]])
-                varList += filter(None, re.split('[^a-zA-Z0-9_]', tool))
-            variableList = ""
-            for var in set(varList):
-                if len(variableList) > 0: variableList += ":"
-                variableList += var
+            treeoptions = {
+            'nEntries': source.GetEntries(),
+            'firstEntry': 0,
+            'columnMask': 'default'
+            }
+            treeoptions.update(kwargs)
 
-            if 'nEntries' in options.keys():
-                nEntries = options['nEntries']
-            else:
-                nEntries = source.GetEntries()
-            if 'firstEntry' in options.keys():
-                firstEntry = options['firstEntry']
-            else:
-                firstEntry = 0
-            if 'mask' in options.keys():
-                columnMask = options['mask']
-            else:
-                columnMask = 'default'
+            variableList = constructVariables(query, varX, varY, varColor, widgetString, self.verbosity, **kwargs)
+            df = tree2Panda(source, variableList, query, treeoptions['nEntries'], treeoptions['firstEntry'], treeoptions['columnMask'])
 
-            df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
-
-        self.query = query
         self.dataSource = df.query(query)
-        if hasattr(df, 'metaData'):
-            self.dataSource.metaData=df.metaData
+        self.dataSource.metaData = df.metaData
         if len(varX) == 0:
             return
         if ":" not in varX:
             self.dataSource.sort_values(varX, inplace=True)
         self.Widgets = self.initWidgets(widgetString)
         self.figure, self.bokehSource, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
-        self.handle = show(self.figure,notebook_handle=True)
+        self.handle = show(self.figure, notebook_handle=True)
         self.updateInteractive("")
         display(self.Widgets)
 
@@ -124,17 +113,28 @@ class bokehDraw(object):
         :param kwargs:
         :return:
         """
-        self=cls(dataFrame,query,"","","","",None)
+        tmp=""
+        for fig in figureArray:
+            for entry in fig[0:2]:
+                if entry == 'table':    continue
+                for word in entry:
+                    tmp+=word+":"
+        varList=""
+        for word in re.split('[^a-zA-Z0-9]', tmp[:-1]):
+            if not word.isnumeric():
+                varList += word + ":"
+        varList += widgetString
+        self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         self.Widgets = self.initWidgets(widgetString)
-        self.figure, self.bokehSource, self.plotArray, self.dataSource = bokehDrawArray(self.dataSource, query, figureArray, **kwargs)
-        #self.figure = gridplotRow(self.plotArray, **kwargs)
-        #handle = show(pAll, notebook_handle=isNotebook)
+        self.figure, self.bokehSource, self.plotArray, self.dataSource = bokehDrawArray(self.dataSource, query,
+                                                                                        figureArray, **kwargs)
+        # self.figure = gridplotRow(self.plotArray, **kwargs)
+        # handle = show(pAll, notebook_handle=isNotebook)
         isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
-        self.handle=show(self.figure,notebook_handle=isNotebook)
+        self.handle = show(self.figure, notebook_handle=isNotebook)
         self.updateInteractive("")
         display(self.Widgets)
         return self
-
 
     def initWidgets(self, widgetString):
         r"""
@@ -151,7 +151,7 @@ class bokehDraw(object):
         except:
             logging.error("Invalid widget string", widgetString)
         return widgets.VBox(self.createWidgets(widgetList), layout=Layout(width='66%'))
-           
+
     def createWidgets(self, widgetList0):
         r'''
         Build widgets and connect observe function of the bokehDraw object
@@ -178,12 +178,12 @@ class bokehDraw(object):
         for widgetTitle, subList in zip(*[iter(widgetList0)] * 2):
             name = widgetTitle.split('.')
             if name[0] == 'accordion':
-                accordion.children = accordion.children +(widgets.VBox(self.createWidgets(subList)),)
-                accordion.set_title(len(accordion.children)-1, name[1])
+                accordion.children = accordion.children + (widgets.VBox(self.createWidgets(subList)),)
+                accordion.set_title(len(accordion.children) - 1, name[1])
                 continue
             elif name[0] == 'tab':
-                tab.children = tab.children +(widgets.VBox(self.createWidgets(subList)),)
-                tab.set_title(len(tab.children)-1, name[1])
+                tab.children = tab.children + (widgets.VBox(self.createWidgets(subList)),)
+                tab.set_title(len(tab.children) - 1, name[1])
                 continue
             elif name[0] == "checkbox":
                 if len(subList) == 0:
@@ -195,44 +195,48 @@ class bokehDraw(object):
                         status = False
                     else:
                         raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". "
-                                     "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
+                                         "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
                 else:
                     raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
-                    "Checkbox {} has {} parameters.".format(name[1], len(subList)))              
-                iWidget = widgets.Checkbox(description=name[1], layout=Layout(width='66%'), value=status, disabled=False)
+                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
+                iWidget = widgets.Checkbox(description=name[1], layout=Layout(width='66%'), value=status,
+                                           disabled=False)
             elif name[0] == "dropdown":
                 values = list(subList)
                 if len(values) == 0:
-                    raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",format(name[1]))
-                iWidget = widgets.Dropdown(description=name[1], options=values, layout=Layout(width='66%'),value=values[0])
+                    raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",
+                                     format(name[1]))
+                iWidget = widgets.Dropdown(description=name[1], options=values, layout=Layout(width='66%'),
+                                           value=values[0])
             elif name[0] == "slider":
                 if len(subList) == 4:
                     iWidget = widgets.FloatSlider(description=name[1], layout=Layout(width='66%'),
-                                                min=float(subList[0]), max=float(subList[1]),
-                                                step=float(subList[2]), value=float(subList[3]))
+                                                  min=float(subList[0]), max=float(subList[1]),
+                                                  step=float(subList[2]), value=float(subList[3]))
                 elif len(subList) == 5:
                     iWidget = widgets.FloatRangeSlider(description=name[1], layout=Layout(width='66%'),
-                                                min=float(subList[0]), max=float(subList[1]),
-                                                step=float(subList[2]), value=[float(subList[3]), float(subList[4])])
+                                                       min=float(subList[0]), max=float(subList[1]),
+                                                       step=float(subList[2]),
+                                                       value=[float(subList[3]), float(subList[4])])
                 else:
                     raise SyntaxError(
                         "The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. "
                         "Slider {} has {} parameters.".format(name[1], len(subList)))
+            elif name[0] == "query":
+                iWidget = widgets.Text(value='', placeholder='Type a query', description='Query:', disabled=False)
             else:
                 if (self.verbosity >> 1) & 1:
                     logging.info("type of the widget\"" + name[0] + "\" is not specified. Assuming it is a slider.")
-                iWidget = self.createWidgets([["slider." + name[0], subList]])         # For backward compatibility
+                iWidget = self.createWidgets([["slider." + name[0], subList]])  # For backward compatibility
             iWidget.observe(self.updateInteractive, names='value')
             widgetSubList.append(iWidget)
         self.allWidgets += widgetSubList
-        if len(accordion.children)>0:
+        if len(accordion.children) > 0:
             widgetSubList.append(accordion)
-        if len(tab.children)>0:
+        if len(tab.children) > 0:
             widgetSubList.append(tab)
-        return widgetSubList       
+        return widgetSubList
 
-    
-    
     def updateInteractive(self, b):
         """
         callback function to update drawing CDS (Column data source) of drawing object
@@ -241,7 +245,7 @@ class bokehDraw(object):
         :return: none
         """
         sliderQuery = ""
-        
+
         for iWidget in self.allWidgets:
             if isinstance(iWidget, widgets.FloatRangeSlider):
                 sliderQuery += str(
@@ -249,8 +253,11 @@ class bokehDraw(object):
                                                 str(iWidget.description), str(iWidget.value[1])))
             elif isinstance(iWidget, widgets.FloatSlider):
                 sliderQuery += str(
-                    "{0}>={1}-{2}&{3}<={4}+{5}&".format(str(iWidget.description), str(iWidget.value), str(iWidget.step), str(iWidget.description), str(iWidget.value),
+                    "{0}>={1}-{2}&{3}<={4}+{5}&".format(str(iWidget.description), str(iWidget.value), str(iWidget.step),
+                                                        str(iWidget.description), str(iWidget.value),
                                                         str(iWidget.step)))
+            elif isinstance(iWidget, widgets.Text):
+                if iWidget.value:   sliderQuery += str(str(iWidget.value) + "&")
             else:
                 sliderQuery += str(str(iWidget.description) + "==" + str(iWidget.value) + "&")
         sliderQuery = sliderQuery[:-1]
@@ -259,9 +266,30 @@ class bokehDraw(object):
         # print(sliderQuery, newSource.data["index"].size)
         if self.verbosity & 1:
             logging.info(sliderQuery)
-        isNotebook=get_ipython().__class__.__name__=='ZMQInteractiveShell'
+        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isNotebook:
             push_notebook(self.handle)
-                 
 
     verbosity = 0
+
+def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
+    varList = []
+    varSource = [varColor, varX, varY, widgetString, query]
+    if 'variables' in kwargs.keys():
+        varSource.append(kwargs['variables'])
+    if 'errY' in kwargs.keys():
+        varSource.append(kwargs['errY'])
+    if 'tooltips' in kwargs.keys():
+        for tip in kwargs["tooltips"]:
+            varSource.append(tip[1].replace("@", ""))
+    toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
+    toReplace = ["^slider.", "^checkbox.", "^dropdown."]
+    varList += getAndTestVariableList(varSource, toRemove, toReplace, verbosity)
+    if 'tooltip' in kwargs.keys():
+        tool = str([str(a[1]) for a in kwargs["tooltip"]])
+        varList += filter(None, re.split('[^a-zA-Z0-9_]', tool))
+    variableList = ""
+    for var in set(varList):
+        if len(variableList) > 0: variableList += ":"
+        variableList += var
+    return variableList

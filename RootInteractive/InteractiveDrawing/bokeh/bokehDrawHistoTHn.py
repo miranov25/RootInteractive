@@ -1,14 +1,15 @@
 from IPython.core.display import display
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
 from bokeh.plotting import figure, show
 from bokeh.layouts import gridplot
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.models.glyphs import Quad
+from bokeh.models import ColumnDataSource
+from bokeh.models.glyphs import VBar
 from bokeh.io import push_notebook
 from ipywidgets import *
-import pyparsing
+
 
 class bokehDrawHistoTHn(object):
-    def __init__(self, histograms, selection, **options):
+    def __init__(self, histograms, selection, **kwargs):
         """
         :param histograms:      TObjArray consists of multidimensional TTree's ( THnT )
                                     for detailed info check:
@@ -20,7 +21,7 @@ class bokehDrawHistoTHn(object):
                                 Ex:
                                     "hisdZ(3),hisdZ(0),hisPullZHM1(3),hisPullZCL(1)"
 
-        :param options:         -ncols        :the number of columns
+        :param options:         -nCols        :the number of columns
                                 -tooltips     :tooltips to show
                                 -plot_width   :the width of each plot
                                 -plot_height  :the height of each plot
@@ -31,8 +32,21 @@ class bokehDrawHistoTHn(object):
 
 
         """
-        
-        self.selectionList = parseSelectionString(selection)
+
+        # define default options
+        options = {
+            'nCols': 2,
+            'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+            'y_axis_type': 'auto',
+            'x_axis_type': 'auto',
+            'plot_width': 400,
+            'plot_height': 400,
+            'bg_color': '#fafafa',
+            'color': "navy",
+            'line_color': "white"
+        }
+        options.update(kwargs)
+        self.selectionList = parseWidgetString(selection)
         self.histArray = histograms
         self.sliderList = []
         self.sliderNames = []
@@ -45,7 +59,7 @@ class bokehDrawHistoTHn(object):
 
     def updateInteractive(self, b):
         for hisTitle, projectionList in zip(*[iter(self.selectionList)] * 2):
-            for iDim in range(self.histArray.FindObject(hisTitle).GetNdimensions() - 1,-1,-1):
+            for iDim in range(self.histArray.FindObject(hisTitle).GetNdimensions() - 1, -1, -1):
                 iSlider = self.sliderNames.index(self.histArray.FindObject(hisTitle).GetAxis(iDim).GetTitle())
                 value = self.sliderList[iSlider].value
                 self.histArray.FindObject(hisTitle).GetAxis(iDim).SetRangeUser(value[0], value[1])
@@ -56,28 +70,14 @@ class bokehDrawHistoTHn(object):
             if nDim > 1:
                 raise NotImplementedError("Sorry!!.. Multidimensional projections have not been implemented, yet")
             histogram = self.histArray.FindObject(hisTitle).Projection(dimList[0])
-            binsLowEdge = []
-            binsUpEdge = []
-            top = []
-            bottom = []
-            for i in range(1, histogram.GetNbinsX() + 1):
-                binsLowEdge.append(histogram.GetXaxis().GetBinLowEdge(i))
-                binsUpEdge.append(histogram.GetXaxis().GetBinUpEdge(i))
-                top.append(histogram.GetBinContent(i))
-                bottom.append(0)
-            newSource = ColumnDataSource(dict(
-                left=binsLowEdge,
-                right=binsUpEdge,
-                top=top,
-                bottom=bottom
-            ))
-            self.source[iterator].data = newSource.data
+            cds = makeCDS(histogram)
+            self.source[iterator].data = cds.data
             iterator = iterator + 1
         push_notebook(self.handle)
 
     def initSlider(self, b):
         for hisTitle, projectionList in zip(*[iter(self.selectionList)] * 2):
-            for iDim in range(self.histArray.FindObject(hisTitle).GetNdimensions() - 1,-1,-1):
+            for iDim in range(self.histArray.FindObject(hisTitle).GetNdimensions() - 1, -1, -1):
                 axis = self.histArray.FindObject(hisTitle).GetAxis(iDim)
                 title = axis.GetTitle()
                 if title not in self.sliderNames:
@@ -90,22 +90,8 @@ class bokehDrawHistoTHn(object):
                     self.sliderList.append(slider)
                     self.sliderNames.append(title)
 
-    def drawGraph(self, **kwargs):
-        
-        # define default options
-        options = {
-            'nCols': 2,
-            'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
-            'y_axis_type': 'auto',
-            'x_axis_type': 'auto',
-            'plot_width': 400,
-            'plot_height': 400,
-            'bg_color': '#fafafa',
-            'color' : "navy",
-            'line_color' : "white"
-        }
-        options.update(kwargs)
-        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
+    def drawGraph(self, **options):
+
         p = []
         source = []
         iterator = 0
@@ -115,46 +101,37 @@ class bokehDrawHistoTHn(object):
             if nDim > 1:
                 raise NotImplementedError("Sorry!!.. Multidimensional projections have not been implemented, yet")
             histogram = self.histArray.FindObject(hisTitle).Projection(dimList[0])
-            binsLowEdge = []
-            binsUpEdge = []
-            top = []
-            bottom = []
-            for i in range(1, histogram.GetNbinsX() + 1):
-                binsLowEdge.append(histogram.GetXaxis().GetBinLowEdge(i))
-                binsUpEdge.append(histogram.GetXaxis().GetBinUpEdge(i))
-                top.append(histogram.GetBinContent(i))
-                bottom.append(0)
+            cds = makeCDS(histogram)
             histLabel = histogram.GetTitle()
             xLabel = histogram.GetXaxis().GetTitle()
             yLabel = histogram.GetYaxis().GetTitle()
-            source.append(ColumnDataSource(dict(
-                left=binsLowEdge,
-                right=binsUpEdge,
-                top=top,
-                bottom=bottom
-            )  )  )
-            localHist = figure(title=histLabel, tools=options['tooltips'], background_fill_color=options['bg_color'], y_axis_type=options['y_axis_type'], x_axis_type=options['x_axis_type'])
-            glyph = Quad(top="top", bottom="bottom", left="left", right="right", fill_color=options['color'], line_color=options['line_color'])
-            localHist.add_glyph(source[iterator], glyph)
+            localHist = figure(title=histLabel, tools=options['tooltips'], background_fill_color=options['bg_color'],
+                               y_axis_type=options['y_axis_type'], x_axis_type=options['x_axis_type'])
+            glyph=VBar(top='value', x='bin', width=abs(cds.data['bin'][2]-cds.data['bin'][1])/1.5,
+                       fill_color=options['color'], line_color=options['line_color'])
+            localHist.add_glyph(cds, glyph)
             localHist.y_range.start = 0
             localHist.xaxis.axis_label = xLabel
             localHist.yaxis.axis_label = yLabel
+            source.append(cds)
             p.append(localHist)
             iterator = iterator + 1
-            pAll = gridplot(p, ncols=options['nCols'], plot_width=options['plot_width'], plot_height=options['plot_height'])
+        pAll = gridplot(p, ncols=options['nCols'], plot_width=options['plot_width'], plot_height=options['plot_height'])
         handle = show(pAll, notebook_handle=True)
         return pAll, handle, source
+
+
+def makeCDS(histogram):
+    top=[]
+    x=[]
+    for i in range(1, histogram.GetNbinsX()+1):
+        top.append(histogram.GetBinContent(i))
+        x.append(histogram.GetBinCenter(i))
+    cds=ColumnDataSource({"value": top, "bin": x})
+    return cds
 
 
 def makeSlider(title, minRange, maxRange, step):
     slider = widgets.FloatRangeSlider(description=title, layout=Layout(width='66%'), min=minRange, max=maxRange,
                                       step=step, value=[minRange, maxRange])
     return slider
-
-
-def parseSelectionString(selectionString):
-    toParse = "(" + selectionString + ")"
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-") | '#' | pyparsing.Suppress(',')
-    selectionParser = pyparsing.nestedExpr('(', ')', content=theContent)
-    selectionList = selectionParser.parseString(toParse)[0]
-    return selectionList
