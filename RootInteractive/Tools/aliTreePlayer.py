@@ -53,7 +53,6 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
     # replace column names
     #    1.) pandas does not allow dots in names
     #    2.) user can specified own mask
-    print(columns)
     for i, column in enumerate(columns):
         if columnMask == 'default':
             column = column.replace(".fElements", "").replace(".fX$", "X").replace(".fY$", "Y")
