@@ -23,7 +23,8 @@ def pandaGetOrMakeColumn(df, variableName):
     if variableName in df.columns:
         return df, varName
     expression = variableName
-    df.metaData[varName + ".OrigName"] = variableName
+    if hasattr(df,"metaData"):
+        df.metaData[varName + ".OrigName"] = variableName
 
     try:
         df[varName] = df.eval(expression)
