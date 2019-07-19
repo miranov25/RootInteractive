@@ -77,7 +77,7 @@ class bokehDrawSA(object):
                 columnMask = options['mask']
             else:
                 columnMask = 'default'
-            df = tree2Panda(source, variableList, query, nEntries, firstEntry, columnMask)
+            df = treeToPanda(source, variableList, query, nEntries, firstEntry, columnMask)
 
         self.query = query
         dataSource = df.query(query)

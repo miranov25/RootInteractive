@@ -210,7 +210,10 @@ def makeBokehDataTable(dataFrame, source, **options):
     """
     columns = []
     for col in dataFrame.columns.values:
-        title = dataFrame.metaData.get(col + ".OrigName", col);
+        if hasattr(dataFrame,"metaData"):
+            title = dataFrame.metaData.get(col + ".OrigName", col);
+        else:
+            title=col
         columns.append(TableColumn(field=col, title=title))
     data_table = DataTable(source=source, columns=columns, **options)
     return data_table
@@ -365,44 +368,6 @@ def parseWidgetString(widgetString):
     return widgetList
 
 
-def tree2Panda(tree, variables, selection, nEntries, firstEntry, columnMask):
-    """
-    :param tree:
-    :param variables:
-    :param selection:
-    :param nEntries:
-    :param firstEntry:
-    :param columnMask:
-    :return:
-    """
-    entries = tree.Draw(str(variables), selection, "goffpara", nEntries, firstEntry)  # query data
-    columns = variables.split(":")
-    # replace column names
-    #    1.) pandas does not allow dots in names
-    #    2.) user can specified own mask
-    for i, iColumn in enumerate(columns):
-        if columnMask == 'default':
-            iColumn = iColumn.replace(".fElements", "").replace(".fX$", "X").replace(".fY$", "Y")
-        else:
-            masks = columnMask.split(":")
-            for mask in masks:
-                iColumn = iColumn.replace(mask, "")
-        columns[i] = iColumn.replace(".", "_")
-
-    ex_dict = {}
-    meta_dict = {}
-    for i, a in enumerate(columns):
-        val = tree.GetVal(i)
-        ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
-        meta_dict[a+".AxisTitle"] = a
-    df = pd.DataFrame(ex_dict, columns=columns)
-    df.metaData = meta_dict
-    for i, a in enumerate(columns):  # change type to time format if specified
-        if (ROOT.TStatToolkit.GetMetadata(tree, a + ".isTime")):
-            df[a] = pd.to_datetime(df[a], unit='s')
-    return df
-
-
 def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     """
     Wrapper bokeh draw array of figures
@@ -445,8 +410,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
-    dfQuery.metaData = dataFrame.metaData
-    logging.info(dfQuery.metaData)
+    if hasattr(dataFrame, 'metaData'):
+        dfQuery.metaData = dataFrame.metaData
+        logging.info(dfQuery.metaData)
     # Check/resp. load derived variables
     i: int
     for i, variables in enumerate(figureArray):
@@ -499,8 +465,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
             figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX])
-            figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
-            figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
+            if hasattr(dfQuery,"metaData"):
+                figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
+                figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
         if color_bar!=None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
