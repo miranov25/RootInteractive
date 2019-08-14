@@ -3,7 +3,11 @@ import numpy as np
 import urllib.request as urlopen
 import pyparsing
 from anytree import *
-import ROOT
+try:
+    import ROOT
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+except ImportError:
+    pass
 import re
 import logging
 

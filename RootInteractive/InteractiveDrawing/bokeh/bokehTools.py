@@ -272,9 +272,11 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'layout': '',
         'palette': Spectral6
     }
+    options.update(kwargs)
     if 'tooltip' in kwargs:  # bug fix - to be compatible with old interface (tooltip instead of tooltips)
         options['tooltips'] = kwargs['tooltip']
-    options.update(kwargs)
+        options['tooltip'] = kwargs['tooltip']
+
 
     mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
     isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
