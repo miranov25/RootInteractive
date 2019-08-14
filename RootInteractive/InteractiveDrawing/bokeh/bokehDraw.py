@@ -62,7 +62,9 @@ class bokehDraw(object):
         # define default options
         options = {
             'nCols': 2,
-            'tooltips': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+            'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+            'tooltips': [],
+            'tooltip':[],
             'y_axis_type': 'auto',
             'x_axis_type': 'auto',
             'plot_width': 400,

@@ -1,4 +1,5 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 # import logging
 
 df = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)), columns=list('ABCD'))
@@ -32,5 +33,15 @@ def test_DrawfromArray():
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     fig=bokehDraw.fromArray(df, "A>0", figureArray,"slider.A(0,100,0,0,100)",tooltips=tooltips, layout=figureLayout)
 
+def test_DrawSAfromArray():
+    output_file("test_BokehDrawArray_DraFromArray.html")
+    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
+    tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
+    widgets="slider.A(0,100,0,0,100),slider.B(0,100,0,0,100),slider.C(0,100,0,0,100),slider.D(0,100,0,0,100),"
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray,widgets,tooltips=tooltips, layout=figureLayout)
+
+
+
 #test_DrawFormula()
 #test_DrawfromArray()
+#test_DrawSAfromArray()
