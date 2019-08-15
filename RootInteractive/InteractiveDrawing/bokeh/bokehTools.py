@@ -9,7 +9,7 @@ from bokeh.io import push_notebook
 import logging
 import pyparsing
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, DateFormatter, TableColumn
+from bokeh.models.widgets import DataTable, DateFormatter, TableColumn, inputs
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 import copy
@@ -20,9 +20,11 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circl
 
 def makeJScallback(widgetDict, **kwargs):
     options = {
-        "verbose": 0
+        "verbose": 0,
+        "varList":['AAA','BBB']
     }
     options.update(kwargs)
+
     size = widgetDict['cdsOrig'].data["index"].size
     code = \
         """
@@ -30,23 +32,46 @@ def makeJScallback(widgetDict, **kwargs):
     var dataSel = cdsSel.data;
     console.log('%f\t%f\t',dataOrig["index"].length, dataSel["index"].length);
     """
+    #for key in options['varList']:
+    #    code += f"      var {key}K={key};\n"
+
     for a in widgetDict['cdsOrig'].data:
         code += f"dataSel[\'{a}\']=[];\n"
+
     code += f"""var arraySize={size};\n"""
     code += """var nSelected=0;\n"""
     code += f"""for (var i = 0; i < {size}; i++)\n"""
     code += " {\n"
     code += """var isSelected=1;\n"""
+    varString=""
+    for a in widgetDict['cdsOrig'].data:
+        if a =="index":
+            continue;
+        code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
+        #code += f"var {a} =dataOrig[\"{a}\"][i];\n"
+
     for key, value in widgetDict.items():
+        #
         if type(value).__name__ == "RangeSlider":
             dataName = key.replace("Range", "")
             code += f"      var {key}Value={key}.value;\n"
-            code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{dataName}\"][i]);\n"
+            #code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{dataName}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]>={key}Value[0])\n"
             code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]<={key}Value[1])\n"
             # print(value)
+        if isinstance(value,inputs.TextInput):
+            code += f"      var queryText={key}.value;\n"
+            #code += f"      console.log(queryText, queryText.length);\n"
+            code += "      if (queryText.length > 1)  {"
+            code += f"      var queryString='';\n"
+            code += f"      var varString='';\n"
+
+            code += f"     eval(varString+ 'var result = ('+ queryText+')');\n"
+            #code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
+            code += f"      isSelected&=result;\n"
+            code+= "}\n"
     code += """      
-        console.log(\"isSelected:%d\t%d\",i,isSelected);
+        //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected) nSelected++;
         if (isSelected){
     """
@@ -60,6 +85,7 @@ def makeJScallback(widgetDict, **kwargs):
     """
     if options["verbose"]>0:
         logging.info("makeJScallback:\n",code)
+    print(code)
     callback = CustomJS(args=widgetDict, code=code)
     return callback
 
