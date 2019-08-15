@@ -95,7 +95,7 @@ class bokehDraw(object):
         self.dataSource = df.query(query)
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
-        print(varX)
+
         if len(varX) == 0:
             return
         if ":" not in varX:
