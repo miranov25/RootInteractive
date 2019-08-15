@@ -1,7 +1,7 @@
 from ipywidgets import *
 from RootInteractive.Tools.histoNDTools import *
 import ipywidgets as widgets
-from IPython.core.display import display
+from IPython.display import *
 
 
 class bokehDrawHisto(object):
@@ -35,15 +35,19 @@ class bokehDrawHisto(object):
         self.histogramList = {}
         for his in tHnArray:
             try:
-                logging.info("Processing histogram %s", his.GetName())
+                # check if root THn - otherwise assume
                 ddHis = thnToNumpyDD(his)
+                logging.info("Processing histogram %s", his.GetName())
             except:
-                logging.error("non compatible object %s\t%s", his.GetName(), his.__class__)
-                continue
-            self.histogramList[his.GetName()] = ddHis
+                #logging.error("non compatible object %s\t%s", his.GetName(), his.__class__)
+                ddHis=his
+            logging.info("Processing histogram %s", ddHis['name'])
+            self.histogramList[ddHis['name']] = ddHis
         self.__processSliders()
         self.sliderWidgets = widgets.VBox(self.sliderList)
         self.__processProjections()
+        isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
+        #self.handle = show(self.sliderWidgets, notebook_handle=isNotebook)
         display(self.sliderWidgets)
         return self
 
@@ -108,6 +112,7 @@ class bokehDrawHisto(object):
         :param figureRow:
         :return:
         """
+        return
         expressionList = parseProjectionExpression(projection)
         histo = evalHistoExpression(expressionList, self.histogramList)
         if len(expressionList[0][2]) >1:
