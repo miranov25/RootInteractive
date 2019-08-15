@@ -20,7 +20,7 @@ from bokeh.palettes import *
 
 #
 logging.getLogger().setLevel(1)
-finput=ROOT.TFile(" ~/github/RootInteractive3/tutorial/data/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
+finput=ROOT.TFile(" ~/github/RootInteractive/tutorial/data/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
 hisArray=finput.Get("hisArray")
 
 
