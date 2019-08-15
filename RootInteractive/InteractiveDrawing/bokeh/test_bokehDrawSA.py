@@ -7,7 +7,6 @@ output_file("test_bokehDrawSA.html")
 
 gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
-#curdoc().theme = 'caliber'
 TFile.SetCacheFileDir("../../data/")
 tree = AliTreePlayer.LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", "", "")
 
