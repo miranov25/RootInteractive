@@ -95,6 +95,7 @@ class bokehDraw(object):
         self.dataSource = df.query(query)
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
+        print(varX)
         if len(varX) == 0:
             return
         if ":" not in varX:
@@ -131,8 +132,6 @@ class bokehDraw(object):
         self.Widgets = self.initWidgets(widgetString)
         self.figure, self.bokehSource, self.plotArray, self.dataSource = bokehDrawArray(self.dataSource, query,
                                                                                         figureArray, **kwargs)
-        # self.figure = gridplotRow(self.plotArray, **kwargs)
-        # handle = show(pAll, notebook_handle=isNotebook)
         isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         self.handle = show(self.figure, notebook_handle=isNotebook)
         self.updateInteractive("")
