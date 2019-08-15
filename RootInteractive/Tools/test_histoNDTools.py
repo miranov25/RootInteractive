@@ -1,3 +1,9 @@
+try:
+    import ROOT
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+except ImportError:
+    exit
+
 ### 0. Imports
 import numpy as np
 import math
@@ -7,6 +13,7 @@ import re
 from TTreeHnInteractive.TTreeHnBrowser import *
 #from InteractiveDrawing.bokeh.bokehDraw import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawHisto import *
+from IPython.display import display
 
 #output_notebook()
 import ROOT
@@ -24,7 +31,7 @@ finput=ROOT.TFile(" ~/github/RootInteractive/tutorial/data/RootInteractive/testD
 hisArray=finput.Get("hisArray")
 
 
-def runTOYMC(nPoints=100000):
+def runTOYMC2(nPoints=100000):
     # 1.) Setup and run  TOY MC
     # nPoints=1000000
     pdg = ROOT.TDatabasePDG.Instance()
@@ -53,7 +60,7 @@ def runTOYMC(nPoints=100000):
 
 
 def testHistoPanda(nPoints=10000):
-    dataFrame = runTOYMC(nPoints)
+    dataFrame = toyMC(nPoints)
     dataFrame.head(5)
     histoStringArray = [
         "TRD:tgl:p:particle:#TRD>0>>hisTRDTgl_P_P(200,0.5,3,5,-1,1, 200,0.3,5,5,0,5)",
@@ -102,11 +109,11 @@ def testDrawSlice():
 def testBokehDrawHistoTHn():
     output_file("test_histoNDTools_testBokehDrawHistoTHn.html")
     hisArray.ls()
-    bokehDrawHisto.fromTHnArray(hisArray,[["hisdY()(0,1)()"], ["hisdZ()(0,1)()"]],{},{})
+    bokehDrawHisto.fromTHnArray(hisArray,[["hisdY()(0,1)(0:100,0:100)"], ["hisdZ()(0,1)(0:100,0:100)"]],{},{})
 
 
 
 #testHistoPanda(1000000)
 #testTHnDraw()
-testDrawSlice()
-#testBokehDrawHistoTHn()
+# testDrawSlice()
+testBokehDrawHistoTHn()

@@ -5,7 +5,7 @@ import logging
 
 class bokehDrawSA(object):
 
-    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **options):
+    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **kwargs):
         """
         :param source:           input data frame
         :param query:            query string
@@ -38,6 +38,23 @@ class bokehDrawSA(object):
         Example usage in:
             test_bokehDrawArray.py
         """
+
+        # define default options
+        options = {
+            'nCols': 2,
+            'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+            'tooltips': [],
+            'tooltip':[],
+            'y_axis_type': 'auto',
+            'x_axis_type': 'auto',
+            'plot_width': 400,
+            'plot_height': 400,
+            'bg_color': '#fafafa',
+            'color': "navy",
+            'line_color': "white"
+        }
+        options.update(kwargs)
+
         self.isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
@@ -46,46 +63,24 @@ class bokehDrawSA(object):
         else:
             if (self.verbosity >> 1) & 1:
                 logging.info('source is not a Panda DataFrame, assuming it is ROOT::TTree')
-            varList = []
-            if 'variables' in options.keys():
-                varList = options['variables'].split(":")
-            varSource = [varColor, varX, varY, widgetString, query]
-            if 'errY' in options.keys():
-                varSource.append(options['errY'])
-            if 'tooltips' in options.keys():
-                for tip in options["tooltips"]:
-                    varSource.append(tip[1].replace("@", ""))
-            toRemove = [r"^tab.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
-            toReplace = ["^slider.", "^checkbox.", "^dropdown."]
-            varList += getAndTestVariableList(varSource, toRemove, toReplace, source, self.verbosity)
-            if 'tooltip' in options.keys():
-                tool = str([str(a[1]) for a in options["tooltip"]])
-                varList += filter(None, re.split('[^a-zA-Z0-9_]', tool))
-            variableList = ""
-            for var in set(varList):
-                if len(variableList) > 0: variableList += ":"
-                variableList += var
-            if 'nEntries' in options.keys():
-                nEntries = options['nEntries']
-            else:
-                nEntries = source.GetEntries()
-            if 'firstEntry' in options.keys():
-                firstEntry = options['firstEntry']
-            else:
-                firstEntry = 0
-            if 'mask' in options.keys():
-                columnMask = options['mask']
-            else:
-                columnMask = 'default'
-            df = treeToPanda(source, variableList, query, nEntries, firstEntry, columnMask)
+            treeoptions = {
+                'nEntries': source.GetEntries(),
+                'firstEntry': 0,
+                'columnMask': 'default'
+            }
+            treeoptions.update(kwargs)
 
-        self.query = query
-        dataSource = df.query(query)
-        if len(varX)==0:
+            variableList = constructVariables(query, varX, varY, varColor, widgetString, self.verbosity, **kwargs)
+            df = treeToPanda(source, variableList, query, treeoptions['nEntries'], treeoptions['firstEntry'], treeoptions['columnMask'])
+
+        self.dataSource = df.query(query)
+        if hasattr(df, 'metaData'):
+            self.dataSource.metaData = df.metaData
+        self.cdsOrig = ColumnDataSource(self.dataSource)
+        if len(varX) == 0:
             return
         if ":" not in varX:
-            dataSource.sort_values(varX, inplace=True)
-        self.cdsOrig = ColumnDataSource(dataSource)
+            self.dataSource.sort_values(varX, inplace=True)
         self.figure, self.cdsSel, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
         self.plotArray.append(self.initWidgets(widgetString))
         pAll=gridplotRow(self.plotArray)
@@ -105,9 +100,22 @@ class bokehDrawSA(object):
         :param kwargs:
         :return:
         """
-        self=cls(dataFrame,query,"","","","",None)
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(dataFrame, query, figureArray, **kwargs)
+        tmp=""
+        for fig in figureArray:
+            for entry in fig[0:2]:
+                if entry == 'table':    continue
+                for word in entry:
+                    tmp+=word+":"
+        varList=""
+        for word in re.split('[^a-zA-Z0-9]', tmp[:-1]):
+            if not word.isnumeric():
+                varList += word + ":"
+        varList += widgetString
+        self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(self.dataSource, query,
+                                                                                 figureArray, **kwargs)
         self.cdsOrig=ColumnDataSource(dataFrameOrig)
+        self.Widgets = self.initWidgets(widgetString)
         self.plotArray.append(self.initWidgets(widgetString))
         pAll=gridplotRow(self.plotArray)
         self.handle=show(pAll,notebook_handle=self.isNotebook)
@@ -207,3 +215,25 @@ class bokehDrawSA(object):
 #        self.allWidgets += widgetSubList
         return widgetSubList
     verbosity=0
+
+def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
+    varList = []
+    varSource = [varColor, varX, varY, widgetString, query]
+    if 'variables' in kwargs.keys():
+        varSource.append(kwargs['variables'])
+    if 'errY' in kwargs.keys():
+        varSource.append(kwargs['errY'])
+    if 'tooltips' in kwargs.keys():
+        for tip in kwargs["tooltips"]:
+            varSource.append(tip[1].replace("@", ""))
+    toRemove = [r"^tab.*", r"^query.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
+    toReplace = ["^slider.", "^checkbox.", "^dropdown."]
+    varList += getAndTestVariableList(varSource, toRemove, toReplace, verbosity)
+    if 'tooltip' in kwargs.keys():
+        tool = str([str(a[1]) for a in kwargs["tooltip"]])
+        varList += filter(None, re.split('[^a-zA-Z0-9_]', tool))
+    variableList = ""
+    for var in set(varList):
+        if len(variableList) > 0: variableList += ":"
+        variableList += var
+    return variableList
