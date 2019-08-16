@@ -90,7 +90,7 @@ class bokehDraw(object):
             treeoptions.update(kwargs)
 
             variableList = constructVariables(query, varX, varY, varColor, widgetString, self.verbosity, **kwargs)
-            df = treeToPanda(source, variableList, query, treeoptions['nEntries'], treeoptions['firstEntry'], treeoptions['columnMask'])
+            df = treeToPanda(source, variableList, query, nEntries=treeoptions['nEntries'], firstEntry=treeoptions['firstEntry'], columnMask=treeoptions['columnMask'])
 
         self.dataSource = df.query(query)
         if hasattr(df, 'metaData'):
