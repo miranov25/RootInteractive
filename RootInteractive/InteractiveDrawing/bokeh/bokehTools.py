@@ -89,7 +89,6 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             logging.error("out of range index", y)
         array.append(fig)
         if type(fig).__name__ == 'DataTable':
-            print("DataTable")
             continue
         if 'commonY' in option:
             if type(option["commonY"]) == str:
