@@ -11,8 +11,10 @@ TFile.SetCacheFileDir("../../data/")
 tree = AliTreePlayer.LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", "", "")
 
 df = pd.DataFrame(np.random.random_sample(size=(500, 4)), columns=list('ABCD'))
+df.eval("Bool=A>0.5", inplace=True)
+df.eval("E=B.floordiv(0.2)", inplace=True)
 df.head(10)
-df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)"}
+df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
 
 
@@ -22,7 +24,8 @@ figureArray = [
     [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
     [['D'], ['(A+B+C)*D'], {"size": 10}],
 ]
-widgets="slider.A(0,1,0.05,0,1),slider.B(0,1,0.05,0,1),slider.C(0,1,0.01,0.1,1):slider.D(0,1,0.01,0,1)"
+#widgets="slider.A(0,1,0.05,0,1),slider.B(0,1,0.05,0,1),slider.C(0,1,0.01,0.1,1),slider.D(0,1,0.01,0,1),checkbox.Bool(1),dropdown.E(0,1,2,3,4)"
+widgets="slider.A(0,1,0.05,0,1),slider.B(0,1,0.05,0,1),slider.C(0,1,0.01,0.1,1),slider.D(0,1,0.01,0,1),dropdown.E(0,1,2,3,4)"
 figureLayout: str = '((0,1,2, plot_height=300),(3, x_visible=1),commonX=1,plot_height=300,plot_width=1200)'
 
 
@@ -44,9 +47,9 @@ def testOldInterface_tree():
 def testBokehDrawArraySA_tree():
     output_file("test_bokehDrawSAArray_fromTTree.html")
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
-    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout,columnMask="")
+    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 #testOldInterface()
 #testBokehDrawArraySA()
-testOldInterface_tree()
-testBokehDrawArraySA_tree()
+#testOldInterface_tree()
+#testBokehDrawArraySA_tree()

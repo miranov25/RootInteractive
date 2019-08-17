@@ -140,7 +140,10 @@ class bokehDrawSA(object):
         widgetDict = {"cdsOrig":self.cdsOrig, "cdsSel":self.cdsSel}
         widgetList=self.createWidgets(widgetList)
         for iWidget in widgetList:
-            widgetDict[iWidget.title]=iWidget
+            try:
+                widgetDict[iWidget.title]=iWidget
+            except AttributeError:
+                widgetDict[iWidget.labels[0]] = iWidget
         callback=makeJScallback(widgetDict)
 #        callback.code = callback.code.replace("A","PA")     # Contemporary correction until makeJScallback is fixed
         for iWidget in widgetList:
@@ -178,22 +181,21 @@ class bokehDrawSA(object):
                     raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",
                                      format(name[1]))
                 iWidget = widgets.Select(title=name[1], value=values[0], options=values)
-#            elif name[0] == "checkbox":
-#                if len(subList) == 0:
-#                    active = []
-#                elif len(subList) == 1:
-#                    if subList[0] in ['True', 'true', '1']:
-#                        active = [0]
-#                    elif subList[0] in ['False', 'false', '0']:
-#                        active = []
-#                    else:
-#                        raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". "
-#                                         "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
-#                else:
-#                    raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
-#                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
-#                values = list(subList)
-#                iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
+            elif name[0] == "checkbox":
+                if len(subList) == 0:
+                    active = []
+                elif len(subList) == 1:
+                    if subList[0] in ['True', 'true', '1']:
+                        active = [0]
+                    elif subList[0] in ['False', 'false', '0']:
+                        active = []
+                    else:
+                        raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". "
+                                         "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
+                else:
+                    raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
+                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
+                iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
             elif name[0] == "query":
                 iWidget = widgets.TextInput(value="", placeholder="Type a query", title="Query")
             elif name[0] == "slider":
