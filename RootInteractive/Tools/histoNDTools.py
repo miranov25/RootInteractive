@@ -211,7 +211,7 @@ def parseProjectionExpression(projectionExpression):
         >>> print(expression)
         >>> [['(TRD-TRD*0.5+ITS-TRD/2)', ['0:100,1:10,0:10:2'], ['0,1'], []]]
     """
-    theContent = pyparsing.Word(pyparsing.alphanums + ":,;+/-*^.\/")
+    theContent = pyparsing.Word(pyparsing.alphanums + ":,;+/-*^.\/_")
     parens = pyparsing.nestedExpr("(", ")", content=theContent)
     if projectionExpression[0] != "(":
         projectionExpression = "(" + projectionExpression + ")"
@@ -291,7 +291,8 @@ def evalHistoExpression(expression, histogramArray):
             varNames[i] = list(set(varNames[i]))
 
         axes.append(histogramArray[iKey]["axes"])
-
+    if len(axes) == 0:
+        print("Histogram {query} does not exist")
     tmp = axes[0]
     for axe in axes:
         for i in range(len(tmp)):
@@ -322,7 +323,7 @@ def evalHistoExpression(expression, histogramArray):
     except:
         raise ValueError("Invalid Histogram expression: {}".format(expression[0][0]))
 
-    histogram["name"] = expression[0][0][1:-1]
+    histogram["name"] = expression[0][0][0:]
     print(varNames)
     histogram["varNames"] = varNames
     histogram["axes"] = axes
