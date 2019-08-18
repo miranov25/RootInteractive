@@ -27,7 +27,8 @@ from bokeh.palettes import *
 
 #
 logging.getLogger().setLevel(1)
-finput=ROOT.TFile(" ~/github/RootInteractive/tutorial/data/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
+ROOT.TFile.SetCacheFileDir("../data/"),
+finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
 hisArray=finput.Get("hisArray")
 
 
@@ -75,8 +76,6 @@ def testHistoPanda(nPoints=10000):
 
 def testTHnDraw():
     output_file("test_histoNDTools_THnDraw.html")
-    ROOT.TFile.SetCacheFileDir("../data/"),
-    finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
     hisArray=finput.Get("hisArray")
     hisArray.ls()
     hisArray.FindObject("hisdY").Print("all")
@@ -91,8 +90,6 @@ def testTHnDraw():
 
 def testDrawSlice():
     output_file("test_histoNDTools_THnDraw.html")
-    ROOT.TFile.SetCacheFileDir("../data/"),
-    finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
     hisArray=finput.Get("hisArray")
     hisArray.ls()
     hisArray.FindObject("hisdY").Print("all")

@@ -9,7 +9,7 @@ from bokeh.io import push_notebook
 import logging
 import pyparsing
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, DateFormatter, TableColumn, inputs
+from bokeh.models.widgets import *
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 import copy
@@ -52,24 +52,35 @@ def makeJScallback(widgetDict, **kwargs):
 
     for key, value in widgetDict.items():
         #
-        if type(value).__name__ == "RangeSlider":
-            dataName = key.replace("Range", "")
+        if isinstance(value,Slider):
             code += f"      var {key}Value={key}.value;\n"
-            #code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{dataName}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]>={key}Value[0])\n"
-            code += f"      isSelected&=(dataOrig[\"{dataName}\"][i]<={key}Value[1])\n"
-            # print(value)
-        if isinstance(value,inputs.TextInput):
+            code += f"      var {key}Step={key}.step;\n"
+            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value-0.5*{key}Step)\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value+0.5*{key}Step)\n"
+        elif isinstance(value,RangeSlider):
+            code += f"      var {key}Value={key}.value;\n"
+            #code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value[0])\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value[1])\n"
+        elif isinstance(value,TextInput):
             code += f"      var queryText={key}.value;\n"
             #code += f"      console.log(queryText, queryText.length);\n"
             code += "      if (queryText.length > 1)  {"
             code += f"      var queryString='';\n"
             code += f"      var varString='';\n"
-
             code += f"     eval(varString+ 'var result = ('+ queryText+')');\n"
             #code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
             code += f"      isSelected&=result;\n"
             code+= "}\n"
+        elif isinstance(value,Select):
+            code += f"      var {key}Value={key}.value;\n"
+            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
+        elif isinstance(value,CheckboxGroup):
+            code += f"      var {key}Value=({key}.active.length>0);\n"
+            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
     code += """      
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected) nSelected++;
@@ -85,7 +96,7 @@ def makeJScallback(widgetDict, **kwargs):
     """
     if options["verbose"]>0:
         logging.info("makeJScallback:\n",code)
-    print(code)
+    #print(code)
     callback = CustomJS(args=widgetDict, code=code)
     return callback
 
@@ -115,7 +126,6 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             logging.error("out of range index", y)
         array.append(fig)
         if type(fig).__name__ == 'DataTable':
-            print("DataTable")
             continue
         if 'commonY' in option:
             if type(option["commonY"]) == str:
