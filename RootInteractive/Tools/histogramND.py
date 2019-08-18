@@ -98,6 +98,22 @@ class histogramND(object):
             histogramMap[his.name]=his
         return histogramMap
 
+    @classmethod
+    def makeHistogramArray(cls, dataSource, histogramStringArray, **kwargs):
+        """
+        :param dataSource:
+        :param histogramStringArray:
+        :return:
+        """
+        options = {}
+        options.update(histoNDOptions)
+        options.update(kwargs)
+        histogramArray = []
+        for histString in histogramStringArray:
+            histogram = cls.fromPanda(dataSource, histString, **options)
+            histogramArray.append(histogram)
+        return histogramArray
+
 
 
 class histogramNDProjection(object):
