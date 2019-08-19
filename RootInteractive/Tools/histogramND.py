@@ -4,6 +4,7 @@ import logging
 from bokeh.models import *
 from bokeh.palettes import *
 from root_numpy import *
+from bokeh.transform import *
 from RootInteractive.Tools.histoNDTools import *
 
 # Standard
@@ -196,7 +197,7 @@ class histogramND(object):
         p2.legend.click_policy = "hide"
         return p2, source
 
-    def bokehDraw2D(self, hSlice, indexX, indexY, figOption, graphOption):
+    def bokehDraw1D(self, hSlice, index, figOption, graphOption):
         """
         Draw slices of histogram
 
@@ -217,17 +218,59 @@ class histogramND(object):
         figOption.pop("plotLegendFormat", None)
         #sliceString = str(hSlice).replace("slice", "")
         TOOLTIPS = [
-            ("index", "$index"),
+            (self.varNames[index], "$x"),
+            ('value', "@image"),
             # ("Slice", sliceString)
         ]
+
+        hLocal = self.H[hSlice]
+        hLocal=np.sum(hLocal, axis=index)
+        axisX=self.axes[index]
+        # produce an image of the 1d histogram
+        p = figure(x_range=(min(axisX), max(axisX)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[index])
+        p.vbar(top=[hLocal], x=axisX[0], width=axisX[1] - axisX[0])
+        return p
+
+    def bokehDraw2D(self, hSlice, indexX, indexY, figOption, graphOption):
+        """
+        Draw slices of histogram
+
+        :param histogram:                 - histogram dictionary - see description in makeHistogram
+        :param hSlice:
+            - slice to visualize (see numpy slice documentation)  e.g:
+                >>> np.index_exp[:, 1:3,3:5]
+        :param axisX:                 - variable index X
+        :param axisY:                 - variable index Y
+        :param figOption:             - options (python dictionary)  for figure
+        :param graphOption:           - option (dictionary) for figure
+        :return:                       histogram figure
+        """
+        #
+        options = {
+            'palette': Spectral6
+        }
+        options.update(histoNDOptions)
+        options.update(figOption)
+        figOption.pop("plotLegendFormat", None)
+        #sliceString = str(hSlice).replace("slice", "")
+        TOOLTIPS = [
+            (self.varNames[indexX], "$x"),
+            (self.varNames[indexY], "$y"),
+            ('value', "@image"),
+            # ("Slice", sliceString)
+        ]
+
         hLocal = self.H[hSlice]
         hLocal=np.sum(hLocal, axis=(indexX,indexY))
         axisX=self.axes[indexX]
         axisY=self.axes[indexY]
+        mapper = LinearColorMapper(palette=options['palette'], low=np.min(hLocal), high=np.max(hLocal))
+        color_bar = ColorBar(color_mapper=mapper, width=8, location=(0, 0))
         #source = ColumnDataSource(data)
         # produce an image of the 2d histogram
-        p = figure(x_range=(min(axisX), max(axisX)), y_range=(min(axisY), max(axisY)), title='Image')
-        p.image(image=[hLocal], x=axisX[0], y=axisY[0], dw=axisX[-1] - axisX[0], dh=axisY[-1] - axisY[0], palette="Spectral11")
+        p = figure(x_range=(min(axisX), max(axisX)), y_range=(min(axisY), max(axisY)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[indexX], y_axis_label=self.varNames[indexY])
+        p.image(image=[hLocal], color_mapper=mapper, x=axisX[0], y=axisY[0], dw=axisX[-1] - axisX[0], color=mapper, dh=axisY[-1] - axisY[0])
+        p.add_layout(color_bar, 'right')
         return p
 
 
