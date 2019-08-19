@@ -6,7 +6,6 @@ from bokeh.palettes import *
 from root_numpy import *
 from RootInteractive.Tools.histoNDTools import *
 
-
 # Standard
 histogramNDOptions = {
     "verbose": 0,
@@ -16,32 +15,39 @@ histogramNDOptions = {
 
 
 class histogramND(object):
-    def __init__(self, HInput=None, HOptions=None ):
-        self.name='histogram'
-        self.title='histogram'
-        self.H=HInput
-        self.axes=[]
-        self.varNames=[]
-        self.varTitles=[]
-        self.axisMetadata=[]
-        self.options=histogramNDOptions
+    def __init__(self, HInput=None, HOptions=None):
+        self.name = 'histogram'
+        self.title = 'histogram'
+        self.H = HInput
+        self.axes = []
+        self.varNames = []
+        self.varTitles = []
+        self.axisMetadata = []
+        self.options = histogramNDOptions
         if HOptions: self.options.update(HOptions)
-        self.verbose=0
+        self.verbose = 0
+
+    def __str__(self):
+        return str(self.__class__) + "\n" + str(self.__dict__)
 
     @classmethod
     def fromDictionary(cls, HInput):
         self = cls()
-        self.H=HInput['H']
-        self.axes=HInput['axes']
+        self.H = HInput['H']
+        self.axes = HInput['axes']
+        self.varNames=HInput['varNames']
+        if 'varTitles' in HInput: self.varTitles=HInput['varTitles']
+        if 'histoSlice' in HInput: self.histogramSlice=HInput['histoSlice']
+        return self
 
     @classmethod
     def fromTHn(cls, rootTHn):
         self = cls()
-        self.name=rootTHn.GetName()
-        self.title=rootTHn.GetTitle()
+        self.name = rootTHn.GetName()
+        self.title = rootTHn.GetTitle()
         hTuple = hist2array(rootTHn, False, True, True)
-        self.H =hTuple[0]
-        self.axes=hTuple[1]
+        self.H = hTuple[0]
+        self.axes = hTuple[1]
         for axis in range(rootTHn.GetNdimensions()):
             self.varNames.insert(axis, rootTHn.GetAxis(axis).GetName())
             self.varTitles.insert(axis, rootTHn.GetAxis(axis).GetTitle())
@@ -58,7 +64,7 @@ class histogramND(object):
         Example usage:
             >>> histogram=histogramND.fromPanda(data,"TRD:pmeas:particle:#TRD>0>>hisTRDPP(50,0.5,3,20,0.3,5,5,0,5)",3)
         """
-        self=cls()
+        self = cls()
         self.options.update(kwargs)
         self.verbose = self.options['verbose']
         if self.verbose & 0x1:
@@ -84,22 +90,22 @@ class histogramND(object):
             logging.info("Histogram bins  :%s", bins)
             logging.info("Histogram range :%s", hRange)
         H, axes = np.histogramdd(inputArray.values, bins=bins, range=hRange)
-        self.H=H
-        self.axes=axes
-        self.name=histoInfo[0]
-        self.varNames=varList
-        self.varTitles=varList
+        self.H = H
+        self.axes = axes
+        self.name = histoInfo[0]
+        self.varNames = varList
+        self.varTitles = varList
         return self
 
     @classmethod
     def arrayToMap(cls, histogramArray):
-        histogramMap={}
+        histogramMap = {}
         for his in histogramArray:
-            histogramMap[his.name]=his
+            histogramMap[his.name] = his
         return histogramMap
 
     @classmethod
-    def makeHistogramArray(cls, dataSource, histogramStringArray, **kwargs):
+    def makeHistogramMap(cls, dataSource, histogramStringArray, **kwargs):
         """
         :param dataSource:
         :param histogramStringArray:
@@ -108,12 +114,121 @@ class histogramND(object):
         options = {}
         options.update(histoNDOptions)
         options.update(kwargs)
-        histogramArray = []
+        histogramMap = {}
         for histString in histogramStringArray:
             histogram = cls.fromPanda(dataSource, histString, **options)
-            histogramArray.append(histogram)
-        return histogramArray
+            histogramMap[histogram.name] = histogram
+        return histogramMap
 
+    def bokehDrawColz(self, hSlice, axisX, axisColor, axisStep, figOption, graphOption):
+        """
+        Draw slices of histogram
+
+        :param histogram:                 - histogram dictionary - see description in makeHistogram
+        :param hSlice:
+            - slice to visualize (see numpy slice documentation)  e.g:
+                >>> np.index_exp[:, 1:3,3:5]
+        :param axisX:                 - variable index - projection to draw
+        :param axisColor:             - variable index to scan
+        :param figOption:             - options (python dictionary)  for figure
+        :param graphOption:           - option (dictionary) for figure
+        :return:                       histogram figure
+        """
+        #
+        options = {}
+        options.update(histoNDOptions)
+        options.update(figOption)
+        figOption.pop("plotLegendFormat", None)
+        sliceString = str(hSlice).replace("slice", "")
+        TOOLTIPS = [
+            ("index", "$index"),
+            # ("Slice", sliceString)
+        ]
+        start = hSlice[axisColor].start
+        stop = hSlice[axisColor].stop
+        step = 1
+        hSliceList = list(hSlice)
+        maxColor = len(options['colors'])
+        color = options['colors'][min(stop - start + 3, maxColor)]
+        data = {}
+        x = self.axes[axisX][hSlice[axisX]]
+        data['varX'] = x
+        fIndex = 0
+        axis = tuple([a for a in range(0, len(self.axes)) if a != axisX])
+        colorAxisLabel = None
+        try:
+            colorAxisLabel = self.varTitles[axisColor]
+        except:
+            colorAxisLabel = self.varNames[axisColor]
+        for a in range(start, stop, axisStep):
+            hSliceList[axisColor] = slice(a, a + 1, step)
+            hSliceLocal = tuple(hSliceList)
+            # print a, self.axes"][axisColor][a]
+            hLocal = self.H[hSliceLocal]
+            y = np.sum(self.H[hSliceLocal], axis=axis)
+            data["varY" + str(fIndex)] = y
+            TOOLTIPS.append((colorAxisLabel + "[" + str(a) + "]", "@varY" + str(fIndex)))
+            fIndex += 1
+        source = ColumnDataSource(data)
+        if "figure" in figOption:
+            p2 = figOption["figure"]
+        else:
+            p2 = figure(title=self.name, tooltips=TOOLTIPS, **figOption)
+        fIndex = 0
+        for a in range(start, stop, axisStep):
+            xAxisLabel = None
+            try:
+                xAxisLabel = self.varTitles[axisX]
+            except:
+                xAxisLabel = self.varNames[axisX]
+            plotLegend = ""
+            if options['plotLegendFormat'] == "%d":
+                plotLegend = colorAxisLabel + "[" + str(a) + "]"
+            else:
+                if "f" in options['plotLegendFormat']:
+                    plotLegendFormat = options['plotLegendFormat']
+                    plotLegend = colorAxisLabel + "[" + (plotLegendFormat % self.axes[axisColor][a]) + ":" + (
+                                plotLegendFormat % self.axes[axisColor][a + 1]) + "]"
+            p2.scatter("varX", "varY" + str(fIndex), source=source, color=color[fIndex % maxColor],
+                       marker=bokehMarkers[fIndex % 4], legend=plotLegend, **graphOption)
+            p2.xaxis.axis_label = xAxisLabel
+            fIndex += 1
+        p2.legend.click_policy = "hide"
+        return p2, source
+
+    def bokehDraw2D(self, hSlice, indexX, indexY, figOption, graphOption):
+        """
+        Draw slices of histogram
+
+        :param histogram:                 - histogram dictionary - see description in makeHistogram
+        :param hSlice:
+            - slice to visualize (see numpy slice documentation)  e.g:
+                >>> np.index_exp[:, 1:3,3:5]
+        :param axisX:                 - variable index X
+        :param axisY:                 - variable index Y
+        :param figOption:             - options (python dictionary)  for figure
+        :param graphOption:           - option (dictionary) for figure
+        :return:                       histogram figure
+        """
+        #
+        options = {}
+        options.update(histoNDOptions)
+        options.update(figOption)
+        figOption.pop("plotLegendFormat", None)
+        #sliceString = str(hSlice).replace("slice", "")
+        TOOLTIPS = [
+            ("index", "$index"),
+            # ("Slice", sliceString)
+        ]
+        hLocal = self.H[hSlice]
+        hLocal=np.sum(hLocal, axis=(indexX,indexY))
+        axisX=self.axes[indexX]
+        axisY=self.axes[indexY]
+        #source = ColumnDataSource(data)
+        # produce an image of the 2d histogram
+        p = figure(x_range=(min(axisX), max(axisX)), y_range=(min(axisY), max(axisY)), title='Image')
+        p.image(image=[hLocal], x=axisX[0], y=axisY[0], dw=axisX[-1] - axisX[0], dh=axisY[-1] - axisY[0], palette="Spectral11")
+        return p
 
 
 class histogramNDProjection(object):
@@ -126,19 +241,30 @@ class histogramNDProjection(object):
                 histogramProjection        array of axes to project
                 histogramOption            options dictionary
                 histogramMap               array/map of histograms used for projection queries
-                bokehCDS                   output data source for bokeh visualization
+                bokehDCS                   output data source for bokeh visualization
                 controlArray               array of controls  - to specify projection ranges
                 graphArray                 array of graphical objects related to projection (should be one?)
         """
-        self.projectionDescription=""
-        self.histogramQuery=''
-        self.histogramSlice=None
-        self.histogramProjection=None
-        self.histogramOption=None
-        self.histogramMap={}
-        self.bokehCDS={}
-        self.controlArray=[]
-        self.bokehFigure= {}
+        self.projectionDescription = ""
+        self.histogramQuery = ''
+        self.histogramSlice = None
+        self.histogramProjection = None
+        self.histogramOption = None
+        self.histogramMap = {}
+        self.bokehCDS = {}
+        self.controlArray = []
+        self.bokehFigure = {}
+
+    def __str__(self):
+        return str(self.__class__) + "\n" + str(self.__dict__)
+
+    @classmethod
+    def fromMap(cls, projectionDescription, histogramMap):
+        self = cls()
+        self.projectionDesciption = projectionDescription
+        self.histogramMap = histogramMap
+        self.parseProjectionExpression(projectionDescription)
+        return self
 
     def parseProjectionExpression(self, projectionExpression):
         """
@@ -149,7 +275,7 @@ class histogramNDProjection(object):
             >>> print(expression)
             >>> [['(TRD-TRD*0.5+ITS-TRD/2)', ['0:100,1:10,0:10:2'], ['0,1'], []]]
         """
-        self.projectionDescription=projectionExpression
+        self.projectionDescription = projectionExpression
 
         theContent = pyparsing.Word(pyparsing.alphanums + ":,;+/-*^.\/_")
         parens = pyparsing.nestedExpr("(", ")", content=theContent)
@@ -173,40 +299,37 @@ class histogramNDProjection(object):
             return iString
 
         self.histogramQuery = buildStr(projection[0][0])
-        self.histogramSlice=projection[0][1]
-        self.histogramOption=projection[0][3]
+        self.histogramSlice = projection[0][1]
+        self.histogramOption = projection[0][3]
         try:
             self.histogramProjection = [int(i) for i in projection[0][2][0].split(",")]
         except:
             logging.error("Invalid syntax for projection slice", self)
 
-
-    def evalHistoExpression(self, expression, histogramArray):
+    def makeProjection(self, slice=None):
         """
-        :param expression:         histogram expression to evaluate
-        :param histogramArray:
         :return: histogram
         """
         # expression  hisdY-hisdZ, abs(hisdY-hisdZ)
-        print(expression)
+        if slice is not None:
+            self.histogramSlice = slice
         histogram = {}
         axes = []
         varNames = []
         query = self.histogramQuery
-        keys = list(set(re.findall(r"\w+", query)).intersection(list(histogramArray.keys())))
+        keys = list(set(re.findall(r"\w+", query)).intersection(list(self.histogramMap.keys())))
         func_list = set(re.findall(r"\w+\(", query))  # there still a parenthesis at the end
 
         for iKey in keys:
-            query = query.replace(iKey, "histogramArray[\'" + iKey + "\'][\'H\']")
-
-            for i, var in enumerate(histogramArray[iKey]["varNames"]):
+            query = query.replace(iKey, "self.histogramMap[\'" + iKey + "\'].H")
+            for i, var in enumerate(self.histogramMap[iKey].varNames):
                 try:
                     varNames[i].append(var)
                 except:
                     varNames.append([var])
                 varNames[i] = list(set(varNames[i]))
 
-            axes.append(histogramArray[iKey]["axes"])
+            axes.append(self.histogramMap[iKey].axes)
         if len(axes) == 0:
             print("Histogram {query} does not exist")
         tmp = axes[0]
@@ -224,28 +347,41 @@ class histogramNDProjection(object):
             varNames[i] = ','.join(var)
         print(query)
 
-        #try:
-        #    nSlice = len(eval("np.index_exp[" + str(expression[0][1][0]) + "]"))
-        #except:
-        #    raise SyntaxError("Invalid Slice: {}".format(str(expression[0][1][0])))
-
-        #nAxes = len(axes)
-        #if nSlice != nAxes:
-        #    raise IndexError("Number of Slices should be equal to number of axes. {} slices requested but {} axes  exist".format(nSlice, nAxes))
-
         try:
-            # histogram['H'] = eval(query + "[np.index_exp" + str(expression[0][1]).replace("'", "") + "]")
             histogram['H'] = eval(query)
         except:
-            raise ValueError("Invalid Histogram expression: {}".format(expression[0][0]))
+            raise ValueError("Invalid Histogram expression: {}".format(self.histogramQuery))
 
-        histogram["name"] = expression[0][0][0:]
+        histogram["name"] = self.histogramQuery
         print(varNames)
         histogram["varNames"] = varNames
         histogram["axes"] = axes
-        if len(expression[0][1])==0:
-            expression[0][1].append("")
-        histoSlice=autoCompleteSlice(expression[0][1][0],histogram)
-        histogram["sliceSlider"]= histoSlice
-        return histogram
+        if len(self.histogramSlice) == 0:
+            self.histogramSlice.append("")
+        #histoSlice = self.completeSlice(histogram)
+        #histogram["sliceSlider"] = histoSlice
+        expressionHisto=histogramND.fromDictionary(histogram)
+        return expressionHisto
 
+    def completeSlice(self, histo):
+        """
+
+        :param expression: build slice for string expression - string
+        :param histo:      reference histogram for slice
+        :return:    numpy slice
+        """
+        axes = histo['axes']
+        maxSize = len(axes)
+        sliceList = expression.split(',')
+        if len(sliceList) > maxSize:
+            logging.error("Size bigger than expected")
+            # raise exception
+        # replace empty slice by full range slice
+        for i in range(len(sliceList), maxSize):
+            sliceList.append(":")
+        for i, rslice in enumerate(sliceList):
+            if len(rslice) == 0:
+                sliceList[i] = ":"
+        sliceString = ",".join(sliceList)
+        npSlice = eval("np.index_exp[" + sliceString + "]")
+        return npSlice
