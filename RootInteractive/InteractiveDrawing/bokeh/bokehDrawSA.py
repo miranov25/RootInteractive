@@ -147,7 +147,10 @@ class bokehDrawSA(object):
         callback=makeJScallback(widgetDict)
 #        callback.code = callback.code.replace("A","PA")     # Contemporary correction until makeJScallback is fixed
         for iWidget in widgetList:
-            iWidget.js_on_change("value", callback)
+            if isinstance(iWidget,CheckboxGroup):
+                iWidget.js_on_click(callback)
+            else:
+                iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
         #display(callback.code)
         return column(widgetList)
@@ -196,6 +199,7 @@ class bokehDrawSA(object):
                     raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
                                       "Checkbox {} has {} parameters.".format(name[1], len(subList)))
                 iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
+#                iWidget.title=name[1]
             elif name[0] == "query":
                 iWidget = widgets.TextInput(value="", placeholder="Type a query", title="Query")
             elif name[0] == "slider":
