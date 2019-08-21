@@ -24,8 +24,8 @@ figureArray = [
     [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
     [['D'], ['(A+B+C)*D'], {"size": 10}],
 ]
-#widgets="slider.A(0,1,0.05,0,1),slider.B(0,1,0.05,0,1),slider.C(0,1,0.01,0.1,1),slider.D(0,1,0.01,0,1),checkbox.Bool(1),dropdown.E(0,1,2,3,4)"
-widgets="slider.A(0,1,0.05,0,1),slider.B(0,1,0.05,0,1),slider.C(0,1,0.01,0.1,1),slider.D(0,1,0.01,0,1),dropdown.E(0,1,2,3,4)"
+widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
+#widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), dropdown.E(0,1,2,3,4)"
 figureLayout: str = '((0,1,2, plot_height=300),(3, x_visible=1),commonX=1,plot_height=300,plot_width=1200)'
 
 
@@ -50,6 +50,6 @@ def testBokehDrawArraySA_tree():
     fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 #testOldInterface()
-#testBokehDrawArraySA()
+testBokehDrawArraySA()
 #testOldInterface_tree()
 #testBokehDrawArraySA_tree()

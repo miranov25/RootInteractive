@@ -52,18 +52,18 @@ def makeJScallback(widgetDict, **kwargs):
 
     for key, value in widgetDict.items():
         #
-        if isinstance(value,Slider):
+        if isinstance(value, Slider):
             code += f"      var {key}Value={key}.value;\n"
             code += f"      var {key}Step={key}.step;\n"
             #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value-0.5*{key}Step)\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value+0.5*{key}Step)\n"
-        elif isinstance(value,RangeSlider):
+        elif isinstance(value, RangeSlider):
             code += f"      var {key}Value={key}.value;\n"
             #code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value[0])\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value[1])\n"
-        elif isinstance(value,TextInput):
+        elif isinstance(value, TextInput):
             code += f"      var queryText={key}.value;\n"
             #code += f"      console.log(queryText, queryText.length);\n"
             code += "      if (queryText.length > 1)  {"
@@ -73,11 +73,15 @@ def makeJScallback(widgetDict, **kwargs):
             #code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
             code += f"      isSelected&=result;\n"
             code+= "}\n"
-        elif isinstance(value,Select):
+        elif isinstance(value, Select):
             code += f"      var {key}Value={key}.value;\n"
-            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
+            #code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
-        elif isinstance(value,CheckboxGroup):
+        elif isinstance(value, MultiSelect):
+            code += f"      var {key}Value={key}.value;\n"
+            code += f"     console.log(\"%s\t%s\t%f\t%s\",\"{key}\",{key}Value.toString,dataOrig[\"{key}\"][i],({key}Value.includes(dataOrig[\"{key}\"][i].toString())));\n"
+            code += f"      isSelected&=({key}Value.includes(dataOrig[\"{key}\"][i].toString()))\n"
+        elif isinstance(value, CheckboxGroup):
             code += f"      var {key}Value=({key}.active.length>0);\n"
             #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"

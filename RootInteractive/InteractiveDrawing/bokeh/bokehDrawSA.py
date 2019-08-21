@@ -184,6 +184,12 @@ class bokehDrawSA(object):
                     raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",
                                      format(name[1]))
                 iWidget = widgets.Select(title=name[1], value=values[0], options=values)
+            elif name[0] == "multiselect":
+                value = list(subList)
+                if len(value) == 0:
+                    raise ValueError("Multiselect menu quires at least 1 option. The multiselect menu {} has no options",
+                                     format(name[1]))
+                iWidget = widgets.MultiSelect(title=name[1], value=value, options=value)
             elif name[0] == "checkbox":
                 if len(subList) == 0:
                     active = []
