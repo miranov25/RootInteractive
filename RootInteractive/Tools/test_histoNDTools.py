@@ -70,8 +70,8 @@ def testHistoPanda(nPoints=10000):
     ]
     output_file("test_histoNDTools.html")
     histogramArray = makeHistogramArray(dataFrame, histoStringArray)
-    fig0,data0=bokehDrawHistoSliceColz(histogramArray[0],np.index_exp[0:200, 0:5, 10:11,0:5], 0,3, 1, {'plot_width':500, 'plot_height':300},{'size':5})
-    fig1,data1=bokehDrawHistoSliceColz(histogramArray[1],np.index_exp[0:200, 0:5, 10:11,0:5], 0,3, 1, {'plot_width':500, 'plot_height':300},{'size':5})
+    fig0, data0 = bokehDrawHistoSliceColz(histogramArray[0],np.index_exp[0:200, 0:5, 10:11,0:5], 0,3, 1, {'plot_width': 500, 'plot_height': 300}, {'size': 5})
+    fig1, data1 = bokehDrawHistoSliceColz(histogramArray[1],np.index_exp[0:200, 0:5, 10:11,0:5], 0,3, 1, {'plot_width': 500, 'plot_height': 300}, {'size': 5})
     show(column(fig0,fig1))
 
 def testTHnDraw():
@@ -106,7 +106,7 @@ def testDrawSlice():
 def testBokehDrawHistoTHn():
     output_file("test_histoNDTools_testBokehDrawHistoTHn.html")
     hisArray.ls()
-    bokehDrawHisto.fromTHnArray(hisArray,[["hisdY()(0,1)(0:100,0:100)"], ["hisdZ()(0,1)(0:100,0:100)"]],{},{})
+    bokehDrawHisto.fromTHnArray(hisArray, [["hisdY()(0,1)(0:100,0:100)"], ["hisdZ()(0,1)(0:100,0:100)"]], {}, {})
 
 
 
