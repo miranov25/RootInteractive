@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -448,7 +448,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "markers": bokehMarkers,
         "color": "#000000",
         "colors": 'Category10',
-        "colorZvar":''
+        "colorZvar":'',
+        "filter":''
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -504,7 +505,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
                 optionLocal["color"]=mapperC
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-
+            #view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX])
             if hasattr(dfQuery,"metaData"):

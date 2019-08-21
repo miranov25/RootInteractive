@@ -19,6 +19,7 @@ df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle'
 
 
 figureArray = [
+#   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C"}],
     [['A'], ['C+A', 'C-A']],
     [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
@@ -50,6 +51,6 @@ def testBokehDrawArraySA_tree():
     fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 #testOldInterface()
-testBokehDrawArraySA()
+#testBokehDrawArraySA()
 #testOldInterface_tree()
 #testBokehDrawArraySA_tree()
