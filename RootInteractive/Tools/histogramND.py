@@ -222,7 +222,9 @@ class histogramND(object):
         ]
 
         hLocal = self.H[hSlice]
-        hLocal=np.sum(hLocal, axis=(indexX))
+        axisList = [ index for index,i in enumerate(self.axes)]
+        axisList.remove(indexX)
+        hLocal=np.sum(hLocal, axis=tuple(axisList))
         axisX=self.axes[indexX]
         # produce an image of the 1d histogram
         p = figure(x_range=(min(axisX), max(axisX)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[indexX])
@@ -259,7 +261,10 @@ class histogramND(object):
         ]
 
         hLocal = self.H[hSlice]
-        hLocal=np.sum(hLocal, axis=(indexX,indexY))
+        axisList = [ index for index,i in enumerate(self.axes)]
+        axisList.remove(indexX)
+        axisList.remove(indexY)
+        hLocal=np.sum(hLocal, axis=tuple(axisList))
         axisX=self.axes[indexX]
         axisY=self.axes[indexY]
         mapper = LinearColorMapper(palette=options['palette'], low=np.min(hLocal), high=np.max(hLocal))

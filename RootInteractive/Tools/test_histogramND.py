@@ -47,8 +47,8 @@ def testHistPandaDraw():
     histogram= histogramMap["hisTRD"]
     fig0, data0 = histogram.bokehDrawColz(np.index_exp[0:200, 0:5, 10:20,0:5],0,3, 1, {'plot_width':600, 'plot_height':600},{'size': 5})
     show(fig0)
-    fig1 = histogramMapABCD['hABCD1'].bokehDraw1D(np.index_exp[0:100, 0:20, 0:100, 0:100], 0, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
-    fig2 = histogramMapABCD['hABCD2'].bokehDraw2D(np.index_exp[0:100, 0:20, 0:100, 0:100], 0, 3, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
+    fig1 = histogramMapABCD['hABCD1'].bokehDraw1D(np.index_exp[0:100, 0:100, 0:100, 0:100], 0, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
+    fig2 = histogramMapABCD['hABCD2'].bokehDraw2D(np.index_exp[0:100, 0:100, 0:100, 0:100], 0, 3, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
     show(row(fig1,fig2))
     return fig0
 
