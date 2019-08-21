@@ -11,12 +11,15 @@ from RootInteractive.Tools.Alice.BetheBloch import *
 histogramMap={}
 histogramMapABCD={}
 
+tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")]
+
+
 def makeMapABCD(nPoints=100000):
     df = pd.DataFrame(np.random.randint(0,100,size=(nPoints, 4)), columns=list('ABCD'))
     histoStringArray = [
-        "A:B:C:D:#A+B>100>>hABCD0(100,0,100,100,0,100,100,0,100,100,0,100)",
-        "A:B:C:D:#A+C>100>>hABCD1(100,0,100,100,0,100,100,0,100,100,0,100)",
-        "A:B:C:D:#A+D>100>>hABCD2(100,0,100,100,0,100,100,0,100,100,0,100)"
+        "A:B:C:D:#A+B>100>>hABCD0(100,0,100,50,0,100,50,0,100,50,0,100)",
+        "A:B:C:D:#A+C>100>>hABCD1(100,0,100,50,0,100,50,0,100,50,0,100)",
+        "A:B:C:D:#A+D>100>>hABCD2(100,0,100,50,0,100,50,0,100,50,0,100)"
     ]
     global histogramMapABCD
     histogramMapABCD = histogramND.makeHistogramMap(df, histoStringArray)
@@ -42,10 +45,10 @@ def testHistoPanda(nPoints=10000):
 def testHistPandaDraw():
     output_file("test_histogramND_testHistPandaDrawColz.html")
     histogram= histogramMap["hisTRD"]
-    fig0, data0 = histogram.bokehDrawColz(np.index_exp[0:200, 0:5, 10:20,0:5],0,3, 1, {'plot_width':600, 'plot_height':600},{'size':5})
+    fig0, data0 = histogram.bokehDrawColz(np.index_exp[0:200, 0:5, 10:20,0:5],0,3, 1, {'plot_width':600, 'plot_height':600},{'size': 5})
     show(fig0)
-    fig1 = histogramMapABCD['hABCD1'].bokehDraw2D(np.index_exp[0:100, 0:20, 0:100,0:100],0,3, {'plot_width':600, 'plot_height':600},{'size':5})
-    fig2 = histogramMapABCD['hABCD2'].bokehDraw2D(np.index_exp[0:100, 0:20, 0:100,0:100],0,3, {'plot_width':600, 'plot_height':600},{'size':5})
+    fig1 = histogramMapABCD['hABCD1'].bokehDraw1D(np.index_exp[0:100, 0:20, 0:100, 0:100], 0, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
+    fig2 = histogramMapABCD['hABCD2'].bokehDraw2D(np.index_exp[0:100, 0:20, 0:100, 0:100], 0, 3, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
     show(row(fig1,fig2))
     return fig0
 

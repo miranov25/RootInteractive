@@ -5,15 +5,15 @@ except ImportError:
     exit
 
 ### 0. Imports
-import numpy as np
-import math
-import pandas as pd
-from functools import partial
-import re
-from TTreeHnInteractive.TTreeHnBrowser import *
+#import numpy as np
+#import math
+#import pandas as pd
+#from functools import partial
+#import re
+#from TTreeHnInteractive.TTreeHnBrowser import *
 #from InteractiveDrawing.bokeh.bokehDraw import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawHisto import *
-from IPython.display import display
+#from IPython.display import display
 
 #output_notebook()
 import ROOT
@@ -110,7 +110,7 @@ def testBokehDrawHistoTHn():
 
 
 
-#testHistoPanda(1000000)
-#testTHnDraw()
-# testDrawSlice()
+testHistoPanda(1000000)
+testTHnDraw()
+testDrawSlice()
 testBokehDrawHistoTHn()
