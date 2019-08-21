@@ -197,16 +197,14 @@ class histogramND(object):
         p2.legend.click_policy = "hide"
         return p2, source
 
-    def bokehDraw1D(self, hSlice, index, figOption, graphOption):
+    def bokehDraw1D(self, hSlice, indexX, figOption, graphOption):
         """
         Draw slices of histogram
 
-        :param histogram:                 - histogram dictionary - see description in makeHistogram
         :param hSlice:
             - slice to visualize (see numpy slice documentation)  e.g:
                 >>> np.index_exp[:, 1:3,3:5]
-        :param axisX:                 - variable index X
-        :param axisY:                 - variable index Y
+        :param indexX:                 - variable index
         :param figOption:             - options (python dictionary)  for figure
         :param graphOption:           - option (dictionary) for figure
         :return:                       histogram figure
@@ -218,17 +216,17 @@ class histogramND(object):
         figOption.pop("plotLegendFormat", None)
         #sliceString = str(hSlice).replace("slice", "")
         TOOLTIPS = [
-            (self.varNames[index], "$x"),
+            (self.varNames[indexX], "$x"),
             ('value', "@image"),
             # ("Slice", sliceString)
         ]
 
         hLocal = self.H[hSlice]
-        hLocal=np.sum(hLocal, axis=index)
-        axisX=self.axes[index]
+        hLocal=np.sum(hLocal, axis=(indexX))
+        axisX=self.axes[indexX]
         # produce an image of the 1d histogram
-        p = figure(x_range=(min(axisX), max(axisX)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[index])
-        p.vbar(top=[hLocal], x=axisX[0], width=axisX[1] - axisX[0])
+        p = figure(x_range=(min(axisX), max(axisX)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[indexX])
+        p.vbar(top=hLocal, x=axisX[0], width=axisX[-1] - axisX[0])
         return p
 
     def bokehDraw2D(self, hSlice, indexX, indexY, figOption, graphOption):
