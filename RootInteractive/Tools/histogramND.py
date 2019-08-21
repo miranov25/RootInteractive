@@ -222,13 +222,13 @@ class histogramND(object):
         ]
 
         hLocal = self.H[hSlice]
-        axisList = [ index for index,i in enumerate(self.axes)]
+        axisList = [index for index,i in enumerate(self.axes)]
         axisList.remove(indexX)
         hLocal=np.sum(hLocal, axis=tuple(axisList))
         axisX=self.axes[indexX]
         # produce an image of the 1d histogram
         p = figure(x_range=(min(axisX), max(axisX)), title='Image', tooltips=TOOLTIPS, x_axis_label=self.varNames[indexX])
-        p.vbar(top=hLocal, x=axisX[0], width=axisX[-1] - axisX[0])
+        p.vbar(top=hLocal, x=axisX, width=axisX[1] - axisX[0])
         return p
 
     def bokehDraw2D(self, hSlice, indexX, indexY, figOption, graphOption):
