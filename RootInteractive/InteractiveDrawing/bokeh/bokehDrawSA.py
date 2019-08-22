@@ -239,7 +239,7 @@ def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **k
         for tip in kwargs["tooltips"]:
             varSource.append(tip[1].replace("@", ""))
     toRemove = [r"^tab.*", r"^query.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
-    toReplace = ["^slider.", "^checkbox.", "^dropdown."]
+    toReplace = ["^slider.", "^checkbox.", "^dropdown.","^multiselect."]
     varList += getAndTestVariableList(varSource, toRemove, toReplace, verbosity)
     if 'tooltip' in kwargs.keys():
         tool = str([str(a[1]) for a in kwargs["tooltip"]])
