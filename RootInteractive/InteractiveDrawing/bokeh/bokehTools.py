@@ -448,8 +448,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "markers": bokehMarkers,
         "color": "#000000",
         "colors": 'Category10',
-        "colorZvar":'',
-        "filter":''
+        "colorZvar": '',
+        "filter": ''
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -480,8 +480,32 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         if variables[0] == 'table':
             plotArray.append(makeBokehDataTable(dfQuery, source))
             continue
-        figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title="xxx",
-                         tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+        xAxisTitle = ""
+        yAxisTitle = ""
+#        zAxisTitle = ""
+        plotTitle = ""
+        for varY in variables[1]:
+            if hasattr(dfQuery, "metaData"):
+                yAxisTitle += dfQuery.metaData.get(varY + ".AxisTitle", varY)
+            else:
+                yAxisTitle += varY
+            yAxisTitle += ','
+        for varX in variables[0]:
+            if hasattr(dfQuery, "metaData"):
+                xAxisTitle += dfQuery.metaData.get(varX + ".AxisTitle", varX)
+            else:
+                xAxisTitle += varX
+            xAxisTitle += ','
+        xAxisTitle = xAxisTitle[:-1]
+        yAxisTitle = yAxisTitle[:-1]
+        plotTitle += yAxisTitle+" vs " + xAxisTitle
+
+        figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
+                         tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
+                         y_axis_type=options['y_axis_type'])
+
+        figureI.xaxis.axis_label = xAxisTitle
+        figureI.yaxis.axis_label = yAxisTitle
 
         # graphArray=drawGraphArray(df, variables)
         lengthX = len(variables[0])
@@ -504,16 +528,18 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 varColor=optionLocal["colorZvar"]
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
                 optionLocal["color"]=mapperC
-                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-            #view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
+                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
+#                zAxisTitle +=varColor + ","
+            #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX])
-            if hasattr(dfQuery,"metaData"):
-                figureI.xaxis.axis_label = dfQuery.metaData.get(varX + ".AxisTitle", varX)
-                figureI.yaxis.axis_label = dfQuery.metaData.get(varY + ".AxisTitle", varY)
         if color_bar!=None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
+#        zAxisTitle=zAxisTitle[:-1]
+#        if(len(zAxisTitle)>0):
+#            plotTitle += " Color:" + zAxisTitle
+#        figureI.title = plotTitle
         plotArray.append(figureI)
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
