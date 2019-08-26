@@ -293,7 +293,7 @@ class histogramNDProjection(object):
         """
         self.projectionDescription = ""
         self.histogramQuery = ''
-        self.histogramSlice = None
+        self.histogramSliceString = None
         self.histogramProjection = None
         self.histogramOption = None
         self.histogramMap = {}
@@ -345,7 +345,7 @@ class histogramNDProjection(object):
             return iString
 
         self.histogramQuery = buildStr(projection[0][0])
-        self.histogramSlice = projection[0][1]
+        self.histogramSliceString = projection[0][1]
         self.histogramOption = projection[0][3]
         try:
             self.histogramProjection = [int(i) for i in projection[0][2][0].split(",")]
@@ -358,7 +358,7 @@ class histogramNDProjection(object):
         """
         # expression  hisdY-hisdZ, abs(hisdY-hisdZ)
         if slice is not None:
-            self.histogramSlice = slice
+            self.histogramSliceString = slice
         histogram = {}
         axes = []
         varNames = []
@@ -402,23 +402,23 @@ class histogramNDProjection(object):
         print(varNames)
         histogram["varNames"] = varNames
         histogram["axes"] = axes
-        if len(self.histogramSlice) == 0:
-            self.histogramSlice.append("")
+        if len(self.histogramSliceString) == 0:
+            self.histogramSliceString.append("")
         #histoSlice = self.completeSlice(histogram)
         #histogram["sliceSlider"] = histoSlice
         expressionHisto=histogramND.fromDictionary(histogram)
         return expressionHisto
 
-    def completeSlice(self, histo):
+    def makeSlice(self, histo, sliceString,  controlArray):
         """
-
-        :param expression: build slice for string expression - string
-        :param histo:      reference histogram for slice
         :return:    numpy slice
         """
-        axes = histo['axes']
+        controlMap={}
+        for control in controlArray:
+            controlMap[control.title]=control
+        axes = histo.axes
         maxSize = len(axes)
-        sliceList = expression.split(',')
+        sliceList = sliceString.split(',')
         if len(sliceList) > maxSize:
             logging.error("Size bigger than expected")
             # raise exception
@@ -430,4 +430,12 @@ class histogramNDProjection(object):
                 sliceList[i] = ":"
         sliceString = ",".join(sliceList)
         npSlice = eval("np.index_exp[" + sliceString + "]")
+        npSliceList=list(npSlice)
+        for index, i in enumerate(npSlice):
+            aName=histo.varNames[index]
+            #npSliceList.replace(index,npSlice[index])
+            if aName in controlMap:
+                print(aName, controlMap[aName])
+                npSliceList[index]=slice(controlMap[aName].value[0], controlMap[aName].value[1])
+        npSlice=tuple(npSliceList)
         return npSlice
