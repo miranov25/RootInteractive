@@ -1,3 +1,5 @@
+# CODE AND TEST NOT FINISHED YET
+
 try:
     import ROOT
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
@@ -7,11 +9,15 @@ except ImportError:
 from RootInteractive.Tools.histogramND import *
 from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.Tools.Alice.BetheBloch import *
+from bokeh.plotting import figure, ColumnDataSource, curdoc
 
 histogramMap={}
 histogramMapABCD={}
 controlList=[]
 tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")]
+layout
+fig0=None
+fig1=None
 
 def initControlList():
     #slider = Slider(start=0, end=100, step=5, value=50, title="A")
@@ -50,7 +56,7 @@ def testHistoPanda(nPoints=10000):
     return histogramMap
 
 def testHistPandaDraw():
-    output_file("test_histogramND_testHistPandaDrawColz.html")
+    #output_file("test_histogramND_testHistPandaDrawColz.html")
     initControlList()
     histogram= histogramMap["hisTRD"]
     fig0, data0 = histogram.bokehDrawColz(np.index_exp[0:200, 0:5, 10:20,0:5],0,3, 1, {'plot_width':600, 'plot_height':600},{'size': 5})
@@ -58,7 +64,8 @@ def testHistPandaDraw():
     fig1 = histogramMapABCD['hABCD1'].bokehDraw1D(np.index_exp[0:100, 0:100, 0:100, 0:100], 0, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
     fig2 = histogramMapABCD['hABCD2'].bokehDraw2D(np.index_exp[0:100, 0:100, 0:100, 0:100], 0, 3, {'plot_width':600, 'plot_height':600}, {'tooltips': tooltips})
     #show(row(fig1,fig2))
-    show(column(row(fig1,fig2),row(controlList)))
+    global layout
+    layout=column(row(fig1,fig2),row(controlList))
     return fig0
 
 def testHistoProjection():
@@ -66,12 +73,19 @@ def testHistoProjection():
     projection=histogramNDProjection.fromMap("((hABCD0+hABCD1+hABCD1) (0:100,1:10,0:10,0:100) (0,1) ()))",histogramMapABCD)
     return projection
 
+def mycallback(attr, old, new):
+    print(controlList[0].value,controlList[1].value)
 
-testHistoPanda(100000)
-testHistPandaDraw()
-projection=testHistoProjection()
-print(projection)
-hisExpresion=projection.makeProjection()
-hisExpresion=projection.makeProjection()
-print(hisExpresion)
-
+def runAll():
+    testHistoPanda(100000)
+    testHistPandaDraw()
+    projection=testHistoProjection()
+    print(projection)
+    hisExpresion=projection.evaluateHistogram()
+    hisExpresion=projection.evaluateHistogram()
+    print(hisExpresion)
+    for rslider in controlList:
+        rslider.on_change('value', testcallback)
+    s,h = projection.makeProjection(controlList,[0,1],"0:100,1:100,:,:")
+    show(layout)
+    curdoc().add_root(layout)
