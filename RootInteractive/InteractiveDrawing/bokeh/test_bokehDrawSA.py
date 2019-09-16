@@ -16,7 +16,8 @@ TStatToolkit.AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
 df = pd.DataFrame(np.random.random_sample(size=(500, 4)), columns=list('ABCD'))
 df.eval("Bool=A>0.5", inplace=True)
-df.eval("E=B.floordiv(0.2)", inplace=True)
+#df.eval("E=B.floordiv(0.2)", inplace=True)
+df["E"]=(df["B"]*5).round(0)
 df.head(10)
 df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
