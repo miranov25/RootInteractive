@@ -34,6 +34,6 @@ def test_DrawFormula():
     bokehFigure=drawColzArray(df, "A>0", "A", "A:B:C:D", "C", None, ncols=2)
 
 
-#test_Draw()
-#test_Layout()
-#test_DrawFormula()
+test_Draw()
+test_Layout()
+test_DrawFormula()

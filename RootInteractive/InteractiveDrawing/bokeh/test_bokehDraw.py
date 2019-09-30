@@ -20,9 +20,13 @@ varDraw = "(meanMIP,meanMIPele):meanMIPele:resolutionMIP"
 varX = "meanMIP:chunkMedian:chunkMedian"
 tooltips = [("MIP", "(@meanMIP)"), ("Electron", "@meanMIPele"), ("Global status", "(@global_Outlier,@global_Warning)"),
             ("MIP status(Warning,Outlier,Acc.)", "@MIPquality_Warning,@MIPquality_Outlier,@MIPquality_PhysAcc"), ("Run","@run")]
-widgets = "tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-widgets += "tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-widgets += "tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+#widgets = "tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
+#widgets += "tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+#widgets += "tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+
+widgets = "slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15),"
+widgets += "slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0),"
+widgets += "slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1)"
 
 
 def test_bokehDrawQAStandard():
@@ -53,6 +57,6 @@ def test_bokehDrawQAYerr():
     xxxErr = bokehDraw(treeQA, "meanMIP>0", "chunkMedian", "meanMIP:meanMIPele:resolutionMIP", "MIPquality_Warning",
                        widgets, 0, errY="meanMIPErr:meanMIPeleErr:resolutionMIPErr", commonX=1, size=6, tooltip=tooltips, x_axis_type='datetime', layout=QAlayout)
 
-# test_bokehDrawQAStandard()
-# test_bokehDrawQAWithXarray()
-# test_bokehDrawQAYerr()
+test_bokehDrawQAStandard()
+test_bokehDrawQAWithXarray()
+test_bokehDrawQAYerr()
