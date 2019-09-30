@@ -71,6 +71,11 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
+    df.metaData ={}
+    metaData=tree.GetUserInfo().FindObject("metaTable")
+    if metaData:
+        for key in metaData:
+            df.metaData[key.GetName()]=key.GetTitle()
     return df
 
 

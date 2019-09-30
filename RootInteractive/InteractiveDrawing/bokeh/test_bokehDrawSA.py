@@ -9,10 +9,15 @@ gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
 TFile.SetCacheFileDir("../../data/")
 tree = AliTreePlayer.LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", "", "")
+TStatToolkit.AddMetadata(tree, "A.AxisTitle","A (cm)")
+TStatToolkit.AddMetadata(tree, "B.AxisTitle","B (cm/s)")
+TStatToolkit.AddMetadata(tree, "C.AxisTitle","B (s)")
+TStatToolkit.AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
 df = pd.DataFrame(np.random.random_sample(size=(500, 4)), columns=list('ABCD'))
 df.eval("Bool=A>0.5", inplace=True)
-df.eval("E=B.floordiv(0.2)", inplace=True)
+#df.eval("E=B.floordiv(0.2)", inplace=True)
+df["E"]=(df["B"]*5).round(0)
 df.head(10)
 df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
@@ -53,4 +58,4 @@ def testBokehDrawArraySA_tree():
 #testOldInterface()
 #testBokehDrawArraySA()
 #testOldInterface_tree()
-#testBokehDrawArraySA_tree()
+testBokehDrawArraySA_tree()

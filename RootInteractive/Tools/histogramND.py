@@ -259,8 +259,10 @@ class histogramND(object):
             ('value', "@image"),
             # ("Slice", sliceString)
         ]
+        hLocal=self.H
 
-        hLocal = self.H[hSlice]
+        if slice!=None:
+            hLocal = self.H[hSlice]
         axisList = [ index for index,i in enumerate(self.axes)]
         axisList.remove(indexX)
         axisList.remove(indexY)
@@ -282,6 +284,7 @@ class histogramNDProjection(object):
         r"""
             Attributes:
                 projectionDescription      description string
+                histogramND                histogram expression
                 histogramQuery             query to evaluate
                 histogramSlice             slide describing projection
                 histogramProjection        array of axes to project
@@ -293,7 +296,7 @@ class histogramNDProjection(object):
         """
         self.projectionDescription = ""
         self.histogramQuery = ''
-        self.histogramSlice = None
+        self.histogramSliceString = None
         self.histogramProjection = None
         self.histogramOption = None
         self.histogramMap = {}
@@ -345,20 +348,19 @@ class histogramNDProjection(object):
             return iString
 
         self.histogramQuery = buildStr(projection[0][0])
-        self.histogramSlice = projection[0][1]
+        self.histogramSliceString = projection[0][1][0]
         self.histogramOption = projection[0][3]
         try:
             self.histogramProjection = [int(i) for i in projection[0][2][0].split(",")]
         except:
             logging.error("Invalid syntax for projection slice", self)
 
-    def makeProjection(self, slice=None):
+    def evaluateHistogram(self):
         """
+
         :return: histogram
         """
         # expression  hisdY-hisdZ, abs(hisdY-hisdZ)
-        if slice is not None:
-            self.histogramSlice = slice
         histogram = {}
         axes = []
         varNames = []
@@ -402,23 +404,28 @@ class histogramNDProjection(object):
         print(varNames)
         histogram["varNames"] = varNames
         histogram["axes"] = axes
-        if len(self.histogramSlice) == 0:
-            self.histogramSlice.append("")
-        #histoSlice = self.completeSlice(histogram)
-        #histogram["sliceSlider"] = histoSlice
-        expressionHisto=histogramND.fromDictionary(histogram)
-        return expressionHisto
+        self.histogramND=histogramND.fromDictionary(histogram)
+        return self.histogramND
 
-    def completeSlice(self, histo):
+    def makeProjection(self, controlArray, projectionND=None,  sliceString=None, histogramND=None):
         """
-
-        :param expression: build slice for string expression - string
-        :param histo:      reference histogram for slice
-        :return:    numpy slice
+        :param controlArray:      control array with bokeh slideres
+        :param sliceString:
+        :param histogramND:
+        :return:
         """
-        axes = histo['axes']
+        if histogramND==None:
+            histogramND=self.histogramND
+        if sliceString==None:
+            sliceString=self.histogramSliceString
+        if (projectionND==None):
+            projectionND=self.histogramProjection
+        controlMap={}
+        for control in controlArray:
+            controlMap[control.title]=control
+        axes = histogramND.axes
         maxSize = len(axes)
-        sliceList = expression.split(',')
+        sliceList = sliceString.split(',')
         if len(sliceList) > maxSize:
             logging.error("Size bigger than expected")
             # raise exception
@@ -430,4 +437,31 @@ class histogramNDProjection(object):
                 sliceList[i] = ":"
         sliceString = ",".join(sliceList)
         npSlice = eval("np.index_exp[" + sliceString + "]")
-        return npSlice
+        npSliceList=list(npSlice)
+        for index, i in enumerate(npSlice):
+            aName=histogramND.varNames[index]
+            #npSliceList.replace(index,npSlice[index])
+            if aName in controlMap:
+                print(aName, controlMap[aName])
+                if i.start==None:
+                    npSliceList[index]=slice(controlMap[aName].value[0], controlMap[aName].value[1])
+                else:
+                    npSliceList[index]=i
+        npSlice=tuple(npSliceList)
+        histogram={}
+        histogram["axes"]=[]
+        histogram["varNames"]=[]
+        hLocal=histogramND.H[npSlice]
+        axisList = [index for index,i in enumerate(histogramND.axes)]
+
+        for axisIndex in projectionND:
+            axisList.remove(axisIndex)
+            histogram["axes"].append(histogramND.axes[axisIndex])
+            histogram["varNames"].append(histogramND.varNames[axisIndex])
+            #histogram["varTitles"].append(histogramND.varTitles[axisIndex])
+
+        hLocal=np.sum(hLocal, axis=tuple(axisList))
+        histogram["H"]=hLocal
+        histogramDraw=histogramND.fromDictionary(histogram)
+
+        return npSlice,histogramDraw
