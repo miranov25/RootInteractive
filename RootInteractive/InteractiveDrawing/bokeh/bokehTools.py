@@ -132,21 +132,21 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if type(fig).__name__ == 'DataTable':
             continue
         if 'commonY' in option:
-            if type(option["commonY"]) == str:
+            if option["commonY"] == 1:
                 fig.y_range = array[0].y_range
-            else:
-                try:
-                    fig.y_range = figureList[int(option["commonY"])].y_range
-                except ValueError:
-                    continue
+#            else:
+#                try:
+#                    fig.y_range = figureList[int(option["commonY"])].y_range
+#                except ValueError:
+#                    continue
         if 'commonX' in option:
-            if type(option["commonX"]) == str:
+            if option["commonX"] == 1:
                 fig.x_range = array[0].x_range
-            else:
-                try:
-                    fig.x_range = figureList[int(option["commonX"])].x_range
-                except ValueError:
-                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
+#            else:
+#                try:
+#                    fig.x_range = figureList[int(option["commonX"])].x_range
+#                except ValueError:
+#                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
 
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
@@ -439,8 +439,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         'plot_height': 400,
         'errX': '',
         'errY': '',
-        'commonX': -1,
-        'commonY': -1,
+        'commonX': 0,
+        'commonY': 0,
         'ncols': -1,
         'layout': '',
         'palette': Spectral6,

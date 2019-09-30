@@ -7,7 +7,6 @@ except ImportError:
     pass
 
 from RootInteractive.Tools.histogramND import *
-from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.Tools.Alice.BetheBloch import *
 from bokeh.plotting import figure, ColumnDataSource, curdoc
 
