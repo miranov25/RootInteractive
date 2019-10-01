@@ -31,7 +31,8 @@ def test_DrawFormula():
     df.head(10)
     df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)"}
     testLayout = "((0,1),(2,x_visible=0),(3), plot_height=200,plot_width=800,commonX=3,commonY=3,y_visible=0)"
-    bokehFigure=drawColzArray(df, "A>0", "A", "A:B:C:D", "C", None, ncols=2)
+    bokehFigure, xxx, yyy=drawColzArray(df, "A>0", "A", "A:B:C:D", "C", None, ncols=2)
+    show(bokehFigure)
 
 
 #test_Draw()
