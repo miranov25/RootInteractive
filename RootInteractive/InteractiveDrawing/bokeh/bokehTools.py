@@ -132,21 +132,19 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if type(fig).__name__ == 'DataTable':
             continue
         if 'commonY' in option:
-            if option["commonY"] == 1:
-                fig.y_range = array[0].y_range
-#            else:
-#                try:
-#                    fig.y_range = figureList[int(option["commonY"])].y_range
-#                except ValueError:
-#                    continue
+            if option["commonY"] >=0 :
+                try:
+                    fig.y_range = figureList[int(option["commonY"])].y_range
+                except ValueError:
+                    logging.info('Failed: to process option ' + option["commonY"])
+                    continue
         if 'commonX' in option:
-            if option["commonX"] == 1:
-                fig.x_range = array[0].x_range
-#            else:
-#                try:
-#                    fig.x_range = figureList[int(option["commonX"])].x_range
-#                except ValueError:
-#                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
+            if option["commonX"] >=0 :
+                try:
+                    fig.x_range = figureList[int(option["commonX"])].x_range
+                except ValueError:
+                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
+                    continue
 
         if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
         if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
@@ -310,7 +308,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'commonY': -1,
         'ncols': -1,
         'layout': '',
-        'palette': Spectral6
+        'palette': Spectral6,
+        'doDraw':0
     }
     options.update(kwargs)
     if 'tooltip' in kwargs:  # bug fix - to be compatible with old interface (tooltip instead of tooltips)
@@ -372,6 +371,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
         #handle = show(pAll, notebook_handle=isNotebook)
+        if options['doDraw']>0:
+            show(pAll)
         return pAll, source, layoutList
 
     plotArray2D = []
@@ -381,6 +382,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         if pCol == 0: plotArray2D.append([])
         plotArray2D[int(pRow)].append(plot)
     pAll = gridplot(plotArray2D)
+    if options['doDraw']>0:
+        show(pAll)
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     #handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, source, plotArray
@@ -449,7 +452,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "color": "#000000",
         "colors": 'Category10',
         "colorZvar": '',
-        "filter": ''
+        "filter": '',
+        'doDraw':0
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -515,6 +519,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         mapperC=None
         for i in range(0, length):
             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
+            dummy, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             optionLocal = copy.copy(options)
             optionLocal['color'] = colorAll[max(length, 4)][i]
             optionLocal['marker']=optionLocal['markers'][i]
@@ -531,8 +536,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
 #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
-            figureI.scatter(x=varX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
-                            marker=optionLocal["marker"], legend=varY + " vs " + variables[0][i % lengthX])
+            figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
+                            marker=optionLocal["marker"], legend=varY + " vs " + varX)
         if color_bar!=None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
@@ -544,5 +549,6 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
-
+    if options['doDraw']>0:
+        show(pAll)
     return pAll, source, layoutList, dfQuery
