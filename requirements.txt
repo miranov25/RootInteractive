@@ -22,6 +22,7 @@ scikit-hep
 forestci
 tensorflow
 keras
+skgarden
 # tests and tutorials
 pytest
 nbval

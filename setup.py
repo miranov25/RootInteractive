@@ -42,6 +42,7 @@ setup(
         'forestci',
         'tensorflow',
         'keras',
+        'skgarden',
         # ------------------      test and tutorials
         'pytest',
         'nbval',
