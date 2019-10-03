@@ -1,8 +1,9 @@
-IPython
 numpy
 scipy
 pandas
 anytree
+## root dependencies
+root_pandas
 ##---------------------   graphics  dependencies
 bokeh
 matplotlib
@@ -24,4 +25,3 @@ keras
 # tests and tutorials
 pytest
 nbval
-nb-clean

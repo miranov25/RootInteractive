@@ -22,6 +22,8 @@ setup(
         'anytree',
         'pytest',
         'nbval',
+        ## root dependencies
+        'root_pandas'
         ##---------------------   graphics  dependencies
         'bokeh',
         'matplotlib',
