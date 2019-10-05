@@ -113,7 +113,7 @@ def treeToAnyTree(tree):
             (Node('/tree/bz'),)
             (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
-    parent = Node("/",ttype="base")
+    parent = Node("",ttype="base")
     for branch in tree.GetListOfBranches():
         __processAnyTreeBranch(branch, parent)
     if tree.GetListOfAliases():
@@ -124,6 +124,7 @@ def treeToAnyTree(tree):
         nodeF = Node(friend.GetName(), parent=parent, ttype="branch")
         for branch in treeF.GetListOfBranches():
             __processAnyTreeBranch(branch, nodeF)
+    tree.anyTree=parent
     return parent
 
 
@@ -159,7 +160,7 @@ def findSelectedBranch(anyTree, regexp, **findOption):
 
 def findSelectedBranches(anyTree, include, exclude, **findOption):
     """
-    :param anyTree:  anyTree
+    :param anyTree:  anyTree or TTree
     :param include:  include array of regular expression
     :param exclude:  exclude array
     :return:  array of selected expression
@@ -171,10 +172,14 @@ def findSelectedBranches(anyTree, include, exclude, **findOption):
         >>> Search 0: ['LHC15o_pass1.hnormChi2TPCMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2TPCMult_Tgl_qPtDist/meanG']
         >>> Search 1: ['LHC15o_pass1.hnormChi2ITSMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2ITSMult_Tgl_qPtDist/meanG']
     """
+    if isinstance(anyTree, ROOT.TTree):
+        anyTree=treeToAnyTree(anyTree)
+    options={}
+    options.update(findOption)
     variablesTree = []
     for selection in include:
-        for var in findall(anyTree, filter_=lambda node: re.match(selection, str(node.leaves[-1])),**findOption):
-            path=str(var).split("'")[1].replace("///","")
+        for var in findall(anyTree, filter_=lambda node: re.match(selection, str(node.leaves[-1]))):
+            path=str(var.leaves[-1]).split("'")[1].replace("//","")
             isOK = 1
             if exclude:
                 for varE in exclude:
@@ -397,19 +402,21 @@ def tree2Panda(tree, include, selection, **kwargs):
     variables = ""
 
     for var in variablesTree:
+        #if var.length<2: continue
         var=var.replace("/",".")
         variables += var + ":"
     variables = variables[0:-1]
 
     entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
     columns = variables.split(":")
+    for i, column in enumerate(columns):
+        columns[i]=column.replace(".", "_")
     # replace column names
     #    1.) pandas does not allow dots in names
     #    2.) user can specified own column mask
     for i, column in enumerate(columns):
         for mask in options["columnMask"]:
-            column = column.replace(mask[0], mask[1])
-        columns[i] = column.replace(".", "_")
+            columns[i] = columns[i].replace(mask[0], mask[1])
 
     ex_dict = {}
     for i, a in enumerate(columns):
