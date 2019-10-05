@@ -10,7 +10,8 @@ def initMetadata(ddf):
     :return:      None
     """
     if hasattr(ddf,"meta"):
-        return
+        if hasattr(ddf.meta,"metaData"):
+            return
     ddf.meta = SimpleNamespace()
     ddf.meta.metaData={}
     #
