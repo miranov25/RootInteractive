@@ -219,6 +219,12 @@ class bokehDrawSA(object):
                     raise SyntaxError(
                         "The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. "
                         "Slider {} has {} parameters.".format(name[1], len(subList)))
+            elif name[0] == "range":
+                start=self.__getStat(name[1],subList[0])
+                end=self.__getStat(name[1],subList[1])
+                step=self.__getStat(name[1],subList[2])
+                value=(self.__getStat(name[1],subList[3]),self.__getStat(name[1],subList[4]))
+                iWidget = widgets.RangeSlider(title=name[1], start=start, end=end, step=step, value=value)
             else:
                 if (self.verbosity >> 1) & 1:
                     logging.info("type of the widget\"" + name[0] + "\" is not specified. Assuming it is a slider.")
@@ -227,6 +233,28 @@ class bokehDrawSA(object):
 #        self.allWidgets += widgetSubList
         return widgetSubList
     verbosity=0
+
+    def __getStat(self, variable, formula):
+        """
+        __getStat - interpret formula expression as a float or as a panda expression
+        :param variable:
+        :param formula:
+        :return:   float value
+        """
+        value=0;
+        if "pd." in formula:
+            formula=formula.replace("pd.",f"{variable}.")
+            value=0
+            try:
+                value=self.dataSource.eval(formula)
+            except:
+                logging.error("getStat", f"Invalid formula {formula}")
+            return value
+        try:
+            value=float(formula)
+        except:
+            logging.error("getStat", f"Invalid formula {formula}")
+        return value
 
 def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
     varList = []

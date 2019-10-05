@@ -248,8 +248,8 @@ def makeBokehDataTable(dataFrame, source, **options):
     """
     columns = []
     for col in dataFrame.columns.values:
-        if hasattr(dataFrame,"metaData"):
-            title = dataFrame.metaData.get(col + ".OrigName", col);
+        if hasattr(dataFrame,"meta"):
+            title = dataFrame.meta.metaData.get(col + ".OrigName", col);
         else:
             title=col
         columns.append(TableColumn(field=col, title=title))
@@ -407,7 +407,7 @@ def parseWidgetString(widgetString):
         Nested lists of strings to create widgets
     '''
     toParse = "(" + widgetString + ")"
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
+    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_[]{}") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
     widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
     widgetList = widgetParser.parseString(toParse)[0]
     return widgetList
@@ -489,14 +489,14 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 #        zAxisTitle = ""
         plotTitle = ""
         for varY in variables[1]:
-            if hasattr(dfQuery, "metaData"):
-                yAxisTitle += dfQuery.metaData.get(varY + ".AxisTitle", varY)
+            if hasattr(dfQuery, "meta"):
+                yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
                 yAxisTitle += varY
             yAxisTitle += ','
         for varX in variables[0]:
-            if hasattr(dfQuery, "metaData"):
-                xAxisTitle += dfQuery.metaData.get(varX + ".AxisTitle", varX)
+            if hasattr(dfQuery, "meta"):
+                xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
                 xAxisTitle += varX
             xAxisTitle += ','

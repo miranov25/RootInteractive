@@ -3,6 +3,7 @@ import numpy as np
 import urllib.request as urlopen
 import pyparsing
 from anytree import *
+from .pandaTools import *
 try:
     import ROOT
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
@@ -71,11 +72,11 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
-    df.metaData = {}
+    initMetadata(df)
     metaData = tree.GetUserInfo().FindObject("metaTable")
     if metaData:
         for key in metaData:
-            df.metaData[key.GetName()] = key.GetTitle()
+            df.meta.metaData[key.GetName()] = key.GetTitle()
     return df
 
 
@@ -423,9 +424,9 @@ def tree2Panda(tree, include, selection, **kwargs):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
-    df.metaData = {}
+    initMetadata(df)
     metaData = tree.GetUserInfo().FindObject("metaTable")
     if metaData:
         for key in metaData:
-            df.metaData[key.GetName()] = key.GetTitle()
+            df.meta.metaData[key.GetName()] = key.GetTitle()
     return df
