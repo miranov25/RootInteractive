@@ -21,7 +21,7 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circl
 def makeJScallback(widgetDict, **kwargs):
     options = {
         "verbose": 0,
-        "varList":['AAA','BBB']
+        "varList": ['AAA', 'BBB']
     }
     options.update(kwargs)
 
@@ -32,7 +32,7 @@ def makeJScallback(widgetDict, **kwargs):
     var dataSel = cdsSel.data;
     console.log('%f\t%f\t',dataOrig["index"].length, dataSel["index"].length);
     """
-    #for key in options['varList']:
+    # for key in options['varList']:
     #    code += f"      var {key}K={key};\n"
 
     for a in widgetDict['cdsOrig'].data:
@@ -43,39 +43,39 @@ def makeJScallback(widgetDict, **kwargs):
     code += f"""for (var i = 0; i < {size}; i++)\n"""
     code += " {\n"
     code += """var isSelected=1;\n"""
-    varString=""
+    varString = ""
     for a in widgetDict['cdsOrig'].data:
-        if a =="index":
-            continue;
+        if a == "index":
+            continue
         code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
-        #code += f"var {a} =dataOrig[\"{a}\"][i];\n"
+        # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
 
     for key, value in widgetDict.items():
         #
         if isinstance(value, Slider):
             code += f"      var {key}Value={key}.value;\n"
             code += f"      var {key}Step={key}.step;\n"
-            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
+            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value-0.5*{key}Step)\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value+0.5*{key}Step)\n"
         elif isinstance(value, RangeSlider):
             code += f"      var {key}Value={key}.value;\n"
-            #code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
+            # code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value[0])\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value[1])\n"
         elif isinstance(value, TextInput):
             code += f"      var queryText={key}.value;\n"
-            #code += f"      console.log(queryText, queryText.length);\n"
+            # code += f"      console.log(queryText, queryText.length);\n"
             code += "      if (queryText.length > 1)  {"
             code += f"      var queryString='';\n"
             code += f"      var varString='';\n"
             code += f"     eval(varString+ 'var result = ('+ queryText+')');\n"
-            #code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
+            # code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
             code += f"      isSelected&=result;\n"
-            code+= "}\n"
+            code += "}\n"
         elif isinstance(value, Select):
             code += f"      var {key}Value={key}.value;\n"
-            #code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
+            # code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
         elif isinstance(value, MultiSelect):
             code += f"      var {key}Value={key}.value;\n"
@@ -83,7 +83,7 @@ def makeJScallback(widgetDict, **kwargs):
             code += f"      isSelected&=({key}Value.includes(dataOrig[\"{key}\"][i].toString()))\n"
         elif isinstance(value, CheckboxGroup):
             code += f"      var {key}Value=({key}.active.length>0);\n"
-            #code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
+            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
     code += """      
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
@@ -98,9 +98,9 @@ def makeJScallback(widgetDict, **kwargs):
     console.log(\"nSelected:%d\",nSelected); 
     cdsSel.change.emit();
     """
-    if options["verbose"]>0:
-        logging.info("makeJScallback:\n",code)
-    #print(code)
+    if options["verbose"] > 0:
+        logging.info("makeJScallback:\n", code)
+    # print(code)
     callback = CustomJS(args=widgetDict, code=code)
     return callback
 
@@ -132,14 +132,14 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
         if type(fig).__name__ == 'DataTable':
             continue
         if 'commonY' in option:
-            if option["commonY"] >=0 :
+            if option["commonY"] >= 0:
                 try:
                     fig.y_range = figureList[int(option["commonY"])].y_range
                 except ValueError:
                     logging.info('Failed: to process option ' + option["commonY"])
                     continue
         if 'commonX' in option:
-            if option["commonX"] >=0 :
+            if option["commonX"] >= 0:
                 try:
                     fig.x_range = figureList[int(option["commonX"])].x_range
                 except ValueError:
@@ -248,10 +248,10 @@ def makeBokehDataTable(dataFrame, source, **options):
     """
     columns = []
     for col in dataFrame.columns.values:
-        if hasattr(dataFrame,"meta"):
+        if hasattr(dataFrame, "meta"):
             title = dataFrame.meta.metaData.get(col + ".OrigName", col);
         else:
-            title=col
+            title = col
         columns.append(TableColumn(field=col, title=title))
     data_table = DataTable(source=source, columns=columns, **options)
     return data_table
@@ -309,13 +309,12 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         'ncols': -1,
         'layout': '',
         'palette': Spectral6,
-        'doDraw':0
+        'doDraw': 0
     }
     options.update(kwargs)
     if 'tooltip' in kwargs:  # bug fix - to be compatible with old interface (tooltip instead of tooltips)
         options['tooltips'] = kwargs['tooltip']
         options['tooltip'] = kwargs['tooltip']
-
 
     mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
     isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
@@ -370,8 +369,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
-        #handle = show(pAll, notebook_handle=isNotebook)
-        if options['doDraw']>0:
+        # handle = show(pAll, notebook_handle=isNotebook)
+        if options['doDraw'] > 0:
             show(pAll)
         return pAll, source, layoutList
 
@@ -382,10 +381,10 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         if pCol == 0: plotArray2D.append([])
         plotArray2D[int(pRow)].append(plot)
     pAll = gridplot(plotArray2D)
-    if options['doDraw']>0:
+    if options['doDraw'] > 0:
         show(pAll)
     #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
-    #handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
+    # handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
     return pAll, source, plotArray
 
 
@@ -453,7 +452,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "colors": 'Category10',
         "colorZvar": '',
         "filter": '',
-        'doDraw':0
+        'doDraw': 0
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -486,7 +485,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             continue
         xAxisTitle = ""
         yAxisTitle = ""
-#        zAxisTitle = ""
+        #        zAxisTitle = ""
         plotTitle = ""
         for varY in variables[1]:
             if hasattr(dfQuery, "meta"):
@@ -502,7 +501,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
-        plotTitle += yAxisTitle+" vs " + xAxisTitle
+        plotTitle += yAxisTitle + " vs " + xAxisTitle
 
         figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
                          tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
@@ -515,40 +514,163 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
-        color_bar=None
-        mapperC=None
+        color_bar = None
+        mapperC = None
         for i in range(0, length):
             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
             dummy, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             optionLocal = copy.copy(options)
             optionLocal['color'] = colorAll[max(length, 4)][i]
-            optionLocal['marker']=optionLocal['markers'][i]
+            optionLocal['marker'] = optionLocal['markers'][i]
             if len(variables) > 2:
                 logging.info("Option", variables[2])
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            if (len(optionLocal["colorZvar"])>0):
+            if (len(optionLocal["colorZvar"]) > 0):
                 logging.info(optionLocal["colorZvar"])
-                varColor=optionLocal["colorZvar"]
+                varColor = optionLocal["colorZvar"]
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
-                optionLocal["color"]=mapperC
+                optionLocal["color"] = mapperC
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
-#                zAxisTitle +=varColor + ","
+            #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + varX)
-        if color_bar!=None:
+        if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
-#        zAxisTitle=zAxisTitle[:-1]
-#        if(len(zAxisTitle)>0):
-#            plotTitle += " Color:" + zAxisTitle
-#        figureI.title = plotTitle
+        #        zAxisTitle=zAxisTitle[:-1]
+        #        if(len(zAxisTitle)>0):
+        #            plotTitle += " Color:" + zAxisTitle
+        #        figureI.title = plotTitle
         plotArray.append(figureI)
     if len(options['layout']) > 0:  # make figure according layout
         x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
         pAll = gridplotRow(layoutList, **optionsLayout)
-    if options['doDraw']>0:
+    if options['doDraw'] > 0:
         show(pAll)
     return pAll, source, layoutList, dfQuery
+
+
+def makeBokehSliderWidget(df, isRange, params, **kwargs):
+    options = {
+        'type': 'auto',
+        'bins': 30,
+        'sigma': 4,
+        'limits': (0.05, 0.05),
+        'title': '',
+    }
+    options.update(kwargs)
+    name = params[0]
+    title = params[0]
+    if len(options['title']) > 0:
+        title = options['title']
+    start = 0
+    end = 0
+    step = 0
+    if options['type'] == 'user':
+        start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
+    elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
+        start = df[name].min()
+        end = df[name].max()
+        step = (end - start) / options['bins']
+    elif options['type'] == 'sigma':
+        mean = df[name].mean()
+        sigma = df[name].std()
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    elif options['type'] == 'sigmaMed':
+        mean = df[name].median()
+        sigma = df[name].std()
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    elif options['type'] == 'sigmaTM':
+        mean = df[name].trimmed_mean(options['limits'])
+        sigma = df[name].trimmed_std(options['limits'])
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    if isRange:
+        value = (start, end)
+        slider = RangeSlider(title=title, start=start, end=end, step=step, value=value)
+    else:
+        value = (start + end) * 0.5
+        slider = Slider(title=title, start=start, end=end, step=step, value=value)
+    return slider
+
+
+def makeBokehSelectWidget(df, params, **kwargs):
+    options = {'default': 0, 'size': 10}
+    options.update(kwargs)
+    #optionsPlot = []
+    if len(params) == 1:
+        optionsPlot = np.sort(df[params[0]].unique()).tolist()
+    else:
+        optionsPlot = params[1:]
+    for i, val in enumerate(optionsPlot):
+        optionsPlot[i] = str(int(val))
+    return Select(title=params[0], value=optionsPlot[options['default']], options=optionsPlot)
+
+
+def makeBokehMultiSelectWidget(df, params, **kwargs):
+    # print("makeBokehMultiSelectWidget",params,kwargs)
+    options = {'default': 0, 'size': 4}
+    options.update(kwargs)
+    #optionsPlot = []
+    if len(params) == 1:
+        optionsPlot = np.sort(df[params[0]].unique()).tolist()
+    else:
+        optionsPlot = params[1:]
+    for i, val in enumerate(optionsPlot):
+        optionsPlot[i] = str(int(val))
+    # print(optionsPlot)
+    return MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
+
+
+def makeBokehCheckboxWidget(df, params, **kwargs):
+    options = {'default': 0, 'size': 10}
+    options.update(kwargs)
+    #optionsPlot = []
+    if len(params) == 1:
+        optionsPlot = np.sort(df[params[0]].unique()).tolist()
+    else:
+        optionsPlot = params[1:]
+    for i, val in enumerate(optionsPlot):
+        optionsPlot[i] = str(val)
+    return CheckboxGroup(labels=optionsPlot, active=[])
+
+
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel):
+    widgetArray = []
+    widgetDict = {"cdsOrig": cdsOrig, "cdsSel": cdsSel}
+    for widget in widgetParams:
+        type = widget[0]
+        params = widget[1]
+        options = {}
+        localWidget = None
+        if len(widget) == 3:
+            options = widget[2]
+        if type == 'range':
+            localWidget = makeBokehSliderWidget(df, True, params, **options)
+        if type == 'slider':
+            localWidget = makeBokehSliderWidget(df, False, params, **options)
+        if type == 'select':
+            localWidget = makeBokehSelectWidget(df, params, **options)
+        if type == 'multiSelect':
+            localWidget = makeBokehMultiSelectWidget(df, params, **options)
+        # if type=='checkbox':
+        #    localWidget=makeBokehCheckboxWidget(df,params,**options)
+        if localWidget:
+            widgetArray.append(localWidget)
+        widgetDict[params[0]] = localWidget
+    callback = makeJScallback(widgetDict)
+    for iWidget in widgetArray:
+        if isinstance(iWidget, CheckboxGroup):
+            iWidget.js_on_click(callback)
+        else:
+            iWidget.js_on_change("value", callback)
+        iWidget.js_on_event("value", callback)
+    return widgetArray
