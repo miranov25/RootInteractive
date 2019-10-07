@@ -5,14 +5,14 @@ import logging
 
 class bokehDrawSA(object):
 
-    def __init__(self, source, query, varX, varY, varColor, widgetString, p, **kwargs):
+    def __init__(self, source, query, varX, varY, varColor, widgetsDescription, p, **kwargs):
         """
         :param source:           input data frame
         :param query:            query string
         :param varX:             X variable name
         :param varY:             : separated list of the Y variables
         :param varColor:         color map variable name
-        :param widgetString:     :  separated string - list of widgets separated by ','
+        :param widgetsDescription:     :  separated string - list of widgets separated by ','
                                   slider:
                                     Requires 4 or 5 numbers as parameters
                                     for single valued sliders: slider.name(min,max,step,initial value)
@@ -51,10 +51,11 @@ class bokehDrawSA(object):
             'plot_height': 400,
             'bg_color': '#fafafa',
             'color': "navy",
-            'line_color': "white"
+            'line_color': "white",
+            'widgetLayout':''
         }
         options.update(kwargs)
-
+        self.widgetLayout=options['widgetLayout']
         self.isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isinstance(source, pd.DataFrame):
             if (self.verbosity >> 1) & 1:
@@ -70,7 +71,7 @@ class bokehDrawSA(object):
             }
             treeoptions.update(kwargs)
 
-            variableList = constructVariables(query, varX, varY, varColor, widgetString, self.verbosity, **kwargs)
+            variableList = constructVariables(query, varX, varY, varColor, widgetsDescription, self.verbosity, **kwargs)
             df = treeToPanda(source, variableList, query, nEntries=treeoptions['nEntries'], firstEntry=treeoptions['firstEntry'], columnMask=treeoptions['columnMask'])
 
         self.dataSource = df.query(query)
@@ -82,18 +83,18 @@ class bokehDrawSA(object):
         if ":" not in varX:
             self.dataSource.sort_values(varX, inplace=True)
         self.figure, self.cdsSel, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
-        self.plotArray.append(self.initWidgets(widgetString))
+        self.plotArray.append(self.initWidgets(widgetsDescription))
         pAll=gridplotRow(self.plotArray)
         self.handle=show(pAll,notebook_handle=self.isNotebook)
 
     @classmethod
-    def fromArray(cls, dataFrame, query, figureArray, widgetString, **kwargs):
+    def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
         r"""
         * Constructor of  interactive standalone figure array
         * :Example usage in:
             * test_bokehDrawArray.py
 
-        :param widgetString:
+        :param widgetsDescription:
         :param dataFrame:
         :param query:
         :param figureArray:
@@ -110,23 +111,23 @@ class bokehDrawSA(object):
         for word in re.split('[^a-zA-Z0-9]', tmp[:-1]):
             if not word.isnumeric():
                 varList += word + ":"
-        if type(widgetString)==str:
-            varList += widgetString
-        elif type(widgetString)==list:
-            for w in widgetString:
-                varList+=w[1]+":"
+        if type(widgetsDescription)==str:
+            varList += widgetsDescription
+        elif type(widgetsDescription)==list:
+            for w in widgetsDescription:
+                varList+=w[1][0]+":"
 
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(self.dataSource, query,
-                                                                                 figureArray, **kwargs)
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(self.dataSource, query, figureArray, **kwargs)
         self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
-        self.plotArray.append(self.initWidgets(widgetString))
+        widgetList=self.initWidgets(widgetsDescription)
+        self.plotArray.append(widgetList)
         pAll=gridplotRow(self.plotArray)
         self.handle=show(pAll,notebook_handle=self.isNotebook)
         return self
 
-    def initWidgets(self, widgetString):
+    def initWidgets(self, widgetsDescription):
         r"""
         Initialize widgets 
 
@@ -135,15 +136,20 @@ class bokehDrawSA(object):
                 >>>  widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
         :return: VBox includes all widgets
         """
-        if type(widgetString)==list:
-            widgetList= makeBokehWidgets(self.dataSource,widgetString, self.cdsOrig, self.cdsSel)
-            return column(widgetList)
+        if type(widgetsDescription)==list:
+            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel)
+            if len(self.widgetLayout)>0:
+                x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
+                widgetList=gridplotRow(layoutList)
+            else:
+                widgetList=column(widgetList)
+            return widgetList
 
         widgetList = []
         try:
-            widgetList = parseWidgetString(widgetString)
+            widgetList = parseWidgetString(widgetsDescription)
         except:
-            logging.error("Invalid widget string", widgetString)
+            logging.error("Invalid widget string", widgetsDescription)
         widgetDict = {"cdsOrig":self.cdsOrig, "cdsSel":self.cdsSel}
         widgetList=self.createWidgets(widgetList)
         for iWidget in widgetList:
@@ -160,7 +166,13 @@ class bokehDrawSA(object):
                 iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
         #display(callback.code)
-        return column(widgetList)
+
+        if len(self.widgetLayout)>0:
+            x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
+            widgetList=gridplotRow(layoutList)
+        else:
+            widgetList=column(widgetList)
+        return widgetList
 
     def createWidgets(self, widgetList0):
         r'''
@@ -226,12 +238,6 @@ class bokehDrawSA(object):
                     raise SyntaxError(
                         "The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. "
                         "Slider {} has {} parameters.".format(name[1], len(subList)))
-            elif name[0] == "range":
-                start=self.__getStat(name[1],subList[0])
-                end=self.__getStat(name[1],subList[1])
-                step=self.__getStat(name[1],subList[2])
-                value=(self.__getStat(name[1],subList[3]),self.__getStat(name[1],subList[4]))
-                iWidget = widgets.RangeSlider(title=name[1], start=start, end=end, step=step, value=value)
             else:
                 if (self.verbosity >> 1) & 1:
                     logging.info("type of the widget\"" + name[0] + "\" is not specified. Assuming it is a slider.")
@@ -241,27 +247,6 @@ class bokehDrawSA(object):
         return widgetSubList
     verbosity=0
 
-    def __getStat(self, variable, formula):
-        """
-        __getStat - interpret formula expression as a float or as a panda expression
-        :param variable:
-        :param formula:
-        :return:   float value
-        """
-        value=0;
-        if "pd." in formula:
-            formula=formula.replace("pd.",f"{variable}.")
-            value=0
-            try:
-                value=self.dataSource.eval(formula)
-            except:
-                logging.error("getStat", f"Invalid formula {formula}")
-            return value
-        try:
-            value=float(formula)
-        except:
-            logging.error("getStat", f"Invalid formula {formula}")
-        return value
 
 def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
     varList = []

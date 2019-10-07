@@ -445,6 +445,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         'commonY': 0,
         'ncols': -1,
         'layout': '',
+        'widgetLayout':'',
         'palette': Spectral6,
         "marker": "square",
         "markers": bokehMarkers,
