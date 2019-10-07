@@ -93,7 +93,7 @@ class bokehDrawSA(object):
         * :Example usage in:
             * test_bokehDrawArray.py
 
-        :param widgetInput:
+        :param widgetString:
         :param dataFrame:
         :param query:
         :param figureArray:
@@ -110,18 +110,21 @@ class bokehDrawSA(object):
         for word in re.split('[^a-zA-Z0-9]', tmp[:-1]):
             if not word.isnumeric():
                 varList += word + ":"
-        varList += widgetString
+        if type(widgetString)==str:
+            varList += widgetString
+        elif type(widgetString)==list:
+            for w in widgetString:
+                varList+=w[1]+":"
+
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(self.dataSource, query,
                                                                                  figureArray, **kwargs)
         self.cdsOrig=ColumnDataSource(dataFrameOrig)
-        self.Widgets = self.initWidgets(widgetString)
+        #self.Widgets = self.initWidgets(widgetString)
         self.plotArray.append(self.initWidgets(widgetString))
         pAll=gridplotRow(self.plotArray)
         self.handle=show(pAll,notebook_handle=self.isNotebook)
         return self
-
-
 
     def initWidgets(self, widgetString):
         r"""
@@ -132,6 +135,10 @@ class bokehDrawSA(object):
                 >>>  widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
         :return: VBox includes all widgets
         """
+        if type(widgetString)==list:
+            widgetList= makeBokehWidgets(self.dataSource,widgetString, self.cdsOrig, self.cdsSel)
+            return column(widgetList)
+
         widgetList = []
         try:
             widgetList = parseWidgetString(widgetString)
