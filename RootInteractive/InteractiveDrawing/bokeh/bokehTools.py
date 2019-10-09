@@ -161,7 +161,6 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             if 'plot_height' in option:
                 fig.height = int(option["plot_height"])
 
-
 def __processBokehLayoutOption(layoutOptions):
     """
     :param layoutOptions:
@@ -220,6 +219,74 @@ def processBokehLayout(layoutString, figList, verbose=0):
     for key in optionsParse:
         if key in options: del options[key]
     return res.asList(), layoutList, options
+
+def processBokehLayoutArray(widgetLayoutDesc,widgetArray):
+    """
+    apply layout on plain array of bokeh figures, resp. interactive widgets
+    :param widgetLayoutDesc: array desciption of layout
+    :param widgetArray: input plain array of widgets/figures
+    :return: combined figure
+    Example:  in tutorial/bokehDraw/makePandaWidgets.ipynb
+    widgetLayoutDesc=[
+        [0,1,2],
+        [3,4,5],
+        [6,7],
+        {'width':10,'sizing_mode':'scale_width'}
+    ]
+    figureLayoutDesc=[
+        [0,1,2, {'commonX':1,'y_visible':2, 'plot_height':300}],
+        [2, {'commonX':1, 'y_visible':0}],
+        {'width':10,'plot_height':200, 'sizing_mode':'scale_width'}
+    ]
+    """
+    options={
+        'commonX':-1, 'commonY':-1,
+        'x_visible':True, 'y_visible':1,
+        'plot_width':-1, 'plot_height':-1,
+        'sizing_mode':'scale_width',
+        'legend_visible':True
+    }
+
+    widgetRows=[]
+    nRows=len(widgetArray)
+    # get/apply global options if exist
+    if isinstance(widgetLayoutDesc[-1],dict):
+        nRows-=1
+        options.update(widgetLayoutDesc[-1])
+        widgetLayoutDesc=widgetLayoutDesc[0:-1]
+
+    for rowWidget in  widgetLayoutDesc:
+        rowOptions={}
+        rowOptions.update(options)
+        #patch local option
+        if isinstance(rowWidget[-1],dict):
+            rowOptions.update(rowWidget[-1])
+            rowWidget=rowWidget[0:-1]
+        rowWidgetArray0=[]
+        for i, iWidget in enumerate(rowWidget):
+            figure=widgetArray[iWidget]
+            rowWidgetArray0.append(figure)
+            if hasattr(figure,'x_range'):
+                if rowOptions['commonX']>=0:
+                    figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
+                if rowOptions['commonY']>=0:
+                    figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
+                figure.yaxis.visible = bool(rowOptions["x_visible"])
+                if rowOptions['y_visible']==0:
+                    figure.yaxis.visible = bool(rowOptions["y_visible"])
+                if rowOptions['y_visible']==2:
+                    if i>0: figure.yaxis.visible = bool(rowOptions["y_visible"])
+            if hasattr(figure,'plot_width'):
+                if rowOptions["plot_width"]>0:
+                    plot_width=int(rowOptions["plot_width"]/len(rowWidget))
+                    figure.plot_width=plot_width
+                if rowOptions["plot_height"]>0:
+                    figure.plot_height=rowOptions["plot_height"]
+                figure.legend.visible=rowOptions["legend_visible"]
+
+        rowWidgetArray=row(rowWidgetArray0,sizing_mode=rowOptions['sizing_mode'])
+        widgetRows.append(rowWidgetArray)
+    return column(widgetRows, sizing_mode=options['sizing_mode'])
 
 
 def gridplotRow(figList0, **options):
@@ -433,7 +500,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     options = {
         'line': -1,
         'size': 2,
-        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
+        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset,save',
         'tooltips': [],
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
@@ -546,9 +613,13 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         #            plotTitle += " Color:" + zAxisTitle
         #        figureI.title = plotTitle
         plotArray.append(figureI)
-    if len(options['layout']) > 0:  # make figure according layout
-        x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
-        pAll = gridplotRow(layoutList, **optionsLayout)
+    if isinstance(options['layout'], list):
+        pAll=processBokehLayoutArray(options['layout'],plotArray)
+        layoutList=[pAll]
+    else:
+        if len(options['layout']) > 0:  # make figure according layout
+            x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
+            pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
     return pAll, source, layoutList, dfQuery
@@ -600,6 +671,7 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     else:
         value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
+    slider.callback_policy='mouseup'
     return slider
 
 

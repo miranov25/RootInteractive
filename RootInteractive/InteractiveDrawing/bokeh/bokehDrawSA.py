@@ -52,9 +52,11 @@ class bokehDrawSA(object):
             'bg_color': '#fafafa',
             'color': "navy",
             'line_color': "white",
-            'widgetLayout':''
+            'widgetLayout':'',
+            'sizing_mode':None
         }
         options.update(kwargs)
+        self.options=options
         self.widgetLayout=options['widgetLayout']
         self.isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         if isinstance(source, pd.DataFrame):
@@ -84,8 +86,8 @@ class bokehDrawSA(object):
             self.dataSource.sort_values(varX, inplace=True)
         self.figure, self.cdsSel, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
         self.plotArray.append(self.initWidgets(widgetsDescription))
-        pAll=gridplotRow(self.plotArray)
-        self.handle=show(pAll,notebook_handle=self.isNotebook)
+        self.pAll=gridplotRow(self.plotArray)
+        self.handle=show(self.pAll,notebook_handle=self.isNotebook)
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -123,8 +125,9 @@ class bokehDrawSA(object):
         #self.Widgets = self.initWidgets(widgetString)
         widgetList=self.initWidgets(widgetsDescription)
         self.plotArray.append(widgetList)
-        pAll=gridplotRow(self.plotArray)
-        self.handle=show(pAll,notebook_handle=self.isNotebook)
+        self.pAll=gridplotRow(self.plotArray,sizing_mode=self.options['sizing_mode'])
+        #self.pAll=column([self.figure,widgetList],sizing_mode=self.options['sizing_mode'])
+        self.handle=show(self.pAll,notebook_handle=self.isNotebook)
         return self
 
     def initWidgets(self, widgetsDescription):
@@ -138,11 +141,14 @@ class bokehDrawSA(object):
         """
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel)
-            if len(self.widgetLayout)>0:
-                x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
-                widgetList=gridplotRow(layoutList)
+            if isinstance(self.widgetLayout,list):
+                widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
-                widgetList=column(widgetList)
+                if len(self.widgetLayout)>0:
+                    x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
+                    widgetList=gridplotRow(layoutList)
+                else:
+                    widgetList=column(widgetList)
             return widgetList
 
         widgetList = []
