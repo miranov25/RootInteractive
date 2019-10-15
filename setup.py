@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.12',
+    version='v0.00.14',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -22,6 +22,8 @@ setup(
         'anytree',
         'pytest',
         'nbval',
+        ## root dependencies
+        'root_pandas'
         ##---------------------   graphics  dependencies
         'bokeh',
         'matplotlib',
@@ -40,6 +42,7 @@ setup(
         'forestci',
         'tensorflow',
         'keras',
+        'skgarden',
         # ------------------      test and tutorials
         'pytest',
         'nbval',

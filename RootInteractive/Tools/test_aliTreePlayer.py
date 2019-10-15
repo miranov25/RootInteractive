@@ -79,8 +79,19 @@ def test_Parsing():
     for expression in varSource:
         parseTreeVariables(expression, counts)
 
+def testTree2Panda():
+    info = ROOT.AliExternalInfo()
+    info.fVerbose = 0
+    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1","QA.ITS")
+    df=tree2Panda(tree,[".*hi2.*"],"run>0")
+    print(df.head(5))
+    df=tree2Panda(tree,[".*hi2.*"],"run>0",columnMask=[["chi2","Chi2"]])
+    print(df.head(5))
+    df=tree2Panda(tree,[".*hi2.*"],"run>0",exclude=[".*infoTPC.*"],columnMask=[["chi2","XXX"]])
+    print(df.head(5))
 
-test_AnyTree()
+
+# test_AnyTree()
 # test_Aliases()
-
-test_Parsing()
+# test_Parsing()
+testTree2Panda()
