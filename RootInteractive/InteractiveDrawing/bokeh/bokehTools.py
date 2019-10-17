@@ -305,8 +305,7 @@ def gridplotRow(figList0, **options):
     pAll = gridplot(figList, **options)
     return pAll
 
-
-def makeBokehDataTable(dataFrame, source, **options):
+def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     """
     Create widget for datatable
 
@@ -315,14 +314,23 @@ def makeBokehDataTable(dataFrame, source, **options):
     :param source:
     :return:
     """
-    columns = []
+    columns = []      
     for col in dataFrame.columns.values:
+        isOK=True
         if hasattr(dataFrame, "meta"):
             title = dataFrame.meta.metaData.get(col + ".OrigName", col);
         else:
             title = col
-        columns.append(TableColumn(field=col, title=title))
-    data_table = DataTable(source=source, columns=columns, **options)
+        if include:
+            isOK=False
+            if re.match(include,col):
+                isOK=True
+        if exclude:
+            if re.match(exclude,col):
+                isOK=False
+        if isOK:
+            columns.append(TableColumn(field=col, title=title))
+    data_table = DataTable(source=source, columns=columns, **kwargs)
     return data_table
 
 
@@ -532,7 +540,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     # Check/resp. load derived variables
     i: int
     for i, variables in enumerate(figureArray):
-        if len(variables) > 1:
+        if len(variables) > 1 and variables[0] is not "table":
             lengthX = len(variables[0])
             lengthY = len(variables[1])
             length = max(len(variables[0]), len(variables[1]))
@@ -551,7 +559,13 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     for i, variables in enumerate(figureArray):
         logging.info(i, variables)
         if variables[0] == 'table':
-            plotArray.append(makeBokehDataTable(dfQuery, source))
+            TOptions= {
+                'include':'',
+                'exclude':''
+            }
+            if len(variables)>1:
+                TOptions.update(variables[1])
+            plotArray.append(makeBokehDataTable(dfQuery, source, TOptions['include'], TOptions['exclude']))
             continue
         xAxisTitle = ""
         yAxisTitle = ""
