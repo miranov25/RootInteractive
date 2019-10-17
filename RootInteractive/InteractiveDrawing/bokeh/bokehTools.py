@@ -283,6 +283,8 @@ def processBokehLayoutArray(widgetLayoutDesc,widgetArray):
                 if rowOptions["plot_height"]>0:
                     figure.plot_height=rowOptions["plot_height"]
                 figure.legend.visible=rowOptions["legend_visible"]
+            if type(figure).__name__ == "DataTable":
+                figure.height = int(rowOptions["plot_height"])
 
         rowWidgetArray=row(rowWidgetArray0,sizing_mode=rowOptions['sizing_mode'])
         widgetRows.append(rowWidgetArray)
