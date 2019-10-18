@@ -105,8 +105,8 @@ class bokehDrawSA(object):
         """
         tmp=""
         for fig in figureArray:
+            if fig[0] == 'table':    continue
             for entry in fig[0:2]:
-                if entry == 'table':    continue
                 for word in entry:
                     tmp+=word+":"
         varList=""
