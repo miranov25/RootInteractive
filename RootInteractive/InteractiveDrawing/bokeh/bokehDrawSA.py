@@ -105,6 +105,8 @@ class bokehDrawSA(object):
         """
         tmp=""
         for fig in figureArray:
+            print(fig)
+            if isinstance(fig,dict):     continue
             if fig[0] == 'table':    continue
             for entry in fig[0:2]:
                 for word in entry:
