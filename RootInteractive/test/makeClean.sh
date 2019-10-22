@@ -1,2 +1,2 @@
-# celan test html files
-find -iname "**test*html" |xargs rm
+# clean test html files
+find ../ -iname "**test*html" |xargs rm

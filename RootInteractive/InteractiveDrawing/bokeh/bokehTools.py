@@ -677,6 +677,11 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
         start = df[name].min()
         end = df[name].max()
         step = (end - start) / options['bins']
+    elif (options['type'] == 'unique'):
+        start = df[name].min()
+        end = df[name].max()
+        nbins=df[name].unique().size-1
+        step = (end - start) / float(nbins)
     elif options['type'] == 'sigma':
         mean = df[name].mean()
         sigma = df[name].std()
@@ -714,7 +719,7 @@ def makeBokehSelectWidget(df, params, **kwargs):
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str(int(val))
+        optionsPlot[i] = str((val))
     return Select(title=params[0], value=optionsPlot[options['default']], options=optionsPlot)
 
 
@@ -728,7 +733,7 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str(int(val))
+        optionsPlot[i] = str((val))
     # print(optionsPlot)
     return MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
 
