@@ -15,7 +15,8 @@ from RootInteractive.Tools.pandaTools import *
 import copy
 
 # tuple of Bokeh markers
-bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross", "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
+bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
+                "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
 
 def makeJScallback(widgetDict, **kwargs):
@@ -161,6 +162,7 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             if 'plot_height' in option:
                 fig.height = int(option["plot_height"])
 
+
 def __processBokehLayoutOption(layoutOptions):
     """
     :param layoutOptions:
@@ -220,7 +222,8 @@ def processBokehLayout(layoutString, figList, verbose=0):
         if key in options: del options[key]
     return res.asList(), layoutList, options
 
-def processBokehLayoutArray(widgetLayoutDesc,widgetArray):
+
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
     :param widgetLayoutDesc: array desciption of layout
@@ -239,54 +242,54 @@ def processBokehLayoutArray(widgetLayoutDesc,widgetArray):
         {'width':10,'plot_height':200, 'sizing_mode':'scale_width'}
     ]
     """
-    options={
-        'commonX':-1, 'commonY':-1,
-        'x_visible':True, 'y_visible':1,
-        'plot_width':-1, 'plot_height':-1,
-        'sizing_mode':'scale_width',
-        'legend_visible':True
+    options = {
+        'commonX': -1, 'commonY': -1,
+        'x_visible': True, 'y_visible': 1,
+        'plot_width': -1, 'plot_height': -1,
+        'sizing_mode': 'scale_width',
+        'legend_visible': True
     }
 
-    widgetRows=[]
-    nRows=len(widgetArray)
+    widgetRows = []
+    nRows = len(widgetArray)
     # get/apply global options if exist
-    if isinstance(widgetLayoutDesc[-1],dict):
-        nRows-=1
+    if isinstance(widgetLayoutDesc[-1], dict):
+        nRows -= 1
         options.update(widgetLayoutDesc[-1])
-        widgetLayoutDesc=widgetLayoutDesc[0:-1]
+        widgetLayoutDesc = widgetLayoutDesc[0:-1]
 
-    for rowWidget in  widgetLayoutDesc:
-        rowOptions={}
+    for rowWidget in widgetLayoutDesc:
+        rowOptions = {}
         rowOptions.update(options)
-        #patch local option
-        if isinstance(rowWidget[-1],dict):
+        # patch local option
+        if isinstance(rowWidget[-1], dict):
             rowOptions.update(rowWidget[-1])
-            rowWidget=rowWidget[0:-1]
-        rowWidgetArray0=[]
+            rowWidget = rowWidget[0:-1]
+        rowWidgetArray0 = []
         for i, iWidget in enumerate(rowWidget):
-            figure=widgetArray[iWidget]
+            figure = widgetArray[iWidget]
             rowWidgetArray0.append(figure)
-            if hasattr(figure,'x_range'):
-                if rowOptions['commonX']>=0:
+            if hasattr(figure, 'x_range'):
+                if rowOptions['commonX'] >= 0:
                     figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
-                if rowOptions['commonY']>=0:
+                if rowOptions['commonY'] >= 0:
                     figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
                 figure.yaxis.visible = bool(rowOptions["x_visible"])
-                if rowOptions['y_visible']==0:
+                if rowOptions['y_visible'] == 0:
                     figure.yaxis.visible = bool(rowOptions["y_visible"])
-                if rowOptions['y_visible']==2:
-                    if i>0: figure.yaxis.visible = bool(rowOptions["y_visible"])
-            if hasattr(figure,'plot_width'):
-                if rowOptions["plot_width"]>0:
-                    plot_width=int(rowOptions["plot_width"]/len(rowWidget))
-                    figure.plot_width=plot_width
-                if rowOptions["plot_height"]>0:
-                    figure.plot_height=rowOptions["plot_height"]
-                figure.legend.visible=rowOptions["legend_visible"]
+                if rowOptions['y_visible'] == 2:
+                    if i > 0: figure.yaxis.visible = bool(rowOptions["y_visible"])
+            if hasattr(figure, 'plot_width'):
+                if rowOptions["plot_width"] > 0:
+                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
+                    figure.plot_width = plot_width
+                if rowOptions["plot_height"] > 0:
+                    figure.plot_height = rowOptions["plot_height"]
+                figure.legend.visible = rowOptions["legend_visible"]
             if type(figure).__name__ == "DataTable":
                 figure.height = int(rowOptions["plot_height"])
 
-        rowWidgetArray=row(rowWidgetArray0,sizing_mode=rowOptions['sizing_mode'])
+        rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
         widgetRows.append(rowWidgetArray)
     return column(widgetRows, sizing_mode=options['sizing_mode'])
 
@@ -305,6 +308,7 @@ def gridplotRow(figList0, **options):
     pAll = gridplot(figList, **options)
     return pAll
 
+
 def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     """
     Create widget for datatable
@@ -314,20 +318,20 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     :param source:
     :return:
     """
-    columns = []      
+    columns = []
     for col in dataFrame.columns.values:
-        isOK=True
+        isOK = True
         if hasattr(dataFrame, "meta"):
             title = dataFrame.meta.metaData.get(col + ".OrigName", col);
         else:
             title = col
         if include:
-            isOK=False
-            if re.match(include,col):
-                isOK=True
+            isOK = False
+            if re.match(include, col):
+                isOK = True
         if exclude:
-            if re.match(exclude,col):
-                isOK=False
+            if re.match(exclude, col):
+                isOK = False
         if isOK:
             columns.append(TableColumn(field=col, title=title))
     data_table = DataTable(source=source, columns=columns, **kwargs)
@@ -393,7 +397,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
         options['tooltips'] = kwargs['tooltip']
         options['tooltip'] = kwargs['tooltip']
 
-    mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
+    mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
+                         high=max(dfQuery[varColor]))
     isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
     varYArray = varY.split(":")
     varXArray = varX.split(":")
@@ -409,8 +414,10 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
         yArray = yS.strip('()').split(",")
         yArrayErr = yErrorS.strip('[]').split(",")
-        p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=yS + " vs " + varX + "  Color=" + varColor,
-                    tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'], y_axis_type=options['y_axis_type'])
+        p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'],
+                    title=yS + " vs " + varX + "  Color=" + varColor,
+                    tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
+                    y_axis_type=options['y_axis_type'])
         fIndex = 0
         varX = varXArray[min(idx, len(varXArray) - 1)]
 
@@ -429,7 +436,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
                     err_y_x.append((coord_x, coord_x))
                     err_y_y.append((coord_y - y_err, coord_y + y_err))
                 p2.multi_line(err_y_x, err_y_y)
-            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'], marker=bokehMarkers[fIndex % 4], legend=varX + y)
+            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'],
+                       marker=bokehMarkers[fIndex % 4], legend=varX + y)
             if options['line'] > 0: p2.line(x=varX, y=y, source=source)
             p2.legend.click_policy = "hide"
             fIndex += 1
@@ -483,7 +491,8 @@ def parseWidgetString(widgetString):
         Nested lists of strings to create widgets
     '''
     toParse = "(" + widgetString + ")"
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_[]{}") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(':')
+    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_[]{}") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(
+        ':')
     widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
     widgetList = widgetParser.parseString(toParse)[0]
     return widgetList
@@ -522,7 +531,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         'commonY': 0,
         'ncols': -1,
         'layout': '',
-        'widgetLayout':'',
+        'widgetLayout': '',
         'palette': Spectral6,
         "marker": "square",
         "markers": bokehMarkers,
@@ -556,14 +565,17 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
     plotArray = []
     colorAll = all_palettes[options['colors']]
+    if isinstance(figureArray[-1], dict):
+        options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
         logging.info(i, variables)
+        if isinstance(variables, dict): continue
         if variables[0] == 'table':
-            TOptions= {
-                'include':'',
-                'exclude':''
+            TOptions = {
+                'include': '',
+                'exclude': ''
             }
-            if len(variables)>1:
+            if len(variables) > 1:
                 TOptions.update(variables[1])
             plotArray.append(makeBokehDataTable(dfQuery, source, TOptions['include'], TOptions['exclude']))
             continue
@@ -614,12 +626,14 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             if (len(optionLocal["colorZvar"]) > 0):
                 logging.info(optionLocal["colorZvar"])
                 varColor = optionLocal["colorZvar"]
-                mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]), high=max(dfQuery[varColor]))
+                mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
+                                      high=max(dfQuery[varColor]))
                 optionLocal["color"] = mapperC
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
-            figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'], color=optionLocal["color"],
+            figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                            color=optionLocal["color"],
                             marker=optionLocal["marker"], legend=varY + " vs " + varX)
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
@@ -630,8 +644,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         #        figureI.title = plotTitle
         plotArray.append(figureI)
     if isinstance(options['layout'], list):
-        pAll=processBokehLayoutArray(options['layout'],plotArray)
-        layoutList=[pAll]
+        pAll = processBokehLayoutArray(options['layout'], plotArray)
+        layoutList = [pAll]
     else:
         if len(options['layout']) > 0:  # make figure according layout
             x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
@@ -692,14 +706,14 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     else:
         value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
-    slider.callback_policy='mouseup'
+    slider.callback_policy = 'mouseup'
     return slider
 
 
 def makeBokehSelectWidget(df, params, **kwargs):
     options = {'default': 0, 'size': 10}
     options.update(kwargs)
-    #optionsPlot = []
+    # optionsPlot = []
     if len(params) == 1:
         optionsPlot = np.sort(df[params[0]].unique()).tolist()
     else:
@@ -713,7 +727,7 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
     # print("makeBokehMultiSelectWidget",params,kwargs)
     options = {'default': 0, 'size': 4}
     options.update(kwargs)
-    #optionsPlot = []
+    # optionsPlot = []
     if len(params) == 1:
         optionsPlot = np.sort(df[params[0]].unique()).tolist()
     else:
@@ -727,7 +741,7 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
 def makeBokehCheckboxWidget(df, params, **kwargs):
     options = {'default': 0, 'size': 10}
     options.update(kwargs)
-    #optionsPlot = []
+    # optionsPlot = []
     if len(params) == 1:
         optionsPlot = np.sort(df[params[0]].unique()).tolist()
     else:
