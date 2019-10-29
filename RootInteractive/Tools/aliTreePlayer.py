@@ -120,11 +120,12 @@ def treeToAnyTree(tree):
     if tree.GetListOfAliases():
         for alias in tree.GetListOfAliases():
             Node(alias.GetName(), parent=parent, ttype="alias")
-    for friend in tree.GetListOfFriends():
-        treeF = tree.GetFriend(friend.GetName())
-        nodeF = Node(friend.GetName(), parent=parent, ttype="branch")
-        for branch in treeF.GetListOfBranches():
-            __processAnyTreeBranch(branch, nodeF)
+    if tree.GetListOfFriends():
+        for friend in tree.GetListOfFriends():
+            treeF = tree.GetFriend(friend.GetName())
+            nodeF = Node(friend.GetName(), parent=parent, ttype="branch")
+            for branch in treeF.GetListOfBranches():
+                __processAnyTreeBranch(branch, nodeF)
     tree.anyTree=parent
     return parent
 
