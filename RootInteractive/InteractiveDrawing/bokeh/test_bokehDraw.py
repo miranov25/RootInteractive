@@ -53,6 +53,6 @@ def test_bokehDrawQAYerr():
     xxxErr = bokehDraw(treeQA, "meanMIP>0", "chunkMedian", "meanMIP:meanMIPele:resolutionMIP", "MIPquality_Warning",
                        widgets, 0, errY="meanMIPErr:meanMIPeleErr:resolutionMIPErr", commonX=1, size=6, tooltip=tooltips, x_axis_type='datetime', layout=QAlayout)
 
-# test_bokehDrawQAStandard()
-# test_bokehDrawQAWithXarray()
-# test_bokehDrawQAYerr()
+#test_bokehDrawQAStandard()
+#test_bokehDrawQAWithXarray()
+#test_bokehDrawQAYerr()

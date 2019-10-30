@@ -3,8 +3,9 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 # import logging
 
 df = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)), columns=list('ABCD'))
+initMetadata(df)
 df.head(10)
-df.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)"}
+df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)"}
 
 figureArray = [
     [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C"}],
@@ -19,7 +20,7 @@ def test_DrawFormula():
     Test of the bokehDrawArray to draw figure array -
     :return:
     """
-    print(df.metaData)
+    print(df.meta.metaData)
     #
     output_file("test_BokehDrawArray_DraFormula.html")
     figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'

@@ -53,3 +53,21 @@ For ALICE CERN see detailed description in issue tracker in JIRA:
 https://alice.its.cern.ch/jira/browse/PWGPP-485
 * ROOT tabular metadata description
 * ....
+
+### Galery:
+
+* Unit test dashboards:
+  * source: 
+    * dashboard: https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-532/test_bokehDrawSAArray.html
+    * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py
+  * source: https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py
+    *  dashborad:  https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-532/test_BokehDrawArray_DraFromArray.html
+
+* Real use case - using C++ interface - multidimensional dEdx calibration - video example: 
+  * video: https://drive.google.com/file/d/1Uo2IhIWo94egaKIBAdjqTRsoTyvjKdJv/view , https://drive.google.com/file/d/1HcZ9jFhaofdiAv62aTiHllhbGjdaCbD-/view 
+  * source code:  https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/PWGPP-485/dEdxPerformance.C
+* dashboards created  by  ROOT maco (dEdxPerformance.C): 
+  * https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-538/alice/data/2015/LHC15o/pass1/40MeV_width/dedxPtElPi_0.html
+  * https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-538/alice/data/2018/LHC18q/pass1/40MeV_width/dedxPtElPi_0.html
+  * https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-538/alice/data/2018/LHC18q/pass1/40MeV_width/dedxPtElPi_0.html
+

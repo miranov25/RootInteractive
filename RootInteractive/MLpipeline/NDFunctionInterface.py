@@ -564,7 +564,7 @@ class Fitter:
 
         return out
 
-    def AppendStatPandas(self, method_name, data, ):
+    def AppendStatPandas(self, method_name, data, prefix=""):
         """
         append statisctic colimns from "??? estomators ***" - random forrst or NN with dropout
         :param method_name:
@@ -575,9 +575,9 @@ class Fitter:
         model = self.Models[i]
         cols = model.predictStat(data[self.data.X_values].values)
         out = data
-        out[method_name + 'Mean'] = cols[0]
-        out[method_name + 'Median'] = cols[1]
-        out[method_name + 'RMS'] = cols[2]
+        out[prefix+method_name + 'Mean'] = cols[0]
+        out[prefix+method_name + 'Median'] = cols[1]
+        out[prefix+method_name + 'RMS'] = cols[2]
         return out
 
     def RemoveMethod(self, method_name):

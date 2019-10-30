@@ -3,6 +3,7 @@ import numpy as np
 import urllib.request as urlopen
 import pyparsing
 from anytree import *
+from .pandaTools import *
 try:
     import ROOT
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
@@ -42,10 +43,10 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
     Convert selected items from the tree into panda table
         TODO:
             * import fail in case of number of entries>2x10^6  (infinite loop) - to check the reason
-            * use data source and aliases to enable characters forbidden in Pandas .[]() which are allowd in ROOT trees
+            * use data source and aliases to enable characters forbidden in Pandas .[]() which are allowed in ROOT trees
 
     :param tree:            input tree
-    :param variables:       ":" separiated variable list
+    :param variables:       ":" separated variable list
     :param selection:       tree selection ()
     :param nEntries:        number of entries to query
     :param firstEntry:      first entry to query
@@ -71,6 +72,11 @@ def treeToPanda(tree, variables, selection, nEntries, firstEntry, columnMask='de
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
+    initMetadata(df)
+    metaData = tree.GetUserInfo().FindObject("metaTable")
+    if metaData:
+        for key in metaData:
+            df.meta.metaData[key.GetName()] = key.GetTitle()
     return df
 
 
@@ -82,20 +88,21 @@ def aliasToDictionary(tree):
     :return: dictionary of aliases
     """
     aliases = {}
-    if tree.GetListOfAliases()!=None:
+    if tree.GetListOfAliases() is not None:
         for a in tree.GetListOfAliases(): aliases[a.GetName()] = a.GetTitle()
     return aliases
 
 
 def __processAnyTreeBranch(branch0, parent):
+    nodeF = Node(branch0.GetName(), parent=parent, ttype="branch")
     for branch in branch0.GetListOfBranches():
-        __processAnyTreeBranch(branch, parent)
+        __processAnyTreeBranch(branch, nodeF)
 
 
 def treeToAnyTree(tree):
     r"""
     :param tree:  input TTree
-    :return:  parent node of the anytree object
+    :return:  parent node of the anyTree object
 
     Example usage:
         see test_aliTreePlayer.py::test_AnyTree()
@@ -107,18 +114,18 @@ def treeToAnyTree(tree):
             (Node('/tree/bz'),)
             (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
-    parent = Node("tree")
+    parent = Node("",ttype="base")
     for branch in tree.GetListOfBranches():
-        branchT = Node(branch.GetName(), parent)
-        __processAnyTreeBranch(branch, branchT)
+        __processAnyTreeBranch(branch, parent)
     if tree.GetListOfAliases():
         for alias in tree.GetListOfAliases():
-            Node(alias.GetName(), parent)
+            Node(alias.GetName(), parent=parent, ttype="alias")
     for friend in tree.GetListOfFriends():
         treeF = tree.GetFriend(friend.GetName())
-        nodeF = Node(friend.GetName(), parent)
+        nodeF = Node(friend.GetName(), parent=parent, ttype="branch")
         for branch in treeF.GetListOfBranches():
             __processAnyTreeBranch(branch, nodeF)
+    tree.anyTree=parent
     return parent
 
 
@@ -138,9 +145,51 @@ def findSelectedBranch(anyTree, regexp, **findOption):
         >>>   test_aliTreePlayer.py::test_AnyTree()
         >>>   branchTree = treeToAnyTree(tree)
         >>> print(findSelectedBranch(branchTree, "MIP.*Warning"))
-        ==> (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
+        ==> (Node('/MIPattachSlopeA_Warning'), Node('/MIPattachSlopeC_Warning'), Node('/MIPattachSlope_comb2_Warning'), Node('/MIPquality_Warning'))
     """
-    return findall(anyTree, filter_=lambda nodeF: re.match(regexp, nodeF.name), **findOption)
+    options={
+        "inPath":1,
+        "inName":1
+    }
+    options.update(findOption)
+    array=[]
+    if options["inPath"]>0:
+        array += findall(anyTree, filter_=lambda nodeF: re.match(regexp, str(nodeF.path)), **findOption)
+    if options["inName"]>0:
+        array += findall(anyTree, filter_=lambda nodeF: re.match(regexp, str(nodeF.name)), **findOption)
+    return array
+
+def findSelectedBranches(anyTree, include, exclude, **findOption):
+    """
+    :param anyTree:  anyTree or TTree
+    :param include:  include array of regular expression
+    :param exclude:  exclude array
+    :return:  array of selected expression
+    Example usage:
+        >>> anyTree = treeToAnyTree(treeMap)
+        >>> print("Search 0:",  findSelectedBranches(anyTree, [".*LHC15o.*Chi2.*meanG.*"], [".*ITS.*"]))
+        >>> print("Search 1:",  findSelectedBranches(anyTree, [".*LHC15o.*Chi2.*meanG.*"], [".*TPC.*"]))
+        >>>
+        >>> Search 0: ['LHC15o_pass1.hnormChi2TPCMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2TPCMult_Tgl_qPtDist/meanG']
+        >>> Search 1: ['LHC15o_pass1.hnormChi2ITSMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2ITSMult_Tgl_qPtDist/meanG']
+    """
+    if isinstance(anyTree, ROOT.TTree):
+        anyTree=treeToAnyTree(anyTree)
+    options={}
+    options.update(findOption)
+    variablesTree = []
+    for selection in include:
+        for var in findall(anyTree, filter_=lambda node: re.match(selection, str(node.leaves[-1]))):
+            path=str(var.leaves[-1]).split("'")[1].replace("//","")
+            isOK = 1
+            if exclude:
+                for varE in exclude:
+                    if re.match(varE,path):
+                        isOK = 0
+                        break
+            if isOK > 0:
+                variablesTree.append(path)
+    return variablesTree
 
 
 def makeAliasAnyTree(key, aliases, parent=None):
@@ -162,7 +211,7 @@ def makeAliasAnyTree(key, aliases, parent=None):
         for a in subExpression:
             if a in aliases:
                 newNode = Node(a, parent=parent, content=aliases[a])
-                makeAliasAnyTree(a, aliases, newNode,)
+                makeAliasAnyTree(a, aliases, newNode, )
             else:
                 Node(a, parent=parent)
     return parent
@@ -245,7 +294,7 @@ def parseTreeVariables(expression, counts=None, verbose=0):
     try:
         res = parents.parseString("(" + expression + ")")
         __parseVariableList(res, varList)
-    except :
+    except:
         logging.error("Oops!  That was no valid number.  Try again...", expression)
     for i in varList:
         counts[i] = counts.get(i, 0) + 1
@@ -289,26 +338,26 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
         toRemove = []
     counts = dict()
     for expression in expressions:
-        if type(expression)== str:
+        if type(expression) == str:
             parseTreeVariables(expression, counts, verbose)
     pop_list = []
     for mask in toRemove:
         for a in counts.keys():
             if re.findall(mask, a):
-                #del (counts[a])
+                # del (counts[a])
                 pop_list.append(a)
     for x in pop_list:
         counts.pop(x)
-    
+
     for mask in toReplace:
         pop_list = []
         for key in counts.keys():
             if re.findall(mask, key):
-                #newKey = re.sub(mask, "", key)
+                # newKey = re.sub(mask, "", key)
                 pop_list.append(key)
-                #counts[newKey] = counts.pop(key)
+                # counts[newKey] = counts.pop(key)
         for x in pop_list:
-            newKey = re.sub(mask,"",x)
+            newKey = re.sub(mask, "", x)
             counts[newKey] = counts.pop(x)
     pop_list = []
     if tree:
@@ -317,7 +366,67 @@ def getAndTestVariableList(expressions, toRemove=None, toReplace=None, tree=None
             if findSelectedBranch(dictionary, key + "$") == ():
                 logging.info("Not existing tree variable", key)
                 pop_list.append(key)
-                #del (counts[key])
+                # del (counts[key])
     for x in pop_list:
         counts.pop(x)
     return counts
+
+
+def tree2Panda(tree, include, selection, **kwargs):
+    r"""
+    Convert selected items from the tree into panda table
+    TODO:
+        * to  consult with uproot
+            * currently not able to work with friend trees
+        * check the latest version of RDeatFrame (in AliRoot latest v16.16.00)
+        * Add filter on metadata - e.g class of variables
+    :param tree:            input tree
+    :param include:         regular expresion array - processing Tree+Friends, branches, aliases
+    :param selection:       tree selection ()
+    :param kwargs:
+        * exclude           exclude arrray
+        * firstEntry        firt entry to enter
+        * nEntries          number of entries to convert
+        * column mask
+    :return:                panda data frame
+    """
+    options={
+        "exclude":[],
+        "firstEntry":0,
+        "nEntries":100000000,
+        "columnMask": [[".fX$","_X"], [".fY$","_y"], [".fElements", ""]],
+        "verbose":0
+    }
+    options.update(kwargs)
+    anyTree = treeToAnyTree(tree)  # expand tree/aliases/variables
+    variablesTree = findSelectedBranches(anyTree, include, options["exclude"])
+    variables = ""
+
+    for var in variablesTree:
+        #if var.length<2: continue
+        var=var.replace("/",".")
+        variables += var + ":"
+    variables = variables[0:-1]
+
+    entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+    columns = variables.split(":")
+    for i, column in enumerate(columns):
+        columns[i]=column.replace(".", "_")
+    # replace column names
+    #    1.) pandas does not allow dots in names
+    #    2.) user can specified own column mask
+    for i, column in enumerate(columns):
+        for mask in options["columnMask"]:
+            columns[i] = columns[i].replace(mask[0], mask[1])
+
+    ex_dict = {}
+    for i, a in enumerate(columns):
+        val = tree.GetVal(i)
+        ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+    df = pd.DataFrame(ex_dict, columns=columns)
+    initMetadata(df)
+    metaData = tree.GetUserInfo().FindObject("metaTable")
+    if metaData:
+        for key in metaData:
+            df.meta.metaData[key.GetName()] = key.GetTitle()
+    return df
