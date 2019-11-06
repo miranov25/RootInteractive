@@ -7,7 +7,7 @@ from .pandaTools import *
 
 try:
     import ROOT
-#    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 except ImportError:
     pass
 import re
@@ -246,8 +246,11 @@ def getTreeInfo(tree):
     for a in tree.GetListOfFriends():
         friends[a.GetName()] = a.GetTitle()
     metaTable = treeInfo['metaTable'] = {}
-    if ROOT.TStatToolkit.GetMetadata(tree):
-        table = ROOT.TStatToolkit.GetMetadata(tree)
+#    if ROOT.TStatToolkit.GetMetadata(tree):
+#        table = ROOT.TStatToolkit.GetMetadata(tree)
+#        for a in table: metaTable[a.GetName()] = a.GetTitle()
+    if Getmetadata(tree):
+        table = Getmetadata(tree)
         for a in table: metaTable[a.GetName()] = a.GetTitle()
     return treeInfo
 
@@ -437,7 +440,7 @@ def tree2Panda(tree, include, selection, **kwargs):
     return df
 
 
-def AddMetadata(tree, varTagName, varTagValue):
+def Addmetadata(tree, varTagName, varTagValue):
     if not tree:
         return None
     metaData = tree.GetUserInfo().FindObject("metaTable")
@@ -445,8 +448,8 @@ def AddMetadata(tree, varTagName, varTagValue):
         metaData = ROOT.THashList()
         metaData.SetName("metaTable")
         tree.GetUserInfo().AddLast(metaData)
-    if not (varTagName is None | varTagValue is None):
-        named = GetMetadata(tree, varTagName, None, True)
+    if not (varTagName is None or varTagValue is None):
+        named = Getmetadata(tree, varTagName, None, True)
         if not named:
             metaData.AddLast(ROOT.TNamed(varTagName, varTagValue))
         else:
@@ -454,7 +457,13 @@ def AddMetadata(tree, varTagName, varTagValue):
     return metaData
 
 
-def GetMetadata(tree, varTagName, prefix, fullMatch):
+def Getmetadata(tree, *args):
+    '''
+        Usage:
+            Getmetadata(TTree)
+            Getmetadata(TTree, varTagName)
+            Getmetadata(TTree, varTagName, prefix, fullMatch)
+    '''
     if not tree:
         return None
     treeMeta = tree
@@ -464,8 +473,18 @@ def GetMetadata(tree, varTagName, prefix, fullMatch):
         metaData.SetName("metaTable")
         tree.GetUserInfo().AddLast(metaData)
         return 0
-    named = metaData.FindObject(varTagName)
-    if named | fullMatch:
+    if len(args) == 0:
+        return metaData
+    elif len(args) == 1:
+        prefix = ""
+        fullMatch = False
+    elif len(args) == 3:
+        prefix = args[1]
+        fullMatch = args[2]
+    else:
+        raise TypeError("Invalid number of arguments")
+    named = metaData.FindObject(args[0])
+    if named or fullMatch:
         return named
     metaName = varTagName
     nDots = metaName.count('.')
