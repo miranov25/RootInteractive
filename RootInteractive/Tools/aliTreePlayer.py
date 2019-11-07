@@ -249,8 +249,8 @@ def getTreeInfo(tree):
 #    if ROOT.TStatToolkit.GetMetadata(tree):
 #        table = ROOT.TStatToolkit.GetMetadata(tree)
 #        for a in table: metaTable[a.GetName()] = a.GetTitle()
-    if Getmetadata(tree):
-        table = Getmetadata(tree)
+    if GetMetadata(tree):
+        table = GetMetadata(tree)
         for a in table: metaTable[a.GetName()] = a.GetTitle()
     return treeInfo
 
@@ -440,7 +440,7 @@ def tree2Panda(tree, include, selection, **kwargs):
     return df
 
 
-def Addmetadata(tree, varTagName, varTagValue):
+def AddMetadata(tree, varTagName, varTagValue):
     if not tree:
         return None
     metaData = tree.GetUserInfo().FindObject("metaTable")
@@ -449,7 +449,7 @@ def Addmetadata(tree, varTagName, varTagValue):
         metaData.SetName("metaTable")
         tree.GetUserInfo().AddLast(metaData)
     if not (varTagName is None or varTagValue is None):
-        named = Getmetadata(tree, varTagName, None, True)
+        named = GetMetadata(tree, varTagName, None, True)
         if not named:
             metaData.AddLast(ROOT.TNamed(varTagName, varTagValue))
         else:
@@ -457,12 +457,12 @@ def Addmetadata(tree, varTagName, varTagValue):
     return metaData
 
 
-def Getmetadata(tree, *args):
+def GetMetadata(tree, *args):
     '''
         Usage:
-            Getmetadata(TTree)
-            Getmetadata(TTree, varTagName)
-            Getmetadata(TTree, varTagName, prefix, fullMatch)
+            GetMetadata(TTree)
+            GetMetadata(TTree, varTagName)
+            GetMetadata(TTree, varTagName, prefix, fullMatch)
     '''
     if not tree:
         return None

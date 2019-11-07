@@ -1,4 +1,5 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
+import RootInteractive.Tools.aliTreePlayer
 from ROOT import TFile, TStatToolkit, gSystem, AliTreePlayer
 from bokeh.io import curdoc
 
@@ -9,10 +10,10 @@ gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
 TFile.SetCacheFileDir("../../data/")
 tree = AliTreePlayer.LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", "", "")
-TStatToolkit.AddMetadata(tree, "A.AxisTitle","A (cm)")
-TStatToolkit.AddMetadata(tree, "B.AxisTitle","B (cm/s)")
-TStatToolkit.AddMetadata(tree, "C.AxisTitle","B (s)")
-TStatToolkit.AddMetadata(tree, "D.AxisTitle","D (a.u.)")
+RootInteractive.Tools.aliTreePlayer.AddMetadata(tree, "A.AxisTitle","A (cm)")
+RootInteractive.Tools.aliTreePlayer.AddMetadata(tree, "B.AxisTitle","B (cm/s)")
+RootInteractive.Tools.aliTreePlayer.AddMetadata(tree, "C.AxisTitle","B (s)")
+RootInteractive.Tools.aliTreePlayer.AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
 df = pd.DataFrame(np.random.random_sample(size=(2000, 6)), columns=list('ABCDEF'))
 initMetadata(df)

@@ -178,7 +178,7 @@ class TTreeHnBrowser:
         self.aliasListROOT = tree.GetListOfAliases()
         self.funUpdateList()
 #        if ROOT.TStatToolkit.GetMetadata(tree): self.loadMetadata(tree)
-        if Getmetadata(tree): self.loadMetadata(tree)
+        if GetMetadata(tree): self.loadMetadata(tree)
         return 0
 
     def loadDataInMemory(self, b):
@@ -205,7 +205,7 @@ class TTreeHnBrowser:
         """ Load sliders according description in tree metadata
         """
 #        treeMeta = ROOT.TStatToolkit.GetMetadata(tree)
-        treeMeta = Getmetadata(tree)
+        treeMeta = GetMetadata(tree)
         for index in range(treeMeta.GetEntries()):
             j = treeMeta.At(index)
             if ROOT.TString(j.GetName()).Contains(".Slider"):
