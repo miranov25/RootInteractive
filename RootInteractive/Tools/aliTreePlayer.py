@@ -4,6 +4,7 @@ import urllib.request as urlopen
 import pyparsing
 from anytree import *
 from .pandaTools import *
+
 try:
     import ROOT
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
@@ -114,7 +115,7 @@ def treeToAnyTree(tree):
             (Node('/tree/bz'),)
             (Node('/tree/MIPattachSlopeA_Warning'), Node('/tree/MIPattachSlopeC_Warning'), Node('/tree/MIPattachSlope_comb2_Warning'), Node('/tree/MIPquality_Warning'))
     """
-    parent = Node("",ttype="base")
+    parent = Node("", ttype="base")
     for branch in tree.GetListOfBranches():
         __processAnyTreeBranch(branch, parent)
     if tree.GetListOfAliases():
@@ -126,7 +127,7 @@ def treeToAnyTree(tree):
             nodeF = Node(friend.GetName(), parent=parent, ttype="branch")
             for branch in treeF.GetListOfBranches():
                 __processAnyTreeBranch(branch, nodeF)
-    tree.anyTree=parent
+    tree.anyTree = parent
     return parent
 
 
@@ -148,15 +149,15 @@ def findSelectedBranch(anyTree, regexp, **findOption):
         >>> print(findSelectedBranch(branchTree, "MIP.*Warning"))
         ==> (Node('/MIPattachSlopeA_Warning'), Node('/MIPattachSlopeC_Warning'), Node('/MIPattachSlope_comb2_Warning'), Node('/MIPquality_Warning'))
     """
-    options={
-        "inPath":1,
-        "inName":1
+    options = {
+        "inPath": 1,
+        "inName": 1
     }
     options.update(findOption)
-    array=[]
-    if options["inPath"]>0:
+    array = []
+    if options["inPath"] > 0:
         array += findall(anyTree, filter_=lambda nodeF: re.match(regexp, str(nodeF.path)), **findOption)
-    if options["inName"]>0:
+    if options["inName"] > 0:
         array += findall(anyTree, filter_=lambda nodeF: re.match(regexp, str(nodeF.name)), **findOption)
     return array
 
@@ -175,17 +176,17 @@ def findSelectedBranches(anyTree, include, exclude, **findOption):
         >>> Search 1: ['LHC15o_pass1.hnormChi2ITSMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2ITSMult_Tgl_qPtDist/meanG']
     """
     if isinstance(anyTree, ROOT.TTree):
-        anyTree=treeToAnyTree(anyTree)
-    options={}
+        anyTree = treeToAnyTree(anyTree)
+    options = {}
     options.update(findOption)
     variablesTree = []
     for selection in include:
         for var in findall(anyTree, filter_=lambda node: re.match(selection, str(node.leaves[-1]))):
-            path=str(var.leaves[-1]).split("'")[1].replace("//","")
+            path = str(var.leaves[-1]).split("'")[1].replace("//", "")
             isOK = 1
             if exclude:
                 for varE in exclude:
-                    if re.match(varE,path):
+                    if re.match(varE, path):
                         isOK = 0
                         break
             if isOK > 0:
@@ -202,13 +203,14 @@ def makeAliasAnyTree(key, aliases, parent=None):
     :param aliases:      - alias dictionary
     :return:               anytree object
     """
-    if (parent == None):
+    if parent is None:
         parent = Node(key)
     theContent = pyparsing.Word(pyparsing.alphanums + ".+-=_><") | pyparsing.Suppress(',') | pyparsing.Suppress('||') | pyparsing.Suppress('&&') | pyparsing.Suppress('!')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString("(" + aliases[key] + ")")[0]
     for subExpression in res:
-        if len(subExpression) == 0: continue
+        if len(subExpression) == 0:
+            continue
         for a in subExpression:
             if a in aliases:
                 newNode = Node(a, parent=parent, content=aliases[a])
@@ -241,10 +243,14 @@ def getTreeInfo(tree):
     """
     treeInfo = {'aliases': aliasToDictionary(tree)}
     friends = treeInfo['friends'] = {}
-    for a in tree.GetListOfFriends(): friends[a.GetName()] = a.GetTitle()
+    for a in tree.GetListOfFriends():
+        friends[a.GetName()] = a.GetTitle()
     metaTable = treeInfo['metaTable'] = {}
-    if ROOT.TStatToolkit.GetMetadata(tree):
-        table = ROOT.TStatToolkit.GetMetadata(tree)
+#    if ROOT.TStatToolkit.GetMetadata(tree):
+#        table = ROOT.TStatToolkit.GetMetadata(tree)
+#        for a in table: metaTable[a.GetName()] = a.GetTitle()
+    if Getmetadata(tree):
+        table = Getmetadata(tree)
         for a in table: metaTable[a.GetName()] = a.GetTitle()
     return treeInfo
 
@@ -284,7 +290,8 @@ def parseTreeVariables(expression, counts=None, verbose=0):
         ==>
         {'sin': 1, 'x': 4, 'x1': 1, 'x2': 1, 'y': 1}
     """
-    if verbose: logging.info("expression", expression)
+    if verbose:
+        logging.info("expression", expression)
     if counts is None:
         counts = dict()
     varList = []
@@ -391,12 +398,12 @@ def tree2Panda(tree, include, selection, **kwargs):
         * column mask
     :return:                panda data frame
     """
-    options={
-        "exclude":[],
-        "firstEntry":0,
-        "nEntries":100000000,
-        "columnMask": [[".fX$","_X"], [".fY$","_y"], [".fElements", ""]],
-        "verbose":0
+    options = {
+        "exclude": [],
+        "firstEntry": 0,
+        "nEntries": 100000000,
+        "columnMask": [[".fX$", "_X"], [".fY$", "_y"], [".fElements", ""]],
+        "verbose": 0
     }
     options.update(kwargs)
     anyTree = treeToAnyTree(tree)  # expand tree/aliases/variables
@@ -404,15 +411,15 @@ def tree2Panda(tree, include, selection, **kwargs):
     variables = ""
 
     for var in variablesTree:
-        #if var.length<2: continue
-        var=var.replace("/",".")
+        # if var.length<2: continue
+        var = var.replace("/", ".")
         variables += var + ":"
     variables = variables[0:-1]
 
     entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
     columns = variables.split(":")
     for i, column in enumerate(columns):
-        columns[i]=column.replace(".", "_")
+        columns[i] = column.replace(".", "_")
     # replace column names
     #    1.) pandas does not allow dots in names
     #    2.) user can specified own column mask
@@ -431,3 +438,69 @@ def tree2Panda(tree, include, selection, **kwargs):
         for key in metaData:
             df.meta.metaData[key.GetName()] = key.GetTitle()
     return df
+
+
+def Addmetadata(tree, varTagName, varTagValue):
+    if not tree:
+        return None
+    metaData = tree.GetUserInfo().FindObject("metaTable")
+    if not metaData:
+        metaData = ROOT.THashList()
+        metaData.SetName("metaTable")
+        tree.GetUserInfo().AddLast(metaData)
+    if not (varTagName is None or varTagValue is None):
+        named = Getmetadata(tree, varTagName, None, True)
+        if not named:
+            metaData.AddLast(ROOT.TNamed(varTagName, varTagValue))
+        else:
+            named.SetTitle(varTagValue)
+    return metaData
+
+
+def Getmetadata(tree, *args):
+    '''
+        Usage:
+            Getmetadata(TTree)
+            Getmetadata(TTree, varTagName)
+            Getmetadata(TTree, varTagName, prefix, fullMatch)
+    '''
+    if not tree:
+        return None
+    treeMeta = tree
+    metaData = treeMeta.GetUserInfo().FindObject("metaTable")
+    if not metaData:
+        metaData = ROOT.THashList()
+        metaData.SetName("metaTable")
+        tree.GetUserInfo().AddLast(metaData)
+        return 0
+    if len(args) == 0:
+        return metaData
+    elif len(args) == 1:
+        prefix = ""
+        fullMatch = False
+    elif len(args) == 3:
+        prefix = args[1]
+        fullMatch = args[2]
+    else:
+        raise TypeError("Invalid number of arguments")
+    named = metaData.FindObject(args[0])
+    if named or fullMatch:
+        return named
+    metaName = varTagName
+    nDots = metaName.count('.')
+    prefix = ""
+    while nDots > 1:
+        fList = tree.GetListOfFriends()
+        if fList:
+            for kf in range(fList.GetEntries()):
+                iName = fList.At(kf).GetName()
+                regFriend = "^" + iName + '.'
+                if re.match(regFriend, metaName):
+                    treeMeta = treeMeta.GetFriend(iName)
+                    re.sub(regFriend, "", metaName)
+            prefix += iName
+        if (nDots == metaName.count('.')):
+            break
+        nDots = metaName.count('.')
+    named = metaData.FindObject(metaName)
+    return named

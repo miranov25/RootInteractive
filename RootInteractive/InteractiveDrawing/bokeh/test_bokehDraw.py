@@ -1,15 +1,16 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
 from ROOT import TFile, TStatToolkit, gSystem, AliTreePlayer
+from RootInteractive.Tools.aliTreePlayer import *
 
-gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+#gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 from bokeh.io import curdoc
 
 curdoc().theme = 'caliber'
 TFile.SetCacheFileDir("../../data/")
 treeQA = AliTreePlayer.LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", "", "")
 treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
-TStatToolkit.AddMetadata(treeQA, "chunkBegin.isTime", "1")
-TStatToolkit.AddMetadata(treeQA, "chunkMedian.isTime", "1")
+Addmetadata(treeQA, "chunkBegin.isTime", "1")
+Addmetadata(treeQA, "chunkMedian.isTime", "1")
 treeQA.SetAlias("meanMIPErr", "resolutionMIP*0.3")
 treeQA.SetAlias("meanMIPeleErr", "resolutionMIPele*0.3")
 treeQA.SetAlias("resolutionMIPErr", "resolutionMIP*0.02")

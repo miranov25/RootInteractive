@@ -16,7 +16,7 @@ class bokehDraw(object):
 
     def __init__(self, source, query, varX, varY, varColor, widgetString, p, **kwargs):
         """
-        :param source:           input data frame
+        :param source:           input data frame (Panda DataFrame or ROOT:TTree)
         :param query:            query string
         :param varX:             X variable name
         :param varY:             : separated list of the Y variables
@@ -110,10 +110,38 @@ class bokehDraw(object):
     def fromArray(cls, dataFrame, query, figureArray, widgetString, **kwargs):
         """
         Constructor of  figure array
-        :param widgetInput:
-        :param dataFrame:
-        :param query:
-        :param figureArray:
+        :param dataFrame:           input data frame (Panda DataFrame or ROOT:TTree)
+        :param query:               query string
+        :param figureArray:         List of list indicates what to plot
+                            Every element of FigureArray is a List of information about different figure. Only last
+                        element may be a dictionary for global option for all figures.
+
+                        If the Figure is a plot, the sublist has three elements: the first element is list of variables
+                        for X axis, the second element is a list of variables for Y axis, the third element is a dictionary
+                        for options of this particular figure. Note that this dictionary overwrites the global options.
+
+                        If the Figure is a table, the sublist has two elements: the first element is the string: "table"
+                        and the second element is a dictionary of which columns are needed to include or exclude.
+                    Example:
+                        figureArray = [
+                            [['A','B'], ['C-A'], {"color": "red", "size": 2, "colorZvar":"C"}],
+                            [['A'], ['C+A', 'C-A']],
+                            [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
+                            [['D'], ['(A+B+C)*D'], {"size": 10}],
+                            ['table', {'include':'.*A.*'}],
+                            {"size":10}
+                         ]
+
+                    Possible figure options:
+                    size:           the size of markers
+                    colorZvar:      Z variable which determines the marker colors for 2D plots. (Overwrites the color option)
+                    color:          the color of markers
+                    marker:         marker type
+
+
+
+
+
         :param kwargs:
         :return:
         """
