@@ -33,6 +33,7 @@ def test_AnyTree():
     info = ROOT.AliExternalInfo()
     info.fVerbose = 0
     tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+    tree.Show(0)
     branchTree = treeToAnyTree(tree)
     print(findSelectedBranch(branchTree, "bz"))
     assert (findSelectedBranch(branchTree, "bz"))
@@ -82,16 +83,30 @@ def test_Parsing():
 def testTree2Panda():
     info = ROOT.AliExternalInfo()
     info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1","QA.ITS")
-    df=tree2Panda(tree,[".*hi2.*"],"run>0")
+    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1", "QA.ITS")
+    df=tree2Panda(tree, [".*hi2.*"], "run>0")
     print(df.head(5))
-    df=tree2Panda(tree,[".*hi2.*"],"run>0",columnMask=[["chi2","Chi2"]])
+    df=tree2Panda(tree, [".*hi2.*"], "run>0", columnMask=[["chi2", "Chi2"]])
     print(df.head(5))
-    df=tree2Panda(tree,[".*hi2.*"],"run>0",exclude=[".*infoTPC.*"],columnMask=[["chi2","XXX"]])
+    df=tree2Panda(tree, [".*hi2.*"], "run>0", exclude=[".*infoTPC.*"], columnMask=[["chi2", "XXX"]])
     print(df.head(5))
 
+def testLoadTree():
+    tree,treeList, fileList=LoadTrees("cat ../tutorial/bokehDraw/performance.list", "identFit", "xxx", ".*", 0)
+    tree.SetAlias("norm", "param.fElements[0]")
+    tree.SetAlias("slope", "param.fElements[1]")
+    tree.SetAlias("isMax", "name.String().Contains(\"PionMax\")==0")
+    tree.SetAlias("isTot", "name.String().Contains(\"PionTot\")==0&&name.String().Contains(\"PionMaxTot\")==0")
+    tree.SetAlias("isMaxTot", "name.String().Contains(\"PionMaxTot\")>0")
+    tree.SetAlias("P0", "name.String().Contains(\"P0\")>0")
+    tree.SetAlias("P1", "name.String().Contains(\"P1\")>0")
+    tree.SetAlias("PA", "name.String().Contains(\"PA\")>0")
+    tree.SetAlias("MB", "name.String().Contains(\"MB\")>0")
+#    logging.info(getTreeInfo(tree))
 
-# test_AnyTree()
-# test_Aliases()
-# test_Parsing()
-testTree2Panda()
+
+#test_AnyTree()
+test_Aliases()
+#test_Parsing()
+#testTree2Panda()
+#testLoadTree()

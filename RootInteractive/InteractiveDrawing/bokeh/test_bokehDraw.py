@@ -7,7 +7,7 @@ from bokeh.io import curdoc
 
 curdoc().theme = 'caliber'
 TFile.SetCacheFileDir("../../data/")
-treeQA = AliTreePlayer.LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", "", "")
+treeQA, treeList, fileList = LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", 0)
 treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
 AddMetadata(treeQA, "chunkBegin.isTime", "1")
 AddMetadata(treeQA, "chunkMedian.isTime", "1")

@@ -516,9 +516,11 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
     treeBase = ROOT.TTree()
     tagValue = {}
     nSelected = 0
+    treeBaseList = []
+    fileList = []
     for iFile in range(nFiles):
         tagValue.clear()
-        tagValue["Title"]=""
+        tagValue["Title"] = ""
         #      read metadata #tag:value information - signed by # at the beginning of the line
         for jFile in range(iFile, nFiles):                                # get rid of the loop using continue
             name = residualMapList.At(jFile).GetName()
@@ -541,12 +543,13 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
                     isSelected = True
         if not isSelected:
             continue
-#        logging.info("<LoadTrees>: Load file\t%s", fileName)
+        logging.info("<LoadTrees>: Load file\t%s", fileName)
         description = ""
         option=""
         if "http" in fileName:
             option="cacheread"
         finput = ROOT.TFile.Open(fileName, option)
+        fileList.append(finput)
         if finput is None:
             raise NameError("<MakeResidualDistortionReport>: Invalid file name {}".format(fileName))
 #            logging.error("<MakeResidualDistortionReport>: Invalid file name %s", fileName)
@@ -559,9 +562,12 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
             if notReg.Match(keys.At(iKey).GetName()) is not 0:
                 continue      # is rejected
             tree = finput.Get(keys.At(iKey).GetName())       # better to use dynamic cast
+            treeBaseList.append(tree)
             if treeBase.GetEntries() is 0:
                 finput2 = ROOT.TFile.Open(fileName, option)
+                fileList.append(finput2)
                 treeBase = finput2.Get(keys.At(iKey).GetName())
+                treeBaseList.append(treeBase)
             fileTitle=tagValue["Title"]
             if len(fileTitle):
                 treeBase.AddFriend(tree, "{}.{}".format(fileTitle, keys.At(iKey).GetName()))
@@ -571,9 +577,9 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
             entriesB = treeBase.GetEntries()
             if entriesB == entriesF:
                 if (verbose>0):
-                    logging.info("InitMapTree: %s\t%s.%s:\t%d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF)
+                    logging.info("InitMapTree: %s %s.%s: %d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF)
             else:
                 raise ValueError("InitMapTree: {} {} . {}:  {}  {}".format(treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF))
 #                logging.error("InitMapTree", "%s\t%s.%s:\t%d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF)
-    return treeBase
+    return treeBase, treeBaseList, fileList
 
