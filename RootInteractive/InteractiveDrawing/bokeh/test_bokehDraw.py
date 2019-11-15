@@ -1,5 +1,5 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
-from ROOT import TFile, TStatToolkit, gSystem, AliTreePlayer
+from ROOT import TFile, gSystem
 from RootInteractive.Tools.aliTreePlayer import *
 
 #gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")

@@ -1,12 +1,11 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
-from ROOT import TFile, TStatToolkit, gSystem, AliTreePlayer
+from ROOT import TFile, gSystem
 from bokeh.io import curdoc
 
 output_file("test_bokehDrawSA.html")
 # import logging
 
-gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
 TFile.SetCacheFileDir("../../data/")
 tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", 0)
