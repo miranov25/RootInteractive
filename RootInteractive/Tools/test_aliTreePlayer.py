@@ -1,4 +1,3 @@
-
 import ROOT
 import logging
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
@@ -6,13 +5,15 @@ from RootInteractive.Tools.aliTreePlayer import *
 ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 from bokeh.io import curdoc
 
-def test_AliExternalInfo():
-    """ test if the tree could be read """
-    info = ROOT.AliExternalInfo()
-    info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
-    # tree.Show(0)
-    assert tree.GetEntries() > 0
+
+#   This test is useless since AliExternalInfo is no longer used in test...
+#def test_AliExternalInfo():
+#    """ test if the tree could be read """
+#    info = ROOT.AliExternalInfo()
+#    info.fVerbose = 0
+#    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+#    # tree.Show(0)
+#    assert tree.GetEntries() > 0
 
 
 def test_TTreeSredirectorWrite():
@@ -30,48 +31,52 @@ def test_TTreeSredirectorWrite():
 
 
 def test_AnyTree():
-    info = ROOT.AliExternalInfo()
-    info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+#    info = ROOT.AliExternalInfo()
+#    info.fVerbose = 0
+#    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+    tree, dummy = makeABCD(10000)
+    tree.Show(0)
     branchTree = treeToAnyTree(tree)
-    print(findSelectedBranch(branchTree, "bz"))
-    assert (findSelectedBranch(branchTree, "bz"))
-    print(findSelectedBranch(branchTree, "MIP.*arning$"))
-    assert (findSelectedBranch(branchTree, "MIP.*arning$"))
+    print(findSelectedBranch(branchTree, "bigA"))
+    assert (findSelectedBranch(branchTree, "bigA"))
+    print(findSelectedBranch(branchTree, "smallA"))
+    assert (findSelectedBranch(branchTree, "smallA"))
 
 
 def test_Aliases():
-    info = ROOT.AliExternalInfo()
-    info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+#    info = ROOT.AliExternalInfo()
+#    info.fVerbose = 0
+#    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+    tree, dummy = makeABCD(10000)
     aliases = aliasToDictionary(tree)
-    base = makeAliasAnyTree("global_Warning", aliases)
+    base = makeAliasAnyTree("bigA", aliases)
     print(RenderTree(base))
-    print(findSelectedBranch(base, ".*PID.*"))
+    print(findSelectedBranch(base, "bigA"))
 
 
 def test_TreeParsing():
-    info = ROOT.AliExternalInfo()
-    info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
-    selection = "meanMIP>0&resolutionMIP>0&time>0"
-    varDraw = "meanMIP:meanMIPele:resolutionMIP:xxx"
-    tooltips = [("MIP", "(@meanMIP)"), ("Electron", "@meanMIPele"), ("Global status", "(@global_Outlier,@global_Warning)"),
-                ("MIP status(Warning,Outlier,Acc.)", "@MIPquality_Warning,@MIPquality_Outlier,@MIPquality_PhysAcc")]
-    widgets = "tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-    widgets += "tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-    widgets += "tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
+#    info = ROOT.AliExternalInfo()
+#    info.fVerbose = 0
+#    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1")
+    tree, dummy = makeABCD(10000)
+    selection = "B>0"
+    varDraw = "A:B:C"
+    tooltips = [("A", "(@A)"), ("B", "@B"), ("C", "(@C)"), ("D", "@D")]
+    widgets = "tab.sliders(slider.A(0,1,0.1,0.2,0.8),slider.B(0,1,0.1,0.2,0.8), slider.C(0,1,0.1,0.2,0.8)),"
+#    widgets += "tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
+#    widgets += "tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
     toRemove = [r"^tab\..*"]
     toReplace = ["^slider.", "^checkbox."]
     logging.info(getAndTestVariableList([selection, varDraw, widgets, "xxx"], toRemove, toReplace, tree))
 
 
 def test_Parsing():
-    query = "tailF>1"
-    variables = "pileUp:tailF:commonF:typeF:fraction:norm:slope:isMax:MB:P0:P1:PA"
-    tooltips = [('Is maximum', '@isMax'), ("Pad type", "@typeF")]
-    slider = "accordion.first(slider.P0(0,1,0.5,0,1),slider.commonF(0,15,5,0,5)),accordion.second(dropdown.MB(0,0.5,1)),accordion.second(checkbox.isMax(False)),slider.typeF(0,4,1,0)"
-    varSource = ["x", "varX", "varY", slider, query]
+    query = "C>0.31"
+    variables = "A:B:C"
+    tooltips = [("A", "(@A)"), ("B", "@B"), ("C", "(@C)"), ("D", "@D")]
+    slider = "tab.sliders(slider.A(0,1,0.1,0.2,0.8),slider.B(0,1,0.1,0.2,0.8), slider.C(0,1,0.1,0.2,0.8)),"
+#    slider = "accordion.first(slider.P0(0,1,0.5,0,1),slider.commonF(0,15,5,0,5)),accordion.second(dropdown.MB(0,0.5,1)),accordion.second(checkbox.isMax(False)),slider.typeF(0,4,1,0)"
+    varSource = ["A", "B", "C", slider, query]
     toRemove = [r"^tab\..*", r"^accordion\..*", "False", "True"]
     toReplace = ["^slider.", "^checkbox.", "^dropdown."]
     # getAndTestVariableList(varSource,toRemove,toReplace,variables,slider)
@@ -80,18 +85,33 @@ def test_Parsing():
         parseTreeVariables(expression, counts)
 
 def testTree2Panda():
-    info = ROOT.AliExternalInfo()
-    info.fVerbose = 0
-    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1","QA.ITS")
-    df=tree2Panda(tree,[".*hi2.*"],"run>0")
+#    info = ROOT.AliExternalInfo()
+#    info.fVerbose = 0
+#    tree = info.GetTree("QA.TPC", "LHC15o", "cpass1_pass1", "QA.ITS")
+    tree, dummy = makeABCD(10000)
+    df=tree2Panda(tree, ["A", "B"], "D>0")
     print(df.head(5))
-    df=tree2Panda(tree,[".*hi2.*"],"run>0",columnMask=[["chi2","Chi2"]])
+    df=tree2Panda(tree, ["A", "B", "C"], "D>0", columnMask=[["A", "a"]])
     print(df.head(5))
-    df=tree2Panda(tree,[".*hi2.*"],"run>0",exclude=[".*infoTPC.*"],columnMask=[["chi2","XXX"]])
+    df=tree2Panda(tree, ["A", "B"], "D>0", exclude=["C"], columnMask=[["B", "b"]])
     print(df.head(5))
 
+def testLoadTree():
+    tree, treeList, fileList=LoadTrees("cat ../tutorial/bokehDraw/performance.list", "identFit", "xxx", ".*", 0)
+    tree.SetAlias("norm", "param.fElements[0]")
+    tree.SetAlias("slope", "param.fElements[1]")
+    tree.SetAlias("isMax", "name.String().Contains(\"PionMax\")==0")
+    tree.SetAlias("isTot", "name.String().Contains(\"PionTot\")==0&&name.String().Contains(\"PionMaxTot\")==0")
+    tree.SetAlias("isMaxTot", "name.String().Contains(\"PionMaxTot\")>0")
+    tree.SetAlias("P0", "name.String().Contains(\"P0\")>0")
+    tree.SetAlias("P1", "name.String().Contains(\"P1\")>0")
+    tree.SetAlias("PA", "name.String().Contains(\"PA\")>0")
+    tree.SetAlias("MB", "name.String().Contains(\"MB\")>0")
+#    logging.info(getTreeInfo(tree))
 
-# test_AnyTree()
-# test_Aliases()
-# test_Parsing()
+
+test_AnyTree()
+test_Aliases()
+test_Parsing()
 testTree2Panda()
+testLoadTree()

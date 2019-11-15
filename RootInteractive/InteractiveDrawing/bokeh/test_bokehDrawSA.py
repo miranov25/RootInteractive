@@ -1,18 +1,18 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
-from ROOT import TFile, TStatToolkit, gSystem, AliTreePlayer
+from RootInteractive.Tools.aliTreePlayer import *
+from ROOT import TFile, gSystem
 from bokeh.io import curdoc
 
 output_file("test_bokehDrawSA.html")
 # import logging
 
-gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 
 TFile.SetCacheFileDir("../../data/")
-tree = AliTreePlayer.LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", "", "")
-TStatToolkit.AddMetadata(tree, "A.AxisTitle","A (cm)")
-TStatToolkit.AddMetadata(tree, "B.AxisTitle","B (cm/s)")
-TStatToolkit.AddMetadata(tree, "C.AxisTitle","B (s)")
-TStatToolkit.AddMetadata(tree, "D.AxisTitle","D (a.u.)")
+tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", 0)
+AddMetadata(tree, "A.AxisTitle","A (cm)")
+AddMetadata(tree, "B.AxisTitle","B (cm/s)")
+AddMetadata(tree, "C.AxisTitle","B (s)")
+AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
 df = pd.DataFrame(np.random.random_sample(size=(2000, 6)), columns=list('ABCDEF'))
 initMetadata(df)

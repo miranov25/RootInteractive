@@ -1,4 +1,5 @@
 import pandas as pd
+from root_pandas import *
 import numpy as np
 import urllib.request as urlopen
 import pyparsing
@@ -7,6 +8,7 @@ from .pandaTools import *
 
 try:
     import ROOT
+
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 except ImportError:
     pass
@@ -90,7 +92,8 @@ def aliasToDictionary(tree):
     """
     aliases = {}
     if tree.GetListOfAliases() is not None:
-        for a in tree.GetListOfAliases(): aliases[a.GetName()] = a.GetTitle()
+        for a in tree.GetListOfAliases():
+            aliases[a.GetName()] = a.GetTitle()
     return aliases
 
 
@@ -161,6 +164,7 @@ def findSelectedBranch(anyTree, regexp, **findOption):
         array += findall(anyTree, filter_=lambda nodeF: re.match(regexp, str(nodeF.name)), **findOption)
     return array
 
+
 def findSelectedBranches(anyTree, include, exclude, **findOption):
     """
     :param anyTree:  anyTree or TTree
@@ -205,7 +209,8 @@ def makeAliasAnyTree(key, aliases, parent=None):
     """
     if parent is None:
         parent = Node(key)
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-=_><") | pyparsing.Suppress(',') | pyparsing.Suppress('||') | pyparsing.Suppress('&&') | pyparsing.Suppress('!')
+    theContent = pyparsing.Word(pyparsing.alphanums + ".+-=_><") | pyparsing.Suppress(',') | pyparsing.Suppress(
+        '||') | pyparsing.Suppress('&&') | pyparsing.Suppress('!')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     res = parents.parseString("(" + aliases[key] + ")")[0]
     for subExpression in res:
@@ -246,11 +251,11 @@ def getTreeInfo(tree):
     for a in tree.GetListOfFriends():
         friends[a.GetName()] = a.GetTitle()
     metaTable = treeInfo['metaTable'] = {}
-#    if ROOT.TStatToolkit.GetMetadata(tree):
-#        table = ROOT.TStatToolkit.GetMetadata(tree)
-#        for a in table: metaTable[a.GetName()] = a.GetTitle()
-    if Getmetadata(tree):
-        table = Getmetadata(tree)
+    #    if ROOT.TStatToolkit.GetMetadata(tree):
+    #        table = ROOT.TStatToolkit.GetMetadata(tree)
+    #        for a in table: metaTable[a.GetName()] = a.GetTitle()
+    if GetMetadata(tree):
+        table = GetMetadata(tree)
         for a in table: metaTable[a.GetName()] = a.GetTitle()
     return treeInfo
 
@@ -295,8 +300,10 @@ def parseTreeVariables(expression, counts=None, verbose=0):
     if counts is None:
         counts = dict()
     varList = []
-    theContent = pyparsing.Word(pyparsing.alphanums + "._") | pyparsing.Suppress(',') | pyparsing.Suppress('|') | pyparsing.Suppress('&') | pyparsing.Suppress('!') \
-                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress('-') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
+    theContent = pyparsing.Word(pyparsing.alphanums + "._") | pyparsing.Suppress(',') | pyparsing.Suppress(
+        '|') | pyparsing.Suppress('&') | pyparsing.Suppress('!') \
+                 | pyparsing.Suppress('>') | pyparsing.Suppress('=') | pyparsing.Suppress('+') | pyparsing.Suppress(
+        '-') | pyparsing.Suppress('<') | pyparsing.Suppress('*') \
                  | pyparsing.Suppress('*') | pyparsing.Suppress(':')
     parents = pyparsing.nestedExpr('(', ')', content=theContent)
     try:
@@ -440,7 +447,7 @@ def tree2Panda(tree, include, selection, **kwargs):
     return df
 
 
-def Addmetadata(tree, varTagName, varTagValue):
+def AddMetadata(tree, varTagName, varTagValue):
     if not tree:
         return None
     metaData = tree.GetUserInfo().FindObject("metaTable")
@@ -449,7 +456,7 @@ def Addmetadata(tree, varTagName, varTagValue):
         metaData.SetName("metaTable")
         tree.GetUserInfo().AddLast(metaData)
     if not (varTagName is None or varTagValue is None):
-        named = Getmetadata(tree, varTagName, None, True)
+        named = GetMetadata(tree, varTagName, None, True)
         if not named:
             metaData.AddLast(ROOT.TNamed(varTagName, varTagValue))
         else:
@@ -457,12 +464,12 @@ def Addmetadata(tree, varTagName, varTagValue):
     return metaData
 
 
-def Getmetadata(tree, *args):
+def GetMetadata(tree, *args):
     '''
         Usage:
-            Getmetadata(TTree)
-            Getmetadata(TTree, varTagName)
-            Getmetadata(TTree, varTagName, prefix, fullMatch)
+            GetMetadata(TTree)
+            GetMetadata(TTree, varTagName)
+            GetMetadata(TTree, varTagName, prefix, fullMatch)
     '''
     if not tree:
         return None
@@ -504,3 +511,93 @@ def Getmetadata(tree, *args):
         nDots = metaName.count('.')
     named = metaData.FindObject(metaName)
     return named
+
+
+def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
+    regExp = ROOT.TPRegexp(chRegExp)
+    notReg = ROOT.TPRegexp(chNotReg)
+    regExpArray = inputFileSelection.split(':')
+    residualMapList = ROOT.gSystem.GetFromPipe(inputDataList).Tokenize('\n')
+    nFiles = residualMapList.GetEntries()
+    treeBase = ROOT.TTree()
+    tagValue = {}
+    nSelected = 0
+    treeBaseList = []
+    fileList = []
+    for iFile in range(nFiles):
+        tagValue.clear()
+        tagValue["Title"] = ""
+        #      read metadata #tag:value information - signed by # at the beginning of the line
+        for jFile in range(iFile, nFiles):  # get rid of the loop using continue
+            name = residualMapList.At(jFile).GetName()
+            if name[0] is '#':
+                first = name.find(":")
+                tag = name[1:name.find(":")]
+                value = name[name.find(":") + 1:len(name)]
+                tagValue[tag] = value
+            else:
+                iFile = jFile
+                break
+        fileName = residualMapList.At(iFile).GetName()
+        isSelected = True
+        #         check if the file was selected
+        if len(regExpArray) > 0:
+            isSelected = False
+            for entry in range(len(regExpArray)):
+                reg = ROOT.TPRegexp(regExpArray[entry])
+                if reg.Match(fileName):
+                    isSelected = True
+        if not isSelected:
+            continue
+        logging.info("<LoadTrees>: Load file\t%s", fileName)
+        description = ""
+        option = ""
+        if "http" in fileName:
+            option = "cacheread"
+        finput = ROOT.TFile.Open(fileName, option)
+        fileList.append(finput)
+        if finput is None:
+            raise NameError("<MakeResidualDistortionReport>: Invalid file name {}".format(fileName))
+            #            logging.error("<MakeResidualDistortionReport>: Invalid file name %s", fileName)
+            continue
+        keys = finput.GetListOfKeys()
+        isLegend = False
+        for iKey in range(keys.GetEntries()):
+            if regExp.Match(keys.At(iKey).GetName()) is 0:
+                continue  # is selected
+            if notReg.Match(keys.At(iKey).GetName()) is not 0:
+                continue  # is rejected
+            tree = finput.Get(keys.At(iKey).GetName())  # better to use dynamic cast
+            treeBaseList.append(tree)
+            if treeBase.GetEntries() is 0:
+                finput2 = ROOT.TFile.Open(fileName, option)
+                fileList.append(finput2)
+                treeBase = finput2.Get(keys.At(iKey).GetName())
+                treeBaseList.append(treeBase)
+            fileTitle = tagValue["Title"]
+            if len(fileTitle):
+                treeBase.AddFriend(tree, "{}.{}".format(fileTitle, keys.At(iKey).GetName()))
+            else:
+                treeBase.AddFriend(tree, "{}".format(keys.At(iKey).GetName()))
+            entriesF = tree.GetEntries()
+            entriesB = treeBase.GetEntries()
+            if entriesB == entriesF:
+                if (verbose > 0):
+                    logging.info("InitMapTree: %s %s.%s: %d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(),
+                                 entriesB, entriesF)
+            else:
+                raise ValueError(
+                    "InitMapTree: {} {} . {}:  {}  {}".format(treeBase.GetName(), fileName, keys.At(iKey).GetName(),
+                                                              entriesB, entriesF))
+    #                logging.error("InitMapTree", "%s\t%s.%s:\t%d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF)
+    return treeBase, treeBaseList, fileList
+
+
+def makeABCD(nPoints=10000):
+    df = pd.DataFrame(np.random.random_sample(size=(nPoints, 4)), columns=list('ABCD'))
+    df.to_root('ABCD.root', "ABCD")
+    f = ROOT.TFile("ABCD.root")
+    tree = f.Get("ABCD")
+    tree.SetAlias("bigA","A>0.5")
+    tree.SetAlias("smallA","A<0.5")
+    return tree, f
