@@ -345,6 +345,61 @@ def drawHistogramExpression(expression, histogramArray, figureOption, graphOptio
     return p, d
 
 
+def makePDFMaps(histo, projectionDimension,  slices, **kwargs):
+    """
+    parameters:
+        input histogram, or list of histograms
+            exception in case  of different dimensionality of histograms
+        dimension of interest
+            usually we are projecting to dimension 0
+        list of slices description per dimension
+            delta:step:begin:end
+            in bins or as float
+        Return value, Output
+            Panda data frame with  statistic per slice described by kwargs option + bin information
+                bin  information as in the C++ implemntation
+                *binNumber, binCenter, binMean
+
+    options/kwargs  - statistics to export as supported in the scikit
+        mean, rms, entries,median  - should be always
+        trimmed mean - array of probabilities to provide  - optional
+        quantiles  - array of probabilities - optional
+        fits -user defined
+            e.g gaus, exp, pol ....
+            Tensor flow or pytorch
+    """
+    histogramMap={}
+    sliceList=[]
+    for iSlice in slices:
+        localSlice = eval("np.index_exp[" + iSlice + "]")
+        sliceList.append(localSlice)
+    npSlice = tuple(sliceList)
+    for histogram, projectionIndex in zip(histo, projectionDimension):
+        histogramLocal = {}
+        histogramLocal["axes"]=[]
+        histogramLocal["varNames"]=[]
+        hLocal = histogram.H[npSlice]
+        histogramLocal["axes"].append(histogram.axes[projectionIndex])
+        histogramLocal["varNames"].append(histogram.varNames[projectionIndex])
+        axisList = [index for index,i in enumerate(histogram.axes)]
+        axisList.remove(projectionIndex)
+        hLocal = np.sum(hLocal, axis=tuple(axisList.remove(projectionIndex)))
+        histogramLocal["H"]=hLocal
+        histogramLocal["name"] =histogram.name
+        histogramMap[histogramLocal["name"]] = histogramLocal
+    df = pd.DataFrame(histogramMap)
+    return df
+
+
+
+
+
+
+
+
+
+
+
 def compileProjection(projection, histogramList):
     """
     compile projection string to python list
