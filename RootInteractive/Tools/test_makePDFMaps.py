@@ -1,4 +1,4 @@
-from makePDFMaps import *
+from RootInteractive.Tools.makePDFMaps import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 
 
