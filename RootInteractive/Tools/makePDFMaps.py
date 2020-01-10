@@ -1,7 +1,11 @@
 from RootInteractive.Tools.histoNDTools import *
-import time
 
-def makePdfMaps(histo, slices, dimI):
+def makePdfMaps(histo, slices, dimI, **kwargs):
+    options = {
+        'quantiles': []
+    }
+    options.update(kwargs)
+
     binList = []                        # Prepare list of bin numbers which has same dimensions with original histogram
     for  axis in histo["axes"]:            #        so same slicing can be applied on the bin list
         binList.append(np.arange(len(axis) - 1))
@@ -9,8 +13,6 @@ def makePdfMaps(histo, slices, dimI):
     widthList = [item[3] for item in slices]    # extract the list of widths from slicing tuple
     localHist = histo["H"].copy()
     localAxes = histo["axes"].copy()
-    zeit=time.time()
-    print(time.time()-zeit)
     for iDim, w in enumerate(widthList):                        #  get the original histogram and shifted histograms by +/- i,
         L = localHist.shape[iDim]                               #  summing all of these will end a merged version of histograms
                                                                 #
@@ -31,7 +33,6 @@ def makePdfMaps(histo, slices, dimI):
         binList[iDim] = binList[iDim][slice(w, L - w)]          # trim the edges of list of bins
         localAxes[iDim] = localAxes[iDim][slice(w, L - w + 1)]  # trim the axes 
     
-    print(time.time()-zeit)
     CenterList = []                                             # initialize list of bin Centers
     for axis in localAxes:
         axisCenter = axis[:-1] + (axis[1] - axis[0]) / 2
@@ -56,7 +57,6 @@ def makePdfMaps(histo, slices, dimI):
         localNumbers.append(iBin[npSlice[i]])
         localCenter.append(iCenter[npSlice[i]])
 
-    print(time.time()-zeit)
     centerI = localCenter.pop(dimI)             # remove the dimension of interest from bin centers and bin numbers
     localNumbers.pop(dimI)                      # the bin centers for dimension of interest is stored at centerI to calculate mean etc.
 
@@ -70,7 +70,6 @@ def makePdfMaps(histo, slices, dimI):
     for el in mesharrayCenter:                                              #
         binCenters.append(el.flatten())                                     # 
                                                                              
-    print(time.time()-zeit)
     newHistogram = np.rollaxis(histogram, dimI, 0)      # move dimension of interest to the dimension-0
 
     histoList = []
@@ -81,18 +80,26 @@ def makePdfMaps(histo, slices, dimI):
     means = []
     rms = []
     medians = []
-    print(time.time()-zeit)
+    quantiles = []
+    for iQuantile in options['quantiles']:
+        quantiles.append([])
     for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rms and median for each histogram
         means.append(np.average(centerI, weights=iHisto))
         rms.append(np.sqrt(np.average(centerI ** 2, weights=iHisto)))
     #        medians.append(np.median(np.repeat(centerI, iHisto.astype(int))))   # repeat the values at axis propotional to bin values and find madian of outcome array
-        halfSum =  iHisto.sum()/2
+        halfSum = iHisto.sum()/2
         for iBin in range(len(centerI)):
-            if iHisto[:iBin].sum() < halfSum and iHisto[:iBin+1].sum() >= halfSum:
+            if iHisto[:iBin].sum() < halfSum <= iHisto[:iBin + 1].sum():
                 medians.append(centerI[iBin])
-                continue
+                break
+        for i, iQuantile in enumerate(options['quantiles']):
+            quantileLimit =iHisto.sum()*iQuantile/100
+            for iBin in range(len(centerI)):
+                if iHisto[:iBin].sum() < quantileLimit <= iHisto[:iBin + 1].sum():
+                    quantiles[i].append(centerI[iBin])
+                    break
 
-    print(time.time()-zeit)
+
 
     histogramMap = {}
     varNames = histo['varNames']
@@ -108,6 +115,8 @@ def makePdfMaps(histo, slices, dimI):
     histogramMap["rms"] = rms
     histogramMap["medians"] = medians
     histogramMap["entries"] = entries
+    for i,iQuantile in enumerate(options['quantiles']):
+        histogramMap["quantile_"+ str(iQuantile)] = quantiles[i]
 
     out = pd.DataFrame(histogramMap)
 
