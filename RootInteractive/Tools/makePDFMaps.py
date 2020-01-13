@@ -34,9 +34,11 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
         localAxes[iDim] = localAxes[iDim][slice(w, L - w + 1)]  # trim the axes 
     
     CenterList = []                                             # initialize list of bin Centers
+    binEdgeList = []                                            # initialize list of bin Edges
     for axis in localAxes:
         axisCenter = axis[:-1] + (axis[1] - axis[0]) / 2
         CenterList.append(axisCenter)
+        binEdgeList.append(axis[1:])
 
     newSliceList = []
     for iDim, iSlice in enumerate(slices):                                          # rearranging slice according to width
@@ -52,13 +54,16 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     histogram = localHist[npSlice]                  # apply the slicing 
     localCenter = []
     localNumbers = []
+    localBinEdge = []
 
-    for i, (iBin, iCenter) in enumerate(zip(binList, CenterList)):      # apply the slicing to binNumbers and binCenters
+    for i, (iBin, iCenter, iEdge) in enumerate(zip(binList, CenterList, binEdgeList)):      # apply the slicing to binNumbers, binEdges and binCenters
         localNumbers.append(iBin[npSlice[i]])
         localCenter.append(iCenter[npSlice[i]])
+        localBinEdge.append(iEdge[npSlice[i]])
 
     centerI = localCenter.pop(dimI)             # remove the dimension of interest from bin centers and bin numbers
     localNumbers.pop(dimI)                      # the bin centers for dimension of interest is stored at centerI to calculate mean etc.
+    edgeI = localBinEdge.pop(dimI)
 
     mesharrayNumbers = np.array(np.meshgrid(*localNumbers, indexing='ij'))  # 
     binNumbers = []                                                         # 
@@ -86,17 +91,19 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rms and median for each histogram
         means.append(np.average(centerI, weights=iHisto))
         rms.append(np.sqrt(np.average(centerI ** 2, weights=iHisto)))
-    #        medians.append(np.median(np.repeat(centerI, iHisto.astype(int))))   # repeat the values at axis propotional to bin values and find madian of outcome array
+        
         halfSum = iHisto.sum()/2
         for iBin in range(len(centerI)):
             if iHisto[:iBin].sum() < halfSum <= iHisto[:iBin + 1].sum():
-                medians.append(centerI[iBin])
+                medians.append((halfSum - iHisto[:iBin].sum())*(edgeI[iBin+1]-edgeI[iBin])/(iHisto[:iBin + 1].sum()-iHisto[:iBin ].sum()) + edgeI[iBin])
                 break
+                
         for i, iQuantile in enumerate(options['quantiles']):
             quantileLimit =iHisto.sum()*iQuantile/100
             for iBin in range(len(centerI)):
                 if iHisto[:iBin].sum() < quantileLimit <= iHisto[:iBin + 1].sum():
-                    quantiles[i].append(centerI[iBin])
+                    quantiles[i].append((quantileLimit - iHisto[:iBin].sum())*(edgeI[iBin+1]-edgeI[iBin])/(iHisto[:iBin + 1].sum()-iHisto[:iBin ].sum()) + edgeI[iBin])
+                    #quantiles[i].append(centerI[iBin])
                     break
 
 
