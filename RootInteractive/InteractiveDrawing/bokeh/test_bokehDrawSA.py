@@ -1,18 +1,23 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
-from ROOT import TFile, gSystem
 from bokeh.io import curdoc
+import os
+import sys
+import pytest
 
+if "ROOT" in sys.modules:
+    from ROOT import TFile, gSystem
+    
 output_file("test_bokehDrawSA.html")
 # import logging
 
-
-TFile.SetCacheFileDir("../../data/")
-tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", 0)
-AddMetadata(tree, "A.AxisTitle","A (cm)")
-AddMetadata(tree, "B.AxisTitle","B (cm/s)")
-AddMetadata(tree, "C.AxisTitle","B (s)")
-AddMetadata(tree, "D.AxisTitle","D (a.u.)")
+if "ROOT" in sys.modules:
+    TFile.SetCacheFileDir("../../data/")
+    tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", 0)
+    AddMetadata(tree, "A.AxisTitle","A (cm)")
+    AddMetadata(tree, "B.AxisTitle","B (cm/s)")
+    AddMetadata(tree, "C.AxisTitle","B (s)")
+    AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
 df = pd.DataFrame(np.random.random_sample(size=(2000, 6)), columns=list('ABCDEF'))
 initMetadata(df)
@@ -64,10 +69,6 @@ def testBokehDrawArraySA():
     output_file("test_bokehDrawSAArray.html")
     fig=bokehDrawSA.fromArray(df, "A>0", figureArray,widgets,tooltips=tooltips, layout=figureLayout)
 
-def testBokehDrawArraySA_tree():
-    output_file("test_bokehDrawSAArray_fromTTree.html")
-    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
-
 def testBokehDrawArrayWidget():
     output_file("test_BokehDrawArrayWidget.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
@@ -76,6 +77,11 @@ def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None)
 
+def testBokehDrawArraySA_tree():
+    if "ROOT" not in sys.modules:
+        pytest.skip("no ROOT module")
+    output_file("test_bokehDrawSAArray_fromTTree.html")
+    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 
 #testOldInterface()

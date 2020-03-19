@@ -8,14 +8,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="PWGPP-517,PWGPP-534 -interactive histograms and projections">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/makeClean.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/miranov.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/miranov.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/notebookTest.sh" beforeDir="false" afterPath="$PROJECT_DIR$/test/notebookTest.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/bokehDraw/standAlone.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/tutorial/bokehDraw/standAlone.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/RootInteractive.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RootInteractive.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RootInteractive/Tools/test_makePDFMaps.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/Tools/test_makePDFMaps.ipynb" afterDir="false" />
     </list>
-    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -23,115 +19,6 @@
   </component>
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
-  </component>
-  <component name="FileEditorManager">
-    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/.gitignore">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="80">
-              <caret line="5" selection-start-line="5" selection-end-line="5" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehTools.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="5552">
-              <caret line="361" column="3" selection-start-line="361" selection-start-column="3" selection-end-line="361" selection-end-column="119" />
-              <folding>
-                <element signature="e#0#52#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/histoNDTools.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="717">
-              <caret line="250" column="20" selection-start-line="250" selection-start-column="20" selection-end-line="250" selection-end-column="20" />
-              <folding>
-                <element signature="e#0#18#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test/makeClean.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="32">
-              <caret line="2" selection-start-line="2" selection-end-line="2" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test/notebookTest.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="112">
-              <caret line="7" column="82" selection-start-line="7" selection-start-column="82" selection-end-line="7" selection-end-column="82" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="96">
-              <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="36" />
-              <folding>
-                <element signature="e#0#64#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="80">
-              <caret line="5" column="117" selection-start-line="5" selection-end-line="5" selection-end-column="117" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="160">
-              <caret line="10" column="28" selection-start-line="10" selection-start-column="28" selection-end-line="10" selection-end-column="28" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="192">
-              <caret line="22" column="104" selection-start-line="22" selection-start-column="104" selection-end-line="22" selection-end-column="113" />
-              <folding>
-                <element signature="e#15#33#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="128">
-              <caret line="11" column="110" selection-start-line="11" selection-start-column="110" selection-end-line="11" selection-end-column="110" />
-              <folding>
-                <element signature="e#0#64#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-    </leaf>
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
@@ -141,69 +28,14 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="IdeDocumentHistory">
-    <option name="CHANGED_PATHS">
-      <list>
-        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHistoND.py" />
-        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHisto.py" />
-        <option value="$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py" />
-        <option value="$PROJECT_DIR$/RootInteractive/Tools/Alice/BetheBloch.py" />
-        <option value="$PROJECT_DIR$/RootInteractive/Tools/histoNDTools.py" />
-        <option value="$PROJECT_DIR$/test/notebookTest.sh" />
-        <option value="$PROJECT_DIR$/test/makeClean.sh" />
-        <option value="$PROJECT_DIR$/.gitignore" />
-      </list>
-    </option>
-  </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="y" value="-2" />
-    <option name="width" value="2048" />
-    <option name="height" value="1154" />
-  </component>
+  <component name="ProjectId" id="1WCbruGi6gvZ3EZg5fxJhhyH1w2" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
   </component>
-  <component name="ProjectView">
-    <navigator proportions="" version="1">
-      <foldersAlwaysOnTop value="true" />
-    </navigator>
-    <panes>
-      <pane id="ProjectPane">
-        <subPane>
-          <expand>
-            <path>
-              <item name="RootInteractive3" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive3" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive3" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive3" type="462c0819:PsiDirectoryNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive3" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive3" type="462c0819:PsiDirectoryNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="Tools" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive3" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive3" type="462c0819:PsiDirectoryNode" />
-              <item name="RootInteractive" type="462c0819:PsiDirectoryNode" />
-              <item name="Tools" type="462c0819:PsiDirectoryNode" />
-              <item name="Alice" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="RootInteractive3" type="b2602c69:ProjectViewProjectNode" />
-              <item name="RootInteractive3" type="462c0819:PsiDirectoryNode" />
-              <item name="test" type="462c0819:PsiDirectoryNode" />
-            </path>
-          </expand>
-          <select />
-        </subPane>
-      </pane>
-      <pane id="Scope" />
-    </panes>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
@@ -211,18 +43,7 @@
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
-  </component>
-  <component name="RunDashboard">
-    <option name="ruleStates">
-      <list>
-        <RuleState>
-          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
-        </RuleState>
-        <RuleState>
-          <option name="name" value="StatusDashboardGroupingRule" />
-        </RuleState>
-      </list>
-    </option>
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunManager">
     <configuration name="test_histoNDTools" type="PythonConfigurationType" factoryName="Python" temporary="true">
@@ -252,6 +73,18 @@
       </list>
     </recent_temporary>
   </component>
+  <component name="ServiceViewManager">
+    <option name="viewStates">
+      <list>
+        <serviceView>
+          <treeState>
+            <expand />
+            <select />
+          </treeState>
+        </serviceView>
+      </list>
+    </option>
+  </component>
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -277,6 +110,8 @@
       <workItem from="1562210694600" duration="599000" />
       <workItem from="1562227860100" duration="4669000" />
       <workItem from="1562298604097" duration="836000" />
+      <workItem from="1578656728392" duration="5817000" />
+      <workItem from="1579264295707" duration="2140000" />
     </task>
     <task id="LOCAL-00001" summary="PWGPP-517,PWGPP-534 - tools for histogramming and histogram visualization">
       <created>1561273506207</created>
@@ -309,71 +144,6 @@
     <option name="localTasksCounter" value="5" />
     <servers />
   </component>
-  <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="71327000" />
-  </component>
-  <component name="ToolWindowManager">
-    <frame x="45" y="25" width="1875" height="1055" extended-state="6" />
-    <editor active="true" />
-    <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.34260288" visible="true" weight="0.12629852" />
-      <window_info id="Structure" order="1" sideWeight="0.6573971" side_tool="true" visible="true" weight="0.12629852" />
-      <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info anchor="bottom" id="Message" order="0" />
-      <window_info active="true" anchor="bottom" id="Find" order="1" visible="true" weight="0.32925472" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.32814237" />
-      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.8965705" weight="0.3971079" />
-      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
-      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.47951037" weight="0.32071504" />
-      <window_info anchor="bottom" id="CMake" order="7" sideWeight="0.40076128" weight="0.3397231" />
-      <window_info anchor="bottom" id="File Transfer" order="8" sideWeight="0.45350733" visible="true" weight="0.24068157" />
-      <window_info anchor="bottom" id="Version Control" order="9" weight="0.32920536" />
-      <window_info anchor="bottom" id="Terminal" order="10" />
-      <window_info anchor="bottom" id="Debug Logs" order="11" />
-      <window_info anchor="bottom" id="Event Log" order="12" sideWeight="0.54649264" side_tool="true" weight="0.33261803" />
-      <window_info anchor="bottom" id="Execute Anonymous" order="13" />
-      <window_info anchor="bottom" id="Salesforce" order="14" />
-      <window_info anchor="bottom" id="CSS-X-Fire" order="15" />
-      <window_info anchor="bottom" id="Messages" order="16" weight="0.32814237" />
-      <window_info anchor="bottom" id="Database Changes" order="17" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Docker" order="18" show_stripe_button="false" />
-      <window_info anchor="right" id="Commander" order="0" weight="0.4" />
-      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
-      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
-      <window_info anchor="right" id="Data View" order="3" />
-      <window_info anchor="right" id="Database" order="4" />
-    </layout>
-    <layout-to-restore>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.35817575" visible="true" weight="0.13613997" />
-      <window_info active="true" id="Structure" order="1" sideWeight="0.64182425" side_tool="true" visible="true" weight="0.13613997" />
-      <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Message" order="1" />
-      <window_info anchor="bottom" id="Find" order="2" weight="0.3297414" />
-      <window_info active="true" anchor="bottom" id="Run" order="3" visible="true" weight="0.32814237" />
-      <window_info anchor="bottom" id="Debug" order="4" sideWeight="0.8965705" weight="0.39777777" />
-      <window_info anchor="bottom" id="Cvs" order="5" weight="0.25" />
-      <window_info anchor="bottom" id="Inspection" order="6" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="7" sideWeight="0.47951037" weight="0.32071504" />
-      <window_info anchor="bottom" id="CMake" order="8" sideWeight="0.40076128" weight="0.3397231" />
-      <window_info anchor="bottom" id="File Transfer" order="9" sideWeight="0.45350733" visible="true" weight="0.24068157" />
-      <window_info anchor="bottom" id="Version Control" order="10" weight="0.32920536" />
-      <window_info anchor="bottom" id="Terminal" order="11" />
-      <window_info anchor="bottom" id="Debug Logs" order="12" />
-      <window_info anchor="bottom" id="Event Log" order="13" sideWeight="0.54649264" side_tool="true" weight="0.33261803" />
-      <window_info anchor="bottom" id="Execute Anonymous" order="14" />
-      <window_info anchor="bottom" id="Salesforce" order="15" />
-      <window_info anchor="bottom" id="CSS-X-Fire" order="16" />
-      <window_info active="true" anchor="bottom" id="Messages" order="17" visible="true" weight="0.32832834" />
-      <window_info anchor="bottom" id="Database Changes" order="18" show_stripe_button="false" />
-      <window_info anchor="right" id="Commander" order="0" weight="0.4" />
-      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
-      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
-      <window_info anchor="right" id="Data View" order="3" />
-      <window_info anchor="right" id="Database" order="4" />
-    </layout-to-restore>
-  </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
   </component>
@@ -383,6 +153,12 @@
     <MESSAGE value="PWGPP-517,PWGPP-534 -interactive histograms and projections" />
     <MESSAGE value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
     <option name="LAST_COMMIT_MESSAGE" value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="525" y="174" key="SettingsEditor" timestamp="1579264341796">
+      <screen x="1051" y="0" width="869" height="1080" />
+    </state>
+    <state x="525" y="174" key="SettingsEditor/984.1080.1920.1080/1051.0.869.1080/1920.0.1920.1080@1051.0.869.1080" timestamp="1579264341796" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -465,164 +241,5 @@
         <evaluation-mode>EXPRESSION</evaluation-mode>
       </expression>
     </expressions>
-  </component>
-  <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHistoND.py" />
-    <entry file="file://$PROJECT_DIR$/sphinx/makesphinx.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="336">
-          <caret line="21" column="35" selection-start-line="21" selection-start-column="35" selection-end-line="21" selection-end-column="35" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-        <state split_layout="SPLIT">
-          <first_editor relative-caret-position="112">
-            <caret line="7" selection-start-line="7" selection-end-line="7" />
-          </first_editor>
-          <second_editor />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/testBokehClient0.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="704">
-          <caret line="47" column="1" selection-start-line="47" selection-start-column="1" selection-end-line="47" selection-end-column="1" />
-          <folding>
-            <element signature="e#0#55#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/software/alicesw3/sw/ubuntu1804_x86-64/Python-modules/1.0-5/lib/python/site-packages/bokeh/core/has_props.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="241">
-          <caret line="257" lean-forward="true" selection-start-line="257" selection-end-line="257" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHisto.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="560">
-          <caret line="38" column="16" selection-start-line="38" selection-start-column="16" selection-end-line="38" selection-end-column="41" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/Alice/BetheBloch.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="656">
-          <caret line="43" column="71" selection-start-line="43" selection-start-column="27" selection-end-line="43" selection-end-column="71" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawHistoTHn.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2048">
-          <caret line="135" column="189" selection-start-line="135" selection-start-column="12" selection-end-line="135" selection-end-column="189" />
-          <folding>
-            <element signature="e#0#40#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehDrawSA.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1472">
-          <caret line="94" column="4" selection-start-line="94" selection-start-column="4" selection-end-line="94" selection-end-column="22" />
-          <folding>
-            <element signature="e#0#26#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehTools.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="5552">
-          <caret line="361" column="3" selection-start-line="361" selection-start-column="3" selection-end-line="361" selection-end-column="119" />
-          <folding>
-            <element signature="e#0#52#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDraw.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="96">
-          <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="36" />
-          <folding>
-            <element signature="e#0#64#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawArray.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="80">
-          <caret line="5" column="117" selection-start-line="5" selection-end-line="5" selection-end-column="117" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="160">
-          <caret line="10" column="28" selection-start-line="10" selection-start-column="28" selection-end-line="10" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="192">
-          <caret line="22" column="104" selection-start-line="22" selection-start-column="104" selection-end-line="22" selection-end-column="113" />
-          <folding>
-            <element signature="e#15#33#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test_Layout.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="128">
-          <caret line="11" column="110" selection-start-line="11" selection-start-column="110" selection-end-line="11" selection-end-column="110" />
-          <folding>
-            <element signature="e#0#64#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/RootInteractive/Tools/histoNDTools.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="717">
-          <caret line="250" column="20" selection-start-line="250" selection-start-column="20" selection-end-line="250" selection-end-column="20" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/notebookTest.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="112">
-          <caret line="7" column="82" selection-start-line="7" selection-start-column="82" selection-end-line="7" selection-end-column="82" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/makeClean.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="32">
-          <caret line="2" selection-start-line="2" selection-end-line="2" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/.gitignore">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="80">
-          <caret line="5" selection-start-line="5" selection-end-line="5" />
-        </state>
-      </provider>
-    </entry>
   </component>
 </project>

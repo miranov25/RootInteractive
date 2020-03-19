@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
 import logging
+import sys
 from bokeh.models import *
 from bokeh.palettes import *
-from root_numpy import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
 from bokeh.palettes import *
+
+if "ROOT" in sys.modules:
+    from root_numpy import *
 
 # from bokeh.io import push_notebook
 

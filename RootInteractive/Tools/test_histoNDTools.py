@@ -1,9 +1,3 @@
-try:
-    import ROOT
-    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
-except ImportError:
-    exit
-
 ### 0. Imports
 #import numpy as np
 #import math
@@ -16,23 +10,29 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawHisto import *
 #from IPython.display import display
 
 #output_notebook()
-import ROOT
 
-ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.Tools.histoNDTools import *
 import logging
-from RootInteractive.Tools.Alice.BetheBloch import *
 from bokeh.palettes import *
+import sys
+import pytest
+
+
 
 #
 logging.getLogger().setLevel(1)
-ROOT.TFile.SetCacheFileDir("../data/"),
-finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
-hisArray=finput.Get("hisArray")
-
+if "ROOT" in sys.modules:
+    from RootInteractive.Tools.Alice.BetheBloch import *
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+    ROOT.TFile.SetCacheFileDir("../data/"),
+    finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
+    hisArray=finput.Get("hisArray")
+else:
+    pytest.skip("ROOT module is not imported", allow_module_level=True)
 
 def runTOYMC2(nPoints=100000):
+
     # 1.) Setup and run  TOY MC
     # nPoints=1000000
     pdg = ROOT.TDatabasePDG.Instance()
@@ -104,6 +104,7 @@ def testDrawSlice():
     show(p)
 
 def testBokehDrawHistoTHn():
+    
     output_file("test_histoNDTools_testBokehDrawHistoTHn.html")
     hisArray.ls()
     bokehDrawHisto.fromTHnArray(hisArray, [["hisdY()(0,1)(0:100,0:100)"], ["hisdZ()(0,1)(0:100,0:100)"]], {}, {})

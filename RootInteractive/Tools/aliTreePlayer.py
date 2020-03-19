@@ -1,17 +1,20 @@
 import pandas as pd
-from root_pandas import *
 import numpy as np
 import urllib.request as urlopen
 import pyparsing
-from anytree import *
-from .pandaTools import *
+import sys
 
+from RootInteractive.Tools.pandaTools import *
 try:
     import ROOT
-
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 except ImportError:
     pass
+
+from anytree import *
+if "ROOT" in sys.modules:
+    from root_pandas import *
+
 import re
 import logging
 
@@ -601,3 +604,16 @@ def makeABCD(nPoints=10000):
     tree.SetAlias("bigA","A>0.5")
     tree.SetAlias("smallA","A<0.5")
     return tree, f
+
+def pandaToTree(df,name=None):
+    if name is None:
+        name="my_ttree"
+        if hasattr(df, "meta"):
+            if hasattr(df.meta, "metaData"):            
+                name=df.meta.metaData.get("Name",name)
+    df.to_root("./."+name+".root",name)
+    f = ROOT.TFile("./."+name+".root")
+    tree = f.Get(name)
+    return tree, f
+
+
