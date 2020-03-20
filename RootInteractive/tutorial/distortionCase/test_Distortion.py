@@ -1,8 +1,18 @@
 from MLpipeline.NDFunctionInterface import DataContainer, Fitter
-from TTreeHnInteractive.TTreeHnBrowser import *
-from  InteractiveDrawing.bokeh.bokehTools import *
-from  InteractiveDrawing.bokeh.bokehDrawPanda import *
+from InteractiveDrawing.bokeh.bokehTools import *
+from InteractiveDrawing.bokeh.bokehDrawPanda import *
 from distortionStudy import *
+import sys
+import pytest
+
+try:
+    import ROOT
+except ImportError:
+    pytest.skip("ROOT module is not imported", allow_module_level=True)
+
+from TTreeHnInteractive.TTreeHnBrowser import *
+
+    
 
 def Distortion():
     ###

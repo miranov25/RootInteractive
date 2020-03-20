@@ -5,10 +5,10 @@ import ipywidgets as widgets
 from ipywidgets import Button, Layout
 import numpy as np
 from IPython.display import display
-import ROOT
 from bqplot import *
 import bqplot.pyplot as pyplt
 import re
+import sys
 import pandas as pd
 import qgrid
 from RootInteractive.Tools.aliTreePlayer import *

@@ -1,21 +1,28 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
-from ROOT import TFile, gSystem
 from RootInteractive.Tools.aliTreePlayer import *
-
-#gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+import sys
+import pytest
 from bokeh.io import curdoc
 
-curdoc().theme = 'caliber'
-TFile.SetCacheFileDir("../../data/")
-treeQA, treeList, fileList = LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", 0)
-treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
-AddMetadata(treeQA, "chunkBegin.isTime", "1")
-AddMetadata(treeQA, "chunkMedian.isTime", "1")
-treeQA.SetAlias("meanMIPErr", "resolutionMIP*0.3")
-treeQA.SetAlias("meanMIPeleErr", "resolutionMIPele*0.3")
-treeQA.SetAlias("resolutionMIPErr", "resolutionMIP*0.02")
+if "ROOT" not in sys.modules:
+    pytest.skip("ROOT module is not imported", allow_module_level=True)
 
-treeQA.RemoveFriend(treeQA.GetFriend("tpcQA"))
+#gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+from ROOT import TFile, gSystem
+
+curdoc().theme = 'caliber'
+
+if "ROOT" in sys.modules:
+    TFile.SetCacheFileDir("../../data/")
+    treeQA, treeList, fileList = LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", 0)
+    treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
+    AddMetadata(treeQA, "chunkBegin.isTime", "1")
+    AddMetadata(treeQA, "chunkMedian.isTime", "1")
+    treeQA.SetAlias("meanMIPErr", "resolutionMIP*0.3")
+    treeQA.SetAlias("meanMIPeleErr", "resolutionMIPele*0.3")
+    treeQA.SetAlias("resolutionMIPErr", "resolutionMIP*0.02")
+
+    treeQA.RemoveFriend(treeQA.GetFriend("tpcQA"))
 
 varDraw = "(meanMIP,meanMIPele):meanMIPele:resolutionMIP"
 varX = "meanMIP:chunkMedian:chunkMedian"

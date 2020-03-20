@@ -43,6 +43,6 @@ def test_DrawSAfromArray():
 
 
 
-#test_DrawFormula()
-#test_DrawfromArray()
+test_DrawFormula()
+test_DrawfromArray()
 test_DrawSAfromArray()

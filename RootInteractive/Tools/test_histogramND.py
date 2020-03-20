@@ -2,13 +2,19 @@
 
 try:
     import ROOT
-    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 except ImportError:
     pass
 
 from RootInteractive.Tools.histogramND import *
-from RootInteractive.Tools.Alice.BetheBloch import *
 from bokeh.plotting import figure, ColumnDataSource, curdoc
+import sys
+import pytest
+
+if "ROOT" in sys.modules:
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+    from RootInteractive.Tools.Alice.BetheBloch import *
+    
+
 
 histogramMap={}
 histogramMapABCD={}
@@ -38,6 +44,8 @@ def makeMapABCD(nPoints=100000):
 
 
 def testHistoPanda(nPoints=10000):
+    if "ROOT" not in sys.modules:
+        pytest.skip("no ROOT module")
     dataFrame = toyMC(nPoints)
     dataFrame.head(5)
     histoStringArray = [
@@ -55,6 +63,8 @@ def testHistoPanda(nPoints=10000):
     return histogramMap
 
 def testHistPandaDraw():
+    if "ROOT" not in sys.modules:
+        pytest.skip("no ROOT module")
     #output_file("test_histogramND_testHistPandaDrawColz.html")
     initControlList()
     histogram= histogramMap["hisTRD"]

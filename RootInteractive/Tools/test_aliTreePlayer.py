@@ -1,9 +1,14 @@
-import ROOT
 import logging
+import pytest
 from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
 from RootInteractive.Tools.aliTreePlayer import *
-ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
 from bokeh.io import curdoc
+
+if "ROOT" in sys.modules:
+    ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
+else:
+    pytest.skip("ROOT module is not imported", allow_module_level=True)
+
 
 
 #   This test is useless since AliExternalInfo is no longer used in test...
