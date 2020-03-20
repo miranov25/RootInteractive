@@ -23,7 +23,7 @@ setup(
         'pytest',
         'nbval',
         ## root dependencies
-        'root_pandas'
+        'root_pandas',
         ##---------------------   graphics  dependencies
         'bokeh',
         'matplotlib',
