@@ -37,23 +37,23 @@ class bokehDraw(object):
                                     Requires 1 or more parameters.
                                     dropdown.name(option1,option2,....)
                                       Ex: dropdown.MB(0,0.5,1)
-                                             
+
                                  to group widget you can use accordion or tab:
                                    Ex:
                                      accordion.group1(widget1,widget2...), accordion.group2(widget1,widget2...)
                                      tab.group1(widget1,widget2...), tab.group2(widget1,widget2...)
-                                         
+
         :param p:                template figure
         :param options:          optional drawing parameters
                                  - ncols - number fo columns in drawing
                                  - commonX=?,commonY=? - switch share axis
                                  - size
-                                 - errX=?  - query for errors on X-axis 
+                                 - errX=?  - query for errors on X-axis
                                  - errY=?  - array of queries for errors on Y
                                  Tree options:
-                                 - variables     - List of variables which will extract from ROOT File 
+                                 - variables     - List of variables which will extract from ROOT File
                                  - nEntries      - number of entries which will extract from ROOT File
-                                 - firstEntry    - Starting entry number 
+                                 - firstEntry    - Starting entry number
                                  - mask          - mask for variable names
                                  - verbosity     - first bit: verbosity for query for every update
                                                  - second bit: verbosity for source file.
@@ -168,7 +168,7 @@ class bokehDraw(object):
 
     def initWidgets(self, widgetString):
         r"""
-        Initialize widgets 
+        Initialize widgets
 
         :param widgetString:
             example string
@@ -291,8 +291,8 @@ class bokehDraw(object):
             else:
                 sliderQuery += str(str(iWidget.description) + "==" + str(iWidget.value) + "&")
         sliderQuery = sliderQuery[:-1]
-        newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
-        self.bokehSource.data = newSource.data
+        #newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
+        self.bokehSource.data = self.dataSource.query(sliderQuery)
         # print(sliderQuery, newSource.data["index"].size)
         if self.verbosity & 1:
             logging.info(sliderQuery)
