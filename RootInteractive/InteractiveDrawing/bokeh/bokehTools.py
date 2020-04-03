@@ -86,7 +86,7 @@ def makeJScallback(widgetDict, **kwargs):
             code += f"      var {key}Value=({key}.active.length>0);\n"
             # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
-    code += """      
+    code += """
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected) nSelected++;
         if (isSelected){
@@ -96,7 +96,7 @@ def makeJScallback(widgetDict, **kwargs):
     code += """
         }
     }
-    console.log(\"nSelected:%d\",nSelected); 
+    console.log(\"nSelected:%d\",nSelected);
     cdsSel.change.emit();
     """
     if options["verbose"] > 0:
@@ -706,7 +706,7 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     else:
         value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
-    slider.callback_policy = 'mouseup'
+    #slider.callback_policy = 'mouseup'
     return slider
 
 
