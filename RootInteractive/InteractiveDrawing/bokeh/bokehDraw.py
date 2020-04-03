@@ -291,7 +291,6 @@ class bokehDraw(object):
             else:
                 sliderQuery += str(str(iWidget.description) + "==" + str(iWidget.value) + "&")
         sliderQuery = sliderQuery[:-1]
-        #newSource = ColumnDataSource(self.dataSource.query(sliderQuery))
         self.bokehSource.data = self.dataSource.query(sliderQuery)
         # print(sliderQuery, newSource.data["index"].size)
         if self.verbosity & 1:
