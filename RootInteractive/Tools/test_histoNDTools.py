@@ -111,7 +111,7 @@ def testBokehDrawHistoTHn():
 
 
 
-testHistoPanda(1000000)
-testTHnDraw()
-testDrawSlice()
-testBokehDrawHistoTHn()
+#testHistoPanda(1000000)
+#testTHnDraw()
+#testDrawSlice()
+#testBokehDrawHistoTHn()

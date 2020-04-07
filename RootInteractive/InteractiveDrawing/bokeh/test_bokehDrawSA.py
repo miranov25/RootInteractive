@@ -13,18 +13,19 @@ output_file("test_bokehDrawSA.html")
 
 if "ROOT" in sys.modules:
     TFile.SetCacheFileDir("../../data/")
-    tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCD.*", ".*", 0)
+    tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCDE.*", ".*", 0)
     AddMetadata(tree, "A.AxisTitle","A (cm)")
     AddMetadata(tree, "B.AxisTitle","B (cm/s)")
     AddMetadata(tree, "C.AxisTitle","B (s)")
     AddMetadata(tree, "D.AxisTitle","D (a.u.)")
 
-df = pd.DataFrame(np.random.random_sample(size=(2000, 6)), columns=list('ABCDEF'))
+df = pd.DataFrame(np.random.random_sample(size=(4000, 6)), columns=list('ABCDEF'))
 initMetadata(df)
 df.eval("Bool=A>0.5", inplace=True)
 df["AA"]=(df.A*10).round(0)/10.
 df["CC"]=(df.C*5).round(0)
 df["DD"]=(df.D*2).round(0)
+df["EE"]=(df.E*4).round(0)
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
@@ -37,8 +38,8 @@ figureArray = [
     [['B'], ['C+B', 'C-B'],{"color": "red", "size": 7, "colorZvar":"C"}],
     [['D'], ['(A+B+C)*D'], {"size": 10}],
 ]
-widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
-#widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), dropdown.E(0,1,2,3,4)"
+#widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
+widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
 figureLayout: str = '((0,1,2, plot_height=300),(3, x_visible=1),commonX=1,plot_height=300,plot_width=1200)'
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
 
@@ -49,7 +50,7 @@ widgetParams=[
     ['range', ['D'], {'type':'sigma', 'bins':10, 'sigma':3}],
     ['range', ['E'], {'type':'sigmaMed', 'bins':10, 'sigma':3}],
     ['slider', ['AA'],{'bins':10}],
-    ['multiSelect',["DD"]],
+    ['multiSelect',["DD",0,1,2,3]],
     ['select',["CC",0,1,2,3]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 ]
@@ -64,6 +65,7 @@ figureLayoutDesc=[
 def testOldInterface():
     output_file("test_bokehDrawSAOldInterface.html")
     fig=bokehDrawSA(df, "A>0", "A","A:B:C:D","C",widgets,0,tooltips=tooltips, layout=figureLayout)
+    #fig=bokehDrawSA(tree, "A>0", "A","A:B:C:D","C",widgets,0,tooltips=tooltips, layout=figureLayout)
 
 def testBokehDrawArraySA():
     output_file("test_bokehDrawSAArray.html")

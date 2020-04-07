@@ -48,6 +48,7 @@ def makeJScallback(widgetDict, **kwargs):
     for a in widgetDict['cdsOrig'].data:
         if a == "index":
             continue
+        code += f"var precision=0.000001;\n"
         code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
         # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
 
@@ -75,17 +76,20 @@ def makeJScallback(widgetDict, **kwargs):
             code += f"      isSelected&=result;\n"
             code += "}\n"
         elif isinstance(value, Select):
+            # check if entry is equat to selected within relitive precission
             code += f"      var {key}Value={key}.value;\n"
             # code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
+            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
+            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)|isOK;\n"
         elif isinstance(value, MultiSelect):
             code += f"      var {key}Value={key}.value;\n"
             code += f"     console.log(\"%s\t%s\t%f\t%s\",\"{key}\",{key}Value.toString,dataOrig[\"{key}\"][i],({key}Value.includes(dataOrig[\"{key}\"][i].toString())));\n"
             code += f"      isSelected&=({key}Value.includes(dataOrig[\"{key}\"][i].toString()))\n"
         elif isinstance(value, CheckboxGroup):
             code += f"      var {key}Value=({key}.active.length>0);\n"
+            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
             # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)\n"
+            code += f"      isSelected&=((dataOrig[\"{key}\"][i]=={key}Value))|isOK;\n"
     code += """      
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected) nSelected++;
