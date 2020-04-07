@@ -25,7 +25,7 @@ setup(
         ## root dependencies
         'root_pandas',
         ##---------------------   graphics  dependencies
-        'bokeh',
+        'bokeh<2',
         'matplotlib',
         'plotly',
         'qgrid',
