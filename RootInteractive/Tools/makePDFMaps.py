@@ -81,30 +81,52 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     for i in range(newHistogram.shape[0]):
         histoList.append(newHistogram[i].flatten())     # flatten all dimensions except the dimension of interest
 
-    histoArray = np.array(histoList).transpose()        # by taking transpose we have a flattened array of histograms. 
+    histoArray = np.array(histoList).transpose()        # by taking transpose we have a flattened array of histograms.
     means = []
     rms = []
+    meansOK = []
     medians = []
+    mediansOK = []
     quantiles = []
+    quantilesOK = []
     for iQuantile in options['quantiles']:
         quantiles.append([])
+        quantilesOK.append([])
     for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rms and median for each histogram
-        means.append(np.average(centerI, weights=iHisto))
-        rms.append(np.sqrt(np.average(centerI ** 2, weights=iHisto)))
-        
+        if sum(iHisto) > 0:
+            means.append(np.average(centerI, weights=iHisto))
+            rms.append(np.sqrt(np.average(centerI ** 2, weights=iHisto)))
+            meansOK.append(1)
+        else:
+            means.append(0)
+            rms.append(0)
+            meansOK.append(0)
+
         halfSum = iHisto.sum()/2
         for iBin in range(len(centerI)):
+            if iBin == len(centerI) - 1:
+                medians.append(0)
+                mediansOK.append(0)
+                break
             if iHisto[:iBin].sum() < halfSum <= iHisto[:iBin + 1].sum():
                 medians.append((halfSum - iHisto[:iBin].sum())*(edgeI[iBin+1]-edgeI[iBin])/(iHisto[:iBin + 1].sum()-iHisto[:iBin ].sum()) + edgeI[iBin])
+                mediansOK.append(1)
                 break
                 
         for i, iQuantile in enumerate(options['quantiles']):
             quantileLimit =iHisto.sum()*iQuantile/100
-            for iBin in range(len(centerI)):
+            for iBin in range(len(centerI) - 1):
+                if iBin == len(centerI) - 1:
+                    quantiles[i].append(0)
+                    quantilesOK[i].append(0)
+                    break
                 if iHisto[:iBin].sum() < quantileLimit <= iHisto[:iBin + 1].sum():
                     quantiles[i].append((quantileLimit - iHisto[:iBin].sum())*(edgeI[iBin+1]-edgeI[iBin])/(iHisto[:iBin + 1].sum()-iHisto[:iBin ].sum()) + edgeI[iBin])
                     #quantiles[i].append(centerI[iBin])
+                    quantilesOK[i].append(1)
                     break
+                quantiles[i].append(0)
+                quantilesOK[i].append(0)
 
 
 
@@ -120,10 +142,13 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
 
     histogramMap["means"] = means
     histogramMap["rms"] = rms
+    histogramMap["meansOK"] = meansOK
     histogramMap["medians"] = medians
+    histogramMap["mediansOK"] = mediansOK
     histogramMap["entries"] = entries
     for i,iQuantile in enumerate(options['quantiles']):
         histogramMap["quantile_"+ str(iQuantile)] = quantiles[i]
+        histogramMap["quantile_"+ str(iQuantile) + "OK"] = quantilesOK[i]
 
     out = pd.DataFrame(histogramMap)
 
