@@ -48,9 +48,6 @@ def makeHistogram(data, hisString, **kwargs):
     selection = description[0]
     histoInfo = description[1]
     del (varList[-1])
-    # get input data as an np array
-    df = data.query(selection)
-    inputArray = df[varList]
     histoInfo = histoInfo.replace('(', ',').replace(')', ',').split(",")
     bins = []
     hRange = []
@@ -62,9 +59,8 @@ def makeHistogram(data, hisString, **kwargs):
         logging.info("Variable list   :%s", varList)
         logging.info("Histogram bins  :%s", bins)
         logging.info("Histogram range :%s", hRange)
-    H, axis = np.histogramdd(inputArray.values, bins=bins, range=hRange)
-    histogram = {"H": H, "axes": axis, "name": histoInfo[0], "varNames": varList}
-    return histogram
+    H, axis = np.histogramdd(data.query(selection)[varList].values, bins=bins, range=hRange)
+    return {"H": H, "axes": axis, "name": histoInfo[0], "varNames": varList}
 
 
 def thnToNumpyDD(his):
