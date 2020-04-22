@@ -23,14 +23,30 @@ def test_makePDF():
     dframe = makePdfMaps(histo, slices, dimI)
     dframe["csin"] = np.sin(6.28 * dframe["CBinCenter"])
     dframe["valueOrig"] = dframe["ABinCenter"] + np.exp(0 * dframe["BBinCenter"]) * dframe["csin"]
-
+    dframe["deltaMean"] = dframe["means"]-dframe["valueOrig"]
+    #
+    tooltips = [("A", "(@ABinCenter)"), ("B", "(@BBinCenter)"), ("C", "(@CBinCenter)"), ("Orig. Value", "(@valueOrig)"), ("Delta", "(@deltaMean)")]
+    widgetParams=[
+            ['range', ['ABinCenter']],
+            ['range', ['BBinCenter']],
+            ['range', ['CBinCenter']],
+            ['range', ['valueOrig']],
+            ['range', ['deltaMean']],
+        ]
+    widgetLayoutDesc=[ [2], [0,1], [3,4], {'sizing_mode':'scale_width'} ]
+    #
     figureArray = [
-        [['CBinCenter'], ['valueOrig', 'means-valueOrig', 'medians-valueOrig']]
+        [['CBinCenter'], ['valueOrig', 'means-valueOrig', 'medians-valueOrig']],
+        [['CBinCenter'], ['rmsd']],
     ]
-    tooltips = [("A", "(@ABinCenter)"), ("B", "(@BBinCenter)"), ("C", "(@CBinCenter)"), ("D", "(@DBinCenter)"), ]
-    widgets = 'slider.DBinCenter(0,1,0.1,0,1)'
-    figureLayout: str = '((0),x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
-    bokehDrawSA.fromArray(dframe, "ABinNumber>0", figureArray, widgets, layout=figureLayout, tooltips=tooltips)
+    figureLayoutDesc=[
+        [0, {'commonX':1,'y_visible':2,'plot_height':400}],
+        [1,{'plot_height':200}],
+        {'plot_height':200,'sizing_mode':'scale_width'}
+    ]
 
+    output_file("test_makePDF.html")
+    bokehDrawSA.fromArray(dframe, "ABinNumber>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc)
+    #
 
 test_makePDF()
