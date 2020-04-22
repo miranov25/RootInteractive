@@ -83,7 +83,7 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
 
     histoArray = np.array(histoList).transpose()        # by taking transpose we have a flattened array of histograms.
     means = []
-    rms = []
+    rmsd = []
     meansOK = []
     medians = []
     mediansOK = []
@@ -92,14 +92,14 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     for iQuantile in options['quantiles']:
         quantiles.append([])
         quantilesOK.append([])
-    for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rms and median for each histogram
+    for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rmsd and median for each histogram
         if sum(iHisto) > 0:
             means.append(np.average(centerI, weights=iHisto))
-            rms.append(np.sqrt(np.average(centerI ** 2, weights=iHisto)))
+            rmsd.append(np.sqrt(np.average((centerI - means[-1]) ** 2, weights=iHisto)))
             meansOK.append(1)
         else:
             means.append(0)
-            rms.append(0)
+            rmsd.append(0)
             meansOK.append(0)
 
         halfSum = iHisto.sum()/2
@@ -141,7 +141,7 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     entries = np.ndarray.flatten(np.sum(histogram, axis=0))
 
     histogramMap["means"] = means
-    histogramMap["rms"] = rms
+    histogramMap["rmsd"] = rmsd
     histogramMap["meansOK"] = meansOK
     histogramMap["medians"] = medians
     histogramMap["mediansOK"] = mediansOK
