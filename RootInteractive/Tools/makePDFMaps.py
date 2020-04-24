@@ -11,8 +11,8 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
         binList.append(np.arange(len(axis) - 1))
 
     widthList = [item[3] for item in slices]    # extract the list of widths from slicing tuple
-    localHist = histo["H"].copy()
-    localAxes = histo["axes"].copy()
+    localHist = histo["H"]
+    localAxes = histo["axes"]
     for iDim, w in enumerate(widthList):                        #  get the original histogram and shifted histograms by +/- i,
         L = localHist.shape[iDim]                               #  summing all of these will end a merged version of histograms
                                                                 #
