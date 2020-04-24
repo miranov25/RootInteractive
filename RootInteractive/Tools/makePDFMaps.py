@@ -92,8 +92,11 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     for iQuantile in options['quantiles']:
         quantiles.append([])
         quantilesOK.append([])
+    nBinsI = len(centerI)
     for iHisto in histoArray:                           # loop on array of histogram produced above and calculate mean, rmsd and median for each histogram
-        if sum(iHisto) > 0:
+        cumsumHisto=np.cumsum(iHisto)
+        sumHisto=cumsumHisto[-1]
+        if sumHisto > 0:
             means.append(np.average(centerI, weights=iHisto))
             rmsd.append(np.sqrt(np.average((centerI - means[-1]) ** 2, weights=iHisto)))
             meansOK.append(1)
@@ -102,21 +105,21 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
             rmsd.append(0)
             meansOK.append(0)
 
-        halfSum = iHisto.sum()/2
-        for iBin in range(len(centerI)):
-            if iBin == len(centerI) - 1:
-                medians.append(0)
-                mediansOK.append(0)
-                break
-            if iHisto[:iBin].sum() < halfSum <= iHisto[:iBin + 1].sum():
-                medians.append((halfSum - iHisto[:iBin].sum())*(edgeI[iBin+1]-edgeI[iBin])/(iHisto[:iBin + 1].sum()-iHisto[:iBin ].sum()) + edgeI[iBin])
-                mediansOK.append(1)
-                break
-                
+        halfSum = sumHisto/2
+        for iBin in range(nBinsI):
+             if iBin == nBinsI - 1:
+                 medians.append(0)
+                 mediansOK.append(0)
+                 break
+             if cumsumHisto[iBin] < halfSum <= cumsumHisto[iBin + 1]:
+                 medians.append((halfSum - cumsumHisto[iBin]) * (edgeI[iBin + 1] - edgeI[iBin]) / (iHisto[iBin+1]) +edgeI[iBin])
+                 mediansOK.append(1)
+                 break
+
         for i, iQuantile in enumerate(options['quantiles']):
             quantileLimit =iHisto.sum()*iQuantile/100
-            for iBin in range(len(centerI) - 1):
-                if iBin == len(centerI) - 1:
+            for iBin in range(nBinsI - 1):
+                if iBin == nBinsI - 1:
                     quantiles[i].append(0)
                     quantilesOK[i].append(0)
                     break
