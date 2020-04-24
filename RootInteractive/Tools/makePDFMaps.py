@@ -17,12 +17,12 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
         L = localHist.shape[iDim]                               #  summing all of these will end a merged version of histograms
                                                                 #
         iSlice = [slice(None)] * len(localHist.shape)           #   Ex:  Assume we have: [a b c d e] for an array and apply w=1
-        iSlice[iDim] = slice(w, L - w)                          #         
+        iSlice[iDim] = slice(w, L - w)                          #
         dummy = localHist[tuple(iSlice)]                        #                   First we trim orginal array as: [b c d]
                                                                 #    then produce two more arrays for w=-1 and w=1: [a b c]
         for i in range(1, w + 1):                               #                                                   [c d e]    +
-            iSlice = [slice(None)] * len(localHist.shape)       #                                             ------------------              
-            iSlice[iDim] = slice(w + i, L - w + i)              #                                                [a+b+c   b+c+d   c+d+e]   
+            iSlice = [slice(None)] * len(localHist.shape)       #                                             ------------------
+            iSlice[iDim] = slice(w + i, L - w + i)              #                                                [a+b+c   b+c+d   c+d+e]
             dummy += localHist[tuple(iSlice)]                   #
                                                                 #
             iSlice = [slice(None)] * len(localHist.shape)       #  and every iteration it passed merge histogram to next iteretion to apply width to next dimension
@@ -31,8 +31,8 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
 
         localHist = dummy
         binList[iDim] = binList[iDim][slice(w, L - w)]          # trim the edges of list of bins
-        localAxes[iDim] = localAxes[iDim][slice(w, L - w + 1)]  # trim the axes 
-    
+        localAxes[iDim] = localAxes[iDim][slice(w, L - w + 1)]  # trim the axes
+
     CenterList = []                                             # initialize list of bin Centers
     binEdgeList = []                                            # initialize list of bin Edges
     for axis in localAxes:
@@ -42,16 +42,16 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
 
     newSliceList = []
     for iDim, iSlice in enumerate(slices):                                          # rearranging slice according to width
-        jSlice = slice(iSlice[0] - iSlice[3], iSlice[1] - iSlice[3], iSlice[2]) 
+        jSlice = slice(iSlice[0] - iSlice[3], iSlice[1] - iSlice[3], iSlice[2])
 
-        if jSlice.start < 0 or jSlice.stop > localHist.shape[iDim]:         
+        if jSlice.start < 0 or jSlice.stop > localHist.shape[iDim]:
             raise ValueError("Range and width of {}th dimension is not compatible: {}".format(iDim, iSlice))
 
         newSliceList.append(jSlice)
 
     npSlice = tuple(newSliceList)
 
-    histogram = localHist[npSlice]                  # apply the slicing 
+    histogram = localHist[npSlice]                  # apply the slicing
     localCenter = []
     localNumbers = []
     localBinEdge = []
@@ -65,16 +65,16 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
     localNumbers.pop(dimI)                      # the bin centers for dimension of interest is stored at centerI to calculate mean etc.
     edgeI = localBinEdge.pop(dimI)
 
-    mesharrayNumbers = np.array(np.meshgrid(*localNumbers, indexing='ij'))  # 
-    binNumbers = []                                                         # 
+    mesharrayNumbers = np.array(np.meshgrid(*localNumbers, indexing='ij'))  #
+    binNumbers = []                                                         #
     for el in mesharrayNumbers:                                             #
-        binNumbers.append(el.flatten())                                     #        
-                                                                            # using mesharray, n-dimensional coordinate arrays are produced for both bbin number and bin centers  
+        binNumbers.append(el.flatten())                                     #
+                                                                            # using mesharray, n-dimensional coordinate arrays are produced for both bbin number and bin centers
     mesharrayCenter = np.array(np.meshgrid(*localCenter, indexing='ij'))    # by flattening them thaey are compatible for panda dataframe
-    binCenters = []                                                         # 
+    binCenters = []                                                         #
     for el in mesharrayCenter:                                              #
-        binCenters.append(el.flatten())                                     # 
-                                                                             
+        binCenters.append(el.flatten())                                     #
+
     newHistogram = np.rollaxis(histogram, dimI, 0)      # move dimension of interest to the dimension-0
 
     histoList = []
@@ -106,18 +106,16 @@ def makePdfMaps(histo, slices, dimI, **kwargs):
             meansOK.append(0)
 
         halfSum = sumHisto/2
-        for iBin in range(nBinsI):
-             if iBin == nBinsI - 1:
-                 medians.append(0)
-                 mediansOK.append(0)
-                 break
-             if cumsumHisto[iBin] < halfSum <= cumsumHisto[iBin + 1]:
-                 medians.append((halfSum - cumsumHisto[iBin]) * (edgeI[iBin + 1] - edgeI[iBin]) / (iHisto[iBin+1]) +edgeI[iBin])
-                 mediansOK.append(1)
-                 break
+        iBin = np.searchsorted(cumsumHisto,halfSum,'right')-1
+        if iBin == nBinsI - 1:
+            medians.append(0)
+            mediansOK.append(0)
+        else:
+            medians.append((halfSum - cumsumHisto[iBin]) * (edgeI[iBin + 1] - edgeI[iBin]) / (iHisto[iBin+1]) +edgeI[iBin])
+            mediansOK.append(1)
 
         for i, iQuantile in enumerate(options['quantiles']):
-            quantileLimit =iHisto.sum()*iQuantile/100
+            quantileLimit = sumHisto*iQuantile/100
             for iBin in range(nBinsI - 1):
                 if iBin == nBinsI - 1:
                     quantiles[i].append(0)
