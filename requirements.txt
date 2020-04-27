@@ -3,9 +3,9 @@ scipy
 pandas
 anytree
 ## root dependencies
-root_pandas
+## root_pandas
 ##---------------------   graphics  dependencies
-bokeh<2.0
+bokeh
 matplotlib
 plotly
 qgrid
