@@ -17,7 +17,7 @@ runtime
 request
 # ---------------------    machine learning dependencies
 sklearn
-scikit-garden
+#scikit-garden
 scikit-hep
 forestci
 tensorflow
