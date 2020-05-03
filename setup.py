@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.17',
+    version='v0.00.18',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -25,7 +25,7 @@ setup(
         ## root dependencies
         'root_pandas',
         ##---------------------   graphics  dependencies
-        'bokeh<2',
+        'bokeh<2,>1',
         'matplotlib',
         'plotly',
         'qgrid',
