@@ -3,6 +3,7 @@ scipy
 pandas
 anytree
 ## root dependencies
+uproot
 ## root_pandas
 ##---------------------   graphics  dependencies
 bokeh<2
