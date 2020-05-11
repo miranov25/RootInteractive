@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.19',
+    version='v0.00.19b',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -23,7 +23,7 @@ setup(
         'pytest',
         'nbval',
         ## root dependencies
-        'uproot'
+        'uproot',
         #'root_pandas',
         ##---------------------   graphics  dependencies
         'bokeh<2,>1',
