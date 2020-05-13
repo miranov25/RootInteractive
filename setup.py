@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.19b',
+    version='v0.00.20b',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -20,7 +20,6 @@ setup(
         'scipy',
         'pandas',
         'anytree',
-        'pytest',
         'nbval',
         ## root dependencies
         'uproot',
@@ -38,7 +37,7 @@ setup(
         'request',
         # ---------------------    machine learning dependencies
         'sklearn',
-        'scikit-garden',
+        # 'scikit-garden',
         'scikit-hep',
         'forestci',
         'tensorflow',
