@@ -23,6 +23,7 @@ setup(
         'nbval',
         ## root dependencies
         'uproot',
+        'iminuit',
         #'root_pandas',
         ##---------------------   graphics  dependencies
         'bokeh<2,>1',
