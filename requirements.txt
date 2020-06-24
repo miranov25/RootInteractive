@@ -2,6 +2,7 @@ numpy
 scipy
 pandas
 anytree
+tabulate
 ## root dependencies
 uproot
 iminuit

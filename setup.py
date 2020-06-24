@@ -21,6 +21,7 @@ setup(
         'pandas',
         'anytree',
         'nbval',
+        'tabulate'
         ## root dependencies
         'uproot',
         'iminuit',
