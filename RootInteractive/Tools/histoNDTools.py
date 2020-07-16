@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import logging
 import sys
+import torch
 from bokeh.models import *
 from bokeh.palettes import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
+from RootInteractive.Tools.Histograms.histogramdd import histogramdd as histogramdd_pytorch
 from bokeh.palettes import *
 
 if "ROOT" in sys.modules:
@@ -16,7 +18,8 @@ if "ROOT" in sys.modules:
 histoNDOptions = {
     "verbose": 0,
     "colors": Category10,
-    "plotLegendFormat": "%d"
+    "plotLegendFormat": "%d",
+    "use_pytorch": False
 }
 
 
@@ -59,7 +62,12 @@ def makeHistogram(data, hisString, **kwargs):
         logging.info("Variable list   :%s", varList)
         logging.info("Histogram bins  :%s", bins)
         logging.info("Histogram range :%s", hRange)
-    H, axis = np.histogramdd(data.query(selection)[varList].values, bins=bins, range=hRange)
+    if options['use_pytorch']:
+        H, axis = histogramdd_pytorch(torch.from_numpy(data.query(selection)[varList].values).T, bins=bins, range=hRange)
+        H = H.numpy()
+        axis = [i.numpy() for i in axis]
+    else:
+        H, axis = np.histogramdd(data.query(selection)[varList].values, bins=bins, range=hRange)
     return {"H": H, "axes": axis, "name": histoInfo[0], "varNames": varList}
 
 
@@ -202,7 +210,7 @@ def bokehDrawHistoSliceColz(histo, hSlice, axisX, axisColor, axisStep, figOption
 
 def parseProjectionExpression(projectionExpression):
     """
-    
+
     :param projectionExpression: (variableExpression)(sliceExpression)(projection)(stat)
     :return:
     example:
