@@ -11,7 +11,8 @@ from RootInteractive.Tools.histoNDTools import *
 histogramNDOptions = {
     "verbose": 0,
     "colors": Category10,
-    "plotLegendFormat": "%d"
+    "plotLegendFormat": "%d",
+    "use_pytorch": False
 }
 
 
@@ -384,7 +385,7 @@ class histogramNDProjection(object):
         for axe in axes:
             for i in range(len(tmp)):
                 if not (axe[i] == tmp[i]).all():
-                    raise ValueError("histograms have incompatible axeses.")
+                    raise ValueError("histograms have incompatible axes.")
         axes = tmp
 
         for iFunc in func_list:
