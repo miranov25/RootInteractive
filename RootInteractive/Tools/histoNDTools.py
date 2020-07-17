@@ -6,7 +6,7 @@ import torch
 from bokeh.models import *
 from bokeh.palettes import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
-from RootInteractive.Tools.Histograms.histogramdd import histogramdd as histogramdd_pytorch
+from RootInteractive.Tools.Histograms.histogramdd_pytorch import histogramdd as histogramdd_pytorch
 from bokeh.palettes import *
 
 if "ROOT" in sys.modules:
