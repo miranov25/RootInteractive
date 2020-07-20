@@ -9,6 +9,33 @@ import torch
 _range = range
 
 def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
+    r"""
+    Function to create N-dimensional histograms
+    :param sample:            Tensor
+        D by N Tensor, i-th row being the list of positions in the i-th coordinate, j-th column being the coordinates of j-th item
+    :param bins:       Tensor, sequence or int, optional
+        Tensor:
+        (Will probably remove this)
+        sequence of Tensors:
+        Each Tensor defines the bins on each axis
+        sequence of D ints:
+        each int signifies the number of bins in each dimension
+        int:
+        signifies the number of ints in each dimension
+    :param range:           sequence, optional
+        Each item in the sequence is either a (min,max) Tuple, or None, in which case the edges are calculated as the minimum and maximum of input data
+    :param remove_overflow: bool, optional, default True
+        Whether the overflow bins should be included in the final histogram or not
+    :return:
+        Histogram with axes
+            * H              - Tensor - the histogram
+            * axis           - list of Tensors - axis description
+        Example usage:
+        >>> r = torch.randn(3,100)
+        >>> H,axes = histogramdd(r,bins = (4,3,7))
+        >>> H.shape
+        (4,3,7)
+    """
     edges=None
     device=None
     custom_edges = False
