@@ -115,8 +115,8 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
                             r[0,i] = 0
                             r[1,i] = 1
                         else:
-                            r[0,i]=torch.min(sample[:,i])[0]
-                            r[1,i]=torch.max(sample[:,i])[0]
+                            r[0,i]=torch.min(sample[:,i])
+                            r[1,i]=torch.max(sample[:,i])
                 range = r.to(device=device,dtype=sample.dtype)
             singular_range = torch.eq(range[0],range[1]) #If the range consists of only one point, pad it up
             range[0,singular_range] -= .5
