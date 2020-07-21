@@ -108,6 +108,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
             elif not torch.is_tensor(range): #range is a tuple
                 r = torch.empty(2,D)
                 for i in _range(D):
+                    if bins[i] <= 0 raise ValueError("Number of bins must be positive.")
                     if range[i] is not None:
                         r[:,i] = torch.as_tensor(range[i])
                     else:
@@ -121,6 +122,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
             singular_range = torch.eq(range[0],range[1]) #If the range consists of only one point, pad it up
             range[0,singular_range] -= .5
             range[1,singular_range] += .5
+            if torch.any(range[0] > range[1]) raise ValueError("Max must be greater than min in range parameters.")
             edges = [torch.linspace(range[0,i],range[1,i],bins[i]+1) for i in _range(len(bins))]
             tranges = torch.empty_like(range)
             tranges[1,:] = bins/(range[1,:]-range[0,:])
