@@ -64,7 +64,7 @@ pip install scikit-garden
 pip install beakerx pandas ipywidgets
 pip install plot runtime
 pip install plotly
-pip install request
+pip install requests
 pip install bqplot
 pip install qgrid
 pip install ipympl

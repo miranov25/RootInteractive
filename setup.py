@@ -36,7 +36,7 @@ setup(
         # ----------------------   jupyter notebook dependencies
         'ipywidgets',
         'runtime',
-        'request',
+        'requests',
         # ---------------------    machine learning dependencies
         'sklearn',
         # 'scikit-garden',
