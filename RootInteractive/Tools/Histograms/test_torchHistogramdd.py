@@ -23,7 +23,7 @@ def test_histogram_uniform(seed,N,D,bins):
     assert len(axes) == D, "Number of axes invalid"
     assert torch.sum(H) <= N, "Sum of histogram too high"
     for i in range(len(axes)):
-        assert len(axes[i]) == bins[i]+1, "Invslid number of edges"
+        assert len(axes[i]) == bins[i]+1, "Invalid number of edges"
 
 def test_invalid_range():
     sample = torch.Tensor([[1,2,0,7],[2,1,4,6],[3,5,1,0]])
@@ -33,3 +33,12 @@ def test_invalid_range():
     except ValueError:
         ok = True
     assert ok, "Accepted garbage input: invalid range"
+
+def test_invalid_bins():
+    sample = torch.Tensor([[1,2,0,7],[2,1,4,6],[3,5,1,0]])
+    try:
+        H,axes = histogramdd_pytorch(sample,bins = [3,4,0], range=9)
+        ok = False
+    except ValueError:
+        ok = True
+    assert ok, "Accepted garbage input: bins must be positive"
