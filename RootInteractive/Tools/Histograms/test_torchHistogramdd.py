@@ -22,6 +22,7 @@ def test_histogram_uniform(seed,N,D,bins):
     Hnp,npaxes = np.histogramdd(sample.T.cpu().numpy(),bins)
     assert len(axes) == D, "Number of axes invalid"
     assert torch.sum(H) <= N, "Sum of histogram too high"
+    assert torch.max(torch.abs(H - Hnp)) <= 1, "Histogram inconsistent with numpy histogram"
     for i in range(len(axes)):
         assert len(axes[i]) == bins[i]+1, "Invalid number of edges"
 
@@ -37,7 +38,7 @@ def test_invalid_range():
 def test_invalid_bins():
     sample = torch.Tensor([[1,2,0,7],[2,1,4,6],[3,5,1,0]])
     try:
-        H,axes = histogramdd_pytorch(sample,bins = [3,4,0], range=9)
+        H,axes = histogramdd_pytorch(sample,bins = [3,4,0])
         ok = False
     except ValueError:
         ok = True
