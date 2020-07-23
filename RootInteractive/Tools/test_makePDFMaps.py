@@ -16,7 +16,7 @@ def randomData(nPoints=100000):
 
 def test_makePDF():
     df = randomData(1000000)
-    histo = makeHistogram(df, "value:A:B:C:D:#A>0>>myhisto(40,-2,2,40,0,1,30,0,1,50,0,1,20,0,1)")
+    histo = makeHistogram(df, "value:A:B:C:D:#A>0>>myhisto(40,-2,2,40,0,1,30,0,1,50,0,1,20,0,1)",use_pytorch=True)
 
     slices = ((0, 40, 1, 0), (10, 30, 1, 1), (10, 24, 5, 1), (1, 49, 3, 1), (0, 10, 3, 0))
     dimI = 0

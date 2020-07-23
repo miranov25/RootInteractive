@@ -9,33 +9,6 @@ import torch
 _range = range
 
 def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
-    r"""
-    Function to create N-dimensional histograms
-    :param sample:            Tensor
-        D by N Tensor, i-th row being the list of positions in the i-th coordinate, j-th column being the coordinates of j-th item
-    :param bins:       Tensor, sequence or int, optional
-        Tensor:
-        (Will probably remove this)
-        sequence of Tensors:
-        Each Tensor defines the bins on each axis
-        sequence of D ints:
-        each int signifies the number of bins in each dimension
-        int:
-        signifies the number of ints in each dimension
-    :param range:           sequence, optional
-        Each item in the sequence is either a (min,max) Tuple, or None, in which case the edges are calculated as the minimum and maximum of input data
-    :param remove_overflow: bool, optional, default True
-        Whether the overflow bins should be included in the final histogram or not
-    :return:
-        Histogram with axes
-            * H              - Tensor - the histogram
-            * axis           - list of Tensors - axis description
-        Example usage:
-        >>> r = torch.randn(3,100)
-        >>> H,axes = histogramdd(r,bins = (4,3,7))
-        >>> H.shape
-        (4,3,7)
-    """
     edges=None
     device=None
     custom_edges = False
@@ -78,10 +51,6 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
         custom_edges = True
         edges = bins
         bins = torch.full([D],bins.size(1)-1,dtype=torch.long,device=device)
-    if torch.any(bins <= 0):
-        raise ValueError(
-        'The number of bins must be a positive integer.'
-        )
     if custom_edges:
         use_old_edges = False
         if not torch.is_tensor(edges):
@@ -118,15 +87,12 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
                         if N == 0: #Edge case: empty histogram
                             r[0,i] = 0
                             r[1,i] = 1
-                        else:
-                            r[0,i]=torch.min(sample[:,i])
-                            r[1,i]=torch.max(sample[:,i])
+                        r[0,i]=torch.min(sample[:,i])[0]
+                        r[1,i]=torch.max(sample[:,i])[0]
                 range = r.to(device=device,dtype=sample.dtype)
             singular_range = torch.eq(range[0],range[1]) #If the range consists of only one point, pad it up
             range[0,singular_range] -= .5
             range[1,singular_range] += .5
-            if torch.any(range[0] > range[1]):
-                 raise ValueError("Max must be greater than min in range parameters.")
             edges = [torch.linspace(range[0,i],range[1,i],bins[i]+1) for i in _range(len(bins))]
             tranges = torch.empty_like(range)
             tranges[1,:] = bins/(range[1,:]-range[0,:])
