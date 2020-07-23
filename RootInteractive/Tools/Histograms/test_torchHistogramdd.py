@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from RootInteractive.Tools.Histograms.histogramdd_pytorch import histogramdd as histogramdd_pytorch
+import itertools
 
 def test_histogram_singular():
     H,axes = histogramdd_pytorch(torch.zeros(5,100000),9)
@@ -28,6 +29,10 @@ def test_histogram_uniform(seed,N,D,bins):
 
 @pytest.mark.parametrize("seed, N, D, bins",[(665162135,100000,5,[9,8,9,10,2]),(665162135,100000,4,[9,2,4,42])])
 def test_histogram_uniform_randombins(seed,N,D,bins):
+    try:
+        from torch import searchsorted
+    except ImportError:
+        pytest.skip("Current Pytorch version doesn't supoport searchsorted")
     torch.random.manual_seed(seed)
     sample = torch.rand(D,N)
     nbins = bins
@@ -59,6 +64,10 @@ def test_invalid_bins():
     assert ok, "Accepted invalid input: bins must be positive"
 
 def test_invalid_bins_custombinning_empty_axis():
+    try:
+        from torch import searchsorted
+    except ImportError:
+        pytest.skip("Current Pytorch version doesn't supoport searchsorted")
     sample = torch.Tensor([[1,2,0,7],[2,1,4,6],[3,5,1,0]])
     try:
         H,axes = histogramdd_pytorch(sample,bins = [torch.tensor([1,2,3]),torch.tensor([2,3,4]),torch.tensor([1])])
