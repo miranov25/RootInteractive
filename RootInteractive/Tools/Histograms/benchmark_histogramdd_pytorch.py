@@ -11,6 +11,12 @@ import timeit
 from matplotlib import pyplot as plt
 from histogramdd_pytorch import histogramdd
 
+try:
+    from torch import searchsorted
+    searchsorted_available = True
+except ImportError:
+    searchsorted_available = False
+
 torch.random.manual_seed(19680801)
 torch.cuda.manual_seed_all(19680801)
 np.random.seed(19680801)
@@ -52,15 +58,13 @@ def histogramdd_synchronized(*args,**kwargs):
     return hist
 
 n = 100
-time_cpu = torch.empty((4,6))
-time_cpu_workaround = torch.empty((4,6))
-time_cuda = torch.empty((4,6))
-time_cuda_workaround = torch.empty((4,6))
-time_numpy = torch.empty((4,6))
+time_cpu = np.empty((4,6))
+time_cuda = np.empty((4,6))
+time_numpy = np.empty((4,6))
 
-time_cpu_e = torch.empty((4,6))
-time_cuda_e = torch.empty((4,6))
-time_numpy_e = torch.empty((4,6))
+time_cpu_e = np.empty((4,6))
+time_cuda_e = np.empty((4,6))
+time_numpy_e = np.empty((4,6))
 for j in range(6):
     for i in range(3,7):
         print("n= ",n,"d= ",i)
@@ -93,73 +97,83 @@ for j in range(6):
         time_numpy[i-3,j] = min(t)
         print("Numpy: ",min(t),sep='\t')
 
-        t = timeit.repeat(
-                stmt="histogramdd(sample,bins)",
-                setup="sample,bins = get_tensors_edges(n,i,device='cpu')",
-                globals=globals(),
-                repeat=20,
-                number=1
-                )
-        time_cpu_e[i-3,j] = min(t)
-        print("CPU: ",min(t),sep='\t')
-        if torch.cuda.is_available():
+        if searchsorted_available:
             t = timeit.repeat(
-                    stmt="histogramdd_synchronized(sample,bins)",
-                    setup="sample,bins = get_tensors_edges(n,i,device='cuda')",
+                    stmt="histogramdd(sample,bins)",
+                    setup="sample,bins = get_tensors_edges(n,i,device='cpu')",
                     globals=globals(),
                     repeat=20,
                     number=1
                     )
-            time_cuda_e[i-3,j] = min(t)
-            print("CUDA: ",min(t),sep='\t')
-        t = timeit.repeat(
-                stmt="np.histogramdd(sample,bins)",
-                setup="sample,bins = get_arrays_edges(n,i)",
-                globals=globals(),
-                repeat=20,
-                number=1
-                )
-        time_numpy_e[i-3,j] = min(t)
-        print("Numpy: ",min(t),sep='\t')
+            time_cpu_e[i-3,j] = min(t)
+            print("CPU: ",min(t),sep='\t')
+            if torch.cuda.is_available():
+                t = timeit.repeat(
+                        stmt="histogramdd_synchronized(sample,bins)",
+                        setup="sample,bins = get_tensors_edges(n,i,device='cuda')",
+                        globals=globals(),
+                        repeat=20,
+                        number=1
+                        )
+                time_cuda_e[i-3,j] = min(t)
+                print("CUDA: ",min(t),sep='\t')
+            t = timeit.repeat(
+                    stmt="np.histogramdd(sample,bins)",
+                    setup="sample,bins = get_arrays_edges(n,i)",
+                    globals=globals(),
+                    repeat=20,
+                    number=1
+                    )
+            time_numpy_e[i-3,j] = min(t)
+            print("Numpy: ",min(t),sep='\t')
 
     n *= 10
 
 fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
 ax1.set_title("d=3")
 ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cpu[0,:],label='CPU')
-ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[0,:],label='CUDA')
+if torch.cuda.is_available():
+    ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[0,:],label='CUDA')
 ax1.loglog([100,1000,10000,100000,1000000,10000000],time_numpy[0,:],label='Numpy')
 ax2.set_title("d=4")
 ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cpu[1,:],label='CPU')
-ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[1,:],label='CUDA')
+if torch.cuda.is_available():
+    ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[1,:],label='CUDA')
 ax2.loglog([100,1000,10000,100000,1000000,10000000],time_numpy[1,:],label='Numpy')
 ax3.set_title("d=5")
 ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cpu[2,:],label='CPU')
-ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[2,:],label='CUDA')
+if torch.cuda.is_available():
+    ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[2,:],label='CUDA')
 ax3.loglog([100,1000,10000,100000,1000000,10000000],time_numpy[2,:],label='Numpy')
 ax4.set_title("d=6")
 ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cpu[3,:],label='CPU')
-ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[3,:],label='CUDA')
+if torch.cuda.is_available():
+    ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cuda[3,:],label='CUDA')
 ax4.loglog([100,1000,10000,100000,1000000,10000000],time_numpy[3,:],label='Numpy')
 ax4.legend()
 fig.show()
 
-fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
-ax1.set_title("d=3")
-ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[0,:],label='CPU')
-ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[0,:],label='CUDA')
-ax1.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[0,:],label='Numpy')
-ax2.set_title("d=4")
-ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[1,:],label='CPU')
-ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[1,:],label='CUDA')
-ax2.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[1,:],label='Numpy')
-ax3.set_title("d=5")
-ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[2,:],label='CPU')
-ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[2,:],label='CUDA')
-ax3.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[2,:],label='Numpy')
-ax4.set_title("d=6")
-ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[3,:],label='CPU')
-ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[3,:],label='CUDA')
-ax4.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[3,:],label='Numpy')
-ax4.legend()
-fig.show()
+if searchsorted_available:
+    fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
+    ax1.set_title("d=3")
+    ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[0,:],label='CPU')
+    if torch.cuda.is_available():
+        ax1.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[0,:],label='CUDA')
+    ax1.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[0,:],label='Numpy')
+    ax2.set_title("d=4")
+    ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[1,:],label='CPU')
+    if torch.cuda.is_available():
+        ax2.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[1,:],label='CUDA')
+    ax2.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[1,:],label='Numpy')
+    ax3.set_title("d=5")
+    ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[2,:],label='CPU')
+    if torch.cuda.is_available():
+        ax3.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[2,:],label='CUDA')
+    ax3.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[2,:],label='Numpy')
+    ax4.set_title("d=6")
+    ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cpu_e[3,:],label='CPU')
+    if torch.cuda.is_available():
+        ax4.loglog([100,1000,10000,100000,1000000,10000000],time_cuda_e[3,:],label='CUDA')
+    ax4.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[3,:],label='Numpy')
+    ax4.legend()
+    fig.show()
