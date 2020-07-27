@@ -160,14 +160,14 @@ fig.show()
 output_string = "Benchmark results: \n"
 output_string += "Numpy: \n"
 output_string += tabulate(time_numpy*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-output_string += "\n"
+output_string += "\n\n"
 output_string += "PyTorch CPU: \n"
 output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-output_string += "\n"
+output_string += "\n\n"
 if torch.cuda.is_available():
     output_string += "PyTorch CUDA: \n"
     output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-    output_string += "\n"
+    output_string += "\n\n"
 
 if searchsorted_available:
     fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
@@ -195,14 +195,14 @@ if searchsorted_available:
     fig.show()
     output_string += "Numpy: \n"
     output_string += tabulate(time_numpy*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-    output_string += "\n"
+    output_string += "\n\n"
     output_string += "PyTorch CPU: \n"
     output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-    output_string += "\n"
+    output_string += "\n\n"
     if torch.cuda.is_available():
         output_string += "PyTorch CUDA: \n"
         output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
-        output_string += "\n"
+        output_string += "\n\n"
 
 print(output_string)
 if create_output_file:
