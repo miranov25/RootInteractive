@@ -8,6 +8,8 @@ Created on Sat Mar 14 16:32:34 2020
 import numpy as np
 import torch
 import timeit
+from tabulate import tabulate
+import io
 from matplotlib import pyplot as plt
 from histogramdd_pytorch import histogramdd
 
@@ -20,6 +22,8 @@ except ImportError:
 torch.random.manual_seed(19680801)
 torch.cuda.manual_seed_all(19680801)
 np.random.seed(19680801)
+
+create_output_file = True
 
 def get_tensors(n,d=3,device=None):
     x = torch.rand((d,n),device=device)
@@ -153,6 +157,18 @@ ax4.loglog([100,1000,10000,100000,1000000,10000000],time_numpy[3,:],label='Numpy
 ax4.legend()
 fig.show()
 
+output_string = "Benchmark results: \n"
+output_string += "Numpy: \n"
+output_string += tabulate(time_numpy*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+output_string += "\n"
+output_string += "PyTorch CPU: \n"
+output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+output_string += "\n"
+if torch.cuda.is_available():
+    output_string += "PyTorch CUDA: \n"
+    output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+    output_string += "\n"
+
 if searchsorted_available:
     fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
     ax1.set_title("d=3")
@@ -177,3 +193,19 @@ if searchsorted_available:
     ax4.loglog([100,1000,10000,100000,1000000,10000000],time_numpy_e[3,:],label='Numpy')
     ax4.legend()
     fig.show()
+    output_string += "Numpy: \n"
+    output_string += tabulate(time_numpy*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+    output_string += "\n"
+    output_string += "PyTorch CPU: \n"
+    output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+    output_string += "\n"
+    if torch.cuda.is_available():
+        output_string += "PyTorch CUDA: \n"
+        output_string += tabulate(time_cpu*1000,["1e2","1e3","1e4","1e5","1e6","1e7"],showindex=[3,4,5,6],tablefmt="github")
+        output_string += "\n"
+
+print(output_string)
+if create_output_file:
+    f = open("benchmark_histogramdd_pytorch.md","w")
+    f.write(output_string)
+    f.close()
