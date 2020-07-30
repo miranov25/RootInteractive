@@ -17,7 +17,7 @@ def test_histogram_empty():
 
 @pytest.mark.parametrize("seed, N, D, bins, device",[(665162135,100000,5,[9,8,9,10,2],"cpu:0"),(665162135,100000,4,[9,2,4,42],"cuda:0")])
 def test_histogram_uniform(seed,N,D,bins,device):
-    if device == "cuda:0" and not torch.cuda.is_available:
+    if device == "cuda:0" and not torch.cuda.is_available():
         pytest.skip("CUDA is not available with pytorch")
     torch.random.manual_seed(seed)
     sample = torch.rand(D,N,device=device)
@@ -31,7 +31,7 @@ def test_histogram_uniform(seed,N,D,bins,device):
 
 @pytest.mark.parametrize("seed, N, D, bins, device",[(665162135,100000,5,[9,8,9,10,2],"cpu:0"),(665162135,100000,4,[9,2,4,42],"cuda:0")])
 def test_histogram_uniform_randombins(seed,N,D,bins,device):
-    if device == "cuda:0" and not torch.cuda.is_available:
+    if device == "cuda:0" and not torch.cuda.is_available():
         pytest.skip("CUDA is not available with pytorch")
     try:
         from torch import searchsorted
