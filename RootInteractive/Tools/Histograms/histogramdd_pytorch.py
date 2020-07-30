@@ -73,7 +73,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
                 bins[i] = edges[i].size(0)-1
             bins = bins.to(device)
         else:
-            bins = torch.as_tensor(bins)
+            bins = torch.as_tensor(bins).to(device)
     if bins.dim() == 2:
         custom_edges = True
         edges = bins
