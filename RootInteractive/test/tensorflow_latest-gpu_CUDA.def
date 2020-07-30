@@ -1,0 +1,76 @@
+Bootstrap: docker
+# https://hub.docker.com/r/tensorflow/tensorflow/tags
+From: tensorflow/tensorflow:2.2.0-gpu-jupyter
+
+%help
+    This Singularity definition contains
+        -
+        - tensorflow-datasets
+        - tensorflow/models examples
+    To enable aliroot from cvmfs:
+        - environment-modules to be installed in container to enable alienv
+        - singularity shell –B /cvmfs
+        - source /cvmfs/alice.cern.ch/etc/login.sh
+        - alienv enter AliPhysics
+    Build as:
+        -
+    Run 'ipython' for an interactive python shell
+    Run 'jupyter notebook' to startup a jupyter notebook server
+    Run 'benchmark.sh' to start the TF benchmark
+
+%environment
+#    source /alicesw/root/bin/thisroot.sh - soruce doesn not work here  sourcing with .
+    .  /cvmfs/alice.cern.ch/etc/login.sh
+%files
+    # Copy cifar10 example script
+    benchmark.sh /usr/local/bin/benchmark.sh
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y mlocate
+    apt-get install -y less mc nano vim
+    apt-get install -y environment-modules
+    # see https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html 
+    apt-get  install -y curl libcurl4-gnutls-dev build-essential gfortran cmake libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev libyaml-cpp-dev rsync lsb-release unzip environment-modules libglfw3-dev
+    #apt-getinstall -y python3-tk
+    #apt-get install -y python36-tkinter
+    #apt-get install -y mc
+    #apt-get install -y  ncurses-devel zlib-devel texinfo gtk+-devel gtk2-devel tcl-devel tk-devel
+    #
+    python3 -m pip install conda
+    #python3 -m conda install pytorch torchvision cudatoolkit=10.2 -c pytorch-nightly  # not working with toolkit
+    #python3 -m conda install pytorch torchvision  -c pytorch-nightly -p /usr/local/    # not working with toolkit
+    python3 -m pip install torch torchvision
+    # python3 -m pip install torch torchvision tensorflow_probability iminuit
+    python3 -m pip install tensorflow_probability iminuit
+    python3 -m pip install tensorflow-datasets pytest pandas bokeh==1.4.0 anytree ipywidgets tabulate
+    python3 -m pip install jax
+    python3 -m pip install git+https://github.com/miranov25/RootInteractive
+    #
+    cd /opt
+    git clone https://github.com/tensorflow/models
+    #
+    #mkdir /alicesw/
+    #cd /alicesw/
+    #wget https://root.cern/download/root_v6.20.04.Linux-centos7-aarch64-gcc4.8.tar.gz
+    #tar xvfz root_v6.20.04.Linux-centos7-aarch64-gcc4.8.tar.gz
+    # install benchmarks
+    mkdir -p /benchmarks/
+    cd /benchmarks/
+    git clone  https://github.com/tensorflow/benchmarks tensorlow_benchmarks
+    git clone  https://github.com/elombardi2/pytorch-gpu-benchmark pytorch-gpu-benchmark
+    updatedb
+    rm -f /var/cache/apt/archives/lock
+%runscript
+
+    echo "Clone of tensorflow-rocm example container"
+    echo "   github.com/sylabs/examples"
+    echo
+    echo "Run 'ipython' for an interactive python shell"
+    echo "Run 'jupyter notebook' to startup a jupyter notebook server"
+    echo "Run 'benchmark.sh' to start the TF benchmark"
+    echo
+    bash
+
+%labels
+    Maintainer "marian.ivanov@cern.ch"
