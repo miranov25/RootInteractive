@@ -61,7 +61,7 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
     git clone  https://github.com/elombardi2/pytorch-gpu-benchmark pytorch-gpu-benchmark
     updatedb
     rm -f /var/cache/apt/archives/lock
-    pytest /usr/local/lib/python3.6/dist-packages/RootInteractive
+    #pytest /usr/local/lib/python3.6/dist-packages/RootInteractive
 
 %runscript
 
