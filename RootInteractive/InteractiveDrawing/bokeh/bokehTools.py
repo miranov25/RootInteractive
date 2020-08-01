@@ -441,7 +441,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
                     err_y_y.append((coord_y - y_err, coord_y + y_err))
                 p2.multi_line(err_y_x, err_y_y)
             p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'],
-                       marker=bokehMarkers[fIndex % 4], legend=varX + y)
+                       marker=bokehMarkers[fIndex % 4], legend_label=varX + y)
             if options['line'] > 0: p2.line(x=varX, y=y, source=source)
             p2.legend.click_policy = "hide"
             fIndex += 1
@@ -638,7 +638,14 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
                             color=optionLocal["color"],
-                            marker=optionLocal["marker"], legend=varY + " vs " + varX)
+                            marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
+            if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
+                err_y_x = []
+                err_y_y = []
+                for coord_x, coord_y, y_err in zip(source.data[varNameX], source.data[varNameY], source.data[optionLocal['errY']]):
+                    err_y_x.append((coord_x, coord_x))
+                    err_y_y.append((coord_y - y_err, coord_y + y_err))
+                #figureI.multi_line(err_y_x, err_y_y)
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"

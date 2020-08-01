@@ -26,6 +26,7 @@ df["AA"]=(df.A*10).round(0)/10.
 df["CC"]=(df.C*5).round(0)
 df["DD"]=(df.D*2).round(0)
 df["EE"]=(df.E*4).round(0)
+df['errY']=df.A*0.02+0.02;
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
@@ -33,11 +34,11 @@ df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisT
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
-    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C"}],
+    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
     [['A'], ['C+A', 'C-A']],
-    [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C"}],
-    [['D'], ['(A+B+C)*D'], {"size": 10}],
-    [['D'], ['D*10'], {"size": 10, "errY": "D"}],
+    [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
+    [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
+    [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
 ]
 #widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
@@ -91,5 +92,5 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArraySA()
 #testOldInterface_tree()
 #testBokehDrawArraySA_tree()
-#testBokehDrawArrayWidget()
+testBokehDrawArrayWidget()
 #testBokehDrawArrayWidgetNoScale()
