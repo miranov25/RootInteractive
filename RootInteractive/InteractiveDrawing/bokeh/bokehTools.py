@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, Band
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -90,7 +90,7 @@ def makeJScallback(widgetDict, **kwargs):
             code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
             # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
             code += f"      isSelected&=((dataOrig[\"{key}\"][i]=={key}Value))|isOK;\n"
-    code += """      
+    code += """
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected) nSelected++;
         if (isSelected){
@@ -100,7 +100,7 @@ def makeJScallback(widgetDict, **kwargs):
     code += """
         }
     }
-    console.log(\"nSelected:%d\",nSelected); 
+    console.log(\"nSelected:%d\",nSelected);
     cdsSel.change.emit();
     """
     if options["verbose"] > 0:
@@ -557,9 +557,22 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             lengthX = len(variables[0])
             lengthY = len(variables[1])
             length = max(len(variables[0]), len(variables[1]))
+            if len(variables) > 2:
+                optionLocal = options.copy()
+                optionLocal.update(variables[2])
+            else:
+                optionLocal = options
             for j in range(0, length):
-                dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
+                    seriesErrY = dfQuery.eval(optionLocal['errY'])
+                    if varNameY+'_lower' not in dfQuery.columns:
+                        seriesLower = dfQuery[varNameY]-seriesErrY
+                        dfQuery[varNameY+'_lower'] = seriesLower
+                    if varNameY+'_upper' not in dfQuery.columns:
+                        seriesUpper = dfQuery[varNameY]+seriesErrY
+                        dfQuery[varNameY+'_upper'] = seriesUpper
 
     try:
         source = ColumnDataSource(dfQuery)
@@ -640,12 +653,11 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                             color=optionLocal["color"],
                             marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
             if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
-                err_y_x = []
-                err_y_y = []
-                for coord_x, coord_y, y_err in zip(source.data[varNameX], source.data[varNameY], source.data[optionLocal['errY']]):
-                    err_y_x.append((coord_x, coord_x))
-                    err_y_y.append((coord_y - y_err, coord_y + y_err))
-                #figureI.multi_line(err_y_x, err_y_y)
+            #    errors = VBar(x=varNameX, bottom=varNameY+"_lower", top=varNameY+"_upper")
+            #    figureI.add_glyph(source,errors)
+                errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
+                figureI.add_layout(errors)
+
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         figureI.legend.click_policy = "hide"
