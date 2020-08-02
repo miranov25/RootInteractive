@@ -653,7 +653,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                             color=optionLocal["color"],
                             marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
             if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
-                errors = VBar(x=varNameX, bottom=varNameY+"_lower", top=varNameY+"_upper")
+                errors = VBar(x=varNameX, bottom=varNameY+"_lower", top=varNameY+"_upper",line_color=optionLocal["color"])
                 figureI.add_glyph(source,errors)
             #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
             #    figureI.add_layout(errors)
