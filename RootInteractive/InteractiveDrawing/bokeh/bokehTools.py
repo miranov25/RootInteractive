@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, Band
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -573,6 +573,14 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                     if varNameY+'_upper' not in dfQuery.columns:
                         seriesUpper = dfQuery[varNameY]+seriesErrY
                         dfQuery[varNameY+'_upper'] = seriesUpper
+                if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
+                    seriesErrX = dfQuery.eval(optionLocal['errX'])
+                    if varNameX+'_lower' not in dfQuery.columns:
+                        seriesLower = dfQuery[varNameX]-seriesErrX
+                        dfQuery[varNameX+'_lower'] = seriesLower
+                    if varNameX+'_upper' not in dfQuery.columns:
+                        seriesUpper = dfQuery[varNameX]+seriesErrX
+                        dfQuery[varNameX+'_upper'] = seriesUpper
 
     try:
         source = ColumnDataSource(dfQuery)
@@ -652,6 +660,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
                             color=optionLocal["color"],
                             marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
+            if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
+                errors = HBar(y=varNameY, left=varNameX+"_lower", right=varNameX+"_upper",line_color=optionLocal["color"])
+                figureI.add_glyph(source,errors)
             if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
                 errors = VBar(x=varNameX, bottom=varNameY+"_lower", top=varNameY+"_upper",line_color=optionLocal["color"])
                 figureI.add_glyph(source,errors)
