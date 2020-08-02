@@ -7,7 +7,7 @@ import pytest
 
 if "ROOT" in sys.modules:
     from ROOT import TFile, gSystem
-    
+
 output_file("test_bokehDrawSA.html")
 # import logging
 
@@ -34,7 +34,7 @@ df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisT
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
-    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
+    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY", "errX":"0.01" }],
     [['A'], ['C+A', 'C-A']],
     [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
