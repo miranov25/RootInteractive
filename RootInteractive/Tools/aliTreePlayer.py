@@ -416,7 +416,10 @@ def tree2Panda(tree, include, selection, **kwargs):
         "verbose": 0
     }
     options.update(kwargs)
-    anyTree = treeToAnyTree(tree)  # expand tree/aliases/variables
+    if hasattr(tree, 'anyTree'):
+        treeToAnyTree(tree)          # expand tree/aliases/variables - if not done before
+    anyTree = tree.anyTree
+    # check regular expressions in anyTree
     variablesTree = findSelectedBranches(anyTree, include, options["exclude"])
     variables = ""
 
@@ -424,6 +427,13 @@ def tree2Panda(tree, include, selection, **kwargs):
         # if var.length<2: continue
         var = var.replace("/", ".")
         variables += var + ":"
+    # check if valid TTree formula
+    for var in include:
+        if ".*" in var:
+            continue
+        formula=    ROOT.TTreeFormula('test', var, tree)
+        if (formula.GetNdim()>0):
+            variables += var + ":"
     variables = variables[0:-1]
 
     entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
@@ -527,7 +537,9 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
     nSelected = 0
     treeBaseList = []
     fileList = []
-    for iFile in range(nFiles):
+    #for iFile in range(nFiles):
+    iFile=0
+    while iFile<nFiles :
         tagValue.clear()
         tagValue["Title"] = ""
         #      read metadata #tag:value information - signed by # at the beginning of the line
@@ -593,6 +605,7 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
                     "InitMapTree: {} {} . {}:  {}  {}".format(treeBase.GetName(), fileName, keys.At(iKey).GetName(),
                                                               entriesB, entriesF))
     #                logging.error("InitMapTree", "%s\t%s.%s:\t%d\t%d", treeBase.GetName(), fileName, keys.At(iKey).GetName(), entriesB, entriesF)
+        iFile+=1
     return treeBase, treeBaseList, fileList
 
 
