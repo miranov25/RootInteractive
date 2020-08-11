@@ -109,6 +109,26 @@ def makeJScallback(widgetDict, **kwargs):
     callback = CustomJS(args=widgetDict, code=code)
     return callback
 
+def makeJSCallbackVisible(widgetDict, **kwargs):
+    """
+    make callback function to change of figure elements visible
+    elements:
+        * legend       visibility
+        * axis title   visibility
+        * legend size , axis size - should be similar to other function
+    :param widgetDict:
+    :param kwargs:
+    :return:
+    """
+    options = {
+        "verbose": 0,
+        "element":"legend",
+        "keyCheck":""
+    }
+    options.update(kwargs)
+    code="console.log('Event occurred at x-position: ' + cb_obj.x)"
+    callback = CustomJS(args=widgetDict, code=code)
+    return callback
 
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
     """
