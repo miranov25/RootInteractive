@@ -416,7 +416,7 @@ def tree2Panda(tree, include, selection, **kwargs):
         "verbose": 0
     }
     options.update(kwargs)
-    if hasattr(tree, 'anyTree'):
+    if not hasattr(tree, 'anyTree'):
         treeToAnyTree(tree)          # expand tree/aliases/variables - if not done before
     anyTree = tree.anyTree
     # check regular expressions in anyTree
