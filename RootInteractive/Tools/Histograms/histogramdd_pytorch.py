@@ -88,7 +88,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
             use_old_edges = True
             edges_old = edges
             m = max(i.size(0) for i in edges)
-            tmp = torch.empty([D,m],device=edges[0].device)
+            tmp = torch.full([D,m],float("inf"),device=edges[0].device)
             for i in _range(D):
                 s = edges[i].size(0)
                 tmp[i,:]=edges[i][-1]
@@ -140,7 +140,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
     multiindex[1:] = torch.cumprod(torch.flip(bins[1:],[0])+2,-1).long()
     multiindex = torch.flip(multiindex,[0])
     l = torch.sum(k*multiindex.reshape(-1,1),0)
-    hist = torch.bincount(l,minlength=(multiindex[0]*(bins[0]+2)).item(),weights=weights)
+    hist = torch.bincount(l,minlength=(multiindex[0]*(bins[0]+2)),weights=weights)
     hist = hist.reshape(tuple(bins+2))
     if remove_overflow:
         core = D * (slice(1, -1),)
