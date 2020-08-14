@@ -139,7 +139,8 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
     multiindex = torch.ones_like(bins)
     multiindex[1:] = torch.cumprod(torch.flip(bins[1:],[0])+2,-1).long()
     multiindex = torch.flip(multiindex,[0])
-    l = torch.sum(k*multiindex.reshape(-1,1),0)
+    k *= multiindex.reshape(-1,1)
+    l = torch.sum(k,0)
     hist = torch.bincount(l,minlength=(multiindex[0]*(bins[0]+2)),weights=weights)
     hist = hist.reshape(tuple(bins+2))
     if remove_overflow:
