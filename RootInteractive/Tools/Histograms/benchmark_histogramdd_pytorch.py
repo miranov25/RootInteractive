@@ -23,6 +23,9 @@ torch.random.manual_seed(19680801)
 torch.cuda.manual_seed_all(19680801)
 np.random.seed(19680801)
 
+number = 5
+repeat = 4
+
 create_output_file = True
 
 def get_tensors(n,d=3,device=None):
@@ -76,60 +79,60 @@ for j in range(6):
                 stmt="histogramdd(sample)",
                 setup="sample = get_tensors(n,i,device='cpu')",
                 globals=globals(),
-                repeat=20,
-                number=1
+                repeat=repeat,
+                number=number
                 )
-        time_cpu[i-3,j] = min(t)
-        print("CPU: ",min(t),sep='\t')
+        time_cpu[i-3,j] = min(t)/number
+        print("CPU: ",min(t)/number,sep='\t')
         if torch.cuda.is_available():
             t = timeit.repeat(
                     stmt="histogramdd_synchronized(sample)",
                     setup="sample = get_tensors(n,i,device='cuda')",
                     globals=globals(),
-                    repeat=20,
-                    number=1
+                    repeat=repeat,
+                    number=number
                     )
-            time_cuda[i-3,j] = min(t)
-            print("CUDA: ",min(t),sep='\t')
+            time_cuda[i-3,j] = min(t)/number
+            print("CUDA: ",min(t)/number,sep='\t')
         t = timeit.repeat(
                 stmt="np.histogramdd(sample)",
                 setup="sample = get_arrays(n,i)",
                 globals=globals(),
-                repeat=20,
-                number=1
+                repeat=repeat,
+                number=number
                 )
-        time_numpy[i-3,j] = min(t)
-        print("Numpy: ",min(t),sep='\t')
+        time_numpy[i-3,j] = min(t)/number
+        print("Numpy: ",min(t)/number,sep='\t')
 
         if searchsorted_available:
             t = timeit.repeat(
                     stmt="histogramdd(sample,bins)",
                     setup="sample,bins = get_tensors_edges(n,i,device='cpu')",
                     globals=globals(),
-                    repeat=20,
-                    number=1
+                    repeat=repeat,
+                    number=number
                     )
-            time_cpu_e[i-3,j] = min(t)
-            print("CPU: ",min(t),sep='\t')
+            time_cpu_e[i-3,j] = min(t)/number
+            print("CPU: ",min(t)/number,sep='\t')
             if torch.cuda.is_available():
                 t = timeit.repeat(
                         stmt="histogramdd_synchronized(sample,bins)",
                         setup="sample,bins = get_tensors_edges(n,i,device='cuda')",
                         globals=globals(),
-                        repeat=20,
-                        number=1
+                        repeat=repeat,
+                        number=number
                         )
-                time_cuda_e[i-3,j] = min(t)
-                print("CUDA: ",min(t),sep='\t')
+                time_cuda_e[i-3,j] = min(t)/number
+                print("CUDA: ",min(t)/number,sep='\t')
             t = timeit.repeat(
                     stmt="np.histogramdd(sample,bins)",
                     setup="sample,bins = get_arrays_edges(n,i)",
                     globals=globals(),
-                    repeat=20,
-                    number=1
+                    repeat=repeat,
+                    number=number
                     )
-            time_numpy_e[i-3,j] = min(t)
-            print("Numpy: ",min(t),sep='\t')
+            time_numpy_e[i-3,j] = min(t)/number
+            print("Numpy: ",min(t)/number,sep='\t')
 
     n *= 10
 
