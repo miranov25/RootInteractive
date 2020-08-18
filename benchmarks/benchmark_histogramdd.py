@@ -7,8 +7,8 @@ def _randombins(nbins,d):
     return x
 
 class HistogramBenchmark:
-    #params = ([1000,10000,100000,1000000,10000000],[3,4,5,6],["uniform","random"])
-    params = ([1000],[3],["uniform","random"])
+    params = ([1000,10000,100000,1000000,10000000],[3,4,5,6],["uniform","random"])
+
     def setup(self,n,d,bins_type):
         self.sample = np.random.randn(n,d)
         self.sample_torch_cpu = torch.tensor(self.sample).T.contiguous()
