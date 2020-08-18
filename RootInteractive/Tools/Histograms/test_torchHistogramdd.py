@@ -15,12 +15,12 @@ def test_histogram_empty():
     assert torch.sum(H) == 0, "Sum of empty histogram is not zero"
     assert len(axes) == 5, "Number of axes invalid"
 
-@pytest.mark.parametrize("seed, N, D, bins, device",[(665162135,100000,5,[9,8,9,10,2],"cpu:0"),(665162135,100000,4,[9,2,4,42],"cuda:0")])
-def test_histogram_uniform(seed,N,D,bins,device):
+@pytest.mark.parametrize("seed, N, D, bins, device, dtype",[(665162135,100000,5,[9,8,9,10,2],"cpu:0",torch.float32),(665162135,100000,4,[9,2,4,42],"cuda:0",torch.float32),(665162135,100000,5,[9,8,9,10,2],"cpu:0",torch.float64),(665162135,100000,4,[9,2,4,42],"cuda:0",torch.float64)])
+def test_histogram_uniform(seed,N,D,bins,device,dtype):
     if device == "cuda:0" and not torch.cuda.is_available():
         pytest.skip("CUDA is not available with pytorch")
     torch.random.manual_seed(seed)
-    sample = torch.rand(D,N,device=device)
+    sample = torch.rand(D,N,device=device,dtype=dtype)
     H,axes = histogramdd_pytorch(sample,bins)
     Hnp,npaxes = np.histogramdd(sample.T.cpu().numpy(),bins)
     assert len(axes) == D, "Number of axes invalid"
@@ -29,8 +29,8 @@ def test_histogram_uniform(seed,N,D,bins,device):
     for i in range(len(axes)):
         assert len(axes[i]) == bins[i]+1, "Invalid number of edges"
 
-@pytest.mark.parametrize("seed, N, D, bins, device",[(665162135,100000,5,[9,8,9,10,2],"cpu:0"),(665162135,100000,4,[9,2,4,42],"cuda:0")])
-def test_histogram_uniform_randombins(seed,N,D,bins,device):
+@pytest.mark.parametrize("seed, N, D, bins, device, dtype",[(665162135,100000,5,[9,8,9,10,2],"cpu:0",torch.float32),(665162135,100000,4,[9,2,4,42],"cuda:0",torch.float32),(665162135,100000,5,[9,8,9,10,2],"cpu:0",torch.float64),(665162135,100000,4,[9,2,4,42],"cuda:0",torch.float64)])
+def test_histogram_uniform_randombins(seed,N,D,bins,device,dtype):
     if device == "cuda:0" and not torch.cuda.is_available():
         pytest.skip("CUDA is not available with pytorch")
     try:
@@ -38,7 +38,7 @@ def test_histogram_uniform_randombins(seed,N,D,bins,device):
     except ImportError:
         pytest.skip("Current Pytorch version doesn't supoport searchsorted")
     torch.random.manual_seed(seed)
-    sample = torch.rand(D,N,device=device)
+    sample = torch.rand(D,N,device=device,dtype=dtype)
     nbins = bins
     bins = [torch.sort(torch.rand(i+1,device=device))[0] for i in nbins] #+1 because there's 1 more fence post than the length of the fence
     H,axes = histogramdd_pytorch(sample,bins)

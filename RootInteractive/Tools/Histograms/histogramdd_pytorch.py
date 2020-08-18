@@ -102,7 +102,7 @@ def histogramdd(sample,bins=None,range=None,weights=None,remove_overflow=True):
             edges = torch.unbind(edges)
     else:
             if range == None: #range is not defined
-                range = torch.empty(2,D,device=device)
+                range = torch.empty(2,D,device=device,dtype=sample.dtype)
                 if N == 0: #Empty histogram
                     range[0,:] = 0
                     range[1,:] = 1
