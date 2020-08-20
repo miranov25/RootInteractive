@@ -7,7 +7,10 @@ from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
-from skgarden import RandomForestQuantileRegressor
+try:
+    from skgarden import RandomForestQuantileRegressor
+except:
+    pass
 
 class RandomForest:
     """
