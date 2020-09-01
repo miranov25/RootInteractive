@@ -104,10 +104,16 @@ class bokehDrawSA(object):
         :return:
         """
         tmp=""
+        optionList=[]
         for fig in figureArray:
-            if isinstance(fig,dict):     continue
+            if isinstance(fig,dict):
+                optionList.append(fig)
+                continue
             if fig[0] == 'table':    continue
-            for entry in fig[0:2]:
+            for entry in fig:
+                if isinstance(entry, dict):
+                    optionList.append(entry)
+                    continue
                 for word in entry:
                     tmp+=word+":"
         varList=""
@@ -119,7 +125,7 @@ class bokehDrawSA(object):
         elif type(widgetsDescription)==list:
             for w in widgetsDescription:
                 varList+=w[1][0]+":"
-
+        kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig = bokehDrawArray(self.dataSource, query, figureArray, **kwargs)
         self.cdsOrig=ColumnDataSource(dataFrameOrig)
@@ -257,16 +263,19 @@ class bokehDrawSA(object):
 
 def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
     varList = []
+    optionParse=["variables","errY","errX","size","markers","colorZvar"]
     varSource = [varColor, varX, varY, widgetString, query]
-    if 'variables' in kwargs.keys():
-        varSource.append(kwargs['variables'])
-    if 'errY' in kwargs.keys():
-        varSource.append(kwargs['errY'])
+    for option in optionParse:
+            if option in kwargs.keys():
+                 varSource.append(kwargs[option])
     if 'tooltips' in kwargs.keys():
         for tip in kwargs["tooltips"]:
             varSource.append(tip[1].replace("@", ""))
-    if 'size' in kwargs.keys():
-        varSource.append(kwargs['size'])
+
+    for figOption in  kwargs['optionList']:
+        for option in optionParse:
+            if option in figOption.keys():
+                varSource.append(figOption[option])
     toRemove = [r"^tab.*", r"^query.*", r"^accordion.*", "^False", "^True", "^false", "^true"]
     toReplace = ["^slider.", "^checkbox.", "^dropdown.","^multiselect."]
     varList += getAndTestVariableList(varSource, toRemove, toReplace, verbosity)
