@@ -38,6 +38,10 @@ class RandomForest:
             return
         clf.fit(X_train, y_train)
         self.model = clf
+        self.model_name=''
+
+    def fit(self, X_train, y_train):
+        self.fit(X_train, y_train)
 
     def predict(self, data, **options):
         """
@@ -62,15 +66,22 @@ class RandomForest:
             allRF[i] = tree.predict(data)
         return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
 
-    def printImportance(self, varNames):
+    def printImportance(self, varNames, **kwargs):
         """
         print sorted importance
         :param varNames:
+        :kwargs:
         :return:
         """
+        nLines=kwargs["nLines"]
         importance = self.model.feature_importances_
         indices = np.argsort(importance)
-        for i in indices:
+        if kwargs["reverse"]:
+            indices = np.flip(indices)
+        if  nLines >0:
+            if kwargs["reverse"] : indices=indices[:nLines]
+            if not kwargs["reverse"] : indices=indices[-nLines:]
+        for pos, i in enumerate(indices):
             print(varNames[i], importance[i])
 
 
@@ -398,6 +409,7 @@ class Fitter:
 
     def Register_Method(self, method_name, method, ClassOrReg, **options):
         """
+        TODO - to be deprecated
         Register a method to be fitted. Can be run several times to register several methods. Every time a different name
         has to be chosen.
         :param method_name: user defined string by which the method can be called in the further course.
@@ -412,6 +424,22 @@ class Fitter:
         self.method.append(method)
         self.options.append(options)
         self.ClassOrReg.append(ClassOrReg)
+
+    def Register_Model(self, method_name, model, ClassOrReg,**options):
+        """
+        TODO - register model as a model not as a recipe
+        :param method_name:
+        :param model:
+        :param ClassOrReg:
+        :param options:
+        :return:
+        """
+        self.method_name.append(method_name)
+        self.method.append("")
+        self.options.append(options)
+        self.ClassOrReg.append(ClassOrReg)
+        self.Models.append(model)
+
 
     def Fit(self):
         """
@@ -435,6 +463,7 @@ class Fitter:
 
             else:
                 return
+            MDL.model_name=self.method_name[idx]
             self.Models.append(MDL)
 
     def Predict(self, data, method_name):
@@ -486,10 +515,16 @@ class Fitter:
         self.ClassOrReg.append(ClassOrReg)
         self.Models.append(b)
 
-    def printImportance(self):
-        for model in self.Models:
+    def printImportance(self,**kwargs):
+        options = {
+            "nLines": -1,
+            "reverse": True
+        }
+        options.update(kwargs)
+        for counter, model in enumerate(self.Models):
             if "printImportance" in dir(model):
-                model.printImportance(self.data.X_values)
+                print(model.model_name)
+                model.printImportance(self.data.X_values, **options)
 
     def PlotRocs(self):
         """
