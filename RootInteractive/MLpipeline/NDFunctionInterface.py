@@ -5,6 +5,7 @@ from keras import regularizers
 from matplotlib import pyplot as plt
 from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 try:
@@ -18,30 +19,38 @@ class RandomForest:
     It allows a fast application and adjusts the notation fur further application.
     """
 
-    def __init__(self, switch, X_train, y_train, **RF_params):
+    def __init__(self, switch, **kwargs):
         """
         The initilialization includes registration and fitting of the random forest.
 
         :param switch: It can be chosen between 'Classifier' or 'Regressor' with the corresponding string.
         :param X_train: Features used for training. Can be provided as numpy array or pandas DF (and more?)
         :param y_train: The target for regression or the labels for classification. Also numpy array or pandas DF.
-        :param RF_params: All options from sklearn can be used. For instance 
+        :param kwargs: All options from sklearn can be used. For instance
         """
+        self.quantiles=[]
+        try:
+            self.quantiles=kwargs["quantiles"]
+            del kwargs["quantiles"]
+        except KeyError:
+            pass
+        if 'quantiles' in kwargs:
+            self.quantiles=kwargs["quantiles"]
         if switch == 'Classifier':
-            clf = RandomForestClassifier(**RF_params)
+            clf = RandomForestClassifier(**kwargs)
         elif switch == 'Regressor':
-            clf = RandomForestRegressor(**RF_params)
+            clf = RandomForestRegressor(**kwargs)
         elif switch == 'RegressorQuantile':
-            clf=RandomForestQuantileRegressor(**RF_params)
+            clf=RandomForestQuantileRegressor(**kwargs)
         else:
             print('specify Classifier or Regressor (first argument)')
             return
-        clf.fit(X_train, y_train)
         self.model = clf
+        self.options=kwargs
         self.model_name=''
 
-    def fit(self, X_train, y_train):
-        self.fit(X_train, y_train)
+    def fit(self, X_train, y_train, sample_weight=None):
+        self.model.fit(X_train, y_train)
 
     def predict(self, data, **options):
         """
@@ -55,6 +64,82 @@ class RandomForest:
             return self.model.predict_proba(data)[:, 1]
         else:
             return self.model.predict(data)
+
+    def predictStat(self, data):
+        """
+        :param data  - input matrix
+        :return: predict statistic mean, median, rms over trees
+        """
+        allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
+        for i, tree in enumerate(self.model.estimators_):
+            allRF[i] = tree.predict(data)
+        return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
+
+    def printImportance(self, varNames, **kwargs):
+        """
+        print sorted importance
+        :param varNames:
+        :kwargs:
+        :return:
+        """
+        nLines=kwargs["nLines"]
+        importance = self.model.feature_importances_
+        indices = np.argsort(importance)
+        if kwargs["reverse"]:
+            indices = np.flip(indices)
+        if  nLines >0:
+            if kwargs["reverse"] : indices=indices[:nLines]
+            if not kwargs["reverse"] : indices=indices[-nLines:]
+        for pos, i in enumerate(indices):
+            print(varNames[i], importance[i])
+
+
+class GradientBoostingRegressorModel:
+    """
+    GradientBoostingRegressor wrapper
+    """
+
+    def __init__(self,  **kwargs):
+        """
+        The initilialization includes registration and fitting of the random forest.
+
+        :param switch: It can be chosen between 'Classifier' or 'Regressor' with the corresponding string.
+        :param X_train: Features used for training. Can be provided as numpy array or pandas DF (and more?)
+        :param y_train: The target for regression or the labels for classification. Also numpy array or pandas DF.
+        :param kwargs: All options from sklearn can be used. For instance
+        """
+        self.quantiles=[]
+        try:
+            self.quantiles=kwargs["quantiles"]
+            del kwargs["quantiles"]
+        except KeyError:
+            pass
+        clf=GradientBoostingRegressor(**kwargs)
+        self.model = clf
+        self.options=kwargs
+        self.model_name=''
+        self.quantileModels=[]
+        for quantile in self.quantiles:
+            kwargs['quantile']=quantile
+            self.quantileModels.append(GradientBoostingRegressor(kwargs))
+
+
+    def fit(self, X_train, y_train, sample_weight=None):
+        self.model.fit(X_train, y_train, sample_weight)
+
+    def predict(self, data, **options):
+        """
+        Returns the output of the RF to the provided data.
+        :param data: array of the features to get the prediction for.
+        :return: array of the predicted values.
+        """
+        predictModel=self.model
+        if  'quantile' in options.keys():
+            print("Not yet implemented")
+            #TODO
+            #return predictModel
+
+        return predictModel.predict(data)
 
     def predictStat(self, data):
         """
@@ -187,7 +272,7 @@ class KNeighbors:
     It allows a fast application and adjusts the notation fur further application.
     """
 
-    def __init__(self, switch, X_train, y_train, **KNN_params):
+    def __init__(self, switch, **KNN_params):
         """
         The initilialization includes registration and fitting of KNeighbors.
         :param switch: It can be chosen between 'Classifier' or 'Regressor' with the corresponding string.
@@ -202,8 +287,10 @@ class KNeighbors:
         else:
             print('specify Classifier or Regressor (first argument)')
             return 0
-        clf.fit(X_train, y_train)
         self.model = clf
+
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
 
     def predict(self, data):
         """
@@ -425,7 +512,7 @@ class Fitter:
         self.options.append(options)
         self.ClassOrReg.append(ClassOrReg)
 
-    def Register_Model(self, method_name, model, ClassOrReg,**options):
+    def Register_Model(self, method_name, model):
         """
         TODO - register model as a model not as a recipe
         :param method_name:
@@ -436,8 +523,8 @@ class Fitter:
         """
         self.method_name.append(method_name)
         self.method.append("")
-        self.options.append(options)
-        self.ClassOrReg.append(ClassOrReg)
+        #self.options.append(model.options)
+        #self.ClassOrReg.append(model.ClassOrReg)
         self.Models.append(model)
 
 
@@ -448,21 +535,24 @@ class Fitter:
         TODO: Register single methods.
         """
         for idx, method in enumerate(self.method):
-
+            if len(self.Models)>idx  :
+                self.Models[idx].fit(self.data.X_train, np.ravel(self.data.y_train))
+                continue
             if (method == 'RandomForest'):
-                MDL = RandomForest(self.ClassOrReg[idx], self.data.X_train, np.ravel(self.data.y_train),
+                MDL = RandomForest(self.ClassOrReg[idx],
                                    **self.options[idx])
 
             elif (method == 'KerasModel'):
-                MDL = KerasModel(self.ClassOrReg[idx], self.data.X_train, np.ravel(self.data.y_train),
+                MDL = KerasModel(self.ClassOrReg[idx],
                                  **self.options[idx])
 
             elif (method == 'KNeighbors'):
-                MDL = KNeighbors(self.ClassOrReg[idx], self.data.X_train, np.ravel(self.data.y_train),
+                MDL = KNeighbors(self.ClassOrReg[idx],
                                  **self.options[idx])
 
             else:
                 return
+            MDL.fit(self.data.X_train, np.ravel(self.data.y_train))
             MDL.model_name=self.method_name[idx]
             self.Models.append(MDL)
 
