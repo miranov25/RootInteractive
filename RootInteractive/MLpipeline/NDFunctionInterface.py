@@ -4,14 +4,26 @@ from keras.models import Sequential
 from keras import regularizers
 from matplotlib import pyplot as plt
 from sklearn import metrics
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+import copy
+from joblib import Parallel, delayed
 try:
     from skgarden import RandomForestQuantileRegressor
 except:
     pass
+
+def bootstrap_weights(nfits,npoints):
+    return np.stack([np.bincount(np.random.randint(0,npoints,npoints),minlength=npoints) for i in range(nfits)])
+
+#def bootstrap_weights(nfits,npoints):
+#    return np.random.randint(2, size=(nfits,npoints))
+
+#def bootstrap_weights(nfits,npoints):
+#    return np.random.random(size=(nfits,npoints))
 
 class RandomForest:
     """
@@ -73,7 +85,9 @@ class RandomForest:
         allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
         for i, tree in enumerate(self.model.estimators_):
             allRF[i] = tree.predict(data)
-        return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
+        stat={"Mean":np.mean(allRF, 0), "Median":np.median(allRF, 0), "RMS": np.std(allRF, 0)}
+        #return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
+        return stat
 
     def printImportance(self, varNames, **kwargs):
         """
@@ -94,38 +108,102 @@ class RandomForest:
             print(varNames[i], importance[i])
 
 
-class GradientBoostingRegressorModel:
+class GradientBoostingPredictionIntervals:
     """
     GradientBoostingRegressor wrapper
     """
 
-    def __init__(self,  **kwargs):
+    def __init__(self, optionsInterval={}, **kwargs):
         """
-        The initilialization includes registration and fitting of the random forest.
-
-        :param switch: It can be chosen between 'Classifier' or 'Regressor' with the corresponding string.
-        :param X_train: Features used for training. Can be provided as numpy array or pandas DF (and more?)
-        :param y_train: The target for regression or the labels for classification. Also numpy array or pandas DF.
-        :param kwargs: All options from sklearn can be used. For instance
+        GradientBoostingRegressor wrapper predicting also estimators for redducioble and irreducible error
+        :param optionsInterval: options for bootstrap and quantile regression intervals
+        defaultOptions = {
+            "n_bootstrap": 0,
+            "n_bootstrap_iter":30,
+            "warm_bootstrap":True,
+            "quantiles": [],
+            "n_quantiles_iter":20,
+            "warm_quantiles":True,
+        }
+        :param kwargs:  options for GBR- GradientBoostingRegressor
         """
-        self.quantiles=[]
-        try:
-            self.quantiles=kwargs["quantiles"]
-            del kwargs["quantiles"]
-        except KeyError:
-            pass
+        defaultOptions = {
+            "n_bootstrap": 0,
+            "n_bootstrap_iter":50,
+            "warm_bootstrap":True,
+            "learning_rate_bootstrap":0.3,
+            "quantiles": [],
+            "n_quantiles_iter":100,
+            "warm_quantiles":True,
+            "learning_rate_quantiles":0.3,
+        }
+        self.options={}
+        self.options.update(defaultOptions)
+        self.options.update(optionsInterval)
+        self.modelBootstrap=[]
+        self.modelQuantiles=[]
         clf=GradientBoostingRegressor(**kwargs)
         self.model = clf
-        self.options=kwargs
         self.model_name=''
-        self.quantileModels=[]
-        for quantile in self.quantiles:
-            kwargs['quantile']=quantile
-            self.quantileModels.append(GradientBoostingRegressor(kwargs))
 
+    def fitParallel(self, iModel, models,  X_train, y_train, sample_weight=[]):
+        if len(sample_weight)==0:
+            models[iModel].fit(X_train, y_train)
+        else:
+            models[iModel].fit(X_train, y_train,sample_weight[iModel])
+        #models[iModel].fit(X_train, y_train)
 
     def fit(self, X_train, y_train, sample_weight=None):
         self.model.fit(X_train, y_train, sample_weight)
+        self.fitModel(X_train,y_train)
+
+    def fitModel(self, X_train, y_train, sample_weight=None):
+        self.model.fit(X_train, y_train, sample_weight)
+        self.model.set_params(warm_start=self.options["warm_bootstrap"])
+        nPoints=y_train.shape[0]
+        # make bootstrap fit if requested
+        if self.options["n_bootstrap"]>0:
+            weights = bootstrap_weights(self.options["n_bootstrap"],nPoints)
+            for iBootstrap in range(0,self.options["n_bootstrap"]):
+                #model=clone(self.model)
+                model=copy.deepcopy(self.model)
+                n_estimators=self.model.n_estimators+self.options["n_bootstrap_iter"]
+                model.set_params(n_estimators=n_estimators, warm_start=self.options["warm_bootstrap"],learning_rate=self.options["learning_rate_bootstrap"])
+                self.modelBootstrap.insert(iBootstrap,model)
+                #model.fit(X_train,y_train,weights[iBootstrap])
+            Parallel(n_jobs=self.options["n_jobs"],backend="threading")(delayed(self.fitParallel)(i,self.modelBootstrap,X_train,y_train,weights) for i in range(0,self.options["n_bootstrap"]))
+        # make quantile regression fit if requested
+        if len(self.options["quantiles"])>0:
+            for iQuantile, quantile in enumerate(self.options["quantiles"]):
+                #model=clone(self.model)
+                model=copy.deepcopy(self.model)
+                n_estimators=self.model.n_estimators+self.options["n_quantiles_iter"]
+                model.set_params(n_estimators=n_estimators, warm_start=self.options["warm_quantiles"],loss='quantile',alpha=quantile,learning_rate=self.options["learning_rate_quantiles"])
+                self.modelQuantiles.insert(iQuantile,model)
+                #model.fit(X_train,y_train)
+            Parallel(n_jobs=self.options["n_jobs"],backend="threading")(delayed(self.fitParallel)(i,self.modelQuantiles,X_train,y_train) for i in range(0,len(self.options["quantiles"])))
+
+    def fitModelsEarlyStop(self, X_train, y_train):
+        """
+        TODO
+        :param X_train:
+        :param y_train:
+        :return:
+        """
+        length=y_train.shape[0]
+        for iReg in [0,1,2]:
+            self.modelPair[iReg]=clone(self.model)
+        self.models1[0].fit(X_train,y_train)
+        self.models1[1].fit(X_train[:length//2],y_train[:length//2])
+        self.models1[2].fit(X_train[length//2:],y_train[length//2:])
+        #
+        n_estimator=self.models1[0].n_estimators
+
+        for iReg in [0,1,2]:
+            self.modelPair[iReg].set_params(warm_start=True)
+
+
+
 
     def predict(self, data, **options):
         """
@@ -146,10 +224,19 @@ class GradientBoostingRegressorModel:
         :param data  - input matrix
         :return: predict statistic mean, median, rms over trees
         """
-        allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
-        for i, tree in enumerate(self.model.estimators_):
-            allRF[i] = tree.predict(data)
-        return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
+        stat={}
+        # bootstrap stat
+        if self.options["n_bootstrap"]>0:
+            allBS=np.zeros((self.options["n_bootstrap"], data.shape[0]))
+            for i in range(0,self.options["n_bootstrap"]):
+                allBS[i] = self.modelBootstrap[i].predict(data)
+            stat = {"Mean": np.mean(allBS, 0), "Median": np.median(allBS, 0), "RMS": np.std(allBS, 0)}
+        #quantile stat
+        for iQuantile, quantile in enumerate(self.options["quantiles"]):
+            statName="Q_"+str(int(round(100*quantile,0)))
+            stat[statName]= self.modelQuantiles[iQuantile].predict(data)
+
+        return stat
 
     def printImportance(self, varNames, **kwargs):
         """
@@ -522,6 +609,7 @@ class Fitter:
         :return:
         """
         self.method_name.append(method_name)
+        model.model_name=method_name
         self.method.append("")
         #self.options.append(model.options)
         #self.ClassOrReg.append(model.ClassOrReg)
@@ -703,9 +791,11 @@ class Fitter:
         model = self.Models[i]
         cols = model.predictStat(data[self.data.X_values].values)
         out = data
-        out[prefix+method_name + 'Mean'] = cols[0]
-        out[prefix+method_name + 'Median'] = cols[1]
-        out[prefix+method_name + 'RMS'] = cols[2]
+        for key, value in cols.items():
+            out[prefix+method_name + key] = value
+        #out[prefix+method_name + 'Mean'] = cols[0]
+        #out[prefix+method_name + 'Median'] = cols[1]
+        #out[prefix+method_name + 'RMS'] = cols[2]
         return out
 
     def RemoveMethod(self, method_name):
