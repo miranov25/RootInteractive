@@ -10,7 +10,9 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 import copy
+import math
 from joblib import Parallel, delayed
+import logging
 try:
     from skgarden import RandomForestQuantileRegressor
 except:
@@ -18,6 +20,9 @@ except:
 
 def bootstrap_weights(nfits,npoints):
     return np.stack([np.bincount(np.random.randint(0,npoints,npoints),minlength=npoints) for i in range(nfits)])
+
+def bootstrap_index(nfits,npoints):
+    return np.stack([np.random.randint(0,npoints,npoints) for i in range(nfits)])
 
 #def bootstrap_weights(nfits,npoints):
 #    return np.random.randint(2, size=(nfits,npoints))
@@ -40,20 +45,10 @@ class RandomForest:
         :param y_train: The target for regression or the labels for classification. Also numpy array or pandas DF.
         :param kwargs: All options from sklearn can be used. For instance
         """
-        self.quantiles=[]
-        try:
-            self.quantiles=kwargs["quantiles"]
-            del kwargs["quantiles"]
-        except KeyError:
-            pass
-        if 'quantiles' in kwargs:
-            self.quantiles=kwargs["quantiles"]
         if switch == 'Classifier':
             clf = RandomForestClassifier(**kwargs)
         elif switch == 'Regressor':
             clf = RandomForestRegressor(**kwargs)
-        elif switch == 'RegressorQuantile':
-            clf=RandomForestQuantileRegressor(**kwargs)
         else:
             print('specify Classifier or Regressor (first argument)')
             return
@@ -70,14 +65,12 @@ class RandomForest:
         :param data: array of the features to get the prediction for.
         :return: array of the predicted values.
         """
-        if  'quantile' in options.keys():
-            return self.model.predict(data,quantile=options['quantile'])
         if 'Classifier' in str(self.model):
             return self.model.predict_proba(data)[:, 1]
         else:
             return self.model.predict(data)
 
-    def predictStat(self, data):
+    def predictStat(self, data, **options):
         """
         :param data  - input matrix
         :return: predict statistic mean, median, rms over trees
@@ -85,7 +78,28 @@ class RandomForest:
         allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
         for i, tree in enumerate(self.model.estimators_):
             allRF[i] = tree.predict(data)
+        # irreducible error estimators
         stat={"Mean":np.mean(allRF, 0), "Median":np.median(allRF, 0), "RMS": np.std(allRF, 0)}
+        #
+        group=np.sqrt(len(self.model.estimators_))
+        ngroup=math.ceil(len(self.model.estimators_)//group)
+        allRFMedian = np.zeros((ngroup, data.shape[0]))
+        allRFMean = np.zeros((ngroup, data.shape[0]))
+        allRFRMS = np.zeros((ngroup, data.shape[0]))
+
+        for i in range(0, ngroup):
+            i0=math.ceil(i*group)
+            i1=math.ceil((i+1)*group)
+            allRFMean[i]=np.mean(allRF[i0:i1], 0)
+            allRFMedian[i]=np.median(allRF[i0:i1], 0)
+            allRFRMS[i]=np.std(allRF[i0:i1], 0)
+
+        stat["MeanMedian"]=np.mean(allRFMedian, 0)
+        stat["MedianMedian"]=np.median(allRFMedian, 0)
+        stat["MeanRMS"]=np.mean(allRFRMS, 0)
+        stat["MedianRMS"]=np.median(allRFRMS, 0)
+        stat["RMSMean"]=np.std(allRFMean, 0)
+        stat["RMSMedian"]=np.std(allRFMedian, 0)
         #return [np.mean(allRF, 0), np.median(allRF, 0), np.std(allRF, 0)]
         return stat
 
@@ -150,7 +164,9 @@ class GradientBoostingPredictionIntervals:
         if len(sample_weight)==0:
             models[iModel].fit(X_train, y_train)
         else:
-            models[iModel].fit(X_train, y_train,sample_weight[iModel])
+            #X=X_train[sample_weight[iModel]]
+            #y=y_train[sample_weight[iModel]]
+            models[iModel].fit(X_train, y_train)
         #models[iModel].fit(X_train, y_train)
 
     def fit(self, X_train, y_train, sample_weight=None):
@@ -172,6 +188,8 @@ class GradientBoostingPredictionIntervals:
                 self.modelBootstrap.insert(iBootstrap,model)
                 #model.fit(X_train,y_train,weights[iBootstrap])
             Parallel(n_jobs=self.options["n_jobs"],backend="threading")(delayed(self.fitParallel)(i,self.modelBootstrap,X_train,y_train,weights) for i in range(0,self.options["n_bootstrap"]))
+            #Parallel(n_jobs=self.options["n_jobs"],backend="threading")(delayed(self.fitParallel)(i,self.modelBootstrap,X_train[weights],y_train[weights]) for i in range(0,self.options["n_bootstrap"]))
+
         # make quantile regression fit if requested
         if len(self.options["quantiles"])>0:
             for iQuantile, quantile in enumerate(self.options["quantiles"]):
@@ -623,15 +641,17 @@ class Fitter:
         TODO: Register single methods.
         """
         for idx, method in enumerate(self.method):
+            logging.info(" %d %s Begin", idx, self.method_name[idx])
             if len(self.Models)>idx  :
                 self.Models[idx].fit(self.data.X_train, np.ravel(self.data.y_train))
+                logging.info("%d %s End", idx, self.method_name[idx])
                 continue
             if (method == 'RandomForest'):
                 MDL = RandomForest(self.ClassOrReg[idx],
                                    **self.options[idx])
 
             elif (method == 'KerasModel'):
-                MDL = KerasModel(self.ClassOrReg[idx],
+                MDL = KerasModel(self.ClassOrReg[idx],self.data.X_train, np.ravel(self.data.y_train),
                                  **self.options[idx])
 
             elif (method == 'KNeighbors'):
@@ -782,7 +802,7 @@ class Fitter:
 
     def AppendStatPandas(self, method_name, data, prefix=""):
         """
-        append statisctic colimns from "??? estomators ***" - random forrst or NN with dropout
+        append statistic columns from "??? estimators ***" - random forest or NN with dropout
         :param method_name:
         :param data:
         :return:
@@ -793,9 +813,6 @@ class Fitter:
         out = data
         for key, value in cols.items():
             out[prefix+method_name + key] = value
-        #out[prefix+method_name + 'Mean'] = cols[0]
-        #out[prefix+method_name + 'Median'] = cols[1]
-        #out[prefix+method_name + 'RMS'] = cols[2]
         return out
 
     def RemoveMethod(self, method_name):
