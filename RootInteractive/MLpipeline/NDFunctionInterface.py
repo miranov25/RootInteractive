@@ -70,30 +70,51 @@ class RandomForest:
         else:
             return self.model.predict(data)
 
-    def predictStat(self, data, **options):
+    def predictStat(self, data, **kwargs):
         """
-        :param data  - input matrix
+        :param data     - input matrix
+        :param kwargs   - optional arguments
         :return: predict statistic mean, median, rms over trees
         """
+        defaultOptions = {
+            "group": -1,
+            "n_groups":-1
+        }
+        options=defaultOptions
+        options.update(kwargs)
+        group=0
+        n_groups=0
+        if (options["group"]<0):
+            group=np.sqrt(len(self.model.estimators_))
+            n_groups=math.ceil(len(self.model.estimators_)//group)
+        else:
+            group=options["group"]
+            n_groups=options["n_groups"]
+            if n_groups*group>=len(self.model.estimators_):
+                n_groups=math.ceil(len(self.model.estimators_)//group)
+
         allRF = np.zeros((len(self.model.estimators_), data.shape[0]))
         for i, tree in enumerate(self.model.estimators_):
             allRF[i] = tree.predict(data)
-        # irreducible error estimators
-        stat={"Mean":np.mean(allRF, 0), "Median":np.median(allRF, 0), "RMS": np.std(allRF, 0)}
-        #
-        group=np.sqrt(len(self.model.estimators_))
-        ngroup=math.ceil(len(self.model.estimators_)//group)
-        allRFMedian = np.zeros((ngroup, data.shape[0]))
-        allRFMean = np.zeros((ngroup, data.shape[0]))
-        allRFRMS = np.zeros((ngroup, data.shape[0]))
+        # irreducible error estimators - in case of full tree
+        stat={}
+        if group<0:
+            stat={"Mean":np.mean(allRF, 0), "Median":np.median(allRF, 0), "RMS": np.std(allRF, 0)}
+        else:
+            nTree=group*n_groups
+            stat={"Mean":np.mean(allRF[0:nTree], 0), "Median":np.median(allRF[0:nTree], 0), "RMS": np.std(allRF[0:nTree], 0)}
+        # group statistics
+        allRFMedian = np.zeros((n_groups, data.shape[0]))
+        allRFMean = np.zeros((n_groups, data.shape[0]))
+        allRFRMS = np.zeros((n_groups, data.shape[0]))
 
-        for i in range(0, ngroup):
+        for i in range(0, n_groups):
             i0=math.ceil(i*group)
             i1=math.ceil((i+1)*group)
             allRFMean[i]=np.mean(allRF[i0:i1], 0)
             allRFMedian[i]=np.median(allRF[i0:i1], 0)
             allRFRMS[i]=np.std(allRF[i0:i1], 0)
-
+        stat["MeanMean"]=np.mean(allRFMean, 0)
         stat["MeanMedian"]=np.mean(allRFMedian, 0)
         stat["MedianMedian"]=np.median(allRFMedian, 0)
         stat["MeanRMS"]=np.mean(allRFRMS, 0)
