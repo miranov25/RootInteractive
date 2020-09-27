@@ -613,7 +613,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
-        logging.info(i, variables)
+        logging.info("%d\t%s",i, variables)
         if isinstance(variables, dict): continue
         if variables[0] == 'table':
             TOptions = {
@@ -664,12 +664,12 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             optionLocal['color'] = colorAll[max(length, 4)][i]
             optionLocal['marker'] = optionLocal['markers'][i]
             if len(variables) > 2:
-                logging.info("Option", variables[2])
+                logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
             if (len(optionLocal["colorZvar"]) > 0):
-                logging.info(optionLocal["colorZvar"])
+                logging.info("%s",optionLocal["colorZvar"])
                 varColor = optionLocal["colorZvar"]
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
                                       high=max(dfQuery[varColor]))
