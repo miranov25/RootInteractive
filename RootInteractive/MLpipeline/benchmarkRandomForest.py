@@ -93,8 +93,8 @@ def makeStatSummary(rf, X, Y, Yorig):
 def makeScan(nPoints0, nPoints1, nPointsD, nPointsTest=5000):
     tables=[]
     for nPoints in range(nPoints0,nPoints1, nPointsD):
-        for fraction in np.arange(0, 0.5, 0.2):
-            for sigma in np.arange(0.1, 0.6, 0.2):
+        for fraction in np.arange(0, 0.5, 0.1):
+            for sigma in np.arange(0.1, 0.6, 0.1):
                 print("Scan\t",nPoints,fraction,sigma)
                 df = generateInput(nPoints,sigma, fraction,10.)
                 fitter=makeFits(df)
