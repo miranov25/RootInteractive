@@ -115,6 +115,11 @@ def makeScan(nPoints0, nPoints1, nPointsD, nPointsTest=5000):
 def scanStat(dfSummary):
     #xxx
     dfSummary["irreducible0"]=np.sqrt((dfSummary['deltaMeanStd']**2-dfSummary['fdeltaMeanStd']**2).astype(np.float64)) # this should be equal to sigma
+
+def scanSummary():
+    dfSummary=makeScan(20000,160001,20000,4000)
+    dfSummary=dfSummary.astype(np.float64)
+    pickle.dump(dfSummary,open('dfSummary.pkl', 'wb'))
 # fSummary=makeScan(10000,40001,10000,2000)
 #dfSummary=makeScan(2000,11000,40000,2000)
 #dfSummary=makeScan(20000,11000,20000,2000)
