@@ -821,7 +821,7 @@ class Fitter:
 
         return out
 
-    def AppendStatPandas(self, method_name, data, prefix=""):
+    def AppendStatPandas(self, method_name, data, prefix="", **kwargs):
         """
         append statistic columns from "??? estimators ***" - random forest or NN with dropout
         :param method_name:
@@ -830,7 +830,7 @@ class Fitter:
         """
         i = self.method_name.index(method_name)
         model = self.Models[i]
-        cols = model.predictStat(data[self.data.X_values].values)
+        cols = model.predictStat(data[self.data.X_values].values,**kwargs)
         out = data
         for key, value in cols.items():
             out[prefix+method_name + key] = value

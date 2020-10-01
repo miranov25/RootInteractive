@@ -49,7 +49,16 @@ def makeFits(df,n_jobs=-1):
     fitter.Fit()
     return fitter
 
-def makeStatSummary(rf, X, Y, Yorig):
+def makeStatSummary(rf, df, XDF, YDF, YorigDF, nExport):
+    """
+
+    :param rf:
+    :param df:        original df
+    :param XDF:       panda with X
+    :param YDF:       panda with Y with noise
+    :param YorigDF:   panda with tree value
+    :return:          scan predictions mean and RMS using different group/ngroup parameters
+    """
     dfSummary=pd.DataFrame(index=range(100),
         columns=["nPoints","sigma","fraction",
                  "group","n_groups",
@@ -61,7 +70,11 @@ def makeStatSummary(rf, X, Y, Yorig):
                  "fdMeanMedStd","dMeanMedStd",
                  "fdMedMedStd","dMedMedStd",
                  ])
+    dfStatList=[]
     dfIndex=0;
+    X=XDF.to_numpy()
+    Y=YDF.to_numpy()
+    Yorig=YorigDF.to_numpy()
     for n_groups in range(10,50,20):
         for group in range(5, 40, 5):
             if group*n_groups>len(rf.model.estimators_):
@@ -70,6 +83,16 @@ def makeStatSummary(rf, X, Y, Yorig):
             dfSummary["group"][dfIndex]=group
             dfSummary["n_groups"][dfIndex]=n_groups
             stat=rf.predictStat(X,group=group, n_groups=n_groups)
+            # export sample prediction  data
+            dfStat=df[0:nExport].copy()
+            dfStat["Mean"]=stat["Mean"][0:nExport].copy()
+            dfStat["Median"]=stat["Median"][0:nExport].copy()
+            dfStat["RMS"]=stat["RMS"][0:nExport].copy()
+            dfStat["RMSMean"]=stat["RMSMean"][0:nExport].copy()
+            dfStat["RMSMedian"]=stat["RMSMedian"][0:nExport].copy()
+            dfStat["group"]=dfStat["RMSMedian"]*0+group
+            dfStat["n_groups"]=dfStat["RMSMedian"]*0+n_groups
+            dfStatList.append(dfStat)
             #dfSummary["MeanRMS"][dfIndex]=
             dfSummary["RMSMean"][dfIndex]=stat["RMS"].mean()                 # mean rms using all points
             dfSummary["MeanRMSMean"][dfIndex]=stat["MeanRMS"].mean()
@@ -88,39 +111,55 @@ def makeStatSummary(rf, X, Y, Yorig):
             dfSummary["dMedMedStd"][dfIndex]=(stat["MedianMedian"]-Y).std()
             dfIndex+=1;
     dfSummary=dfSummary[0:dfIndex]
-    return dfSummary
+    dfStatAll=pd.concat(dfStatList)
+    return dfSummary,dfStatAll
 
-def makeScan(nPoints0, nPoints1, nPointsD, nPointsTest=5000):
+def makeScan(nPoints0, nPoints1, nPointsD, dFraction=0.1, dSigma=0.2, nPointsTest=5000,nPointsExport=1000):
     tables=[]
+    tablesSample=[]
     for nPoints in range(nPoints0,nPoints1, nPointsD):
-        for fraction in np.arange(0, 0.5, 0.1):
-            for sigma in np.arange(0.1, 0.6, 0.1):
+        for fraction in np.arange(0, 0.5, dFraction):
+            for sigma in np.arange(0.1, 0.6, dSigma):
                 print("Scan\t",nPoints,fraction,sigma)
                 df = generateInput(nPoints,sigma, fraction,10.)
                 fitter=makeFits(df)
                 df = generateInput(nPointsTest,sigma, fraction,10.)
                 rf=fitter.Models[0]
-                X=df[fitter.data.X_values].to_numpy()
-                Y=df["value"].to_numpy()
-                Yorig=df["valueOrig"].to_numpy()
-                dfOut=makeStatSummary(rf,X,Y,Yorig)
+                X=df[fitter.data.X_values]
+                Y=df["value"]
+                Yorig=df["valueOrig"]
+                dfOut,dfSample=makeStatSummary(rf,df,X,Y,Yorig,nPointsExport)
                 dfOut["nPoints"]=nPoints
                 dfOut["fraction"]=fraction
                 dfOut["sigma"]=sigma
+                dfSample["nPoints"]=dfSample["A"]*0+nPoints
+                dfSample["fraction"]=dfSample["A"]*0+fraction
+                dfSample["sigma"]=dfSample["A"]*0+sigma
                 print(dfOut)
+                print(dfSample.head(5))
                 tables.append(dfOut)
+                tablesSample.append(dfSample)
+
     dfSummary=pd.concat(tables)
-    return dfSummary
+    dfSampleAll=pd.concat(tablesSample)
+    return dfSummary,dfSampleAll
 
 def scanStat(dfSummary):
     #xxx
     dfSummary["irreducible0"]=np.sqrt((dfSummary['deltaMeanStd']**2-dfSummary['fdeltaMeanStd']**2).astype(np.float64)) # this should be equal to sigma
 
 def scanSummary():
-    dfSummary=makeScan(20000,160001,20000,4000)
+    dfSummary,dfSample=makeScan(20000,160001,20000,0.1,0.1, 4000,1000)
     dfSummary=dfSummary.astype(np.float64)
     pickle.dump(dfSummary,open('dfSummary.pkl', 'wb'))
+    pickle.dump(dfSample,open('dfSample.pkl', 'wb'))
 # fSummary=makeScan(10000,40001,10000,2000)
 #dfSummary=makeScan(2000,11000,40000,2000)
 #dfSummary=makeScan(20000,11000,20000,2000)
 #pickle.dump(dfSummary,open('dfSummary.pkl', 'wb'))
+
+def scanSampleFast():
+    dfSummary,dfSample=makeScan(20000,180001,40000,0.2,0.2, 4000,1000)
+    dfSummary=dfSummary.astype(np.float64)
+    pickle.dump(dfSummary,open('dfSummary.pkl', 'wb'))
+    pickle.dump(dfSample,open('dfSample.pkl', 'wb'))
