@@ -36,7 +36,7 @@ df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisT
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY", "errX":"0.01" }],
-    [['A'], ['C+A', 'C-A']],
+    [['A'], ['C+A', 'C-A', 'A/A']],
     [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
@@ -60,9 +60,9 @@ widgetParams=[
 widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
-    [0, 1, 2, {'commonX': 1, 'y_visible': 2, 'plot_height': 300}],
-    [3, 4, {'plot_height': 100}],
-    {'plot_height': 100, 'sizing_mode': 'scale_width'}
+    [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+    [3, 4, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
+    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
 ]
 
 def testOldInterface():
@@ -89,9 +89,8 @@ def testBokehDrawArraySA_tree():
     fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 
-#testOldInterface()
+testOldInterface()           # axis not working since new Bokeh - will be depecated soon
 #testBokehDrawArraySA()
-#testOldInterface_tree()
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()
 #testBokehDrawArrayWidgetNoScale()

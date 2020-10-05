@@ -23,20 +23,20 @@ def test_DrawFormula():
     print(df.meta.metaData)
     #
     output_file("test_BokehDrawArray_DraFormula.html")
-    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
+    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)'
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     pAll,source,figureList, df2 =bokehDrawArray(df, "A>0", figureArray, layout=figureLayout, color="blue", size=4, tooltips=tooltips)
     show(pAll)
 
 def test_DrawfromArray():
     output_file("test_BokehDrawArray_test_DrawfromArray.html")
-    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
+    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)'
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     fig=bokehDraw.fromArray(df, "A>0", figureArray,"slider.A(0,100,0,0,100)",tooltips=tooltips, layout=figureLayout)
 
 def test_DrawSAfromArray():
     output_file("test_BokehRDrawArray_DrawSAfromArray.html")
-    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
+    figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)'
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
     widgets=",query.(), slider.A(0,100,0,0,100),slider.B(0,100,0,0,100),slider.C(0,100,0,0,100),slider.D(0,100,0,0,100)"
     fig=bokehDrawSA.fromArray(df, "A>0", figureArray,widgets,tooltips=tooltips, layout=figureLayout)

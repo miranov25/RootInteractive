@@ -14,7 +14,12 @@ curdoc().theme = 'caliber'
 
 if "ROOT" in sys.modules:
     TFile.SetCacheFileDir("../../data/")
-    treeQA, treeList, fileList = LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", 0)
+    try:
+        treeQA, treeList, fileList = LoadTrees("echo https://aliqat.web.cern.ch/aliqat/qcml/data/2018/LHC18q/trending_merged_LHC18q_withStatusTree.root", ".*", ".*sta.*", ".*", 0)
+    except:
+        pytest.skip("ROOT module is not imported", allow_module_level=True)
+        pass
+
     treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
     AddMetadata(treeQA, "chunkBegin.isTime", "1")
     AddMetadata(treeQA, "chunkMedian.isTime", "1")
@@ -38,7 +43,8 @@ def test_bokehDrawQAStandard():
     Standard bok
     :return: None
     """
-    QAlayout: str = "((0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)"
+    output_file("test_BokehDraw_bokehDrawQAStandard.html")
+    QAlayout: str = "((0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)"
     bokehDraw(treeQA, "meanMIP>0", "chunkMedian", varDraw, "MIPquality_Warning", widgets, 0, commonX=1, size=6, tooltip=tooltips, x_axis_type='datetime', layout=QAlayout)
 
 
@@ -47,7 +53,8 @@ def test_bokehDrawQAWithXarray():
     Standard drawing test
     :return: None
     """
-    QAlayout: str = '((0,commonX=0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)'
+    output_file("test_BokehDraw_bokehDrawQAWithXarray.html")
+    QAlayout: str = '((0,commonX=0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)'
     # xxx=bokehDraw(treeQA,"meanMIP>0",varX,"meanMIPele:meanMIPele:resolutionMIP","MIPquality_Warning",widgets,0,size=6,tooltip=tooltips,x_axis_type='datetime',layout=layout)
     bokehDraw(treeQA, "meanMIP>0", varX, "meanMIPele:meanMIPele:resolutionMIP", "MIPquality_Warning", widgets, 0, size=6, tooltip=tooltips, layout=QAlayout)
 
@@ -57,7 +64,8 @@ def test_bokehDrawQAYerr():
     Test with error bars
     :return: None
     """
-    QAlayout: str = "((0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=0,plot_height=250,plot_width=1000)"
+    output_file("test_BokehDraw_Yerr.html")
+    QAlayout: str = "((0),(1),(2,x_visible=1),commonX=2,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)"
     xxxErr = bokehDraw(treeQA, "meanMIP>0", "chunkMedian", "meanMIP:meanMIPele:resolutionMIP", "MIPquality_Warning",
                        widgets, 0, errY="meanMIPErr:meanMIPeleErr:resolutionMIPErr", commonX=1, size=6, tooltip=tooltips, x_axis_type='datetime', layout=QAlayout)
 

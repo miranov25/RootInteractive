@@ -171,8 +171,12 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
                     if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
                     continue
 
-        if (idx > 0) & ('y_visible' in option): fig.yaxis.visible = bool(option["y_visible"])
-        if 'x_visible' in option:     fig.xaxis.visible = bool(option["x_visible"])
+        if (idx > 0) & ('y_visible' in option):
+            fig.yaxis.visible = bool(option["y_visible"]==1)
+        if (idx == 0) & ('y_visible' in option):
+            fig.yaxis.visible = bool(option["y_visible"]!=0)
+        if 'x_visible' in option:
+            fig.xaxis.visible = bool(option["x_visible"]==1)
     nCols = len(array)
     for fig in array:
         if type(fig).__name__ == 'Figure':
@@ -268,7 +272,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
     """
     options = {
         'commonX': -1, 'commonY': -1,
-        'x_visible': True, 'y_visible': 1,
+        'x_visible': 1, 'y_visible': 1,
         'plot_width': -1, 'plot_height': -1,
         'sizing_mode': 'scale_width',
         'legend_visible': True
@@ -298,11 +302,15 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
                     figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
                 if rowOptions['commonY'] >= 0:
                     figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
-                figure.yaxis.visible = bool(rowOptions["x_visible"])
+                if rowOptions['x_visible'] == 0:
+                    figure.xaxis.visible = False
+                else:
+                     figure.xaxis.visible = True
+                #figure.xaxis.visible = bool(rowOptions["x_visible"])
                 if rowOptions['y_visible'] == 0:
-                    figure.yaxis.visible = bool(rowOptions["y_visible"])
+                    figure.yaxis.visible = False
                 if rowOptions['y_visible'] == 2:
-                    if i > 0: figure.yaxis.visible = bool(rowOptions["y_visible"])
+                    if i > 0: figure.yaxis.visible = False
             if hasattr(figure, 'plot_width'):
                 if rowOptions["plot_width"] > 0:
                     plot_width = int(rowOptions["plot_width"] / len(rowWidget))
@@ -444,7 +452,8 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
                     y_axis_type=options['y_axis_type'])
         fIndex = 0
         varX = varXArray[min(idx, len(varXArray) - 1)]
-
+        p2.xaxis.axis_label= varX
+        #figureI.yaxis.axis_label = yAxisTitle
         for y, yError in zip(yArray, yArrayErr):
             if 'varXerr' in locals():
                 err_x_x = []
@@ -464,6 +473,7 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
                        marker=bokehMarkers[fIndex % 4], legend_label=varX + y)
             if options['line'] > 0: p2.line(x=varX, y=y, source=source)
             p2.legend.click_policy = "hide"
+            p2.yaxis.axis_label= y
             fIndex += 1
 
         if pFirst:  # set common X resp Y if specified. NOTE usage of layout options is more flexible
