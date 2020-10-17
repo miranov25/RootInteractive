@@ -3,7 +3,7 @@ import numpy as np
 import urllib.request as urlopen
 import pyparsing
 import sys
-
+import uproot
 from RootInteractive.Tools.pandaTools import *
 try:
     import ROOT
@@ -12,8 +12,8 @@ except ImportError:
     pass
 
 from anytree import *
-if "ROOT" in sys.modules:
-    from root_pandas import *
+#if "ROOT" in sys.modules:
+#    from root_pandas import *
 
 import re
 import logging
@@ -179,8 +179,8 @@ def findSelectedBranches(anyTree, include, exclude, **findOption):
         >>> print("Search 0:",  findSelectedBranches(anyTree, [".*LHC15o.*Chi2.*meanG.*"], [".*ITS.*"]))
         >>> print("Search 1:",  findSelectedBranches(anyTree, [".*LHC15o.*Chi2.*meanG.*"], [".*TPC.*"]))
         >>>
-        >>> Search 0: ['LHC15o_pass1.hnormChi2TPCMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2TPCMult_Tgl_qPtDist/meanG']
-        >>> Search 1: ['LHC15o_pass1.hnormChi2ITSMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2ITSMult_Tgl_qPtDist/meanG']
+        >>> Search 0 ['LHC15o_pass1.hnormChi2TPCMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2TPCMult_Tgl_qPtDist/meanG']
+        >>> Search 1 ['LHC15o_pass1.hnormChi2ITSMult_Tgl_mdEdxDist/meanG', 'LHC15o_pass1.hnormChi2ITSMult_Tgl_qPtDist/meanG']
     """
     if isinstance(anyTree, ROOT.TTree):
         anyTree = treeToAnyTree(anyTree)
@@ -608,10 +608,12 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
         iFile+=1
     return treeBase, treeBaseList, fileList
 
-
 def makeABCD(nPoints=10000):
-    df = pd.DataFrame(np.random.random_sample(size=(nPoints, 4)), columns=list('ABCD'))
-    df.to_root('ABCD.root', "ABCD")
+    with uproot.recreate("ABDC.root") as f:
+        f["ABCD"] = uproot.newtree({"A": "float32", "B": "float32", "C": "float32", "D": "float32"})
+        for i in range(5):
+            f["ABCD"].extend({"A": np.random.normal(0, 1, nPoints), "B":np.random.normal(0, 1, nPoints),
+                           "C": np.random.normal(0, 1, nPoints), "D": np.random.normal(0, 1, nPoints)})
     f = ROOT.TFile("ABCD.root")
     tree = f.Get("ABCD")
     tree.SetAlias("bigA","A>0.5")
