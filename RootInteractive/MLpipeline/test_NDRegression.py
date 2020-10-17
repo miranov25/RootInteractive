@@ -186,7 +186,8 @@ def drawFitRF(df):
                                 widgetLayout=widgetLayoutDesc)
 
 
-def test_NDRegression(nPoints, generate=True, n_jobs=-1):
+def test_NDRegression(nPoints=50, generate=True, n_jobs=-1):
+    nDraw=min(nPoints,2000)
     if generate:
         df = generateInput(nPoints)
         fitter = makeFits(df,n_jobs)
@@ -199,9 +200,9 @@ def test_NDRegression(nPoints, generate=True, n_jobs=-1):
     else:
         df = pd.read_pickle("test_NDRegression.pkl")
     print(df.columns)
-    drawFits(df.sample(2000))
-    drawRMS(df.sample(2000))
-    drawFitDelta(df.sample(2000))
+    drawFits(df.sample(nDraw))
+    drawRMS(df.sample(nDraw))
+    drawFitDelta(df.sample(nDraw))
 
     print("pullRF:", df["pullRF"].mean(), df["pullRF"].std())
     print("pullRF14:", df["pullRF14"].mean(), df["pullRF14"].std())
@@ -249,4 +250,5 @@ def printSummary2():
     dfReport['fpullMean'] = dfOut[["fpull{}".format(x) for x in methods]].mean()
     dfReport['fpullSTD'] = dfOut[["fpull{}".format(x) for x in methods]].std()
 
-logging.basicConfig(level=logging.DEBUG,  format="%(asctime)s %(levelname)s %(filename)s:%(funcName)s%(message)s")
+#logging.basicConfig(level=logging.DEBUG,  format="%(asctime)s %(levelname)s %(filename)s:%(funcName)s%(message)s")
+#test_NDRegression()

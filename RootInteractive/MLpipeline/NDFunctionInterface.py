@@ -85,7 +85,7 @@ class RandomForest:
         group=0
         n_groups=0
         if (options["group"]<0):
-            group=np.sqrt(len(self.model.estimators_))
+            group=int(np.sqrt(len(self.model.estimators_)))
             n_groups=math.ceil(len(self.model.estimators_)//group)
         else:
             group=options["group"]
@@ -101,7 +101,7 @@ class RandomForest:
         if group<0:
             stat={"Mean":np.mean(allRF, 0), "Median":np.median(allRF, 0), "RMS": np.std(allRF, 0)}
         else:
-            nTree=group*n_groups
+            nTree=int(group)*n_groups
             stat={"Mean":np.mean(allRF[0:nTree], 0), "Median":np.median(allRF[0:nTree], 0), "RMS": np.std(allRF[0:nTree], 0)}
         # group statistics
         allRFMedian = np.zeros((n_groups, data.shape[0]))
