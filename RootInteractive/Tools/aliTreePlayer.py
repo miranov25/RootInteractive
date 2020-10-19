@@ -572,10 +572,14 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
         finput = ROOT.TFile.Open(fileName, option)
         fileList.append(finput)
         if finput is None:
-            raise NameError("<MakeResidualDistortionReport>: Invalid file name {}".format(fileName))
+            logging.error("<MakeResidualDistortionReport>: Invalid file name {}".format(fileName))
             #            logging.error("<MakeResidualDistortionReport>: Invalid file name %s", fileName)
-            continue
-        keys = finput.GetListOfKeys()
+            return None,None,None
+        try:
+            keys = finput.GetListOfKeys()
+        except:
+            logging.error("<MakeResidualDistortionReport>: Invalid file name or access rights {}".format(fileName))
+            return None,None,None
         isLegend = False
         for iKey in range(keys.GetEntries()):
             if regExp.Match(keys.At(iKey).GetName()) is 0:
@@ -615,7 +619,7 @@ def makeABCD(nPoints=10000):
             f["ABCD"].extend({"A": np.random.normal(0, 1, nPoints), "B":np.random.normal(0, 1, nPoints),
                            "C": np.random.normal(0, 1, nPoints), "D": np.random.normal(0, 1, nPoints)})
     f = ROOT.TFile("ABCD.root")
-    tree = f.Get("ABCD")
+    tree = ROOT.TTree(f.Get("ABCD"))
     tree.SetAlias("bigA","A>0.5")
     tree.SetAlias("smallA","A<0.5")
     return tree, f

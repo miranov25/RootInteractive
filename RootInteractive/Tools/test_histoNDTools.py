@@ -27,7 +27,16 @@ if "ROOT" in sys.modules:
     ROOT.gSystem.Load("$ALICE_ROOT/lib/libSTAT.so")
     ROOT.TFile.SetCacheFileDir("../data/"),
     finput=ROOT.TFile.Open("https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root","cacheread")
-    hisArray=finput.Get("hisArray")
+    if finput == None:
+        logging.error("Input file not accessible locally - https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
+        pytest.skip("ROOT module is not imported", allow_module_level=True)
+        pass
+    try:
+        hisArray=finput.Get("hisArray")
+    except:
+        logging.error("Input file not accessible locally - https://rootinteractive.web.cern.ch/RootInteractive/testData/JIRA/PWGPP-485/hisPull.root")
+        pytest.skip("ROOT module is not imported", allow_module_level=True)
+        pass
 else:
     pytest.skip("ROOT module is not imported", allow_module_level=True)
 

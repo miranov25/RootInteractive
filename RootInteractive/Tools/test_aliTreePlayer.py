@@ -105,6 +105,9 @@ def testTree2Panda():
 
 def testLoadTree():
     tree, treeList, fileList=LoadTrees("cat ../tutorial/bokehDraw/performance.list", "identFit", "xxx", ".*", 0)
+    if tree == None:
+        logging.error("Input file not accessible performance.list")
+        pass
     tree.SetAlias("norm", "param.fElements[0]")
     tree.SetAlias("slope", "param.fElements[1]")
     tree.SetAlias("isMax", "name.String().Contains(\"PionMax\")==0")
