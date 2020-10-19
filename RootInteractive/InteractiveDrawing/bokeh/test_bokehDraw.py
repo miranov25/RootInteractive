@@ -19,7 +19,9 @@ if "ROOT" in sys.modules:
     except:
         pytest.skip("ROOT module is not imported", allow_module_level=True)
         pass
-
+    if treeQA == None:
+        pytest.skip("Input data file not accessible ", allow_module_level=True)
+        pass
     treeQA.RemoveFriend(treeQA.GetFriend("Tstatus"))
     AddMetadata(treeQA, "chunkBegin.isTime", "1")
     AddMetadata(treeQA, "chunkMedian.isTime", "1")
