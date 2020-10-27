@@ -20,31 +20,38 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
 
 %environment
 #    source /alicesw/root/bin/thisroot.sh - soruce doesn not work here  sourcing with .
-    .  /cvmfs/alice.cern.ch/etc/login.sh
+#    .  /cvmfs/alice.cern.ch/etc/login.sh
+     export ALIBUILD_WORK_DIR=/alicesw/
 %files
     # Copy cifar10 example script
     benchmark.sh /usr/local/bin/benchmark.sh
 %post
+    mkdir -p /lustre
+    mkdir -p /cvmfs
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y mlocate
     apt-get install -y less mc nano vim
-    apt-get install -y environment-modules
+    apt-get install -y environment-modules libssl-dev python3-venv tclsh
+    #openssl-devel
+    #sudo apt-get install libssl-dev
     # see https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html 
-    apt-get  install -y curl libcurl4-gnutls-dev build-essential gfortran cmake libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev libyaml-cpp-dev rsync lsb-release unzip environment-modules libglfw3-dev
+    # apt-get  install -y curl libcurl4-gnutls-dev build-essential gfortran cmake libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev libyaml-cpp-dev rsync lsb-release unzip environment-modules libglfw3-dev
+    apt-get  install -y curl libcurl4-gnutls-dev build-essential gfortran cmake libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev libyaml-cpp-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev libgsl-dev libssl-dev cmake
+
     #apt-getinstall -y python3-tk
     #apt-get install -y python36-tkinter
     #apt-get install -y mc
     #apt-get install -y  ncurses-devel zlib-devel texinfo gtk+-devel gtk2-devel tcl-devel tk-devel
     #
-    python3 -m pip install conda
+    python3 -m pip install conda aliBuild notebook
     #python3 -m conda install pytorch torchvision cudatoolkit=10.2 -c pytorch-nightly  # not working with toolkit
     #python3 -m conda install pytorch torchvision  -c pytorch-nightly -p /usr/local/    # not working with toolkit
     python3 -m pip install torch torchvision
     # python3 -m pip install torch torchvision tensorflow_probability iminuit
     python3 -m pip install tensorflow_probability iminuit
     python3 -m pip install tensorflow-datasets pytest pandas bokeh==1.4.0 anytree ipywidgets tabulate
-    python3 -m pip install jax
+    python3 -m pip install jax scikit-garden
     python3 -m pip install git+https://github.com/miranov25/RootInteractive
     #
     cd /opt
@@ -57,12 +64,10 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
     # install benchmarks
     mkdir -p /benchmarks/
     cd /benchmarks/
-    git clone  https://github.com/tensorflow/benchmarks tensorlow_benchmarks
+    git clone  https://github.com/tensorflow/benchmarks tensorflow_benchmarks
     git clone  https://github.com/elombardi2/pytorch-gpu-benchmark pytorch-gpu-benchmark
     updatedb
     rm -f /var/cache/apt/archives/lock
-    #pytest /usr/local/lib/python3.6/dist-packages/RootInteractive
-
 %runscript
 
     echo "Clone of tensorflow-rocm example container"
