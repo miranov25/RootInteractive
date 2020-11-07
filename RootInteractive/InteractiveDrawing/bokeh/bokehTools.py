@@ -52,8 +52,8 @@ def makeJScallback(widgetDict, **kwargs):
         code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
         # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
 
+    code += "let isOK = false;\n"
     for key, value in widgetDict.items():
-        #
         if isinstance(value, Slider):
             code += f"      var {key}Value={key}.value;\n"
             code += f"      var {key}Step={key}.step;\n"
@@ -770,7 +770,6 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     else:
         value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
-    slider.callback_policy = 'mouseup'
     return slider
 
 
