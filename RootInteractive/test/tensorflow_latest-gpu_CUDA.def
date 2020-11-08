@@ -21,7 +21,14 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
 %environment
 #    source /alicesw/root/bin/thisroot.sh - soruce doesn not work here  sourcing with .
 #    .  /cvmfs/alice.cern.ch/etc/login.sh
-     export ALIBUILD_WORK_DIR=/alicesw/
+     export ALIBUILD_WORK_DIR=/alicesw/sw/
+     if [ -d /alicesw/sw/ ]; then
+        export ALIBUILD_WORK_DIR=/alicesw/sw/
+        alienv enter AliPhysics/latest
+        export PYTHONPATH=/usr/local/lib/python3.6/dist-packages:$PYTHONPATH
+        export PYTHONPATH=$RootInteractive/:$PYTHONPATH
+        export PATH=/usr/local/bin/:$PATH
+     fi
 %files
     # Copy cifar10 example script
     benchmark.sh /usr/local/bin/benchmark.sh
@@ -31,6 +38,10 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y mlocate
+    # adding nodejs and npm - see https://linuxize.com/post/how-to-install-node-js-on-ubuntu-18.04/
+    curl -sL https://deb.nodesource.com/setup_14.x | bash -
+    apt-get install  -y nodejs
+    #
     apt-get install -y less mc nano vim
     apt-get install -y environment-modules libssl-dev python3-venv tclsh
     #openssl-devel
@@ -45,14 +56,23 @@ From: tensorflow/tensorflow:2.2.0-gpu-jupyter
     #apt-get install -y  ncurses-devel zlib-devel texinfo gtk+-devel gtk2-devel tcl-devel tk-devel
     #
     python3 -m pip install conda aliBuild notebook
-    #python3 -m conda install pytorch torchvision cudatoolkit=10.2 -c pytorch-nightly  # not working with toolkit
-    #python3 -m conda install pytorch torchvision  -c pytorch-nightly -p /usr/local/    # not working with toolkit
+    python3 -m pip install pytest pytest_tornasync pandas bokeh==1.4.0 anytree  tabulate
+    python3 -m pip install voila panel ipyvolume ipywidgets iminuit
     python3 -m pip install torch torchvision
+    # jupyter hub
+    python3 -m pip install jupyterhub jupyterlab
+    npm install -g configurable-http-proxy
     # python3 -m pip install torch torchvision tensorflow_probability iminuit
-    python3 -m pip install tensorflow_probability iminuit
-    python3 -m pip install tensorflow-datasets pytest pandas bokeh==1.4.0 anytree ipywidgets tabulate
+    python3 -m pip install tensorflow_probability  tensorflow-datasets
     python3 -m pip install jax scikit-garden
     python3 -m pip install git+https://github.com/miranov25/RootInteractive
+    # enable jupyter lab externsions
+    jupyter labextension install @pyviz/jupyterlab_pyviz
+    jupyter labextension install @jupyter-widgets/jupyterlab-manager
+    jupyter labextension install ipyvolume
+    jupyter labextension install jupyter-threejs
+    jupyter nbextension enable --py --sys-prefix ipyvolume
+    jupyter nbextension enable --py --sys-prefix widgetsnbextension
     #
     cd /opt
     git clone https://github.com/tensorflow/models
