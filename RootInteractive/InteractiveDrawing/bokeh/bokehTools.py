@@ -52,8 +52,8 @@ def makeJScallback(widgetDict, **kwargs):
         code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
         # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
 
+    code += "let isOK = false;\n"
     for key, value in widgetDict.items():
-        #
         if isinstance(value, Slider):
             code += f"      var {key}Value={key}.value;\n"
             code += f"      var {key}Step={key}.step;\n"
@@ -690,12 +690,12 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
                             color=optionLocal["color"],
                             marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
-            if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
-                errors = HBar(y=varNameY, left=varNameX+"_lower", right=varNameX+"_upper",line_color=optionLocal["color"])
-                figureI.add_glyph(source,errors)
-            if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
-                errors = VBar(x=varNameX, bottom=varNameY+"_lower", top=varNameY+"_upper",line_color=optionLocal["color"])
-                figureI.add_glyph(source,errors)
+            if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
+                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=optionLocal["color"])
+                figureI.add_glyph(source, errorX)
+            if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
+                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=optionLocal["color"])
+                figureI.add_glyph(source, errorY)
             #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
             #    figureI.add_layout(errors)
 
@@ -770,7 +770,6 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     else:
         value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
-    slider.callback_policy = 'mouseup'
     return slider
 
 
