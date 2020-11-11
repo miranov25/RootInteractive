@@ -20,7 +20,7 @@ def test_Surface3d():
     source = ColumnDataSource(data=dict(x=xx, y=yy, z=value, colorValue=colorValue))
 
     surface = BokehVisJSGraph3D(x="x", y="y", z="z", style="colorValue", data_source=source, width=300,
-                                height=300, options3D={"style": "dot-size"})
+                                height=300, options3D={"style": "surface"})
 
     show(surface)
 
@@ -60,10 +60,10 @@ def test_Surface3d_sliders():
 
 
 def test_Surface3d_select():
-    x = [random() for x in range(500)]
-    y = [random() for y in range(500)]
-    z = [random() for z in range(500)]
-    colorValue = [random() for x in range(500)]
+    x = np.random.rand(500) * 300
+    y = np.random.rand(500) * 300
+    z = np.sin(x / 50) * np.cos(y / 50) * 50 + 50
+    colorValue = z
 
     s1 = ColumnDataSource(data=dict(x=x, y=y, z=z, colorValue=colorValue))
     s2 = ColumnDataSource(data=dict(x=[0], y=[0], z=[0], colorValue=[0]))
@@ -72,8 +72,8 @@ def test_Surface3d_select():
     plot1.circle('x', 'y', source=s1, alpha=0.6)
 
     plot2 = BokehVisJSGraph3D(x="x", y="y", z="z", style="colorValue", data_source=s2, width=300,
-                                height=300, options3D={"style": "dot-color", "xMin": 0, "xMax": 1, "yMin": 0, "yMax": 1,
-                                                       "zMin": 0, "zMax": 1})
+                              height=300, options3D={"style": "dot_color", "xMin": 0, "xMax": 300,
+                                                     "yMin": 0, "yMax": 300})
 
     s1.selected.js_on_change('indices', CustomJS(args=dict(s1=s1, s2=s2), code="""
         var inds = cb_obj.indices;
