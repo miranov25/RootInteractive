@@ -16,7 +16,7 @@ def test_Surface3d():
 
     source = ColumnDataSource(data=dict(x=xx, y=yy, z=value, colorValue=colorValue))
 
-    surface = Surface3d(x="x", y="y", z="z", style="colorValue", myWidth="100px", data_source=source, width=300,
+    surface = Surface3d(x="x", y="y", z="z", style="colorValue", data_source=source, width=300,
                         height=300, options3D={"style": "dot-size"})
 
     show(surface)

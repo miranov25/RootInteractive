@@ -35,9 +35,6 @@ class Surface3d(LayoutDOM):
     y = String
     z = String
     style = String
-    myWidth = String("100px")
-    legendLabel = String("XXX123")
-    xxx = Int
     options3D = Dict(String, Any)
     print("x", __implementation__)
 #    width=String(default=10)
