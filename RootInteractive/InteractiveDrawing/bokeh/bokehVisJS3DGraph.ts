@@ -44,8 +44,8 @@ const OPTIONS = {
 // or into the DOM, we must create a View subclass for the model.
 //
 // In this case we will subclass from the existing BokehJS ``LayoutDOMView``
-export class Surface3dView extends LayoutDOMView {
-  model: Surface3d
+export class BokehVisJSGraph3DView extends LayoutDOMView {
+  model: BokehVisJSGraph3D
 
   private _graph: vis.Graph3d
 
@@ -113,7 +113,7 @@ export class Surface3dView extends LayoutDOMView {
 // correspond to the python Bokeh model subclass. In this case, since we want
 // an element that can position itself in the DOM according to a Bokeh layout,
 // we subclass from ``LayoutDOM``
-export namespace Surface3d {
+export namespace BokehVisJSGraph3D {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = LayoutDOM.Props & {
@@ -126,13 +126,13 @@ export namespace Surface3d {
   }
 }
 
-export interface Surface3d extends Surface3d.Attrs {}
+export interface BokehVisJSGraph3D extends BokehVisJSGraph3D.Attrs {}
 
-export class Surface3d extends LayoutDOM {
-  properties: Surface3d.Props
-  __view_type__: Surface3dView
+export class BokehVisJSGraph3D extends LayoutDOM {
+  properties: BokehVisJSGraph3D.Props
+  __view_type__: BokehVisJSGraph3DView
 
-  constructor(attrs?: Partial<Surface3d.Attrs>) {
+  constructor(attrs?: Partial<BokehVisJSGraph3D.Attrs>) {
     super(attrs)
   }
 
@@ -141,18 +141,18 @@ export class Surface3d extends LayoutDOM {
   // will be automatically filled in during compilation, so except in some
   // special cases, this shouldn't be generally included manually, to avoid
   // typos, which would prohibit serialization/deserialization of this model.
-  static __name__ = "Surface3d"
+  static __name__ = "BokehVisJSGraph3D"
 
-  static init_Surface3d() {
+  static init_BokehVisJSGraph3D() {
     // This is usually boilerplate. In some cases there may not be a view.
-    this.prototype.default_view = Surface3dView
+    this.prototype.default_view = BokehVisJSGraph3DView
 
     // The @define block adds corresponding "properties" to the JS model. These
     // should basically line up 1-1 with the Python model class. Most property
     // types have counterparts, e.g. ``bokeh.core.properties.String`` will be
     // ``p.String`` in the JS implementatin. Where the JS type system is not yet
     // as rich, you can use ``p.Any`` as a "wildcard" property type.
-    this.define<Surface3d.Props>({
+    this.define<BokehVisJSGraph3D.Props>({
       x:            [ p.String   ],
       y:            [ p.String   ],
       z:            [ p.String   ],

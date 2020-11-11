@@ -1,6 +1,4 @@
-import numpy as np
-from bokeh.core.properties import Instance, String, Int, Dict, Any
-from bokeh.io import show
+from bokeh.core.properties import Instance, String, Dict, Any
 from bokeh.models import ColumnDataSource, LayoutDOM
 # see options in https://visjs.github.io/vis-graph3d/docs/graph3d/index.html
 
@@ -9,11 +7,11 @@ from bokeh.models import ColumnDataSource, LayoutDOM
 # Bokeh layouts, so use ``LayoutDOM`` as the base class. If you wanted to create
 # a custom tool, you could inherit from ``Tool``, or from ``Glyph`` if you
 # wanted to create a custom glyph, etc.
-class Surface3d(LayoutDOM):
+class BokehVisJSGraph3D(LayoutDOM):
 
     # The special class attribute ``__implementation__`` should contain a string
     # of JavaScript code that implements the browser side of the extension model.
-    __implementation__ = "surface3d.ts"
+    __implementation__ = "bokehVisJS3DGraph.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -37,4 +35,3 @@ class Surface3d(LayoutDOM):
     style = String
     options3D = Dict(String, Any)
     print("x", __implementation__)
-#    width=String(default=10)
