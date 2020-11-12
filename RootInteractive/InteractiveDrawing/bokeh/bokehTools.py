@@ -12,6 +12,7 @@ from IPython import get_ipython
 from bokeh.models.widgets import *
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 import copy
 
 # tuple of Bokeh markers
@@ -163,12 +164,18 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
                 except ValueError:
                     logging.info('Failed: to process option ' + option["commonY"])
                     continue
+                except AttributeError:
+                    logging.info('Failed: to process option ' + option["commonY"])
+                    continue
         if 'commonX' in option:
             if option["commonX"] >= 0:
                 try:
                     fig.x_range = figureList[int(option["commonX"])].x_range
                 except ValueError:
                     if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
+                    continue
+                except AttributeError:
+                    logging.info('Failed: to process option ')
                     continue
 
         if (idx > 0) & ('y_visible' in option):
@@ -185,6 +192,11 @@ def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, ve
             if 'plot_height' in option:
                 fig.plot_height = int(option["plot_height"])
         if type(fig).__name__ == 'DataTable':
+            if 'plot_width' in option:
+                fig.width = int(option["plot_width"] / nCols)
+            if 'plot_height' in option:
+                fig.height = int(option["plot_height"])
+        if type(fig).__name__ == 'BokehVisJSGraph3D':
             if 'plot_width' in option:
                 fig.width = int(option["plot_width"] / nCols)
             if 'plot_height' in option:
@@ -320,6 +332,12 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
                 figure.legend.visible = rowOptions["legend_visible"]
             if type(figure).__name__ == "DataTable":
                 figure.height = int(rowOptions["plot_height"])
+            if type(figure).__name__ == "BokehVisJSGraph3D":
+                if rowOptions["plot_width"] > 0:
+                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
+                    figure.width = plot_width
+                if rowOptions["plot_height"] > 0:
+                    figure.height = rowOptions["plot_height"]
 
         rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
         widgetRows.append(rowWidgetArray)
@@ -636,7 +654,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             continue
         xAxisTitle = ""
         yAxisTitle = ""
-        #        zAxisTitle = ""
+        # zAxisTitle = ""
         plotTitle = ""
         for varY in variables[1]:
             if hasattr(dfQuery, "meta"):
@@ -654,9 +672,24 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         yAxisTitle = yAxisTitle[:-1]
         plotTitle += yAxisTitle + " vs " + xAxisTitle
 
-        figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
-                         tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
-                         y_axis_type=options['y_axis_type'])
+        optionLocal = copy.copy(options)
+        if len(variables) > 2:
+            logging.info("Option %s", variables[2])
+            optionLocal.update(variables[2])
+        if 'varZ' in optionLocal.keys():
+            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+            _, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][0])
+            _, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
+            _, varNameColor = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+            options3D = {"width": "99%", "height": "99%"}
+            plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
+                                      data_source=source, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor, options3D=options3D)
+            plotArray.append(plotI)
+            continue
+        else:
+            figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
+                             tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
+                             y_axis_type=options['y_axis_type'])
 
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
