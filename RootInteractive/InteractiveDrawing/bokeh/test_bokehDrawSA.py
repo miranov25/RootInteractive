@@ -35,7 +35,7 @@ df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisT
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
-    [['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY", "errX":"0.01" }],
+    [['A'], ['A*A-C*C'], {"color": "red", "size": 7, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01" }],
     [['A'], ['C+A', 'C-A', 'A/A']],
     [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
@@ -89,7 +89,7 @@ def testBokehDrawArraySA_tree():
     fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
 
 
-testOldInterface()           # axis not working since new Bokeh - will be depecated soon
+#testOldInterface()           # axis not working since new Bokeh - will be depecated soon
 #testBokehDrawArraySA()
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()
