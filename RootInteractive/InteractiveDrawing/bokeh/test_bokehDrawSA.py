@@ -82,6 +82,11 @@ def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None)
 
+
+def testBokehDrawArrayDownsample():
+    output_file("test_BokehDrawArrayDownsample.html")
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=4)
+
 def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
         pytest.skip("no ROOT module")
