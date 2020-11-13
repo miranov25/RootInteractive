@@ -53,8 +53,8 @@ class bokehDrawSA(object):
             'color': "navy",
             'line_color': "white",
             'widgetLayout':'',
-            'sizing_mode':None,
-            'nPointRender': 7
+            'sizing_mode': None,
+            'nPointRender': 100000
         }
         options.update(kwargs)
         self.options=options
