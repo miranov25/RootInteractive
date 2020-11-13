@@ -46,6 +46,7 @@ def makeJScallback(widgetDict, **kwargs):
     code += f"""for (var i = 0; i < {size}; i++)\n"""
     code += " {\n"
     code += """let isSelected=1;\n"""
+    code += """let idx=0;\n"""
     code += f"const nPointRender =  {options['nPointRender']};\n"
     for a in widgetDict['cdsOrig'].data:
         if a == "index":
@@ -102,9 +103,10 @@ def makeJScallback(widgetDict, **kwargs):
     code += """
             } else {
                 if(Math.random() < 1 / nSelected){
+                    idx = Math.floor(Math.random()*nPointRender)
     """
     for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'][Math.floor(Math.random()*nPointRender)]=dataOrig[\'{a}\'][i];\n"
+        code += f"dataSel[\'{a}\'][idx]=dataOrig[\'{a}\'][i];\n"
     code += """
                 }
             }
