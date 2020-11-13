@@ -23,16 +23,17 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circl
 def makeJScallback(widgetDict, **kwargs):
     options = {
         "verbose": 0,
-        "varList": ['AAA', 'BBB']
+        "varList": ['AAA', 'BBB'],
+        "nPointRender": 100000
     }
     options.update(kwargs)
 
     size = widgetDict['cdsOrig'].data["index"].size
     code = \
         """
-    var dataOrig = cdsOrig.data;
-    var dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig["index"].length, dataSel["index"].length);
+    let dataOrig = cdsOrig.data;
+    let dataSel = cdsSel.data;
+    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
     """
     # for key in options['varList']:
     #    code += f"      var {key}K={key};\n"
@@ -40,12 +41,12 @@ def makeJScallback(widgetDict, **kwargs):
     for a in widgetDict['cdsOrig'].data:
         code += f"dataSel[\'{a}\']=[];\n"
 
-    code += f"""var arraySize={size};\n"""
-    code += """var nSelected=0;\n"""
+    code += f"""let arraySize={size};\n"""
+    code += """let nSelected=0;\n"""
     code += f"""for (var i = 0; i < {size}; i++)\n"""
     code += " {\n"
-    code += """var isSelected=1;\n"""
-    varString = ""
+    code += """let isSelected=1;\n"""
+    code += f"const nPointRender =  {options['nPointRender']};\n"
     for a in widgetDict['cdsOrig'].data:
         if a == "index":
             continue
@@ -93,12 +94,21 @@ def makeJScallback(widgetDict, **kwargs):
             code += f"      isSelected&=((dataOrig[\"{key}\"][i]=={key}Value))|isOK;\n"
     code += """
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
-        if (isSelected) nSelected++;
         if (isSelected){
+          if(nSelected < nPointRender){
     """
     for a in widgetDict['cdsOrig'].data:
         code += f"dataSel[\'{a}\'].push(dataOrig[\'{a}\'][i]);\n"
     code += """
+            } else {
+                if(Math.random() < 1 / nSelected){
+    """
+    for a in widgetDict['cdsOrig'].data:
+        code += f"dataSel[\'{a}\'][Math.floor(Math.random()*nPointRender)]=dataOrig[\'{a}\'][i];\n"
+    code += """
+                }
+            }
+            nSelected++;
         }
     }
     console.log(\"nSelected:%d\",nSelected);
@@ -847,7 +857,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
     widgetArray = []
     widgetDict = {"cdsOrig": cdsOrig, "cdsSel": cdsSel}
     for widget in widgetParams:
@@ -870,10 +880,12 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel):
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallback(widgetDict)
+    callback = makeJScallback(widgetDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
+        elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
+            iWidget.js_on_change("value_throttled", callback)
         else:
             iWidget.js_on_change("value", callback)
         iWidget.js_on_event("value", callback)

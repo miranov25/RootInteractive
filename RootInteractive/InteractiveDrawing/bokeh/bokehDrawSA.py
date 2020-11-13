@@ -20,18 +20,18 @@ class bokehDrawSA(object):
                                     for Ranged sliders: slider.name(min,max,step,initial start value, initial end value)
                                       Ex: slider.commonF(0,15,5,0,10)
 
-                                         
+
         :param p:                template figure
         :param options:          optional drawing parameters
                                  - ncols - number fo columns in drawing
                                  - commonX=?,commonY=? - switch share axis
                                  - size
-                                 - errX=?  - query for errors on X-axis 
+                                 - errX=?  - query for errors on X-axis
                                  - errY=?  - array of queries for errors on Y
                                  Tree options:
-                                 - variables     - List of variables which will extract from ROOT File 
+                                 - variables     - List of variables which will extract from ROOT File
                                  - nEntries      - number of entries which will extract from ROOT File
-                                 - firstEntry    - Starting entry number 
+                                 - firstEntry    - Starting entry number
                                  - mask          - mask for variable names
                                  - verbosity     - first bit: verbosity for query for every update
                                                  - second bit: verbosity for source file.
@@ -53,7 +53,8 @@ class bokehDrawSA(object):
             'color': "navy",
             'line_color': "white",
             'widgetLayout':'',
-            'sizing_mode':None
+            'sizing_mode':None,
+            'nPointRender': 7
         }
         options.update(kwargs)
         self.options=options
@@ -139,7 +140,7 @@ class bokehDrawSA(object):
 
     def initWidgets(self, widgetsDescription):
         r"""
-        Initialize widgets 
+        Initialize widgets
 
         :param widgetString:
             example string
@@ -147,7 +148,7 @@ class bokehDrawSA(object):
         :return: VBox includes all widgets
         """
         if type(widgetsDescription)==list:
-            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel)
+            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout,list):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
@@ -170,7 +171,7 @@ class bokehDrawSA(object):
                 widgetDict[iWidget.title]=iWidget
             except AttributeError:
                 widgetDict[iWidget.labels[0]] = iWidget
-        callback=makeJScallback(widgetDict)
+        callback=makeJScallback(widgetDict, nPointRender=self.options['nPointRender'])
 #        callback.code = callback.code.replace("A","PA")     # Contemporary correction until makeJScallback is fixed
         for iWidget in widgetList:
             if isinstance(iWidget,CheckboxGroup):
