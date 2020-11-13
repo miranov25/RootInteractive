@@ -71,7 +71,8 @@ class bokehDraw(object):
             'plot_height': 400,
             'bg_color': '#fafafa',
             'color': "navy",
-            'line_color': "white"
+            'line_color': "white",
+            'nPointRender': 100000
         }
         options.update(kwargs)
 
@@ -145,6 +146,11 @@ class bokehDraw(object):
         :param kwargs:
         :return:
         """
+        options={
+            'nPointRender': 100000
+        }
+        options.update(kwargs)
+        kwargs=options
         tmp=""
         for fig in figureArray:
             for entry in fig[0:2]:

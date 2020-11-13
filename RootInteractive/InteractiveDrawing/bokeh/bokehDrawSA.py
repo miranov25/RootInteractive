@@ -104,6 +104,11 @@ class bokehDrawSA(object):
         :param kwargs:
         :return:
         """
+        options={
+            'nPointRender': 100000
+        }
+        options.update(kwargs)
+        kwargs=options
         tmp=""
         optionList=[]
         for fig in figureArray:

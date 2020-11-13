@@ -601,7 +601,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "colors": 'Category10',
         "colorZvar": '',
         "filter": '',
-        'doDraw': 0
+        'doDraw': 0,
+        'nPointRender': 100000
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -641,7 +642,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                         dfQuery[varNameX+'_upper'] = seriesUpper
 
     try:
-        source = ColumnDataSource(dfQuery)
+        #source = ColumnDataSource(dfQuery)
+        source  = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0],options['nPointRender'])))
     except:
         logging.error("Invalid source:", source)
     # define default options
@@ -885,7 +887,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
         elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
-            iWidget.js_on_change("value_throttled", callback)
+            iWidget.js_on_change("value", callback)
         else:
             iWidget.js_on_change("value", callback)
         iWidget.js_on_event("value", callback)
