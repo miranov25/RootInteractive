@@ -38,6 +38,7 @@ def makeJScallback(widgetDict, **kwargs):
     for (const property in dataSel) {
         var dataSelP = dataSel[`${property}`];
         console.log(`${property}: ${dataSelP.length}`);
+        dataSel[`${property}`]=[]
     }
     """
     # for key in options['varList']:
@@ -102,17 +103,15 @@ def makeJScallback(widgetDict, **kwargs):
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected){
           if(nSelected < nPointRender){
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'][nSelected] = dataOrig[\'{a}\'][i];\n"
-    code += """
+            for (const property in dataSel) {
+                dataSel[`${property}`][nSelected]= dataOrig[`${property}`][i];
+            }
             } else {
                 if(Math.random() < 1 / nSelected){
                     idx = Math.floor(Math.random()*nPointRender)
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'][idx]=dataOrig[\'{a}\'][i];\n"
-    code += """
+                    for (const property in dataSel) {
+                        dataSel[`${property}`][idx]= dataOrig[`${property}`][i];
+                    }
                 }
             }
             nSelected++;
