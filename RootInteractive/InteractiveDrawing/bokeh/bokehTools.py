@@ -97,103 +97,6 @@ def makeJScallback(widgetDict, **kwargs):
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected){
           if(nSelected < nPointRender){
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'].push(dataOrig[\'{a}\'][i]);\n"
-    code += """
-            } else {
-                if(Math.random() < 1 / nSelected){
-                    idx = Math.floor(Math.random()*nPointRender)
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'][idx]=dataOrig[\'{a}\'][i];\n"
-    code += """
-                }
-            }
-            nSelected++;
-        }
-    }
-    console.log(\"nSelected:%d\",nSelected);
-    cdsSel.change.emit();
-    """
-    if options["verbose"] > 0:
-        logging.info("makeJScallback:\n", code)
-    # print(code)
-    callback = CustomJS(args=widgetDict, code=code)
-    return callback
-
-
-def makeJScallbackOptimized(widgetDict, **kwargs):
-    options = {
-        "verbose": 0,
-        "varList": ['AAA', 'BBB'],
-        "nPointRender": 100000
-    }
-    options.update(kwargs)
-
-    size = widgetDict['cdsOrig'].data["index"].size
-    code = \
-        """
-    let dataOrig = cdsOrig.data;
-    let dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
-    """
-    # for key in options['varList']:
-    #    code += f"      var {key}K={key};\n"
-
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\']=[];\n"
-
-    code += f"""let arraySize={size};\n"""
-    code += f"const nPointRender =  {options['nPointRender']};\n"
-    code += """let nSelected=0;\n"""
-    code += "const precision=0.000001;\n"
-    code += f"""for (var i = 0; i < {size}; i++)\n"""
-    code += " {\n"
-    code += "   let isSelected=1;\n"""
-    code += "   let idx=0;\n"""
-    code += "   let isOK = false;\n"
-    for key, value in widgetDict.items():
-        if isinstance(value, Slider):
-            code += f"      var {key}Value={key}.value;\n"
-            code += f"      var {key}Step={key}.step;\n"
-            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value-0.5*{key}Step)\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value+0.5*{key}Step)\n"
-        elif isinstance(value, RangeSlider):
-            code += f"      var {key}Value={key}.value;\n"
-            # code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value[0])\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value[1])\n"
-        elif isinstance(value, TextInput):
-            code += f"      var queryText={key}.value;\n"
-            # code += f"      console.log(queryText, queryText.length);\n"
-            code += "      if (queryText.length > 1)  {"
-            code += f"      var queryString='';\n"
-            code += f"      var varString='';\n"
-            code += f"     eval(varString+ 'var result = ('+ queryText+')');\n"
-            # code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
-            code += f"      isSelected&=result;\n"
-            code += "}\n"
-        elif isinstance(value, Select):
-            # check if entry is equat to selected within relitive precission
-            code += f"      var {key}Value={key}.value;\n"
-            # code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
-            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)|isOK;\n"
-        elif isinstance(value, MultiSelect):
-            code += f"      var {key}Value={key}.value;\n"
-            # code += f"     console.log(\"%s\t%s\t%f\t%s\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i],({key}Value.includes(dataOrig[\"{key}\"][i].toString())));\n"
-            code += f"      isSelected&=({key}Value.includes(dataOrig[\"{key}\"][i].toString()))\n"
-        elif isinstance(value, CheckboxGroup):
-            code += f"      var {key}Value=({key}.active.length>0);\n"
-            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
-            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=((dataOrig[\"{key}\"][i]=={key}Value))|isOK;\n"
-    code += """
-        //console.log(\"isSelected:%d\t%d\",i,isSelected);
-        if (isSelected){
-          if(nSelected < nPointRender){
             for (const key in dataSel){
                 dataSel[key].push(dataOrig[key][i]);
             }
@@ -215,6 +118,89 @@ def makeJScallbackOptimized(widgetDict, **kwargs):
         logging.info("makeJScallback:\n", code)
     # print(code)
     callback = CustomJS(args=widgetDict, code=code)
+    return callback
+
+
+def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
+    options = {
+        "verbose": 0,
+        "varList": ['AAA', 'BBB'],
+        "nPointRender": 100000
+    }
+    options.update(kwargs)
+
+    code = \
+        """
+    console.log("Hello JSCallback");
+    const dataOrig = cdsOrig.data;
+    let dataSel = cdsSel.data;
+    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    const nPointRender = options.nPointRender;
+    let nSelected=0;
+    for (const i in dataSel){
+        dataSel[i] = [];
+    }
+    const precision = 0.000001;
+    const size = dataOrig.index.length;
+    for (let i = 0; i < size; i++){
+        let isSelected = true;
+        let randomIndex = 0;
+        let isOK = false;
+        for (const key in widgetDict){
+            const widget = widgetDict[key];
+            if(widget.type == "Slider"){
+                isSelected &= (dataOrig[key][i] >= widget.value-0.5*widget.step);
+                isSelected &= (dataOrig[key][i] <= widget.value+0.5*widget.step);
+            }
+            if(widget.type == "RangeSlider"){
+                isSelected &= (dataOrig[key][i] >= widget.value[0]);
+                isSelected &= (dataOrig[key][i] <= widget.value[1]);
+            }
+            if(widget.type == "Select"){
+                isOK = Math.abs(dataOrig[key][i] - widget.value) <= widget.value * precision;
+                isSelected &= (dataOrig[key][i] == widget.value) | isOK;
+            }
+            if(widget.type == "MultiSelect"){
+                isSelected &= (widget.value.includes(dataOrig[key][i].toString()));
+            }
+            if(widget.type == "CheckboxGroup"){
+                isOK = Math.abs(dataOrig[key][i] - widget.value) <= widget.value * precision;
+                isSelected &= (dataOrig[key][i] == widget.value) | isOK;
+            }
+            if(widget.type == "TextInput"){
+                let queryText = widget.value;
+                 if (queryText.length > 1)  {
+                    let queryString='';
+                    let varString='';
+                    eval(varString+ 'var result = ('+ queryText+')');
+                    isSelected&=result;
+                 }
+            }
+        }
+        if (isSelected){
+          if(nSelected < nPointRender){
+            for (const key in dataSel){
+                dataSel[key].push(dataOrig[key][i]);
+            }
+            } else {
+                if(Math.random() < 1 / nSelected){
+                    randomIndex = Math.floor(Math.random()*nPointRender);
+                    for (const key in dataSel){
+                        dataSel[key][randomIndex] = dataOrig[key][i];
+                    }
+                }
+            }
+            nSelected++;
+        }
+    }
+    console.log(\"nSelected:%d\",nSelected);
+    cdsSel.change.emit();
+    """
+    if options["verbose"] > 0:
+        logging.info("makeJScallback:\n", code)
+    # print(code)
+    callback = CustomJS(args={'widgetDict': widgetDict, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
+                        code=code)
     return callback
 
 
@@ -959,7 +945,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
 
 def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
     widgetArray = []
-    widgetDict = {"cdsOrig": cdsOrig, "cdsSel": cdsSel}
+    widgetDict = {}
     for widget in widgetParams:
         type = widget[0]
         params = widget[1]
@@ -981,7 +967,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    callback = makeJScallbackOptimized(widgetDict, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
