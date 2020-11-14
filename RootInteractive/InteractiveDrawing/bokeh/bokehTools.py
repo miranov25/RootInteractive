@@ -145,14 +145,14 @@ def makeJScallbackOptimized(widgetDict, **kwargs):
         code += f"dataSel[\'{a}\']=[];\n"
 
     code += f"""let arraySize={size};\n"""
-    code += """let nSelected=0;\n"""
     code += f"const nPointRender =  {options['nPointRender']};\n"
+    code += """let nSelected=0;\n"""
     code += "const precision=0.000001;\n"
     code += f"""for (var i = 0; i < {size}; i++)\n"""
     code += " {\n"
-    code += """let isSelected=1;\n"""
-    code += """let idx=0;\n"""
-    code += "let isOK = false;\n"
+    code += "   let isSelected=1;\n"""
+    code += "   let idx=0;\n"""
+    code += "   let isOK = false;\n"
     for key, value in widgetDict.items():
         if isinstance(value, Slider):
             code += f"      var {key}Value={key}.value;\n"
@@ -201,7 +201,7 @@ def makeJScallbackOptimized(widgetDict, **kwargs):
                 if(Math.random() < 1 / nSelected){
                     idx = Math.floor(Math.random()*nPointRender);
                     for (const key in dataSel){
-                        dataSel[key].push(dataOrig[key][i]);
+                        dataSel[key][idx] = dataOrig[key][i];
                     }
                 }
             }
