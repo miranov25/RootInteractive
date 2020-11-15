@@ -20,7 +20,7 @@ if "ROOT" in sys.modules:
     AddMetadata(tree, "C.AxisTitle", "B (s)")
     AddMetadata(tree, "D.AxisTitle", "D (a.u.)")
 
-df = pd.DataFrame(np.random.random_sample(size=(4000, 6)), columns=list('ABCDEF'))
+df = pd.DataFrame(np.random.random_sample(size=(20000, 6)), columns=list('ABCDEF'))
 initMetadata(df)
 df.eval("Bool=A>0.5", inplace=True)
 df["AA"]=(df.A*10).round(0)/10.
@@ -35,7 +35,7 @@ df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisT
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
-    [['A'], ['A*A-C*C'], {"color": "red", "size": 7, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01" }],
+    [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
     [['A'], ['C+A', 'C-A', 'A/A']],
     [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY", "rescaleColorMapper": True }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
@@ -85,7 +85,7 @@ def testBokehDrawArrayWidgetNoScale():
 
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=4)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
 
 def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
@@ -99,3 +99,4 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()
 #testBokehDrawArrayWidgetNoScale()
+#testBokehDrawArrayDownsample()
