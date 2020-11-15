@@ -131,7 +131,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
 
     code = \
         """
-    console.log("Hello JSCallback");
     const dataOrig = cdsOrig.data;
     let dataSel = cdsSel.data;
     console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
@@ -142,57 +141,90 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const precision = 0.000001;
     const size = dataOrig.index.length;
-    for (let i = 0; i < size; i++){
-        let isSelected = true;
-        let randomIndex = 0;
-        let isOK = false;
-        for (const key in widgetDict){
-            const widget = widgetDict[key];
-            if(widget.type == "Slider"){
-                isSelected &= (dataOrig[key][i] >= widget.value-0.5*widget.step);
-                isSelected &= (dataOrig[key][i] <= widget.value+0.5*widget.step);
-            }
-            if(widget.type == "RangeSlider"){
-                isSelected &= (dataOrig[key][i] >= widget.value[0]);
-                isSelected &= (dataOrig[key][i] <= widget.value[1]);
-            }
-            if(widget.type == "Select"){
-                isOK = Math.abs(dataOrig[key][i] - widget.value) <= widget.value * precision;
-                isSelected &= (dataOrig[key][i] == widget.value) | isOK;
-            }
-            if(widget.type == "MultiSelect"){
-                isSelected &= (widget.value.includes(dataOrig[key][i].toString()));
-            }
-            if(widget.type == "CheckboxGroup"){
-                isOK = Math.abs(dataOrig[key][i] - widget.value) <= widget.value * precision;
-                isSelected &= (dataOrig[key][i] == widget.value) | isOK;
-            }
-            if(widget.type == "TextInput"){
-                let queryText = widget.value;
-                 if (queryText.length > 1)  {
-                    let queryString='';
-                    let varString='';
-                    eval(varString+ 'var result = ('+ queryText+')');
-                    isSelected&=result;
-                 }
+    let selectedPointsBuffer = new ArrayBuffer(size);
+    let isSelected = new Uint8Array(selectedPointsBuffer);
+    let permutationFilter = [];
+    for(let i=0; i<size; i++){
+        isSelected[i] = 1;
+    }
+    for (const key in widgetDict){
+        const widget = widgetDict[key];
+        const widgetType = widget.type;
+        if(widgetType == "Slider"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            const widgetStep = widget.step;
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (col[i] >= widgetValue-0.5*widgetStep);
+                isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
             }
         }
-        if (isSelected){
-          if(nSelected < nPointRender){
-            for (const key in dataSel){
-                dataSel[key].push(dataOrig[key][i]);
+        if(widgetType == "RangeSlider"){
+            const col = dataOrig[key];
+            const low = widget.value[0];
+            const high = widget.value[1];
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (col[i] >= low);
+                isSelected[i] &= (col[i] <= high);
             }
-            } else {
-                if(Math.random() < 1 / nSelected){
-                    randomIndex = Math.floor(Math.random()*nPointRender);
-                    for (const key in dataSel){
-                        dataSel[key][randomIndex] = dataOrig[key][i];
-                    }
+        }
+        if(widgetType == "Select"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
+                isSelected[i] &= (col[i] == widgetValue) | isOK;
+            }
+        }
+        if(widgetType == "MultiSelect"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (widgetValue.includes(col[i].toString()));
+            }
+        }
+        if(widgetType == "CheckboxGroup"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
+                isSelected &= (col[i] == widgetValue) | isOK;
+            }
+        }
+        // This is broken, to be fixed later.
+/*        if(widgetType == "TextInput"){
+            const widgetValue = widget.value;
+             if (queryText.length > 1)  {
+                let queryString='';
+                let varString='';
+                eval(varString+ 'var result = ('+ queryText+')');
+                for(let i=0; i<size; i++){
+                    isSelected[i] &= result[i];
                 }
+             }
+        }*/
+    }
+    for (let i = 0; i < size; i++){
+        let randomIndex = 0;
+        if (isSelected[i]){
+            if(nSelected < nPointRender){
+                permutationFilter.push(i);
+            } else if(Math.random() < 1 / nSelected) {
+                randomIndex = Math.floor(Math.random()*nPointRender);
+                permutationFilter[randomIndex] = i;
             }
             nSelected++;
         }
     }
+    nSelected = Math.min(nSelected, nPointRender);
+    for (const key in dataSel){
+        const colSel = dataSel[key];
+        const colOrig = dataOrig[key];
+        for(let i=0; i<nSelected; i++){
+            colSel[i] = colOrig[permutationFilter[i]];
+        }
+    }
+
     console.log(\"nSelected:%d\",nSelected);
     cdsSel.change.emit();
     """
