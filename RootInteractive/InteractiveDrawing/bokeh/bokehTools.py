@@ -124,8 +124,8 @@ def makeJScallback(widgetDict, **kwargs):
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
-        "varList": ['AAA', 'BBB'],
-        "nPointRender": 100000
+        "nPointRender": 100000,
+        "cmapDict": None
     }
     options.update(kwargs)
 
@@ -133,7 +133,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const dataOrig = cdsOrig.data;
     let dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    // console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
     const nPointRender = options.nPointRender;
     let nSelected=0;
     for (const i in dataSel){
@@ -224,7 +224,20 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             colSel[i] = colOrig[permutationFilter[i]];
         }
     }
-
+    const cmapDict = options.cmapDict;
+    if (cmapDict !== undefined && nSelected !== 0){
+        for(const key in cmapDict){
+            const cmapList = cmapDict[key];
+            const col = dataSel[key];
+            const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+            const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+            for(let i=0; i<cmapList.length; i++){
+                cmapList[i].transform.high = high;
+                cmapList[i].transform.low = low;
+                cmapList[i].transform.change.emit();
+            }
+        }
+    }
     console.log(\"nSelected:%d\",nSelected);
     cdsSel.change.emit();
     """
@@ -716,6 +729,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "color": "#000000",
         "colors": 'Category10',
         "colorZvar": '',
+        "rescaleColorMapper": False,
         "filter": '',
         'doDraw': 0,
         'nPointRender': 100000
@@ -766,6 +780,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
     plotArray = []
     colorAll = all_palettes[options['colors']]
+    colorMapperDict = {}
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
@@ -845,6 +860,11 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
                                       high=max(dfQuery[varColor]))
                 optionLocal["color"] = mapperC
+                if optionLocal["rescaleColorMapper"]:
+                    if optionLocal["colorZvar"] in colorMapperDict:
+                        colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
+                    else:
+                        colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
@@ -877,7 +897,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery
+    return pAll, source, layoutList, dfQuery, colorMapperDict
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
@@ -975,7 +995,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -999,7 +1019,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
