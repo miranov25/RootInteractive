@@ -41,10 +41,6 @@ def makeJScallback(widgetDict, **kwargs):
         dataSel[`${property}`]=[]
     }
     """
-    # for key in options['varList']:
-    #    code += f"      var {key}K={key};\n"
-#    for a in widgetDict['cdsOrig'].data:
-#        code += f"dataSel[\'{a}\']=[];\n"
     code += f"""let arraySize={size};\n"""
     code += """let nSelected=0;\n"""
     code += f"""for (var i = 0; i < {size}; i++)\n"""
@@ -809,6 +805,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             _, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
             _, varNameColor = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
             options3D = {"width": "99%", "height": "99%"}
+            options3D["dot-size"]=options["size"]
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=source, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor, options3D=options3D)
             plotArray.append(plotI)
