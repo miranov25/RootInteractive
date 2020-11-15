@@ -71,6 +71,10 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // a Graph3d to the DOM.
     this._graph = new vis.Graph3d(this.el, this.get_data(), OPTIONS)
     if(this.model.options3D !== null){
+      this.model.options3D.xLabel=this.model.x
+      this.model.options3D.yLabel=this.model.y
+      this.model.options3D.zLabel=this.model.z
+      this.model.options3D.legendLabel=this.model.style
       this._graph.setOptions(this.model.options3D)
     }
 
