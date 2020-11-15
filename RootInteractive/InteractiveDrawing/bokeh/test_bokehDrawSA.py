@@ -37,7 +37,7 @@ figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 7, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01" }],
     [['A'], ['C+A', 'C-A', 'A/A']],
-    [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY" }],
+    [['B'], ['C+B', 'C-B'], {"color": "red", "size": 7, "colorZvar": "C", "errY": "errY", "rescaleColorMapper": True }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
 ]

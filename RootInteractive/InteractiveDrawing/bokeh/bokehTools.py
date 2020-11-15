@@ -48,10 +48,10 @@ def makeJScallback(widgetDict, **kwargs):
     code += """let isSelected=1;\n"""
     code += """let idx=0;\n"""
     code += f"const nPointRender =  {options['nPointRender']};\n"
+    code += f"const precision=0.000001;\n"
     for a in widgetDict['cdsOrig'].data:
         if a == "index":
             continue
-        code += f"var precision=0.000001;\n"
         code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
         # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
 
@@ -97,17 +97,15 @@ def makeJScallback(widgetDict, **kwargs):
         //console.log(\"isSelected:%d\t%d\",i,isSelected);
         if (isSelected){
           if(nSelected < nPointRender){
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'].push(dataOrig[\'{a}\'][i]);\n"
-    code += """
+            for (const key in dataSel){
+                dataSel[key].push(dataOrig[key][i]);
+            }
             } else {
                 if(Math.random() < 1 / nSelected){
-                    idx = Math.floor(Math.random()*nPointRender)
-    """
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\'][idx]=dataOrig[\'{a}\'][i];\n"
-    code += """
+                    idx = Math.floor(Math.random()*nPointRender);
+                    for (const key in dataSel){
+                        dataSel[key][idx] = dataOrig[key][i];
+                    }
                 }
             }
             nSelected++;
@@ -121,6 +119,135 @@ def makeJScallback(widgetDict, **kwargs):
     # print(code)
     callback = CustomJS(args=widgetDict, code=code)
     return callback
+
+
+def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
+    options = {
+        "verbose": 0,
+        "nPointRender": 100000,
+        "cmapDict": None
+    }
+    options.update(kwargs)
+
+    code = \
+        """
+    const dataOrig = cdsOrig.data;
+    let dataSel = cdsSel.data;
+    // console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    const nPointRender = options.nPointRender;
+    let nSelected=0;
+    for (const i in dataSel){
+        dataSel[i] = [];
+    }
+    const precision = 0.000001;
+    const size = dataOrig.index.length;
+    let selectedPointsBuffer = new ArrayBuffer(size);
+    let isSelected = new Uint8Array(selectedPointsBuffer);
+    let permutationFilter = [];
+    for(let i=0; i<size; i++){
+        isSelected[i] = 1;
+    }
+    for (const key in widgetDict){
+        const widget = widgetDict[key];
+        const widgetType = widget.type;
+        if(widgetType == "Slider"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            const widgetStep = widget.step;
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (col[i] >= widgetValue-0.5*widgetStep);
+                isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
+            }
+        }
+        if(widgetType == "RangeSlider"){
+            const col = dataOrig[key];
+            const low = widget.value[0];
+            const high = widget.value[1];
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (col[i] >= low);
+                isSelected[i] &= (col[i] <= high);
+            }
+        }
+        if(widgetType == "Select"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
+                isSelected[i] &= (col[i] == widgetValue) | isOK;
+            }
+        }
+        if(widgetType == "MultiSelect"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                isSelected[i] &= (widgetValue.includes(col[i].toString()));
+            }
+        }
+        if(widgetType == "CheckboxGroup"){
+            const col = dataOrig[key];
+            const widgetValue = widget.value;
+            for(let i=0; i<size; i++){
+                isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
+                isSelected &= (col[i] == widgetValue) | isOK;
+            }
+        }
+        // This is broken, to be fixed later.
+/*        if(widgetType == "TextInput"){
+            const widgetValue = widget.value;
+             if (queryText.length > 1)  {
+                let queryString='';
+                let varString='';
+                eval(varString+ 'var result = ('+ queryText+')');
+                for(let i=0; i<size; i++){
+                    isSelected[i] &= result[i];
+                }
+             }
+        }*/
+    }
+    for (let i = 0; i < size; i++){
+        let randomIndex = 0;
+        if (isSelected[i]){
+            if(nSelected < nPointRender){
+                permutationFilter.push(i);
+            } else if(Math.random() < 1 / nSelected) {
+                randomIndex = Math.floor(Math.random()*nPointRender);
+                permutationFilter[randomIndex] = i;
+            }
+            nSelected++;
+        }
+    }
+    nSelected = Math.min(nSelected, nPointRender);
+    for (const key in dataSel){
+        const colSel = dataSel[key];
+        const colOrig = dataOrig[key];
+        for(let i=0; i<nSelected; i++){
+            colSel[i] = colOrig[permutationFilter[i]];
+        }
+    }
+    const cmapDict = options.cmapDict;
+    if (cmapDict !== undefined && nSelected !== 0){
+        for(const key in cmapDict){
+            const cmapList = cmapDict[key];
+            const col = dataSel[key];
+            const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+            const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+            for(let i=0; i<cmapList.length; i++){
+                cmapList[i].transform.high = high;
+                cmapList[i].transform.low = low;
+                cmapList[i].transform.change.emit();
+            }
+        }
+    }
+    console.log(\"nSelected:%d\",nSelected);
+    cdsSel.change.emit();
+    """
+    if options["verbose"] > 0:
+        logging.info("makeJScallback:\n", code)
+    # print(code)
+    callback = CustomJS(args={'widgetDict': widgetDict, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
+                        code=code)
+    return callback
+
 
 def makeJSCallbackVisible(widgetDict, **kwargs):
     """
@@ -602,6 +729,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "color": "#000000",
         "colors": 'Category10',
         "colorZvar": '',
+        "rescaleColorMapper": False,
         "filter": '',
         'doDraw': 0,
         'nPointRender': 100000
@@ -652,6 +780,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
     plotArray = []
     colorAll = all_palettes[options['colors']]
+    colorMapperDict = {}
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
@@ -731,6 +860,11 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
                                       high=max(dfQuery[varColor]))
                 optionLocal["color"] = mapperC
+                if optionLocal["rescaleColorMapper"]:
+                    if optionLocal["colorZvar"] in colorMapperDict:
+                        colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
+                    else:
+                        colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
                 color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
@@ -763,7 +897,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery
+    return pAll, source, layoutList, dfQuery, colorMapperDict
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
@@ -861,9 +995,9 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRender=10000):
     widgetArray = []
-    widgetDict = {"cdsOrig": cdsOrig, "cdsSel": cdsSel}
+    widgetDict = {}
     for widget in widgetParams:
         type = widget[0]
         params = widget[1]
@@ -884,7 +1018,8 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, nPointRender=10000):
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallback(widgetDict, nPointRender=nPointRender)
+    # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
