@@ -133,7 +133,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const dataOrig = cdsOrig.data;
     let dataSel = cdsSel.data;
-    // console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
     const nPointRender = options.nPointRender;
     let nSelected=0;
     for (const i in dataSel){
@@ -742,7 +742,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     # Check/resp. load derived variables
     i: int
     for i, variables in enumerate(figureArray):
-        if len(variables) > 1 and variables[0] is not "table":
+        if len(variables) > 1 and variables[0] != "table":
             lengthX = len(variables[0])
             lengthY = len(variables[1])
             length = max(len(variables[0]), len(variables[1]))
@@ -846,9 +846,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         for i in range(0, length):
             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
             dummy, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
-            optionLocal = copy.copy(options)
-            optionLocal['color'] = colorAll[max(length, 4)][i]
-            optionLocal['marker'] = optionLocal['markers'][i]
+            color = colorAll[max(length, 4)][i]
+            marker = optionLocal['markers'][i]
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
@@ -859,7 +858,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 varColor = optionLocal["colorZvar"]
                 mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
                                       high=max(dfQuery[varColor]))
-                optionLocal["color"] = mapperC
+                color = mapperC
                 if optionLocal["rescaleColorMapper"]:
                     if optionLocal["colorZvar"] in colorMapperDict:
                         colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
@@ -869,13 +868,13 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
-                            color=optionLocal["color"],
-                            marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
+                            color=color,
+                            marker=marker, legend_label=varY + " vs " + varX)
             if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=optionLocal["color"])
+                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                 figureI.add_glyph(source, errorX)
             if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=optionLocal["color"])
+                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
                 figureI.add_glyph(source, errorY)
             #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
             #    figureI.add_layout(errors)
