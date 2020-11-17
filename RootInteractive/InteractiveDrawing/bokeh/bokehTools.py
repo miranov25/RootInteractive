@@ -131,9 +131,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
 
     code = \
         """
+    const t0 = performance.now();
     const dataOrig = cdsOrig.data;
     let dataSel = cdsSel.data;
-    // console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
     const nPointRender = options.nPointRender;
     let nSelected=0;
     for (const i in dataSel){
@@ -224,6 +225,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             colSel[i] = colOrig[permutationFilter[i]];
         }
     }
+    const t1 = performance.now();
+    console.log(`Filtering took ${t1 - t0} milliseconds.`);
     const cmapDict = options.cmapDict;
     if (cmapDict !== undefined && nSelected !== 0){
         for(const key in cmapDict){
@@ -238,8 +241,12 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
     }
-    console.log(\"nSelected:%d\",nSelected);
+    const t2 = performance.now();
+    console.log(`Updating colormaps took ${t2 - t1} milliseconds.`);
     cdsSel.change.emit();
+    const t3 = performance.now();
+    console.log(`Updating cds took ${t3 - t2} milliseconds.`);
+    console.log(\"nSelected:%d\",nSelected);  
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
@@ -742,7 +749,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     # Check/resp. load derived variables
     i: int
     for i, variables in enumerate(figureArray):
-        if len(variables) > 1 and variables[0] is not "table":
+        if len(variables) > 1 and variables[0] != "table":
             lengthX = len(variables[0])
             lengthY = len(variables[1])
             length = max(len(variables[0]), len(variables[1]))
@@ -843,39 +850,41 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
         mapperC = None
+        if (len(optionLocal["colorZvar"]) > 0):
+            logging.info("%s", optionLocal["colorZvar"])
+            varColor = optionLocal["colorZvar"]
+            mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
+                                  high=max(dfQuery[varColor]))
+            if optionLocal["rescaleColorMapper"]:
+                if optionLocal["colorZvar"] in colorMapperDict:
+                    colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
+                else:
+                    colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
+            color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
         for i in range(0, length):
             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
             dummy, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
-            optionLocal = copy.copy(options)
-            optionLocal['color'] = colorAll[max(length, 4)][i]
-            optionLocal['marker'] = optionLocal['markers'][i]
+            if mapperC is not None:
+                color = mapperC
+            else:
+                color = colorAll[max(length, 4)][i]
+            marker = optionLocal['markers'][i]
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            if (len(optionLocal["colorZvar"]) > 0):
-                logging.info("%s",optionLocal["colorZvar"])
-                varColor = optionLocal["colorZvar"]
-                mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
-                                      high=max(dfQuery[varColor]))
-                optionLocal["color"] = mapperC
-                if optionLocal["rescaleColorMapper"]:
-                    if optionLocal["colorZvar"] in colorMapperDict:
-                        colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
-                    else:
-                        colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
-                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
+
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
             figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
-                            color=optionLocal["color"],
-                            marker=optionLocal["marker"], legend_label=varY + " vs " + varX)
+                            color=color,
+                            marker=marker, legend_label=varY + " vs " + varX)
             if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=optionLocal["color"])
+                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                 figureI.add_glyph(source, errorX)
             if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=optionLocal["color"])
+                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
                 figureI.add_glyph(source, errorY)
             #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
             #    figureI.add_layout(errors)
