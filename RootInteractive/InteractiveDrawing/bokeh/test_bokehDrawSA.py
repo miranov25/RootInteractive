@@ -23,9 +23,10 @@ if "ROOT" in sys.modules:
 df = pd.DataFrame(np.random.random_sample(size=(20000, 6)), columns=list('ABCDEF'))
 initMetadata(df)
 df.eval("Bool=A>0.5", inplace=True)
-df["AA"]=(df.A*10).round(0)/10.
-df["CC"]=(df.C*5).round(0)
-df["DD"]=(df.D*2).round(0)/2
+df.eval("BoolB=B>0.5", inplace=True)
+df["AA"]=((df.A*10).round(0)).astype(int)
+df["CC"]=((df.C*5).round(0)).astype(int)
+df["DD"]=((df.D*4).round(0)/2)
 df["EE"]=(df.E*4).round(0)
 df['errY']=df.A*0.02+0.02;
 df.head(10)
@@ -55,9 +56,11 @@ widgetParams=[
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DD", 0, .5, 1]],
     ['select',["CC", 0, 1, 2, 3]],
+    ['select',["Bool"]],
+    ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7],[8,9], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
