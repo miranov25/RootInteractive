@@ -187,12 +187,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 if(!isNaN(val)) return Number(val);
                 return val;
             });
-            const widgetNSelected = widgetValue.length;
             for(let i=0; i<size; i++){
-                let isOK=0;
-                for(let j=0; j<widgetNSelected; j++){
-                    isOK |= Math.abs(widgetValue[j]-col[i])<precision;              
-                }
+                const isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
                 isSelected[i] &= isOK;
             }
         }
