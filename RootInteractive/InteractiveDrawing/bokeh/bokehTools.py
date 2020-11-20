@@ -171,7 +171,9 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         }
         if(widgetType == "Select"){
             const col = dataOrig[key];
-            const widgetValue = widget.value;
+            let widgetValue = widget.value;
+            widgetValue = widgetValue === "True" ? true : widgetValue;
+            widgetValue = widgetValue === "False" ? false : widgetValue;
             for(let i=0; i<size; i++){
                 let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
@@ -179,13 +181,14 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         }
         if(widgetType == "MultiSelect"){
             const col = dataOrig[key];
-            const widgetValue = widget.value.map((val)=>Number(val));
-            const widgetNSelected = widgetValue.length;
+            const widgetValue = widget.value.map((val)=>{
+                if(val === "True") return true;
+                if(val === "False") return false;
+                if(!isNaN(val)) return Number(val);
+                return val;
+            });
             for(let i=0; i<size; i++){
-                let isOK=0;
-                for(let j=0; j<widgetNSelected; j++){
-                    isOK |= Math.abs(widgetValue[j]-col[i])<precision;              
-                }
+                const isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
                 isSelected[i] &= isOK;
             }
         }
