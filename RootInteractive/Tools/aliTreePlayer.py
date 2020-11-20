@@ -452,6 +452,11 @@ def tree2Panda(tree, include, selection, **kwargs):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
+    for i, a in enumerate(columns):
+         if (tree.GetLeaf(a)):
+              if (tree.GetLeaf(a).ClassName() == 'TLeafI'): df[a]=df[a].astype(int)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafB'): df[a]=df[a].astype(bool)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafC'): df[a]=df[a].astype(int)
     initMetadata(df)
     metaData = tree.GetUserInfo().FindObject("metaTable")
     if metaData:
