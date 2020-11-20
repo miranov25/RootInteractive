@@ -25,7 +25,7 @@ initMetadata(df)
 df.eval("Bool=A>0.5", inplace=True)
 df["AA"]=(df.A*10).round(0)/10.
 df["CC"]=(df.C*5).round(0)
-df["DD"]=(df.D*2).round(0)
+df["DD"]=(df.D*2).round(0)/2
 df["EE"]=(df.E*4).round(0)
 df['errY']=df.A*0.02+0.02;
 df.head(10)
@@ -53,7 +53,7 @@ widgetParams=[
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
-    ['multiSelect', ["DD", 0, 1, 2, 3]],
+    ['multiSelect', ["DD", 0, .5, 1]],
     ['select',["CC", 0, 1, 2, 3]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 ]
@@ -98,5 +98,5 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArraySA()
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()
-#testBokehDrawArrayWidgetNoScale()
+testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
