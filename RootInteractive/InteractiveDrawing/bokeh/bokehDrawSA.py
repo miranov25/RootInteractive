@@ -141,6 +141,7 @@ class bokehDrawSA(object):
         widgetList=self.initWidgets(widgetsDescription)
         self.plotArray.append(widgetList)
         self.pAll=gridplotRow(self.plotArray,sizing_mode=self.options['sizing_mode'])
+        self.widgetList=widgetList
         #self.pAll=column([self.figure,widgetList],sizing_mode=self.options['sizing_mode'])
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)
         return self
