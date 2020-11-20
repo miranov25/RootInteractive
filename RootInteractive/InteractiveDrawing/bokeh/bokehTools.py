@@ -179,9 +179,14 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         }
         if(widgetType == "MultiSelect"){
             const col = dataOrig[key];
-            const widgetValue = widget.value;
+            const widgetValue = widget.value.map((val)=>Number(val));
+            const widgetNSelected = widgetValue.length;
             for(let i=0; i<size; i++){
-                isSelected[i] &= (widgetValue.includes(col[i].toString()));
+                let isOK=0;
+                for(let j=0; j<widgetNSelected; j++){
+                    isOK |= Math.abs(widgetValue[j]-col[i])<precision;              
+                }
+                isSelected[i] &= isOK;
             }
         }
         if(widgetType == "CheckboxGroup"){
