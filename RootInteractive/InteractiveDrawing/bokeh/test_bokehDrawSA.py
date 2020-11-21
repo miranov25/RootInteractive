@@ -4,6 +4,7 @@ from bokeh.io import curdoc
 import os
 import sys
 import pytest
+from pandas import CategoricalDtype
 
 if "ROOT" in sys.modules:
     from ROOT import TFile, gSystem
@@ -24,7 +25,7 @@ df = pd.DataFrame(np.random.random_sample(size=(20000, 6)), columns=list('ABCDEF
 initMetadata(df)
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
-df["AA"]=((df.A*10).round(0)).astype(int)
+df["AA"]=((df.A*10).round(0)).astype(CategoricalDtype(ordered=True))
 df["CC"]=((df.C*5).round(0)).astype(int)
 df["DD"]=((df.D*4).round(0)/2)
 df["EE"]=(df.E*4).round(0)
