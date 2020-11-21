@@ -17,7 +17,7 @@ from anytree import *
 
 import re
 import logging
-
+from pandas import CategoricalDtype
 
 def readDataFrameURL(fName, nrows=0):
     if 'http' in fName:
@@ -413,6 +413,7 @@ def tree2Panda(tree, include, selection, **kwargs):
         "firstEntry": 0,
         "nEntries": 100000000,
         "columnMask": [[".fX$", "_X"], [".fY$", "_y"], [".fElements", ""]],
+        "category":0,
         "verbose": 0
     }
     options.update(kwargs)
@@ -453,10 +454,19 @@ def tree2Panda(tree, include, selection, **kwargs):
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):
-         if (tree.GetLeaf(a)):
-              if (tree.GetLeaf(a).ClassName() == 'TLeafI'): df[a]=df[a].astype(int)
-              if (tree.GetLeaf(a).ClassName() == 'TLeafB'): df[a]=df[a].astype(bool)
-              if (tree.GetLeaf(a).ClassName() == 'TLeafC'): df[a]=df[a].astype(int)
+        if (tree.GetLeaf(a)):
+              if (tree.GetLeaf(a).ClassName() == 'TLeafC'): df[a]=df[a].astype(np.int8)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafS'): df[a]=df[a].astype(np.int16)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafI'): df[a]=df[a].astype(np.int32)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafL'): df[a]=df[a].astype(np.int64)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafB'): df[a] = df[a].astype(bool)
+        if (options["category"]>0):
+            dfUniq=df[a].unique()
+            if dfUniq.shape[0]<=options["category"] :
+                df[a]=df[a].astype(CategoricalDtype(ordered=True))
+
+
+
     initMetadata(df)
     metaData = tree.GetUserInfo().FindObject("metaTable")
     if metaData:
