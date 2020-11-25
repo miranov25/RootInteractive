@@ -19,7 +19,6 @@ import copy
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
-
 def makeJScallback(widgetDict, **kwargs):
     options = {
         "verbose": 0,
@@ -176,6 +175,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             widgetValue = widgetValue === "False" ? false : widgetValue;
             for(let i=0; i<size; i++){
                 let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
+                isOK|=(col[i] == widgetValue)
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
             }
         }
@@ -188,7 +188,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 return val;
             });
             for(let i=0; i<size; i++){
-                const isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
+                let isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
+                if (!isOK){ 
+                    isOK = widgetValue.reduce((acc,cur)=>acc|cur===col[i],0);
+                }
                 isSelected[i] &= isOK;
             }
         }
@@ -741,12 +744,13 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         'palette': Spectral6,
         "marker": "square",
         "markers": bokehMarkers,
-        "color": "#000000",
+        "color": None,
         "colors": 'Category10',
         "colorZvar": '',
         "rescaleColorMapper": False,
         "filter": '',
         'doDraw': 0,
+        "legend_field":None,
         'nPointRender': 100000
     }
     options.update(kwargs)
@@ -876,7 +880,12 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 color = mapperC
             else:
                 color = colorAll[max(length, 4)][i]
-            marker = optionLocal['markers'][i]
+            if optionLocal['color'] is not None:
+                color=optionLocal['color']
+            try:
+                marker = optionLocal['markers'][i]
+            except:
+                marker = optionLocal['markers']
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
@@ -885,9 +894,12 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
             #                zAxisTitle +=varColor + ","
             #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
-            figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
-                            color=color,
-                            marker=marker, legend_label=varY + " vs " + varX)
+            if optionLocal["legend_field"] is None:
+                figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                            color=color, marker=marker, legend_label=varY + " vs " + varX)
+            else:
+                figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                            color=color, marker=marker, legend_field=optionLocal["legend_field"])
             if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
                 errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                 figureI.add_glyph(source, errorX)
@@ -990,7 +1002,10 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
     options.update(kwargs)
     # optionsPlot = []
     if len(params) == 1:
-        optionsPlot = np.sort(df[params[0]].unique()).tolist()
+        try:
+            optionsPlot = np.sort(df[params[0]].unique()).tolist()
+        except:
+            optionsPlot = sorted(df[params[0]].unique().tolist())
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
