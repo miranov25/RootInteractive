@@ -32,7 +32,7 @@ export class HistogramCDS extends ColumnarDataSource {
 
     this.define<HistogramCDS.Props>(({Ref})=>({
       source:  [Ref(ColumnDataSource)],
-      view:         [Ref(CDSView), () => new CDSView()],
+      view:         [Ref(CDSView)],
       nbins:        [p.Number],
       range_min:    [p.Number],
       range_max:    [p.Number],
@@ -45,7 +45,10 @@ export class HistogramCDS extends ColumnarDataSource {
     super.initialize()
 
     this.data = {"bin_count":[], "bin_left":[], "bin_right":[]}
-    this.view = new CDSView({source:this.source})
+    if(this.view === null){
+      this.view = new CDSView({source:this.source})
+    }
+
 
     this.update_range()
   }
