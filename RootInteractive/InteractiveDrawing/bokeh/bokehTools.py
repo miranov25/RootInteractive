@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, BooleanFilter
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -13,6 +13,7 @@ from bokeh.models.widgets import *
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
+from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 import copy
 
 # tuple of Bokeh markers
@@ -124,7 +125,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
         "nPointRender": 100000,
-        "cmapDict": None
+        "cmapDict": None,
+        "view": None
     }
     options.update(kwargs)
 
@@ -141,8 +143,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const precision = 0.000001;
     const size = dataOrig.index.length;
-    let selectedPointsBuffer = new ArrayBuffer(size);
-    let isSelected = new Uint8Array(selectedPointsBuffer);
+    let isSelected = new Array(size);
+    for(let i=0; i<size; ++i){
+        isSelected[i] = true;
+    }
     let permutationFilter = [];
     for(let i=0; i<size; i++){
         isSelected[i] = 1;
@@ -215,6 +219,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 }
              }
         }*/
+    }
+    const view = options.view;
+    if(view != null){
+        view.filters[0].booleans = isSelected;
+        view.compute_indices();
     }
     for (let i = 0; i < size; i++){
         let randomIndex = 0;
@@ -751,7 +760,11 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "filter": '',
         'doDraw': 0,
         "legend_field":None,
-        'nPointRender': 100000
+        'nPointRender': 100000,
+        "nbins": 10,
+        "range_min": 0,
+        "range_max": 1,
+        "weights": None
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -771,28 +784,31 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             else:
                 optionLocal = options
             for j in range(0, length):
-                dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
-                    seriesErrY = dfQuery.eval(optionLocal['errY'])
-                    if varNameY+'_lower' not in dfQuery.columns:
-                        seriesLower = dfQuery[varNameY]-seriesErrY
-                        dfQuery[varNameY+'_lower'] = seriesLower
-                    if varNameY+'_upper' not in dfQuery.columns:
-                        seriesUpper = dfQuery[varNameY]+seriesErrY
-                        dfQuery[varNameY+'_upper'] = seriesUpper
-                if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
-                    seriesErrX = dfQuery.eval(optionLocal['errX'])
-                    if varNameX+'_lower' not in dfQuery.columns:
-                        seriesLower = dfQuery[varNameX]-seriesErrX
-                        dfQuery[varNameX+'_lower'] = seriesLower
-                    if varNameX+'_upper' not in dfQuery.columns:
-                        seriesUpper = dfQuery[varNameX]+seriesErrX
-                        dfQuery[varNameX+'_upper'] = seriesUpper
+                if variables[1][j % lengthY] != "histo":
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
+                        seriesErrY = dfQuery.eval(optionLocal['errY'])
+                        if varNameY+'_lower' not in dfQuery.columns:
+                            seriesLower = dfQuery[varNameY]-seriesErrY
+                            dfQuery[varNameY+'_lower'] = seriesLower
+                        if varNameY+'_upper' not in dfQuery.columns:
+                            seriesUpper = dfQuery[varNameY]+seriesErrY
+                            dfQuery[varNameY+'_upper'] = seriesUpper
+                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
+                        seriesErrX = dfQuery.eval(optionLocal['errX'])
+                        if varNameX+'_lower' not in dfQuery.columns:
+                            seriesLower = dfQuery[varNameX]-seriesErrX
+                            dfQuery[varNameX+'_lower'] = seriesLower
+                        if varNameX+'_upper' not in dfQuery.columns:
+                            seriesUpper = dfQuery[varNameX]+seriesErrX
+                            dfQuery[varNameX+'_upper'] = seriesUpper
 
     try:
         #source = ColumnDataSource(dfQuery)
-        source  = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0],options['nPointRender'])))
+        cdsFull = ColumnDataSource(dfQuery)
+        view = CDSView(source=cdsFull, filters=[BooleanFilter()])
+        source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
     except:
         logging.error("Invalid source:", source)
     # define default options
@@ -874,7 +890,10 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                     colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
         for i in range(0, length):
-            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
+            if variables[1][i % lengthY] != "histo":
+                dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
+            else:
+                varNameY = "histo"
             dummy, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             if mapperC is not None:
                 color = mapperC
@@ -892,22 +911,32 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
 
-            #                zAxisTitle +=varColor + ","
-            #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
-            if optionLocal["legend_field"] is None:
-                figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
-                            color=color, marker=marker, legend_label=varY + " vs " + varX)
+            if varY == "histo":
+                cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
+                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"],
+                                        view=view)
+                colorHisto = colorAll[max(length, 4)][i]
+                if optionLocal['color'] is not None:
+                    colorHisto = optionLocal['color']
+                histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+                figureI.add_glyph(cdsHisto, histoGlyph)
             else:
-                figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
-                            color=color, marker=marker, legend_field=optionLocal["legend_field"])
-            if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
-                figureI.add_glyph(source, errorX)
-            if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
-                figureI.add_glyph(source, errorY)
-            #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
-            #    figureI.add_layout(errors)
+                #                zAxisTitle +=varColor + ","
+                #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
+                if optionLocal["legend_field"] is None:
+                    figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                                color=color, marker=marker, legend_label=varY + " vs " + varX)
+                else:
+                    figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                                color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
+                    errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
+                    figureI.add_glyph(source, errorX)
+                if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
+                    errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
+                    figureI.add_glyph(source, errorY)
+                #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
+                #    figureI.add_layout(errors)
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
@@ -926,7 +955,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, view
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
@@ -1027,7 +1056,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, view=None, cmapDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1051,7 +1080,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRen
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, cmapDict=cmapDict, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, view=view, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
