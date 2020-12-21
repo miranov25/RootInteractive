@@ -220,11 +220,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
              }
         }*/
     }
-    const view = options.view;
-    if(view != null){
-        view.filters[0].booleans = isSelected;
-        view.compute_indices();
-    }
     for (let i = 0; i < size; i++){
         let randomIndex = 0;
         if (isSelected[i]){
@@ -247,6 +242,13 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const t1 = performance.now();
     console.log(`Filtering took ${t1 - t0} milliseconds.`);
+    const view = options.view;
+    if(view != null){
+        view.filters[0].booleans = isSelected;
+        view.compute_indices();
+    }
+    const t2 = performance.now();
+    console.log(`Histogramming took ${t2 - t1} milliseconds.`);
     const cmapDict = options.cmapDict;
     if (cmapDict !== undefined && nSelected !== 0){
         for(const key in cmapDict){
@@ -261,11 +263,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
     }
-    const t2 = performance.now();
-    console.log(`Updating colormaps took ${t2 - t1} milliseconds.`);
-    cdsSel.change.emit();
     const t3 = performance.now();
-    console.log(`Updating cds took ${t3 - t2} milliseconds.`);
+    console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
+    cdsSel.change.emit();
+    const t4 = performance.now();
+    console.log(`Updating cds took ${t4 - t3} milliseconds.`);
     console.log(\"nSelected:%d\",nSelected);  
     """
     if options["verbose"] > 0:
