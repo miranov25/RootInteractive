@@ -72,27 +72,36 @@ export class HistogramCDS extends ColumnarDataSource {
         //TODO: Make this actually do something
       } else {
         bincount.fill(0, 0, this.nbins)
-        // Caching view indices might save some time. Same for specifying a view only by its indices.
+        // Caching view indices might save some time, as this is the only way of obtaining them, the indices field in cdsview is private.
+        // Same for specifying a view only by its indices. Bitmasking might be more cache efficient for more dense arrays
         let view_indices = [...this.view.indices]
         const sample_array = this.source.data[this.sample]
-        // Hack to make a trivial function perform better - can be optimized further
-        let weights_getter
+        const n_indices = view_indices.length
         if(this.weights != null){
           const weights_array = this.source.data[this.weights]
-          weights_getter = (i: number):number=>weights_array[view_indices[i]]
+          for(let i=0; i<n_indices; i++){
+            let j = view_indices[i]
+            const bin = this.getbin(sample_array[j])
+            if(bin >= 0 && bin < this.nbins){
+              bincount[bin] += weights_array[j]
+            }
+          }
         } else {
-          weights_getter = (_dummy: number):number=>1
-        }
-        for(let i=0; i<view_indices.length; i++){
-          const bin = this.getbin(sample_array[view_indices[i]])
-          if(bin >= 0 && bin < this.nbins){
-            bincount[bin] += weights_getter(i)
+          for(let i=0; i<n_indices; i++){
+            const bin = this.getbin(sample_array[view_indices[i]])
+            if(bin >= 0 && bin < this.nbins){
+              bincount[bin] += 1
+            }
           }
         }
+
       }
       this.data["bin_count"] = bincount
       this.change.emit()
   }
+
+  private _transform_origin: number
+  private _transform_scale: number
 
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
@@ -100,6 +109,8 @@ export class HistogramCDS extends ColumnarDataSource {
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
       bin_right.length = 0
+      this._transform_scale = this.nbins/(this.range_max-this.range_min)
+      this._transform_origin = -this.range_min*this._transform_scale
       for (let index = 0; index < this.nbins; index++) {
         bin_left.push(this.range_min+index*(this.range_max-this.range_min)/this.nbins)
         bin_right.push(this.range_min+(index+1)*(this.range_max-this.range_min)/this.nbins)
@@ -108,13 +119,13 @@ export class HistogramCDS extends ColumnarDataSource {
   }
 
   getbin(val: number): number{
-      // Make the max value inclusive
-      if(val === this.range_max) return this.nbins-1
       // Overflow bins
       if(val > this.range_max) return this.nbins
       if(val < this.range_min) return -1
-      // We can avoid an arithmetic operation there if we cache origin/scale points - TODO: Do that
-      return ((val-this.range_min)*this.nbins/(this.range_max-this.range_min))|0
+      // Make the max value inclusive
+      if(val === this.range_max) return this.nbins-1
+      // Compute the bin in the normal case
+      return (val*this._transform_scale+this._transform_origin)|0
   }
 
 }
