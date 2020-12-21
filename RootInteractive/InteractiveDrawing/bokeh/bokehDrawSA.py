@@ -90,6 +90,7 @@ class bokehDrawSA(object):
         self.pAll=gridplotRow(self.plotArray)
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)
         self.cmapDist = None
+        self.view = None
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -134,9 +135,9 @@ class bokehDrawSA(object):
                 varList+=w[1][0]+":"
         kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict = bokehDrawArray(self.dataSource, query,
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict, self.cdsOrig, self.view = bokehDrawArray(self.dataSource, query,
                                                                                                 figureArray, **kwargs)
-        self.cdsOrig=ColumnDataSource(dataFrameOrig)
+        # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         widgetList=self.initWidgets(widgetsDescription)
         self.plotArray.append(widgetList)
@@ -156,7 +157,7 @@ class bokehDrawSA(object):
         :return: VBox includes all widgets
         """
         if type(widgetsDescription)==list:
-            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.cmapDict, nPointRender = self.options['nPointRender'])
+            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.view, self.cmapDict, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout,list):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:

@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, BooleanFilter
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -125,7 +125,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
         "nPointRender": 100000,
-        "cmapDict": None
+        "cmapDict": None,
+        "view": None
     }
     options.update(kwargs)
 
@@ -142,8 +143,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const precision = 0.000001;
     const size = dataOrig.index.length;
-    let selectedPointsBuffer = new ArrayBuffer(size);
-    let isSelected = new Uint8Array(selectedPointsBuffer);
+    let isSelected = new Array(size);
+    for(let i=0; i<size; ++i){
+        isSelected[i] = true;
+    }
     let permutationFilter = [];
     for(let i=0; i<size; i++){
         isSelected[i] = 1;
@@ -216,6 +219,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 }
              }
         }*/
+    }
+    const view = options.view;
+    if(view != null){
+        view.filters[0].booleans = isSelected;
+        view.compute_indices();
     }
     for (let i = 0; i < size; i++){
         let randomIndex = 0;
@@ -798,7 +806,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
     try:
         #source = ColumnDataSource(dfQuery)
-        source  = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0],options['nPointRender'])))
+        cdsFull = ColumnDataSource(dfQuery)
+        view = CDSView(source=cdsFull, filters=[BooleanFilter()])
+        source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
     except:
         logging.error("Invalid source:", source)
     # define default options
@@ -902,8 +912,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             varY = variables[1][i % lengthY]
 
             if varY == "histo":
-                cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
-                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"])
+                cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
+                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"],
+                                        view=view)
                 histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=color)
                 figureI.add_glyph(cdsHisto, histoGlyph)
             else:
@@ -941,7 +952,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, view
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
@@ -1042,7 +1053,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, view=None, cmapDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1066,7 +1077,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, cmapDict=None, nPointRen
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, cmapDict=cmapDict, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, view=view, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
