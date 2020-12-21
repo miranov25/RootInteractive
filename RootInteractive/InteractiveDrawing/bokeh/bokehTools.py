@@ -915,7 +915,10 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
                                         range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"],
                                         view=view)
-                histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=color)
+                colorHisto = colorAll[max(length, 4)][i]
+                if optionLocal['color'] is not None:
+                    colorHisto = optionLocal['color']
+                histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
                 figureI.add_glyph(cdsHisto, histoGlyph)
             else:
                 #                zAxisTitle +=varColor + ","
