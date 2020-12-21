@@ -164,7 +164,7 @@ class bokehDraw(object):
         varList += widgetString
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         self.Widgets = self.initWidgets(widgetString)
-        self.figure, self.bokehSource, self.plotArray, self.dataSource, _ = bokehDrawArray(self.dataSource, query,
+        self.figure, self.bokehSource, self.plotArray, self.dataSource, _, _, _ = bokehDrawArray(self.dataSource, query,
                                                                                         figureArray, **kwargs)
         isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
         self.handle = show(self.figure, notebook_handle=isNotebook)

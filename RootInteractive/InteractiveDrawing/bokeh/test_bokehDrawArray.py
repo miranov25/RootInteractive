@@ -25,8 +25,7 @@ def test_DrawFormula():
     output_file("test_BokehDrawArray_DraFormula.html")
     figureLayout: str = '((0,1,2),(3),(4, x_visible=1),commonX=1,x_visible=1,y_visible=1,plot_height=250,plot_width=1000)'
     tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
-    pAll,source,figureList, df2, cmapDict =bokehDrawArray(df, "A>0", figureArray, layout=figureLayout, color="blue", size=4, tooltips=tooltips)
-    show(pAll)
+    _ = bokehDrawArray(df, "A>0", figureArray, layout=figureLayout, color="blue", size=4, tooltips=tooltips)
 
 def test_DrawfromArray():
     output_file("test_BokehDrawArray_test_DrawfromArray.html")
