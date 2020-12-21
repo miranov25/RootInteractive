@@ -72,19 +72,19 @@ export class HistogramCDS extends ColumnarDataSource {
         //TODO: Make this actually do something
       } else {
         bincount.fill(0, 0, this.nbins)
-        // Caching view indices might save some time. Blame bokehjs
+        // Caching view indices might save some time. Same for specifying a view only by its indices.
         let view_indices = [...this.view.indices]
         const sample_array = this.source.data[this.sample]
         // Hack to make a trivial function perform better - can be optimized further
         let weights_getter
         if(this.weights != null){
           const weights_array = this.source.data[this.weights]
-          weights_getter = (i: number):number=>weights_array[i]
+          weights_getter = (i: number):number=>weights_array[view_indices[i]]
         } else {
           weights_getter = (_dummy: number):number=>1
         }
         for(let i=0; i<view_indices.length; i++){
-          const bin = this.getbin(sample_array[i])
+          const bin = this.getbin(sample_array[view_indices[i]])
           if(bin >= 0 && bin < this.nbins){
             bincount[bin] += weights_getter(i)
           }
@@ -95,6 +95,7 @@ export class HistogramCDS extends ColumnarDataSource {
   }
 
   update_range(): void {
+      // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
       const bin_left = (this.data["bin_left"] as number[])
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
