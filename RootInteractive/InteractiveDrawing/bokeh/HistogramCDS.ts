@@ -1,6 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
-import {CDSView} from "models/sources/cds_view"
 import * as p from "core/properties"
 
 export namespace HistogramCDS {
@@ -8,7 +7,7 @@ export namespace HistogramCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnDataSource>
-    view: p.Property<CDSView>
+    view: p.Property<number[] | null>
     nbins:        p.Property<number>
     range_min:    p.Property<number>
     range_max:    p.Property<number>
@@ -30,9 +29,9 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Ref})=>({
+    this.define<HistogramCDS.Props>(({Nullable, Ref, Array, Int})=>({
       source:  [Ref(ColumnDataSource)],
-      view:         [Ref(CDSView)],
+      view:         [Nullable(Array(Int)), null],
       nbins:        [p.Number],
       range_min:    [p.Number],
       range_max:    [p.Number],
@@ -45,11 +44,6 @@ export class HistogramCDS extends ColumnarDataSource {
     super.initialize()
 
     this.data = {"bin_count":[], "bin_left":[], "bin_right":[]}
-    if(this.view === null){
-      this.view = new CDSView({source:this.source})
-    }
-
-
     this.update_range()
   }
 
@@ -57,7 +51,6 @@ export class HistogramCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => this.update_data())
-    this.connect(this.view.change, () => this.update_data())
   }
 
   update_data(indices: number[] | null = null): void {
@@ -72,25 +65,43 @@ export class HistogramCDS extends ColumnarDataSource {
         //TODO: Make this actually do something
       } else {
         bincount.fill(0, 0, this.nbins)
-        // Caching view indices might save some time, as this is the only way of obtaining them, the indices field in cdsview is private.
-        // Same for specifying a view only by its indices. Bitmasking might be more cache efficient for more dense arrays
-        let view_indices = [...this.view.indices]
         const sample_array = this.source.data[this.sample]
-        const n_indices = view_indices.length
-        if(this.weights != null){
-          const weights_array = this.source.data[this.weights]
-          for(let i=0; i<n_indices; i++){
-            let j = view_indices[i]
-            const bin = this.getbin(sample_array[j])
-            if(bin >= 0 && bin < this.nbins){
-              bincount[bin] += weights_array[j]
+        const view_indices = this.view
+        if(view_indices === null){
+          const n_indices = this.source.length
+          if(this.weights != null){
+            const weights_array = this.source.data[this.weights]
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[i])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += weights_array[i]
+              }
+            }
+          } else {
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[i])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += 1
+              }
             }
           }
         } else {
-          for(let i=0; i<n_indices; i++){
-            const bin = this.getbin(sample_array[view_indices[i]])
-            if(bin >= 0 && bin < this.nbins){
-              bincount[bin] += 1
+          const n_indices = view_indices.length
+          if(this.weights != null){
+            const weights_array = this.source.data[this.weights]
+            for(let i=0; i<n_indices; i++){
+              let j = view_indices[i]
+              const bin = this.getbin(sample_array[j])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += weights_array[j]
+              }
+            }
+          } else {
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[view_indices[i]])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += 1
+              }
             }
           }
         }

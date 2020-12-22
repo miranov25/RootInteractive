@@ -126,7 +126,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         "verbose": 0,
         "nPointRender": 100000,
         "cmapDict": None,
-        "view": None
+        "histogramList": []
     }
     options.update(kwargs)
 
@@ -148,6 +148,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         isSelected[i] = true;
     }
     let permutationFilter = [];
+    let indicesAll = [];
     for(let i=0; i<size; i++){
         isSelected[i] = 1;
     }
@@ -243,9 +244,17 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     const t1 = performance.now();
     console.log(`Filtering took ${t1 - t0} milliseconds.`);
     const view = options.view;
-    if(view != null){
-        view.filters[0].booleans = isSelected;
-        view.compute_indices();
+    const histogramList = options.histogramList
+    if(histogramList != []){
+        for (let i = 0; i < size; i++){
+            if (isSelected[i]){
+                indicesAll.push(i);
+            }
+        }     
+        for (const histo of histogramList){
+            histo.view = indicesAll;
+            histo.update_data();
+        }
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
@@ -809,7 +818,6 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     try:
         #source = ColumnDataSource(dfQuery)
         cdsFull = ColumnDataSource(dfQuery)
-        view = CDSView(source=cdsFull, filters=[BooleanFilter()])
         source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
     except:
         logging.error("Invalid source:", source)
@@ -818,6 +826,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     plotArray = []
     colorAll = all_palettes[options['colors']]
     colorMapperDict = {}
+    histoList = []
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
@@ -915,8 +924,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
             if varY == "histo":
                 cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
-                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"],
-                                        view=view)
+                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"])
+                histoList.append(cdsHisto)
                 colorHisto = colorAll[max(length, 4)][i]
                 if optionLocal['color'] is not None:
                     colorHisto = optionLocal['color']
@@ -957,7 +966,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, view
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
@@ -1058,7 +1067,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, view=None, cmapDict=None, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1082,7 +1091,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, view=None, cmapDict=None
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, view=view, cmapDict=cmapDict, nPointRender=nPointRender)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
