@@ -1,6 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
-import {CDSView} from "models/sources/cds_view"
 import * as p from "core/properties"
 
 export namespace HistogramCDS {
@@ -8,7 +7,7 @@ export namespace HistogramCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnDataSource>
-    view: p.Property<CDSView>
+    view: p.Property<number[] | null>
     nbins:        p.Property<number>
     range_min:    p.Property<number>
     range_max:    p.Property<number>
@@ -30,9 +29,9 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Ref})=>({
+    this.define<HistogramCDS.Props>(({Nullable, Ref, Array, Int})=>({
       source:  [Ref(ColumnDataSource)],
-      view:         [Ref(CDSView)],
+      view:         [Nullable(Array(Int)), null],
       nbins:        [p.Number],
       range_min:    [p.Number],
       range_max:    [p.Number],
@@ -45,11 +44,6 @@ export class HistogramCDS extends ColumnarDataSource {
     super.initialize()
 
     this.data = {"bin_count":[], "bin_left":[], "bin_right":[]}
-    if(this.view === null){
-      this.view = new CDSView({source:this.source})
-    }
-
-
     this.update_range()
   }
 
@@ -57,7 +51,6 @@ export class HistogramCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => this.update_data())
-    this.connect(this.view.change, () => this.update_data())
   }
 
   update_data(indices: number[] | null = null): void {
@@ -72,27 +65,58 @@ export class HistogramCDS extends ColumnarDataSource {
         //TODO: Make this actually do something
       } else {
         bincount.fill(0, 0, this.nbins)
-        // Caching view indices might save some time. Same for specifying a view only by its indices.
-        let view_indices = [...this.view.indices]
         const sample_array = this.source.data[this.sample]
-        // Hack to make a trivial function perform better - can be optimized further
-        let weights_getter
-        if(this.weights != null){
-          const weights_array = this.source.data[this.weights]
-          weights_getter = (i: number):number=>weights_array[view_indices[i]]
+        const view_indices = this.view
+        if(view_indices === null){
+          const n_indices = this.source.length
+          if(this.weights != null){
+            const weights_array = this.source.data[this.weights]
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[i])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += weights_array[i]
+              }
+            }
+          } else {
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[i])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += 1
+              }
+            }
+          }
         } else {
-          weights_getter = (_dummy: number):number=>1
-        }
-        for(let i=0; i<view_indices.length; i++){
-          const bin = this.getbin(sample_array[view_indices[i]])
-          if(bin >= 0 && bin < this.nbins){
-            bincount[bin] += weights_getter(i)
+          const n_indices = view_indices.length
+          if(this.weights != null){
+            const weights_array = this.source.data[this.weights]
+            for(let i=0; i<n_indices; i++){
+              let j = view_indices[i]
+              const bin = this.getbin(sample_array[j])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += weights_array[j]
+              }
+            }
+          } else {
+            for(let i=0; i<n_indices; i++){
+              const bin = this.getbin(sample_array[view_indices[i]])
+              if(bin >= 0 && bin < this.nbins){
+                bincount[bin] += 1
+              }
+            }
           }
         }
+
       }
       this.data["bin_count"] = bincount
       this.change.emit()
   }
+
+  private _transform_origin: number
+  private _transform_scale: number
+
+  private _range_min: number
+  private _range_max: number
+  private _nbins: number
 
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
@@ -100,6 +124,11 @@ export class HistogramCDS extends ColumnarDataSource {
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
       bin_right.length = 0
+      this._range_min = this.range_min
+      this._range_max = this.range_max
+      this._nbins = this.nbins
+      this._transform_scale = this.nbins/(this.range_max-this.range_min)
+      this._transform_origin = -this.range_min*this._transform_scale
       for (let index = 0; index < this.nbins; index++) {
         bin_left.push(this.range_min+index*(this.range_max-this.range_min)/this.nbins)
         bin_right.push(this.range_min+(index+1)*(this.range_max-this.range_min)/this.nbins)
@@ -108,13 +137,13 @@ export class HistogramCDS extends ColumnarDataSource {
   }
 
   getbin(val: number): number{
-      // Make the max value inclusive
-      if(val === this.range_max) return this.nbins-1
       // Overflow bins
-      if(val > this.range_max) return this.nbins
-      if(val < this.range_min) return -1
-      // We can avoid an arithmetic operation there if we cache origin/scale points - TODO: Do that
-      return ((val-this.range_min)*this.nbins/(this.range_max-this.range_min))|0
+      if(val > this._range_max) return this._nbins
+      if(val < this._range_min) return -1
+      // Make the max value inclusive
+      if(val === this._range_max) return this._nbins-1
+      // Compute the bin in the normal case
+      return (val*this._transform_scale+this._transform_origin)|0
   }
 
 }

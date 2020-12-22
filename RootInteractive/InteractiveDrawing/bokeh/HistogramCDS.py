@@ -1,5 +1,5 @@
-from bokeh.core.properties import Instance, String, Float, Int
-from bokeh.models import ColumnarDataSource, CDSView
+from bokeh.core.properties import Instance, String, Float, Int, List
+from bokeh.models import ColumnarDataSource
 
 
 class HistogramCDS(ColumnarDataSource):
@@ -15,7 +15,7 @@ class HistogramCDS(ColumnarDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
     source = Instance(ColumnarDataSource)
-    view = Instance(CDSView)
+    view = List(Int)
     sample = String
     weights = String(default=None)
     nbins = Int
