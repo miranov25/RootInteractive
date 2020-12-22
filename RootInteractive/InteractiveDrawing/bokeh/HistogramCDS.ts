@@ -116,6 +116,7 @@ export class HistogramCDS extends ColumnarDataSource {
 
   private _range_min: number
   private _range_max: number
+  private _nbins: number
 
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
@@ -123,8 +124,9 @@ export class HistogramCDS extends ColumnarDataSource {
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
       bin_right.length = 0
-      this._range_min = this._range_min
-      this._range_max = this._range_max
+      this._range_min = this.range_min
+      this._range_max = this.range_max
+      this._nbins = this.nbins
       this._transform_scale = this.nbins/(this.range_max-this.range_min)
       this._transform_origin = -this.range_min*this._transform_scale
       for (let index = 0; index < this.nbins; index++) {
@@ -136,10 +138,10 @@ export class HistogramCDS extends ColumnarDataSource {
 
   getbin(val: number): number{
       // Overflow bins
-      if(val > this._range_max) return this.nbins
+      if(val > this._range_max) return this._nbins
       if(val < this._range_min) return -1
       // Make the max value inclusive
-      if(val === this._range_max) return this.nbins-1
+      if(val === this._range_max) return this._nbins-1
       // Compute the bin in the normal case
       return (val*this._transform_scale+this._transform_origin)|0
   }
