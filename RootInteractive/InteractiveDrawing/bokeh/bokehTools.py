@@ -134,7 +134,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    let dataSel = cdsSel.data;
+    let dataSel = null;
+    if(cdsSel != null){
+        dataSel = cdsSel.data;
+    }
     console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
     const nPointRender = options.nPointRender;
     let nSelected=0;
@@ -221,24 +224,26 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
              }
         }*/
     }
-    for (let i = 0; i < size; i++){
+    if(nPointRender > 0 && cdsSel != null){
+        for (let i = 0; i < size; i++){
         let randomIndex = 0;
-        if (isSelected[i]){
-            if(nSelected < nPointRender){
-                permutationFilter.push(i);
-            } else if(Math.random() < 1 / nSelected) {
-                randomIndex = Math.floor(Math.random()*nPointRender);
-                permutationFilter[randomIndex] = i;
+            if (isSelected[i]){
+                if(nSelected < nPointRender){
+                    permutationFilter.push(i);
+                } else if(Math.random() < 1 / nSelected) {
+                    randomIndex = Math.floor(Math.random()*nPointRender);
+                    permutationFilter[randomIndex] = i;
+                }
+                nSelected++;
             }
-            nSelected++;
         }
-    }
-    nSelected = Math.min(nSelected, nPointRender);
-    for (const key in dataSel){
-        const colSel = dataSel[key];
-        const colOrig = dataOrig[key];
-        for(let i=0; i<nSelected; i++){
-            colSel[i] = colOrig[permutationFilter[i]];
+        nSelected = Math.min(nSelected, nPointRender);
+        for (const key in dataSel){
+            const colSel = dataSel[key];
+            const colOrig = dataOrig[key];
+            for(let i=0; i<nSelected; i++){
+                colSel[i] = colOrig[permutationFilter[i]];
+            }
         }
     }
     const t1 = performance.now();
