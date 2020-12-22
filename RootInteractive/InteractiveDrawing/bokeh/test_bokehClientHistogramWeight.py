@@ -39,4 +39,4 @@ df,a,b,c,d=makePanda(0.02,0.1)
 df['D']=df["A"]-df["B"]
 output_file("test_bokehClientHistogramWeight.html")
 xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=0)
+                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width")
