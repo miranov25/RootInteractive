@@ -7,7 +7,7 @@ export namespace HistogramCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnDataSource>
-    view: p.Property<number[] | null>
+//    view: p.Property<number[] | null>
     nbins:        p.Property<number>
     range_min:    p.Property<number>
     range_max:    p.Property<number>
@@ -29,9 +29,9 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Nullable, Ref, Array, Int})=>({
+    this.define<HistogramCDS.Props>(({Ref})=>({
       source:  [Ref(ColumnDataSource)],
-      view:         [Nullable(Array(Int)), null],
+//      view:         [Nullable(Array(Int)), null],
       nbins:        [p.Number],
       range_min:    [p.Number],
       range_max:    [p.Number],
@@ -44,6 +44,7 @@ export class HistogramCDS extends ColumnarDataSource {
     super.initialize()
 
     this.data = {"bin_count":[], "bin_left":[], "bin_right":[]}
+    this.view = null
     this.update_range()
   }
 
@@ -117,6 +118,8 @@ export class HistogramCDS extends ColumnarDataSource {
   private _range_min: number
   private _range_max: number
   private _nbins: number
+
+  public view: number[] | null
 
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
