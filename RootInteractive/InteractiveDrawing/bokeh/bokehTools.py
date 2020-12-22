@@ -134,8 +134,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    let dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    let dataSel = null;
+    if(cdsSel != null){
+        dataSel = cdsSel.data;
+        console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
+    }
     const nPointRender = options.nPointRender;
     let nSelected=0;
     for (const i in dataSel){
@@ -149,9 +152,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     let permutationFilter = [];
     let indicesAll = [];
-    for(let i=0; i<size; i++){
-        isSelected[i] = 1;
-    }
     for (const key in widgetDict){
         const widget = widgetDict[key];
         const widgetType = widget.type;
@@ -221,24 +221,26 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
              }
         }*/
     }
-    for (let i = 0; i < size; i++){
+    if(nPointRender > 0 && cdsSel != null){
+        for (let i = 0; i < size; i++){
         let randomIndex = 0;
-        if (isSelected[i]){
-            if(nSelected < nPointRender){
-                permutationFilter.push(i);
-            } else if(Math.random() < 1 / nSelected) {
-                randomIndex = Math.floor(Math.random()*nPointRender);
-                permutationFilter[randomIndex] = i;
+            if (isSelected[i]){
+                if(nSelected < nPointRender){
+                    permutationFilter.push(i);
+                } else if(Math.random() < 1 / nSelected) {
+                    randomIndex = Math.floor(Math.random()*nPointRender);
+                    permutationFilter[randomIndex] = i;
+                }
+                nSelected++;
             }
-            nSelected++;
         }
-    }
-    nSelected = Math.min(nSelected, nPointRender);
-    for (const key in dataSel){
-        const colSel = dataSel[key];
-        const colOrig = dataOrig[key];
-        for(let i=0; i<nSelected; i++){
-            colSel[i] = colOrig[permutationFilter[i]];
+        nSelected = Math.min(nSelected, nPointRender);
+        for (const key in dataSel){
+            const colSel = dataSel[key];
+            const colOrig = dataOrig[key];
+            for(let i=0; i<nSelected; i++){
+                colSel[i] = colOrig[permutationFilter[i]];
+            }
         }
     }
     const t1 = performance.now();
@@ -258,25 +260,27 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
-    const cmapDict = options.cmapDict;
-    if (cmapDict !== undefined && nSelected !== 0){
-        for(const key in cmapDict){
-            const cmapList = cmapDict[key];
-            const col = dataSel[key];
-            const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
-            const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
-            for(let i=0; i<cmapList.length; i++){
-                cmapList[i].transform.high = high;
-                cmapList[i].transform.low = low;
-                cmapList[i].transform.change.emit();
+    if(nPointRender > 0 && cdsSel != null){
+        const cmapDict = options.cmapDict;
+        if (cmapDict !== undefined && nSelected !== 0){
+            for(const key in cmapDict){
+                const cmapList = cmapDict[key];
+                const col = dataSel[key];
+                const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+                const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+                for(let i=0; i<cmapList.length; i++){
+                    cmapList[i].transform.high = high;
+                    cmapList[i].transform.low = low;
+                    cmapList[i].transform.change.emit();
+                }
             }
         }
+        const t3 = performance.now();
+        console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
+        cdsSel.change.emit();
+        const t4 = performance.now();
+        console.log(`Updating cds took ${t4 - t3} milliseconds.`);
     }
-    const t3 = performance.now();
-    console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
-    cdsSel.change.emit();
-    const t4 = performance.now();
-    console.log(`Updating cds took ${t4 - t3} milliseconds.`);
     console.log(\"nSelected:%d\",nSelected);  
     """
     if options["verbose"] > 0:
@@ -779,6 +783,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
+    output_cdsSel = False
     if hasattr(dataFrame, 'metaData'):
         dfQuery.metaData = dataFrame.metaData
         logging.info(dfQuery.metaData)
@@ -796,6 +801,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 optionLocal = options
             for j in range(0, length):
                 if variables[1][j % lengthY] != "histo":
+                    output_cdsSel = True
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                     if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
@@ -818,7 +824,10 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
     try:
         #source = ColumnDataSource(dfQuery)
         cdsFull = ColumnDataSource(dfQuery)
-        source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
+        if output_cdsSel:
+            source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
+        else:
+            source = None
     except:
         logging.error("Invalid source:", source)
     # define default options
