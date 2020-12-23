@@ -16,11 +16,24 @@ for i in range(H.size):
     c[i]=edges[2][i//(nBins*nBins)]
 #    c[i]=edges[2][i%(nBins*nBins)]
 df=pd.DataFrame(data={'A': a, 'B': b, 'C': c,'H': H.flatten()})
-
 # Test - send to cds
-df["A"].astype(CategoricalDtype(ordered=True))
-
 entropy(df["A"].value_counts(),base=2)
 entropy(((df[0:-1]-df[1:])["A"])[1:-1].value_counts(),  base=2)
+#entropy=0
 entropy(df["B"].value_counts(),base=2)
 entropy(((df[0:-1]-df[1:])["B"])[1:-1].value_counts(),  base=2)
+#entropy=0
+entropy(df["H"].value_counts(),base=2)
+#entropy=3.1
+
+# TODO
+#      if (User coding){
+#          float-> integer
+#          entropy coding
+#      }else{
+#       1. Unique gives amount of distinct value
+#       1. if Unique<<size
+#           1. Entropy for value_counts
+#           2. Entropy for delta.value-counts
+#           3. Use coding with smaller entopy
+#   }
