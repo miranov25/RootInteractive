@@ -45,22 +45,20 @@ def simulatePandaDCA():
     # qPt,tgl.mdEdx.alpha, dCA
     range=([-5,5],[-1,1],[0,1],[0,2*np.pi],[-10*sigma0,10*sigma0])
     bins=[50,20,20,12,100]
-    H, edges= np.histogramdd(sample=np.array([[0,0,0,0,0]]), bins=bins,range=range)
-    indexH=np.arange(H.size)
-    indexC=np.unravel_index(indexH,bins)
-    Hf=H.flatten()
-    for i in indexH:
-        qPt=edges[0][indexC[0][i]]
-        mdEdx=edges[2][indexC[2][i]]
-        value=edges[4][indexC[4][i]]
-        valueSigma=sigma0*np.sqrt(1+sigma1*mdEdx*qPt*qPt)
-        weight=np.exp(-value*value/(2*valueSigma*valueSigma))
-        weightPoison=np.random.poisson(weight*entries,1)[0]
-        Hf[i]=weightPoison
+    H, edges = np.histogramdd(sample=np.array([[0, 0, 0, 0, 0]]), bins=bins, range=range)
+    indexH = np.arange(H.size)
+    indexC = np.unravel_index(indexH, bins)
+    qPt = edges[0][indexC[0]]
+    mdEdx = edges[2][indexC[2]]
+    value = edges[4][indexC[4]]
+    valueSigma = sigma0 * np.sqrt(1 + sigma1 * mdEdx * qPt * qPt)
+    weight = np.exp(-value * value / (2 * valueSigma * valueSigma))
+    weightPoisson = np.random.poisson(weight * entries, H.size)
+    H = weightPoisson
     # to export  panda, columns
     #       qPtCenter,tglCenter,mdEdxCenter,alphaCenter,
     #       DCA mean, DCA rms
     #       DCA, w
-    return H,edges
+    return H, edges
 
 H,edges = simulatePandaDCA()
