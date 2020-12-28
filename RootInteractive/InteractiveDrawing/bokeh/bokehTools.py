@@ -194,7 +194,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             });
             for(let i=0; i<size; i++){
                 let isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
-                if (!isOK){ 
+                if (!isOK){
                     isOK = widgetValue.reduce((acc,cur)=>acc|cur===col[i],0);
                 }
                 isSelected[i] &= isOK;
@@ -252,7 +252,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             if (isSelected[i]){
                 indicesAll.push(i);
             }
-        }     
+        }
         for (const histo of histogramList){
             histo.view = indicesAll;
             histo.update_data();
@@ -281,7 +281,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         const t4 = performance.now();
         console.log(`Updating cds took ${t4 - t3} milliseconds.`);
     }
-    console.log(\"nSelected:%d\",nSelected);  
+    console.log(\"nSelected:%d\",nSelected);
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
@@ -804,7 +804,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                     output_cdsSel = True
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] !=''):
+                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
                         seriesErrY = dfQuery.eval(optionLocal['errY'])
                         if varNameY+'_lower' not in dfQuery.columns:
                             seriesLower = dfQuery[varNameY]-seriesErrY
@@ -812,7 +812,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                         if varNameY+'_upper' not in dfQuery.columns:
                             seriesUpper = dfQuery[varNameY]+seriesErrY
                             dfQuery[varNameY+'_upper'] = seriesUpper
-                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] !=''):
+                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
                         seriesErrX = dfQuery.eval(optionLocal['errX'])
                         if varNameX+'_lower' not in dfQuery.columns:
                             seriesLower = dfQuery[varNameX]-seriesErrX
@@ -820,6 +820,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                         if varNameX+'_upper' not in dfQuery.columns:
                             seriesUpper = dfQuery[varNameX]+seriesErrX
                             dfQuery[varNameX+'_upper'] = seriesUpper
+                else:
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
 
     try:
         #source = ColumnDataSource(dfQuery)
@@ -933,7 +936,7 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
 
             if varY == "histo":
                 cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
-                                        range_max=optionLocal["range_max"], sample=varX, weights=optionLocal["weights"])
+                                        range_max=optionLocal["range_max"], sample=varNameX, weights=optionLocal["weights"])
                 histoList.append(cdsHisto)
                 colorHisto = colorAll[max(length, 4)][i]
                 if optionLocal['color'] is not None:
