@@ -53,7 +53,7 @@ def testBokehClientHistogram():
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
         [['A'], ['histo', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['A'], ['histo', '(C+A)*200', '(C-A)*200'], {"weights": "B"}],
+        [['(A+B)/2'], ['histo', '(C+A)*200', '(C-A)*200'], {"weights": "C"}],
         [['B'], ['histo', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True, "nbins": 100,
                                                     "range_min": 0, "range_max": 1}]
@@ -64,7 +64,7 @@ def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['A'], ['histo']],
-        [['A'], ['histo'], {"weights": "B"}],
+        [['(A+B)/2'], ['histo'], {"weights": "C"}],
         [['B'], ['histo'], {"nbins": 100, "range_min": 0, "range_max": 1}]
     ]
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
