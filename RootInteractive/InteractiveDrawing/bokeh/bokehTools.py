@@ -822,7 +822,6 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                             dfQuery[varNameX+'_upper'] = seriesUpper
                 else:
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
 
     try:
         #source = ColumnDataSource(dfQuery)
