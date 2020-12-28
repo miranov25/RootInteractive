@@ -108,9 +108,10 @@ def histogramDCAPlot(df):
         [4, 5, {'plot_height': 150, 'x_visible': 1}],
         {'plot_height': 250, 'sizing_mode': 'scale_width', "legend_visible": True}
     ]
-    fig = bokehDrawSA.fromArray(df.sample(100000), "rms>0", figureArray, widgetParams, layout=figureLayoutDesc,
+    fig = bokehDrawSA.fromArray(df.query("(index%27)==0"), "weight>0", figureArray, widgetParams, layout=figureLayoutDesc,
                                 tooltips=tooltips, sizing_mode='scale_width', widgetLayout=widgetLayoutDesc,
-                                nPointRender=10000, rescaleColorMapper=True)
+                                nPointRender=5000, rescaleColorMapper=True)
 
-df = simulatePandaDCA()
-histogramDCAPlot(df)
+def test_Compression0():
+    df = simulatePandaDCA()
+    histogramDCAPlot(df)
