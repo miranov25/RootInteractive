@@ -261,23 +261,24 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
-    if(nPointRender > 0 && cdsSel != null){
-        const cmapDict = options.cmapDict;
-        if (cmapDict !== undefined && nSelected !== 0){
-            for(const key in cmapDict){
-                const cmapList = cmapDict[key];
-                for(let i=0; i<cmapList.length; i++){
-                    const col = cmapList[i][0].data[key];
-                    const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
-                    const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
-                    cmapList[i][1].transform.high = high;
-                    cmapList[i][1].transform.low = low;
+    const cmapDict = options.cmapDict;
+    if (cmapDict !== undefined){
+        for(const key in cmapDict){
+            const cmapList = cmapDict[key];
+            for(let i=0; i<cmapList.length; i++){
+                const col = cmapList[i][0].data[key];
+                if(col.length === 0) continue;
+                const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+                const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+                cmapList[i][1].transform.high = high;
+                cmapList[i][1].transform.low = low;
 //                    cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs events might improve the performance
-                }
             }
         }
-        const t3 = performance.now();
-        console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
+    }
+    const t3 = performance.now();
+    console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
+    if(nPointRender > 0 && cdsSel != null){
         cdsSel.change.emit();
         const t4 = performance.now();
         console.log(`Updating cds took ${t4 - t3} milliseconds.`);
@@ -804,7 +805,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 optionLocal = options
             for j in range(0, length):
                 if variables[1][j % lengthY] != "histo":
-                    output_cdsSel = True
+                    if not optionLocal["histo2d"]:
+                        output_cdsSel = True
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                     if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
