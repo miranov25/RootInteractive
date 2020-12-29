@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, BooleanFilter
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, Image
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -14,6 +14,7 @@ from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
+from RootInteractive.InteractiveDrawing.bokeh.Histo2dCDS import Histo2dCDS
 import copy
 
 # tuple of Bokeh markers
@@ -265,13 +266,13 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         if (cmapDict !== undefined && nSelected !== 0){
             for(const key in cmapDict){
                 const cmapList = cmapDict[key];
-                const col = dataSel[key];
-                const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
-                const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
                 for(let i=0; i<cmapList.length; i++){
-                    cmapList[i].transform.high = high;
-                    cmapList[i].transform.low = low;
-                    cmapList[i].transform.change.emit();
+                    const col = cmapList[i][0].data[key];
+                    const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+                    const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+                    cmapList[i][1].transform.high = high;
+                    cmapList[i][1].transform.low = low;
+//                    cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs events might improve the performance
                 }
             }
         }
@@ -779,7 +780,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "nbins": 10,
         "range_min": 0,
         "range_max": 1,
-        "weights": None
+        "weights": None,
+        "histo2d": False,
+        "range": None
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -903,13 +906,13 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         if (len(optionLocal["colorZvar"]) > 0):
             logging.info("%s", optionLocal["colorZvar"])
             varColor = optionLocal["colorZvar"]
-            mapperC = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
+            mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=min(dfQuery[varColor]),
                                   high=max(dfQuery[varColor]))
             if optionLocal["rescaleColorMapper"]:
                 if optionLocal["colorZvar"] in colorMapperDict:
-                    colorMapperDict[optionLocal["colorZvar"]] += [mapperC]
+                    colorMapperDict[optionLocal["colorZvar"]] += [[source, mapperC]]
                 else:
-                    colorMapperDict[optionLocal["colorZvar"]] = [mapperC]
+                    colorMapperDict[optionLocal["colorZvar"]] = [[source, mapperC]]
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
         for i in range(0, length):
             if variables[1][i % lengthY] != "histo":
@@ -941,6 +944,20 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
                 if optionLocal['color'] is not None:
                     colorHisto = optionLocal['color']
                 histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+                figureI.add_glyph(cdsHisto, histoGlyph)
+            elif optionLocal["histo2d"]:
+                cdsHisto = Histo2dCDS(source=cdsFull, nbins=optionLocal["nbins"], range=optionLocal["range"],
+                                        sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
+                histoList.append(cdsHisto)
+                mapperC = linear_cmap(field_name="bin_count", palette=optionLocal['palette'], low=0,
+                                      high=1)
+                if ("bin_count") in colorMapperDict:
+                    colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
+                else:
+                    colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
+                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varX + " vs " + varY)
+                histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
+                                fill_color=mapperC)
                 figureI.add_glyph(cdsHisto, histoGlyph)
             else:
                 #                zAxisTitle +=varColor + ","
