@@ -9,7 +9,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(200000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -64,8 +64,8 @@ def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['A'], ['histo']],
-        [['(A+B)/2'], ['histo'], {"weights": "C"}],
-        [['B'], ['histo'], {"nbins": 100, "range_min": 0, "range_max": 1}]
+        [['(A+B)/2'], ['histo'], {"weights": "D"}],
+        [['A'], ['B'], {"nbins": [20, 20], "histo2d": True, "weights": "D"}]
     ]
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
 
