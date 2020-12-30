@@ -1,5 +1,6 @@
 import zlib
 import pickle
+import numpy as np
 
 
 def getCompressionSize(inputObject):
@@ -10,18 +11,34 @@ def getSize(inputObject):
     return len(pickle.dumps(inputObject))
 
 
-def codeMapDF(df, maxFraction=0.5):
+def roundRelativeBinary(df, nBits):
     """
-    Compress panda data frame using remapping to arrays
+    roundRelativeBinary     - round mantissa of float number in nBits, assuming better lossy compression later
+    :param df:              - input array (for a moment only pandas or numpy)
+    :param nBits:           - number of significant bits to round
+    :return:                - rounded array
+    """
+    shiftN = 2 ** nBits
+    mantissa, exp2 = np.frexp(df)
+    mantissa = (mantissa * shiftN).astype("int")
+    mantissa /= shiftN
+    return mantissa * 2 ** exp2
+
+
+def codeMapDF(df, maxFraction=0.5, doPrint=0):
+    """
+    Compress data frame using remapping to arrays (working for  panda and vaex)
     :param df:              input data frame
     :param maxFraction:     maximal fraction of distinct points
-    :return:
+    :param doPrint:         print flag
+    :return:                mapIndex and mapCodeI
+
     """
     mapIndex = {}
     mapCodeI = {}
     for column in df.columns:
         values = df[column].unique()
-        if values.size < maxFraction * df[column].size:
+        if values.size < maxFraction * df[column].shape[0]:
             dictValues = {}
             dictValuesI = {}
             for i, value in enumerate(values):
@@ -32,8 +49,10 @@ def codeMapDF(df, maxFraction=0.5):
                 mapIndex[column] = df[column].map(dictValues).astype("int8")
             else:
                 mapIndex[column] = df[column].map(dictValues).astype("int16")
-            dfSize = getCompressionSize(mapIndex[column].to_numpy())
-            print(column, values.size, dfSize)
+            if doPrint:
+                dfSizeC = getCompressionSize(mapIndex[column].to_numpy())
+                dfSize0 = getSize(mapIndex[column].to_numpy())
+                print(column, values.size, dfSize0, dfSizeC, dfSizeC / float(dfSize0))
         else:
             mapIndex[column] = df[column]
     return mapIndex, mapCodeI

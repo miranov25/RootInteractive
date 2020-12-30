@@ -1,35 +1,10 @@
 import pandas as pd
 import numpy as np
-# from pandas import CategoricalDtype
 from scipy.stats import entropy
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
-
-
-def estimateEntropy():
-    random = np.random.randn(10000, 3)
-    nBins = 10
-    H, edges = np.histogramdd(random, bins=(nBins, nBins, nBins), range=[[-6, 6], [-6, 6], [-6, 6]])
-    a = np.empty(H.size)
-    b = np.empty(H.size)
-    c = np.empty(H.size)
-    for i in range(H.size):
-        a[i] = edges[0][i % nBins]
-        b[i] = edges[1][(i // nBins) % nBins]
-        c[i] = edges[2][i // (nBins * nBins)]
-    #    c[i]=edges[2][i%(nBins*nBins)]
-    dfE = pd.DataFrame(data={'A': a, 'B': b, 'C': c, 'H': H.flatten()})
-    # Test - send to cds
-    entropy(dfE["A"].value_counts(), base=2)
-    entropy(((dfE[0:-1] - dfE[1:])["A"])[1:-1].value_counts(), base=2)
-    # entropy=0
-    entropy(dfE["B"].value_counts(), base=2)
-    entropy(((dfE[0:-1] - dfE[1:])["B"])[1:-1].value_counts(), base=2)
-    # entropy=0
-    entropy(dfE["H"].value_counts(), base=2)
-
+from RootInteractive.Tools.compressArray import *
 
 # entropy=3.1
-
 # TODO
 #      if (User coding){
 #          float-> integer
@@ -55,9 +30,9 @@ def simulatePandaDCA():
     tglSlope = 0.1
     entries = 1000
     # qPt,tgl.mdEdx.alpha, dCA
-    range = ([-5, 5], [-1, 1], [0, 1], [0, 2 * np.pi], [-10 * sigma0 - 1, 10 * sigma0 + 1])
+    rangeH = ([-5, 5], [-1, 1], [0, 1], [0, 2 * np.pi], [-10 * sigma0 - 1, 10 * sigma0 + 1])
     bins = [50, 20, 20, 12, 100]
-    H, edges = np.histogramdd(sample=np.array([[0, 0, 0, 0, 0]]), bins=bins, range=range)
+    H, edges = np.histogramdd(sample=np.array([[0, 0, 0, 0, 0]]), bins=bins, range=rangeH)
     indexH = np.arange(H.size)
     indexC = np.unravel_index(indexH, bins)
     qPtCenter = (edges[0][indexC[0]] + edges[0][indexC[0] + 1]) * .5
@@ -112,6 +87,29 @@ def histogramDCAPlot(df):
                                 tooltips=tooltips, sizing_mode='scale_width', widgetLayout=widgetLayoutDesc,
                                 nPointRender=5000, rescaleColorMapper=True)
 
+def mitest_roundRelativeBinary(df):
+    """
+    :param df:
+    :return:
+    """
+    df["weightR5"]=roundRelativeBinary(df["weight"],5)
+    df["weightR7"]=roundRelativeBinary(df["weight"],7)
+    df["weightR8"]=roundRelativeBinary(df["weight"],8)
+    mapIndex,mapCodeI=codeMapDF(df,0.5,1)
+    sizeR0=getCompressionSize(df["weight"].to_numpy())/getSize(df["weight"].to_numpy())
+    sizeR5=getCompressionSize(df["weightR5"].to_numpy().astype("int8"))/getSize(df["weight"].to_numpy())
+    sizeR7=getCompressionSize(df["weightR7"].to_numpy().astype("int8"))/getSize(df["weight"].to_numpy())
+    sizeR8=getCompressionSize(df["weightR8"].to_numpy().astype("int16"))/getSize(df["weight"].to_numpy())
+    entropy0=entropy(df["weight"].value_counts(), base=2)
+    entropy5=entropy(df["weightR5"].value_counts(), base=2)
+    entropy7=entropy(df["weightR7"].value_counts(), base=2)
+    entropy8=entropy(df["weightR8"].value_counts(), base=2)
+    print("mitest_roundRelativeBinary(df)")
+    print(sizeR0,sizeR8,sizeR7,sizeR5)
+    print(entropy0/64,entropy8/64,entropy7/64,entropy5/64)
+    print(entropy0,entropy8,entropy7,entropy5)
+
 def test_Compression0():
     df = simulatePandaDCA()
+    mitest_roundRelativeBinary(df)
     histogramDCAPlot(df)
