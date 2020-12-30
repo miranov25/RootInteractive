@@ -16,10 +16,10 @@ def makePanda(step,sigma):
 
 
 figureArray = [
-    [['A'], ['histo'], { "weights": "Wa","nbins": 50,"range_min": -1, "range_max": 1}],
-    [['A'], ['histo'], { "weights": "W","nbins": 50,"range_min": -1, "range_max": 1}],
-    [['B'], ['histo'], { "weights": "W","nbins": 50,"range_min": -1, "range_max": 1}],
-    [['D'], ['histo'], { "weights": "W","nbins": 50,"range_min": -1, "range_max": 1}],
+    [['A'], ['histo'], { "weights": "Wa","nbins": 50, "range": [-1, 1]}],
+    [['A'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
+    [['B'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
+    [['D'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
 ]
 widgetParams = [
     ['range', ['A',-1., 1., 0.1, -1., 1.]],
