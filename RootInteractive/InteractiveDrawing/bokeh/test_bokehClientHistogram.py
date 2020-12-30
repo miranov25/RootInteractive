@@ -62,12 +62,16 @@ def testBokehClientHistogram():
 
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
+    histoArray = [
+        {"name": "histo1", "variables": ["A"]}
+    ]
     figureArray = [
-        [['A'], ['histo']],
+        [['A'], ['histo1']],
         [['(A+B)/2'], ['histo'], {"weights": "D"}],
         [['A'], ['B'], {"nbins": [20, 20], "histo2d": True, "weights": "D"}]
     ]
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 # testBokehClientHistogram()
 testBokehClientHistogramOnlyHisto()
