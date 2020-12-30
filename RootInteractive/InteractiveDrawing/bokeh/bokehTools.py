@@ -733,7 +733,7 @@ def parseWidgetString(widgetString):
     return widgetList
 
 
-def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
+def bokehDrawArray(dataFrame, query, figureArray, histogramArray={}, **kwargs):
     """
     Wrapper bokeh draw array of figures
 
@@ -776,11 +776,9 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         "rescaleColorMapper": False,
         "filter": '',
         'doDraw': 0,
-        "legend_field":None,
+        "legend_field": None,
         'nPointRender': 100000,
         "nbins": 10,
-        "range_min": 0,
-        "range_max": 1,
         "weights": None,
         "histo2d": False,
         "range": None
@@ -839,10 +837,11 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
         logging.error("Invalid source:", source)
     # define default options
 
+    histoList = []
+
     plotArray = []
     colorAll = all_palettes[options['colors']]
     colorMapperDict = {}
-    histoList = []
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
@@ -939,8 +938,8 @@ def bokehDrawArray(dataFrame, query, figureArray, **kwargs):
             varY = variables[1][i % lengthY]
 
             if varY == "histo":
-                cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], range_min=optionLocal["range_min"],
-                                        range_max=optionLocal["range_max"], sample=varNameX, weights=optionLocal["weights"])
+                cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
+                                        range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
                 histoList.append(cdsHisto)
                 colorHisto = colorAll[max(length, 4)][i]
                 if optionLocal['color'] is not None:
@@ -1131,3 +1130,11 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             iWidget.js_on_change("value", callback)
         iWidget.js_on_event("value", callback)
     return widgetArray
+
+
+def bokehMakeHistogramCDS(cdsOrig, histogramArray=[]):
+    histoDict = {}
+    for iHisto in histogramArray:
+        sampleVars = iHisto["variables"]
+        histoName = iHisto["name"]
+    return histoDict

@@ -56,9 +56,9 @@ def testBokehClientHistogram():
         [['(A+B)/2'], ['histo', '(C+A)*200', '(C-A)*200'], {"weights": "C"}],
         [['B'], ['histo', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True, "nbins": 100,
-                                                    "range_min": 0, "range_max": 1}]
+                                                    "range": [0, 1]}]
     ]
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointsRender=3000)
 
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
