@@ -1,5 +1,7 @@
-import zlib
+import base64
 import pickle
+import zlib
+
 import numpy as np
 
 
@@ -12,7 +14,7 @@ def getSize(inputObject):
 
 
 def roundRelativeBinary(df, nBits):
-    """
+    """ TODO - check more optimal implementation using shifts ... and pipes
     roundRelativeBinary     - round mantissa of float number in nBits, assuming better lossy compression later
     :param df:              - input array (for a moment only pandas or numpy)
     :param nBits:           - number of significant bits to round
@@ -56,3 +58,15 @@ def codeMapDF(df, maxFraction=0.5, doPrint=0):
         else:
             mapIndex[column] = df[column]
     return mapIndex, mapCodeI
+
+
+def codeCDS(df, doZip=0, printSize=0):
+    mapIndex, mapCodeI = codeMapDF(df, 0.5, printSize)
+    data = {}
+    if doZip:
+        for key, value in mapIndex.items():
+            mapIndex[key] = base64.b64encode(zlib.compress(value.to_numpy())).decode("utf-8")
+    for key, value in mapIndex.items():
+        data[key] = value
+    data["mapCodeI"] = mapCodeI
+    return data
