@@ -19,6 +19,5 @@ class HistogramCDS(ColumnarDataSource):
     sample = String
     weights = String(default=None)
     nbins = Int
-    range_min = Float
-    range_max = Float
+    range = List(Float)
     print("x", __implementation__)

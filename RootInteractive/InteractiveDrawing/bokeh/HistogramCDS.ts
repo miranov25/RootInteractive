@@ -9,8 +9,7 @@ export namespace HistogramCDS {
     source: p.Property<ColumnDataSource>
 //    view: p.Property<number[] | null>
     nbins:        p.Property<number>
-    range_min:    p.Property<number>
-    range_max:    p.Property<number>
+    range:    p.Property<number[] | null>
     sample:      p.Property<string>
     weights:      p.Property<string | null>
   }
@@ -29,12 +28,11 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Ref})=>({
+    this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable})=>({
       source:  [Ref(ColumnDataSource)],
 //      view:         [Nullable(Array(Int)), null],
       nbins:        [p.Number],
-      range_min:    [p.Number],
-      range_max:    [p.Number],
+      range:    [Nullable(Array(Number))],
       sample:      [p.String],
       weights:      [p.String, null]
     }))
@@ -127,14 +125,20 @@ export class HistogramCDS extends ColumnarDataSource {
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
       bin_right.length = 0
-      this._range_min = this.range_min
-      this._range_max = this.range_max
+      if(this.range === null ){
+        const sample_arr = this.source.data[this.sample] as number[]
+        this._range_min = sample_arr.reduce((acc, cur) => Math.min(acc, cur), sample_arr[0])
+        this._range_max = sample_arr.reduce((acc, cur) => Math.max(acc, cur), sample_arr[0])
+      } else {
+        this._range_min = this.range[0]
+        this._range_max = this.range[1]
+      }
       this._nbins = this.nbins
-      this._transform_scale = this.nbins/(this.range_max-this.range_min)
-      this._transform_origin = -this.range_min*this._transform_scale
-      for (let index = 0; index < this.nbins; index++) {
-        bin_left.push(this.range_min+index*(this.range_max-this.range_min)/this.nbins)
-        bin_right.push(this.range_min+(index+1)*(this.range_max-this.range_min)/this.nbins)
+      this._transform_scale = this._nbins/(this._range_max-this._range_min)
+      this._transform_origin = -this._range_min*this._transform_scale
+      for (let index = 0; index < this._nbins; index++) {
+        bin_left.push(this._range_min+index*(this._range_max-this._range_min)/this._nbins)
+        bin_right.push(this._range_min+(index+1)*(this._range_max-this._range_min)/this._nbins)
       }
       this.update_data()
   }
