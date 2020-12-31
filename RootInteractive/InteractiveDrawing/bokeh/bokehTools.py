@@ -927,15 +927,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                     colorMapperDict[optionLocal["colorZvar"]] = [[source, mapperC]]
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
         for i in range(0, length):
+            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             if variables[1][i % lengthY] in histogramDict:
                 iHisto = histogramDict[variables[1][i % lengthY]]
                 if iHisto["type"] == "histogram":
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
+                elif iHisto["type"] == "histogram":
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
+                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][1])
             elif variables[1][i % lengthY] == "histo":
                 varNameY = "histo"
             else:
                 dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
-            _, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             if mapperC is not None:
                 color = mapperC
             else:
@@ -983,6 +986,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                     if optionLocal['color'] is not None:
                         colorHisto = optionLocal['color']
                     histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+                    figureI.add_glyph(cdsHisto, histoGlyph)
+                elif histoHandle["type"] == "histo2d":
+                    cdsHisto = histoHandle["cds"]
+                    mapperC = linear_cmap(field_name="bin_count", palette=optionLocal['palette'], low=0,
+                                          high=1)
+                    if ("bin_count") in colorMapperDict:
+                        colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
+                    else:
+                        colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
+                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
+                                         title=varX + " vs " + varY)
+                    histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
+                                      fill_color=mapperC)
                     figureI.add_glyph(cdsHisto, histoGlyph)
             else:
                 #                zAxisTitle +=varColor + ","
@@ -1171,4 +1187,11 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], **kwargs):
             cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histogram", "name":histoName, "variables": sampleVars}
+        elif len(sampleVars) == 2:
+            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
+            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, sampleVars[1])
+            cdsHisto = Histo2dCDS(source=cdsFull, nbins=optionLocal["nbins"],
+                                    range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
+            histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
+                                    "variables": sampleVars}
     return histoDict, dfQuery
