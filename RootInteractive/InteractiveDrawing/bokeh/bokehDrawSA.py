@@ -54,7 +54,7 @@ class bokehDrawSA(object):
             'line_color': "white",
             'widgetLayout':'',
             'sizing_mode': None,
-            'nPointRender': 100000
+            'nPointRender': 10000
         }
         options.update(kwargs)
         self.options=options
@@ -107,7 +107,7 @@ class bokehDrawSA(object):
         :return:
         """
         options={
-            'nPointRender': 100000
+            'nPointRender': 10000
         }
         options.update(kwargs)
         kwargs=options

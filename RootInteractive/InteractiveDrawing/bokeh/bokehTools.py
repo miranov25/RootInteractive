@@ -25,7 +25,7 @@ def makeJScallback(widgetDict, **kwargs):
     options = {
         "verbose": 0,
         "varList": ['AAA', 'BBB'],
-        "nPointRender": 100000
+        "nPointRender": 10000
     }
     options.update(kwargs)
 
@@ -125,7 +125,7 @@ def makeJScallback(widgetDict, **kwargs):
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
-        "nPointRender": 100000,
+        "nPointRender": 10000,
         "cmapDict": None,
         "cdsCompress":None,
         "histogramList": []
@@ -779,7 +779,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "filter": '',
         'doDraw': 0,
         "legend_field": None,
-        'nPointRender': 100000,
+        'nPointRender': 10000,
         "nbins": 10,
         "weights": None,
         "histo2d": False,
