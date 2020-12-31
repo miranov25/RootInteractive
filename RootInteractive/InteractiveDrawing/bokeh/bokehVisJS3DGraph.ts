@@ -9,6 +9,7 @@ import {LayoutDOM, LayoutDOMView} from "models/layouts/layout_dom"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import {LayoutItem} from "core/layout"
 import * as p from "core/properties"
+declare var Zlib : any;
 
 declare namespace vis {
   class Graph3d {
@@ -90,6 +91,9 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
   // This is the callback executed when the Bokeh data has an change. Its basic
   // function is to adapt the Bokeh data source to the vis.js DataSet format.
   get_data(): vis.DataSet {
+    if (0){
+      testUnzip("12345")
+    }
     const data = new vis.DataSet()
     const source = this.model.data_source
     for (let i = 0; i < source.get_length()!; i++) {
@@ -165,4 +169,16 @@ export class BokehVisJSGraph3D extends LayoutDOM {
       data_source:  [ p.Instance ],
     })
   }
+}
+
+function testUnzip(s:string) {
+  //var s = atob("eJyrVkrLz1eyUlBKSixSqgUAIJgEVA==");
+  var data = new Array(s.length);
+  for(let i  = 0; i = s.length; ++i) {
+    data[i] = s.charCodeAt(i);
+  }
+  var inflate = new Zlib.Inflate(data);
+  var decompress = inflate.decompress();
+  var plain = new TextDecoder("utf-8").decode(decompress);
+  return plain
 }
