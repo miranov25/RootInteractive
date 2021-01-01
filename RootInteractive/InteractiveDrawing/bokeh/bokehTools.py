@@ -553,31 +553,6 @@ def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
     return pAll, source, plotArray
 
 
-def parseWidgetString(widgetString):
-    r'''
-    Parse widget string and convert it to  nested lists
-    :param widgetString:
-
-    Example:
-        https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/ADQT-3/tpcQADemoWithStatus.ipynb
-            >>> from InteractiveDrawing.bokeh.bokehTools import *
-            >>> widgets="tab.sliders(slider.meanMIP(45,55,0.1,45,55),slider.meanMIPele(50,80,0.2,50,80), slider.resolutionMIP(0,0.15,0.01,0,0.15)),"
-            >>> widgets+="tab.checkboxGlobal(slider.global_Warning(0,1,1,0,1),checkbox.global_Outlier(0)),"
-            >>> widgets+="tab.checkboxMIP(slider.MIPquality_Warning(0,1,1,0,1),checkbox.MIPquality_Outlier(0), checkbox.MIPquality_PhysAcc(1))"
-            >>> print(parseWidgetString(widgets))
-            >>> ['tab.sliders', ['slider.meanMIP', ['45', '55', '0.1', '45', '55'], 'slider.meanMIPele', ['50', '80', '0.2', '50', '80'], ....]
-
-    :return:
-        Nested lists of strings to create widgets
-    '''
-    toParse = "(" + widgetString + ")"
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-_[]{}") | '#' | pyparsing.Suppress(',') | pyparsing.Suppress(
-        ':')
-    widgetParser = pyparsing.nestedExpr('(', ')', content=theContent)
-    widgetList = widgetParser.parseString(toParse)[0]
-    return widgetList
-
-
 def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     """
     Wrapper bokeh draw array of figures
