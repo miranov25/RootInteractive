@@ -10,6 +10,7 @@ import {ColumnDataSource} from "models/sources/column_data_source"
 import {LayoutItem} from "core/layout"
 import * as p from "core/properties"
 declare var Zlib : any;
+//import * as pako from 'pako'
 
 declare namespace vis {
   class Graph3d {

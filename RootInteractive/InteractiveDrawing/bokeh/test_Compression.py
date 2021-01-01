@@ -18,7 +18,7 @@ from RootInteractive.Tools.compressArray import *
 #   }
 
 
-def simulatePandaDCA():
+def simulatePandaDCA(fastTest=False):
     """
     simulate DCA 5 D histograms :
     DCA: qPt,tgl,mdEd,alpha
@@ -32,6 +32,8 @@ def simulatePandaDCA():
     # qPt,tgl.mdEdx.alpha, dCA
     rangeH = ([-5, 5], [-1, 1], [0, 1], [0, 2 * np.pi], [-10 * sigma0 - 1, 10 * sigma0 + 1])
     bins = [50, 20, 20, 12, 100]
+    if (fastTest):
+        bins = [50, 10, 10, 12, 50]
     H, edges = np.histogramdd(sample=np.array([[0, 0, 0, 0, 0]]), bins=bins, range=rangeH)
     indexH = np.arange(H.size)
     indexC = np.unravel_index(indexH, bins)
@@ -110,6 +112,6 @@ def mitest_roundRelativeBinary(df):
     print(entropy0,entropy8,entropy7,entropy5)
 
 def test_Compression0():
-    df = simulatePandaDCA()
+    df = simulatePandaDCA(True)
     mitest_roundRelativeBinary(df)
-    histogramDCAPlot(df)
+    #histogramDCAPlot(df)

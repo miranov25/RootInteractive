@@ -21,107 +21,6 @@ from RootInteractive.Tools.compressArray import *
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
-def makeJScallback(widgetDict, **kwargs):
-    options = {
-        "verbose": 0,
-        "varList": ['AAA', 'BBB'],
-        "nPointRender": 10000
-    }
-    options.update(kwargs)
-
-    size = widgetDict['cdsOrig'].data["index"].size
-    code = \
-        """
-    let dataOrig = cdsOrig.data;
-    let dataSel = cdsSel.data;
-    console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
-    """
-    # for key in options['varList']:
-    #    code += f"      var {key}K={key};\n"
-
-    for a in widgetDict['cdsOrig'].data:
-        code += f"dataSel[\'{a}\']=[];\n"
-
-    code += f"""let arraySize={size};\n"""
-    code += """let nSelected=0;\n"""
-    code += f"""for (var i = 0; i < {size}; i++)\n"""
-    code += " {\n"
-    code += """let isSelected=1;\n"""
-    code += """let idx=0;\n"""
-    code += f"const nPointRender =  {options['nPointRender']};\n"
-    code += f"const precision=0.000001;\n"
-    for a in widgetDict['cdsOrig'].data:
-        if a == "index":
-            continue
-        code += f"var v{a} =dataOrig[\"{a}\"][i];\n"
-        # code += f"var {a} =dataOrig[\"{a}\"][i];\n"
-
-    code += "let isOK = false;\n"
-    for key, value in widgetDict.items():
-        if isinstance(value, Slider):
-            code += f"      var {key}Value={key}.value;\n"
-            code += f"      var {key}Step={key}.step;\n"
-            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,{key}Step,dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value-0.5*{key}Step)\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value+0.5*{key}Step)\n"
-        elif isinstance(value, RangeSlider):
-            code += f"      var {key}Value={key}.value;\n"
-            # code += f"      console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value[0],{key}Value[1],dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]>={key}Value[0])\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]<={key}Value[1])\n"
-        elif isinstance(value, TextInput):
-            code += f"      var queryText={key}.value;\n"
-            # code += f"      console.log(queryText, queryText.length);\n"
-            code += "      if (queryText.length > 1)  {"
-            code += f"      var queryString='';\n"
-            code += f"      var varString='';\n"
-            code += f"     eval(varString+ 'var result = ('+ queryText+')');\n"
-            # code += f"      console.log(\"query\", {key}, {key}.value, \"Result=\", varString, queryText, result, vA);\n"
-            code += f"      isSelected&=result;\n"
-            code += "}\n"
-        elif isinstance(value, Select):
-            # check if entry is equat to selected within relitive precission
-            code += f"      var {key}Value={key}.value;\n"
-            # code += f"     console.log(\"%s\t%s\t%f\",\"{key}\", {key}Value, dataOrig[\"{key}\"][i]);\n"
-            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
-            code += f"      isSelected&=(dataOrig[\"{key}\"][i]=={key}Value)|isOK;\n"
-        elif isinstance(value, MultiSelect):
-            code += f"      var {key}Value={key}.value;\n"
-            code += f"     console.log(\"%s\t%s\t%f\t%s\",\"{key}\",{key}Value.toString,dataOrig[\"{key}\"][i],({key}Value.includes(dataOrig[\"{key}\"][i].toString())));\n"
-            code += f"      isSelected&=({key}Value.includes(dataOrig[\"{key}\"][i].toString()))\n"
-        elif isinstance(value, CheckboxGroup):
-            code += f"      var {key}Value=({key}.active.length>0);\n"
-            code += f"      isOK=Math.abs((dataOrig[\"{key}\"][i]-{key}Value))<={key}Value*precision;\n"
-            # code += f"     console.log(\"%s\t%f\t%f\t%f\",\"{key}\",{key}Value,dataOrig[\"{key}\"][i]);\n"
-            code += f"      isSelected&=((dataOrig[\"{key}\"][i]=={key}Value))|isOK;\n"
-    code += """
-        //console.log(\"isSelected:%d\t%d\",i,isSelected);
-        if (isSelected){
-          if(nSelected < nPointRender){
-            for (const key in dataSel){
-                dataSel[key].push(dataOrig[key][i]);
-            }
-            } else {
-                if(Math.random() < 1 / nSelected){
-                    idx = Math.floor(Math.random()*nPointRender);
-                    for (const key in dataSel){
-                        dataSel[key][idx] = dataOrig[key][i];
-                    }
-                }
-            }
-            nSelected++;
-        }
-    }
-    console.log(\"nSelected:%d\",nSelected);
-    cdsSel.change.emit();
-    """
-    if options["verbose"] > 0:
-        logging.info("makeJScallback:\n", code)
-    # print(code)
-    callback = CustomJS(args=widgetDict, code=code)
-    return callback
-
-
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
@@ -295,27 +194,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     return callback
 
 
-def makeJSCallbackVisible(widgetDict, **kwargs):
-    """
-    make callback function to change of figure elements visible
-    elements:
-        * legend       visibility
-        * axis title   visibility
-        * legend size , axis size - should be similar to other function
-    :param widgetDict:
-    :param kwargs:
-    :return:
-    """
-    options = {
-        "verbose": 0,
-        "element":"legend",
-        "keyCheck":""
-    }
-    options.update(kwargs)
-    code="console.log('Event occurred at x-position: ' + cb_obj.x)"
-    callback = CustomJS(args=widgetDict, code=code)
-    return callback
-
 def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
     """
     :param layoutRow:
@@ -411,41 +289,6 @@ def __processBokehLayoutOption(layoutOptions):
                 except ValueError:
                     options[k] = v
     return options
-
-
-def processBokehLayout(layoutString, figList, verbose=0):
-    r"""
-    :param layoutString:
-        * layout string   see example
-            https://github.com/miranov25/RootInteractiveTest/blob/870533dee18e528d0716a7e6feff8c8289c172dc/JIRA/PWGPP-485/parseLayout.ipynb
-        * syntax:
-            >>> layout="((row0),<(row1)>, ..., globalOptions)"
-            >>> rowX="(id0,<id1>, ...,rowOptions)"
-        * raw option derived from the global option, could be locally overwritten
-        * layout options :
-            >>> ["plot_width", "plot_height", "commonX", "commonY", "x_visible", "y_visible"]
-        * Example layout syntax:
-            >>> layout="((0,2,3,x_visible=1,y_visible=0), (1,plot_height=80, x_visible=0),"
-            >>> layout+="(4,plot_height=80), plot_width=900, plot_height=200, commonY=1,commonX=1,x_visible=0)"
-    :param figList:         array of figures to draw
-    :param verbose:  verbosity
-    :return: result as a string, layout list, options
-    """
-    # optionParse are propagated to daughter and than removed from global list
-    optionsParse = ["plot_width", "plot_height", "commonX", "commonY", "x_visible", "y_visible"]
-    theContent = pyparsing.Word(pyparsing.alphanums + ".+-=_") | pyparsing.Suppress(',')
-    parents = pyparsing.nestedExpr('(', ')', content=theContent)
-    res = parents.parseString(layoutString)[0]
-    layoutList = []
-    if verbose > 0: logging.info(res)
-    options = __processBokehLayoutOption(res)
-    if verbose > 0: logging.info(options)
-    for x in res:
-        if type(x) != str:
-            __processBokehLayoutRow(x, figList, layoutList, options, verbose)
-    for key in optionsParse:
-        if key in options: del options[key]
-    return res.asList(), layoutList, options
 
 
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
