@@ -9,12 +9,16 @@ setup(
     author='Marian Ivanov',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.00.24',
+    version='v0.00.25',
     #packages=setuptools.find_packages(),
-    packages=setuptools.find_packages(exclude=["scripts*", "tests*"]),
+    packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
     long_description=long_description,
     long_description_content_type="text/markdown",
+    include_package_data=False,
+    package_data={
+    '': ['../*/*/*/*.ts']
+    },
     install_requires=[
         'numpy',
         'scipy',
@@ -27,7 +31,7 @@ setup(
         'iminuit',
         #'root_pandas',
         ##---------------------   graphics  dependencies
-        'bokeh>2',
+        'bokeh>2,<=2.3',
         'matplotlib',
         'plotly',
         'qgrid',
