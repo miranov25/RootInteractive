@@ -151,125 +151,21 @@ class bokehDrawSA(object):
         r"""
         Initialize widgets
 
-        :param widgetString:
-            example string
-                >>>  widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
+        :param widgetsDescription:
+            example
+                >>>  widgetParams=[['range', ['A']], ['slider', ['AA'], {'bins': 10}],  ['select',["Bool"]]]
         :return: VBox includes all widgets
         """
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList, self.cmapDict, nPointRender = self.options['nPointRender'])
-            if isinstance(self.widgetLayout,list):
+            if isinstance(self.widgetLayout, list):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
-                if len(self.widgetLayout)>0:
-                    x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
-                    widgetList=gridplotRow(layoutList)
-                else:
-                    widgetList=column(widgetList)
+                widgetList=column(widgetList)
             return widgetList
+        raise RuntimeError("String based interface for widgets no longer supported")
 
-        widgetList = []
-        try:
-            widgetList = parseWidgetString(widgetsDescription)
-        except:
-            logging.error("Invalid widget string", widgetsDescription)
-        widgetDict = {"cdsOrig":self.cdsOrig, "cdsSel":self.cdsSel}
-        widgetList=self.createWidgets(widgetList)
-        for iWidget in widgetList:
-            try:
-                widgetDict[iWidget.title]=iWidget
-            except AttributeError:
-                widgetDict[iWidget.labels[0]] = iWidget
-        callback=makeJScallback(widgetDict, nPointRender=self.options['nPointRender'])
-#        callback.code = callback.code.replace("A","PA")     # Contemporary correction until makeJScallback is fixed
-        for iWidget in widgetList:
-            if isinstance(iWidget,CheckboxGroup):
-                iWidget.js_on_click(callback)
-            else:
-                iWidget.js_on_change("value", callback)
-            iWidget.js_on_event("value", callback)
-        #display(callback.code)
-
-        if len(self.widgetLayout)>0:
-            x, layoutList, optionsLayout = processBokehLayout(self.widgetLayout,  widgetList)
-            widgetList=gridplotRow(layoutList)
-        else:
-            widgetList=column(widgetList)
-        return widgetList
-
-    def createWidgets(self, widgetList0):
-        r'''
-        Build widgets and connect observe function of the bokehDraw object
-
-        :param widgetString:
-            Example:
-                RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py
-            >>> widgets="slider.A(0,100,0.5,0,100),slider.B(0,100,5,0,100),slider.C(0,100,1,1,100):slider.D(0,100,1,1,100)"
-
-        :return:
-            fill widgets arrays  to be shown in the Notebook
-                * widgetArray
-                * accordArray
-                * tabArray
-
-        Algorithm:
-            * make a tree representation of widgets (recursive list of lists)
-            * create an recursive widget structure
-            * assign
-        '''
-        widgetSubList = []
-        for widgetTitle, subList in zip(*[iter(widgetList0)] * 2):
-            name = widgetTitle.split('.')
-            if name[0] == "dropdown":
-                values = list(subList)
-                if len(values) == 0:
-                    raise ValueError("dropdown menu quires at least 1 option. The dropdown menu {} has no options",
-                                     format(name[1]))
-                iWidget = widgets.Select(title=name[1], value=values[0], options=values)
-            elif name[0] == "multiselect":
-                value = list(subList)
-                if len(value) == 0:
-                    raise ValueError("Multiselect menu quires at least 1 option. The multiselect menu {} has no options",
-                                     format(name[1]))
-                iWidget = widgets.MultiSelect(title=name[1], value=value, options=value)
-            elif name[0] == "checkbox":
-                if len(subList) == 0:
-                    active = []
-                elif len(subList) == 1:
-                    if subList[0] in ['True', 'true', '1']:
-                        active = [0]
-                    elif subList[0] in ['False', 'false', '0']:
-                        active = []
-                    else:
-                        raise ValueError("The parameters for checkbox can only be \"True\", \"False\", \"0\" or \"1\". "
-                                         "The parameter for the checkbox {} was:{}".format(name[1], subList[0]))
-                else:
-                    raise SyntaxError("The number of parameters for Checkbox can be 1 or 0."
-                                      "Checkbox {} has {} parameters.".format(name[1], len(subList)))
-                iWidget = widgets.CheckboxGroup(labels=[name[1]], active=active)
-#                iWidget.title=name[1]
-            elif name[0] == "query":
-                iWidget = widgets.TextInput(value="", placeholder="Type a query", title="Query")
-            elif name[0] == "slider":
-                if len(subList) == 4:
-                    iWidget = widgets.Slider(title=name[1], start=float(subList[0]), end=float(subList[1]),
-                                             step=float(subList[2]), value=float(subList[3]))
-                elif len(subList) == 5:
-                    iWidget = widgets.RangeSlider(title=name[1], start=float(subList[0]), end=float(subList[1]),
-                                                  step=float(subList[2]), value=(float(subList[3]), float(subList[4])))
-                else:
-                    raise SyntaxError(
-                        "The number of parameters for Sliders can be 4 for Single value sliders and 5 for ranged sliders. "
-                        "Slider {} has {} parameters.".format(name[1], len(subList)))
-            else:
-                if (self.verbosity >> 1) & 1:
-                    logging.info("type of the widget\"" + name[0] + "\" is not specified. Assuming it is a slider.")
-                iWidget = self.createWidgets([["slider." + name[0], subList]])  # For backward compatibility
-            widgetSubList.append(iWidget)
-#        self.allWidgets += widgetSubList
-        return widgetSubList
-    verbosity=0
-
+    verbosity = 0
 
 def constructVariables(query, varX, varY, varColor, widgetString, verbosity, **kwargs):
     varList = []
