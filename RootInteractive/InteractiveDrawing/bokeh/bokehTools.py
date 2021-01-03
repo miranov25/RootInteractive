@@ -1005,9 +1005,9 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    cdsCompress = codeCDS(df,1)
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsCompress=cdsCompress)
-    #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
+    #cdsCompress = codeCDS(df,0)
+    #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsCompress=cdsCompress)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
