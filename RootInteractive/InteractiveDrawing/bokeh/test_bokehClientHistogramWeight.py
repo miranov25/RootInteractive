@@ -16,18 +16,24 @@ def makePanda(step,sigma):
 
 
 figureArray = [
-    [['A'], ['histo'], { "weights": "Wa","nbins": 50, "range": [-1, 1]}],
-    [['A'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
-    [['B'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
-    [['D'], ['histo'], { "weights": "W","nbins": 50, "range": [-1, 1]}],
+    [['A'], ['histoA']],
+    [['A'], ['histoA1']],
+    [['B'], ['histoB']],
+    [['D'], ['histoD']],
+]
+histogramArray = [
+    {"name": "histoA", "variables": ["A"], "weights": "Wa", "nbins": 50, "range": [-1, 1]},
+    {"name": "histoA1", "variables": ["A"], "weights": "W", "nbins": 50, "range": [-1, 1]},
+    {"name": "histoB", "variables": ["B"], "weights": "W", "nbins": 50, "range": [-1, 1]},
+    {"name": "histoD", "variables": ["D"], "weights": "W", "nbins": 50, "range": [-1, 1]},
 ]
 widgetParams = [
-    ['range', ['A',-1., 1., 0.1, -1., 1.]],
+    ['range', ['A', -1., 1., 0.1, -1., 1.]],
     ['range', ['B']],
     ['range', ['C']],
     ['range', ['D']],
 ]
-widgetLayoutDesc = [[0, 1], [2,3], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc = [[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc = [
     [0, 1, {'y_visible': 1, 'x_visible': 1, 'plot_height': 150}],
@@ -39,4 +45,4 @@ df,a,b,c,d=makePanda(0.02,0.1)
 df['D']=df["A"]-df["B"]
 output_file("test_bokehClientHistogramWeight.html")
 xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width")
+                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
