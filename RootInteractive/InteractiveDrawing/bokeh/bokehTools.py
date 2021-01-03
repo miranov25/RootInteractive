@@ -602,25 +602,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             if varY in histogramDict:
                 histoHandle = histogramDict[varY]
                 if histoHandle["type"] == "histogram":
-                    cdsHisto = histoHandle["cds"]
                     colorHisto = colorAll[max(length, 4)][i]
-                    if optionLocal['color'] is not None:
-                        colorHisto = optionLocal['color']
-                    histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
-                    figureI.add_glyph(cdsHisto, histoGlyph)
+                    addHistogramGlyph(figureI, histoHandle, colorHisto, optionLocal)
                 elif histoHandle["type"] == "histo2d":
-                    cdsHisto = histoHandle["cds"]
-                    mapperC = linear_cmap(field_name="bin_count", palette=optionLocal['palette'], low=0,
-                                          high=1)
-                    if ("bin_count") in colorMapperDict:
-                        colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
-                    else:
-                        colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
-                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
-                                         title=varX + " vs " + varY)
-                    histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
-                                      fill_color=mapperC)
-                    figureI.add_glyph(cdsHisto, histoGlyph)
+                    addHisto2dGlyph(figureI, varNameX, varNameY, histoHandle, colorMapperDict, color, marker, dfQuery,
+                                    optionLocal)
             else:
                 #                zAxisTitle +=varColor + ","
                 #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
@@ -653,6 +639,51 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     if options['doDraw'] > 0:
         show(pAll)
     return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList
+
+
+def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
+    visualization_type = "heatmap"
+    if "visualization_type" in options:
+        visualization_type = options["visualization_type"]
+    cdsHisto = histoHandle["cds"]
+
+    if visualization_type == "heatmap":
+        mapperC = linear_cmap(field_name="bin_count", palette=options['palette'], low=0,
+                              high=1)
+        if ("bin_count") in colorMapperDict:
+            colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
+        else:
+            colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
+        color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
+                             title=x + " vs " + y)
+        histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
+                          fill_color=mapperC)
+        fig.add_glyph(cdsHisto, histoGlyph)
+        fig.add_layout(color_bar, 'right')
+    elif visualization_type == "colZ":
+        mapperC = linear_cmap(field_name="bin_bottom", palette=options['palette'], low=min(dfQuery[y]),
+                                  high=max(dfQuery[y]))
+        if "bin_bottom" in colorMapperDict:
+            colorMapperDict["bin_bottom"] += [[cdsHisto, mapperC]]
+        else:
+            colorMapperDict["bin_bottom"] = [[cdsHisto, mapperC]]
+        color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
+                             title=x + " vs " + y)
+        if options["legend_field"] is None:
+            fig.scatter(x="bin_left", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+                            color=mapperC, marker=marker, legend_label="Histogram of " + x)
+        else:
+            fig.scatter(x="bin_left", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+                            color=mapperC, marker=marker, legend_field=options["legend_field"])
+        fig.add_layout(color_bar, 'right')
+
+
+def addHistogramGlyph(fig, histoHandle, colorHisto, options):
+    cdsHisto = histoHandle["cds"]
+    if options['color'] is not None:
+        colorHisto = options['color']
+    histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+    fig.add_glyph(cdsHisto, histoGlyph)
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
