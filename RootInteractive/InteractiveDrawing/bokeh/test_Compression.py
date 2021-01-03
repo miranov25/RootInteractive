@@ -62,13 +62,17 @@ def histogramDCAPlot(df):
     output_file("dcaCompressionDemo.html")
     optionsAll = {"colorZvar": "mdEdxCenter"}
     df["Vcorr"] = df["V"] - df["mean"]
+    histogramArray = [
+        {"name": "histoV", "variables": ["V"], "range": [-2, 2], "weights": "weight", "nbins": 100},
+        {"name": "histoVcorr", "variables": ["Vcorr"], "range": [-2, 2], "weights": "weight", "nbins": 100}
+    ]
     figureArray = [
         [['qPtCenter'], ['mean'], optionsAll],
         [['tglCenter'], ['mean'], optionsAll],
         [['qPtCenter'], ['tglCenter'], {"color": "red", "size": 2, "colorZvar": "mean", "varZ": "mean"}],
         [['V'], ['weight'], optionsAll],
-        [['V'], ['histo'], {"range_min": -2, "range_max": 2, "weights": "weight", "nbins": 100}],
-        [['Vcorr'], ['histo'], {"range_min": -2, "range_max": 2, "weights": "weight", "nbins": 100}],
+        [['V'], ['histoV']],
+        [['Vcorr'], ['histoVcorr']],
     ]
 
     widgetParams = [
@@ -87,7 +91,7 @@ def histogramDCAPlot(df):
     ]
     fig = bokehDrawSA.fromArray(df.query("(index%27)==0"), "weight>0", figureArray, widgetParams, layout=figureLayoutDesc,
                                 tooltips=tooltips, sizing_mode='scale_width', widgetLayout=widgetLayoutDesc,
-                                nPointRender=5000, rescaleColorMapper=True)
+                                nPointRender=5000, rescaleColorMapper=True, histogramArray=histogramArray)
 
 def mitest_roundRelativeBinary(df):
     """
