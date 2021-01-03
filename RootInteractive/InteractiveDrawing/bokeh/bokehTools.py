@@ -416,143 +416,6 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     return data_table
 
 
-def drawColzArray(dataFrame, query, varX, varY, varColor, p, **kwargs):
-    r"""
-    drawColzArray
-
-    :param dataFrame: data frame
-    :param query:
-        selection e.g:
-            >>> "varX>1&abs(varY)<2&A>0"
-    :param varX:      x query
-    :param varY:
-        y query array of queries
-            >>> "A:B:C:D:A"
-    :param varColor:  z query
-    :param p:         figure template
-    :param kwargs:
-        optional drawing parameters
-            * option           - ncols - number fo columns in drawing
-            * option           - commonX=?,commonY=? - switch share axis
-            * option           - size
-            * option errX      - query for errors on X
-            * option errY      - array of queries for errors on Y
-            * option tooltip   - tooltip to show
-    :return:
-        figure, handle (for bokeh notebook), bokeh CDS
-        drawing example - functionality like the tree->Draw( colz)
-    :Example:
-        https://github.com/miranov25/RootInteractiveTest/blob/master/JIRA/PWGPP-518/layoutPlay.ipynb
-            >>>  df = pd.DataFrame(np.random.randint(0,100,size=(200, 4)), columns=list('ABCD'))
-            >>>  drawColzArray(df,"A>0","A","A:B:C:D:A","C",None,ncols=2,plot_width=400,commonX=1, plot_height=200)
-    """
-    dfQuery = dataFrame.query(query)
-    try:
-        source = ColumnDataSource(dfQuery)
-    except:
-        logging.error("Invalid source:", source)
-    # define default options
-    options = {
-        'line': -1,
-        'size': 2,
-        'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset',
-        'tooltips': [],
-        'y_axis_type': 'auto',
-        'x_axis_type': 'auto',
-        'plot_width': 600,
-        'plot_height': 400,
-        'errX': '',
-        'errY': '',
-        'commonX': -1,
-        'commonY': -1,
-        'ncols': -1,
-        'layout': '',
-        'palette': Spectral6,
-        'doDraw': 0
-    }
-    options.update(kwargs)
-    if 'tooltip' in kwargs:  # bug fix - to be compatible with old interface (tooltip instead of tooltips)
-        options['tooltips'] = kwargs['tooltip']
-        options['tooltip'] = kwargs['tooltip']
-
-    mapper = linear_cmap(field_name=varColor, palette=options['palette'], low=min(dfQuery[varColor]),
-                         high=max(dfQuery[varColor]))
-    isNotebook = get_ipython().__class__.__name__ == 'ZMQInteractiveShell'
-    varYArray = varY.split(":")
-    varXArray = varX.split(":")
-    plotArray = []
-    pFirst = None
-
-    if len(options['errX']) > 1: varXerr = options['errX']
-    if len(options['errY']) > 1:
-        varYerrArray = options['errY'].split(":")
-    else:
-        varYerrArray = varYArray
-
-    for idx, (yS, yErrorS) in enumerate(zip(varYArray, varYerrArray)):
-        yArray = yS.strip('()').split(",")
-        yArrayErr = yErrorS.strip('[]').split(",")
-        p2 = figure(plot_width=options['plot_width'], plot_height=options['plot_height'],
-                    title=yS + " vs " + varX + "  Color=" + varColor,
-                    tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
-                    y_axis_type=options['y_axis_type'])
-        fIndex = 0
-        varX = varXArray[min(idx, len(varXArray) - 1)]
-        p2.xaxis.axis_label= varX
-        #figureI.yaxis.axis_label = yAxisTitle
-        for y, yError in zip(yArray, yArrayErr):
-            if 'varXerr' in locals():
-                err_x_x = []
-                err_x_y = []
-                for coord_x, coord_y, x_err in zip(source.data[varX], source.data[y], source.data[varXerr]):
-                    err_x_y.append((coord_y, coord_y))
-                    err_x_x.append((coord_x - x_err, coord_x + x_err))
-                p2.multi_line(err_x_x, err_x_y)
-            if 'errY' in kwargs.keys():
-                err_y_x = []
-                err_y_y = []
-                for coord_x, coord_y, y_err in zip(source.data[varX], source.data[y], source.data[yError]):
-                    err_y_x.append((coord_x, coord_x))
-                    err_y_y.append((coord_y - y_err, coord_y + y_err))
-                p2.multi_line(err_y_x, err_y_y)
-            p2.scatter(x=varX, y=y, line_color=mapper, color=mapper, fill_alpha=1, source=source, size=options['size'],
-                       marker=bokehMarkers[fIndex % 4], legend_label=varX + y)
-            if options['line'] > 0: p2.line(x=varX, y=y, source=source)
-            p2.legend.click_policy = "hide"
-            p2.yaxis.axis_label= y
-            fIndex += 1
-
-        if pFirst:  # set common X resp Y if specified. NOTE usage of layout options is more flexible
-            if options['commonX'] > 0: p2.x_range = pFirst.x_range
-            if options['commonY'] > 0: p2.y_range = pFirst.y_range
-        else:
-            pFirst = p2
-        plotArray.append(p2)
-        color_bar = ColorBar(color_mapper=mapper['transform'], width=8, location=(0, 0))
-        p2.add_layout(color_bar, 'right')
-
-    if len(options['layout']) > 0:  # make figure according layout
-        x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
-        pAll = gridplotRow(layoutList, **optionsLayout)
-        # handle = show(pAll, notebook_handle=isNotebook)
-        if options['doDraw'] > 0:
-            show(pAll)
-        return pAll, source, layoutList
-
-    plotArray2D = []
-    for i, plot in enumerate(plotArray):
-        pRow = int(i / options['ncols'])
-        pCol = i % options['ncols']
-        if pCol == 0: plotArray2D.append([])
-        plotArray2D[int(pRow)].append(plot)
-    pAll = gridplot(plotArray2D)
-    if options['doDraw'] > 0:
-        show(pAll)
-    #    https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
-    # handle = show(pAll, notebook_handle=isNotebook)  # set handle in case drawing is in notebook
-    return pAll, source, plotArray
-
-
 def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     """
     Wrapper bokeh draw array of figures
@@ -611,49 +474,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         logging.info(dfQuery.metaData)
     # Check/resp. load derived variables
     i: int
+    dfQuery, histogramDict, output_cdsSel = makeDerivedColumns(dfQuery, figureArray, histogramArray, options)
     histogramDict = {}
-    for i, histo in enumerate(histogramArray):
-        histogramDict[histo["name"]] = None
-        for j, variable in enumerate(histo["variables"]):
-            dfQuery, _ = pandaGetOrMakeColumn(dfQuery, variable)
-
-    for i, variables in enumerate(figureArray):
-        if len(variables) > 1 and variables[0] != "table":
-            lengthX = len(variables[0])
-            lengthY = len(variables[1])
-            length = max(len(variables[0]), len(variables[1]))
-            if len(variables) > 2:
-                optionLocal = options.copy()
-                optionLocal.update(variables[2])
-            else:
-                optionLocal = options
-            for j in range(0, length):
-                if variables[1][j % lengthY] != "histo" and variables[1][j % lengthY] not in histogramDict:
-                    if not optionLocal["histo2d"]:
-                        output_cdsSel = True
-                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                        seriesErrY = dfQuery.eval(optionLocal['errY'])
-                        if varNameY+'_lower' not in dfQuery.columns:
-                            seriesLower = dfQuery[varNameY]-seriesErrY
-                            dfQuery[varNameY+'_lower'] = seriesLower
-                        if varNameY+'_upper' not in dfQuery.columns:
-                            seriesUpper = dfQuery[varNameY]+seriesErrY
-                            dfQuery[varNameY+'_upper'] = seriesUpper
-                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                        seriesErrX = dfQuery.eval(optionLocal['errX'])
-                        if varNameX+'_lower' not in dfQuery.columns:
-                            seriesLower = dfQuery[varNameX]-seriesErrX
-                            dfQuery[varNameX+'_lower'] = seriesLower
-                        if varNameX+'_upper' not in dfQuery.columns:
-                            seriesUpper = dfQuery[varNameX]+seriesErrX
-                            dfQuery[varNameX+'_upper'] = seriesUpper
-                else:
-                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
 
     try:
-        #source = ColumnDataSource(dfQuery)
         cdsFull = ColumnDataSource(dfQuery)
         if output_cdsSel:
             source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
@@ -676,8 +500,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
-        logging.info("%d\t%s",i, variables)
-        if isinstance(variables, dict): continue
+        logging.info("%d\t%s", i, variables)
+        if isinstance(variables, dict):
+            continue
         if variables[0] == 'table':
             TOptions = {
                 'include': '',
@@ -718,7 +543,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             _, varNameColor = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
             options3D = {"width": "99%", "height": "99%"}
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
-                                      data_source=source, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor, options3D=options3D)
+                                      data_source=source, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
+                                      options3D=options3D)
             plotArray.append(plotI)
             continue
         else:
@@ -1017,3 +843,48 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], **kwargs):
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
     return histoDict, dfQuery
+
+
+def makeDerivedColumns(dfQuery, figureArray, histogramArray, options):
+    histogramDict = {}
+    output_cdsSel = True
+    for i, histo in enumerate(histogramArray):
+        histogramDict[histo["name"]] = None
+        for j, variable in enumerate(histo["variables"]):
+            dfQuery, _ = pandaGetOrMakeColumn(dfQuery, variable)
+
+    for i, variables in enumerate(figureArray):
+        if len(variables) > 1 and variables[0] != "table":
+            lengthX = len(variables[0])
+            lengthY = len(variables[1])
+            length = max(len(variables[0]), len(variables[1]))
+            if len(variables) > 2:
+                optionLocal = options.copy()
+                optionLocal.update(variables[2])
+            else:
+                optionLocal = options
+            for j in range(0, length):
+                if variables[1][j % lengthY] != "histo" and variables[1][j % lengthY] not in histogramDict:
+                    if not optionLocal["histo2d"]:
+                        output_cdsSel = True
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
+                        seriesErrY = dfQuery.eval(optionLocal['errY'])
+                        if varNameY+'_lower' not in dfQuery.columns:
+                            seriesLower = dfQuery[varNameY]-seriesErrY
+                            dfQuery[varNameY+'_lower'] = seriesLower
+                        if varNameY+'_upper' not in dfQuery.columns:
+                            seriesUpper = dfQuery[varNameY]+seriesErrY
+                            dfQuery[varNameY+'_upper'] = seriesUpper
+                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
+                        seriesErrX = dfQuery.eval(optionLocal['errX'])
+                        if varNameX+'_lower' not in dfQuery.columns:
+                            seriesLower = dfQuery[varNameX]-seriesErrX
+                            dfQuery[varNameX+'_lower'] = seriesLower
+                        if varNameX+'_upper' not in dfQuery.columns:
+                            seriesUpper = dfQuery[varNameX]+seriesErrX
+                            dfQuery[varNameX+'_upper'] = seriesUpper
+                else:
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+    return dfQuery, histogramDict, output_cdsSel
