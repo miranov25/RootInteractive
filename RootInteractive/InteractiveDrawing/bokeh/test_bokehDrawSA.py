@@ -104,4 +104,4 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
-testBokehDrawArrayDownsample()
+#testBokehDrawArrayDownsample()

@@ -115,3 +115,26 @@ def test_Compression0():
     df = simulatePandaDCA(True)
     mitest_roundRelativeBinary(df)
     #histogramDCAPlot(df)
+
+def testCompressionDecompression0(stop=10,step=1):
+    # compress pipeline
+    V0 = np.arange(start=0, stop=stop, step=step).astype("int16")
+    V1=base64.b64encode(V0.data)
+    V1C=zlib.compress(V1)
+    V1CB=base64.b64encode(V1C).decode('utf-8')
+    # decompres pipline
+    V1CBI=base64.b64decode(V1CB)
+    V1D=zlib.decompress(V1CBI)
+    V2= base64.b64decode(V1D)
+    V3=np.frombuffer(V2, dtype='int16')
+    print("V0",V0);
+    print("V1",V1);
+    print("V1C",V1C);
+    print("V1CB",V1CB);
+    print("V1CBI",V1CBI);
+    print("V1D",V1D);
+    print("V2",V2);
+    print("V3",V3);
+    diffSum=(V3-V0).sum()
+    if diffSum>0:
+        raise ValueError("testCompressionDecompression0 error")
