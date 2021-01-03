@@ -578,11 +578,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                 iHisto = histogramDict[variables[1][i % lengthY]]
                 if iHisto["type"] == "histogram":
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
-                elif iHisto["type"] == "histogram":
+                elif iHisto["type"] == "histo2d":
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][1])
-            elif variables[1][i % lengthY] == "histo":
-                varNameY = "histo"
             else:
                 dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
             if mapperC is not None:
@@ -601,30 +599,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
 
-            if varY == "histo":
-                cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
-                                        range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
-                histoList.append(cdsHisto)
-                colorHisto = colorAll[max(length, 4)][i]
-                if optionLocal['color'] is not None:
-                    colorHisto = optionLocal['color']
-                histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
-                figureI.add_glyph(cdsHisto, histoGlyph)
-            elif optionLocal["histo2d"]:
-                cdsHisto = Histo2dCDS(source=cdsFull, nbins=optionLocal["nbins"], range=optionLocal["range"],
-                                        sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
-                histoList.append(cdsHisto)
-                mapperC = linear_cmap(field_name="bin_count", palette=optionLocal['palette'], low=0,
-                                      high=1)
-                if ("bin_count") in colorMapperDict:
-                    colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
-                else:
-                    colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
-                color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varX + " vs " + varY)
-                histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
-                                fill_color=mapperC)
-                figureI.add_glyph(cdsHisto, histoGlyph)
-            elif varY in histogramDict:
+            if varY in histogramDict:
                 histoHandle = histogramDict[varY]
                 if histoHandle["type"] == "histogram":
                     cdsHisto = histoHandle["cds"]
@@ -675,10 +650,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     if isinstance(options['layout'], list):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
         layoutList = [pAll]
-    else:
-        if len(options['layout']) > 0:  # make figure according layout
-            x, layoutList, optionsLayout = processBokehLayout(options["layout"], plotArray)
-            pAll = gridplotRow(layoutList, **optionsLayout)
     if options['doDraw'] > 0:
         show(pAll)
     return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList
