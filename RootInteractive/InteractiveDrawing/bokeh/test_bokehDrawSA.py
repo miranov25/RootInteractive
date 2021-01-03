@@ -30,6 +30,10 @@ colorFactor=factor_cmap('DDC', 'Category10_6', ["A0","A1","A2","A3","A4"] )
 mapDDC={0:"A0",1:"A1",2:"A2",3:"A3",4:"A4"}
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
+df["A"]=df["A"].round(3);
+df["B"]=df["B"].round(3);
+df["C"]=df["C"].round(3);
+df["D"]=df["D"].round(3);
 df["AA"]=((df.A*10).round(0)).astype(CategoricalDtype(ordered=True))
 df["CC"]=((df.C*5).round(0)).astype(int)
 df["DD"]=((df.D*4).round(0)).astype(int)
