@@ -3,11 +3,13 @@ from bokeh.models import ColumnDataSource, Slider, CustomJS
 from bokeh.io import show
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from bokeh.layouts import gridplot, row
-from bokeh.plotting import figure
+from bokeh.plotting import figure, output_file
 from random import random
 
 
 def test_Surface3d():
+    output_file("test_Surface3d.html")
+
     x = np.arange(0, 300, 10)
     y = np.arange(0, 300, 10)
     xx, yy = np.meshgrid(x, y)
@@ -26,6 +28,8 @@ def test_Surface3d():
 
 
 def test_Surface3d_sliders():
+    output_file("test_Surface3d_sliders.html")
+
     x = np.arange(0, 300, 10)
     y = np.arange(0, 300, 10)
     xx, yy = np.meshgrid(x, y)
@@ -60,6 +64,8 @@ def test_Surface3d_sliders():
 
 
 def test_Surface3d_select():
+    output_file("test_Surface3d_select.html")
+
     x = np.random.rand(500) * 300
     y = np.random.rand(500) * 300
     z = np.sin(x / 50) * np.cos(y / 50) * 50 + 50
