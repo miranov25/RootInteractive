@@ -110,9 +110,8 @@ export class Histo2dCDS extends ColumnarDataSource {
 
       }
       this.data["bin_count"] = bincount
-      const histogram_error = Math.sqrt(bincount.reduce((acc, cur)=>acc+cur, 0))
-      this.data["errorbar_low"] = bincount.map(x=>x-histogram_error)
-      this.data["errorbar_high"] = bincount.map(x=>x+histogram_error)
+      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
+      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
       this.change.emit()
   }
 
