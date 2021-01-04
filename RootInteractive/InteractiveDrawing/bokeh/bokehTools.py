@@ -465,7 +465,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "weights": None,
         "histo2d": False,
         "range": None,
-        "flip_histogram_axes": False
+        "flip_histogram_axes": False,
+        "show_histogram_error": False
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -662,20 +663,23 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
-        mapperC = linear_cmap(field_name="bin_bottom", palette=options['palette'], low=min(dfQuery[y]),
+        mapperC = linear_cmap(field_name="y", palette=options['palette'], low=min(dfQuery[y]),
                                   high=max(dfQuery[y]))
-        if "bin_bottom" in colorMapperDict:
-            colorMapperDict["bin_bottom"] += [[cdsHisto, mapperC]]
+        if "y" in colorMapperDict:
+            colorMapperDict["y"] += [[cdsHisto, mapperC]]
         else:
-            colorMapperDict["bin_bottom"] = [[cdsHisto, mapperC]]
+            colorMapperDict["y"] = [[cdsHisto, mapperC]]
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=x + " vs " + y)
         if options["legend_field"] is None:
-            fig.scatter(x="bin_left", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_label="Histogram of " + x)
         else:
-            fig.scatter(x="bin_left", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
+        if "show_histogram_error" in options:
+            errorbar = VBar(x="x", width=0, top="errorbar_high", bottom="errorbar_low", line_color=mapperC)
+            fig.add_glyph(cdsHisto, errorbar)
         fig.add_layout(color_bar, 'right')
 
 

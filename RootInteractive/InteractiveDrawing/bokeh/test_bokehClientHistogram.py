@@ -71,7 +71,7 @@ def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['A'], ['histoA']],
-        [['A'], ['histoAB'], {"visualization_type": "colZ"}],
+        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
         [['B'], ['histoB'], {"flip_histogram_axes": True}]
     ]
