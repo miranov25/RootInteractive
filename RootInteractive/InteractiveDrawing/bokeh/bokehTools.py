@@ -464,7 +464,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "nbins": 10,
         "weights": None,
         "histo2d": False,
-        "range": None
+        "range": None,
+        "flip_histogram_axes": False
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -475,7 +476,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     # Check/resp. load derived variables
     i: int
     dfQuery, histogramDict, output_cdsSel = makeDerivedColumns(dfQuery, figureArray, histogramArray, options)
-    histogramDict = {}
 
     try:
         cdsFull = ColumnDataSource(dfQuery)
@@ -648,6 +648,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
     cdsHisto = histoHandle["cds"]
 
     if visualization_type == "heatmap":
+        # Flipping histogram axes probably doesn't make sense in this case.
         mapperC = linear_cmap(field_name="bin_count", palette=options['palette'], low=0,
                               high=1)
         if ("bin_count") in colorMapperDict:
@@ -682,7 +683,10 @@ def addHistogramGlyph(fig, histoHandle, colorHisto, options):
     cdsHisto = histoHandle["cds"]
     if options['color'] is not None:
         colorHisto = options['color']
-    histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+    if options['flip_histogram_axes']:
+        histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
+    else:
+        histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
     fig.add_glyph(cdsHisto, histoGlyph)
 
 
