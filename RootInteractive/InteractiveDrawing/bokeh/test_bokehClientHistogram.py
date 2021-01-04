@@ -71,13 +71,13 @@ def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['A'], ['histoA']],
-        [['A'], ['histoAB'], {"visualization_type": "colZ"}],
+        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoB']]
+        [['B'], ['histoB'], {"flip_histogram_axes": True}]
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
     ]
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,

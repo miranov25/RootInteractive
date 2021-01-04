@@ -43,7 +43,7 @@ export class Histo2dCDS extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[], "bin_left":[], "bin_right":[], "bin_top":[], "bin_bottom":[]}
+    this.data = {"bin_count":[], "bin_left":[], "bin_right":[], "bin_top":[], "bin_bottom":[], "x":[], "y":[], "errorbar_low":[], "errorbar_high":[]}
     this.view = null
     this._bin_indices = []
     this.update_range()
@@ -110,6 +110,8 @@ export class Histo2dCDS extends ColumnarDataSource {
 
       }
       this.data["bin_count"] = bincount
+      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
+      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
       this.change.emit()
   }
 
@@ -133,6 +135,8 @@ export class Histo2dCDS extends ColumnarDataSource {
       const bin_right = (this.data["bin_right"] as number[])
       const bin_top = (this.data["bin_top"] as number[])
       const bin_bottom = (this.data["bin_bottom"] as number[])
+      const x = (this.data["x"] as number[])
+      const y = (this.data["y"] as number[])
       const sample_arr_x = this.source.data[this.sample_x] as number[]
       const sample_arr_y = this.source.data[this.sample_y] as number[]
       bin_left.length = 0
@@ -174,8 +178,10 @@ export class Histo2dCDS extends ColumnarDataSource {
       const length = this._nbins[0] * this._nbins[1]
       for (let index = 0; index < length; index++) {
         bin_left.push(this._range_min[0]+((index/this._stride)|0)*(this._range_max[0]-this._range_min[0])/this._nbins[0])
+        x.push(this._range_min[0]+(((index/this._stride)|0)+.5)*(this._range_max[0]-this._range_min[0])/this._nbins[0])
         bin_right.push(this._range_min[0]+(((index/this._stride)|0)+1)*(this._range_max[0]-this._range_min[0])/this._nbins[0])
         bin_bottom.push(this._range_min[1]+(index%this._stride)*(this._range_max[1]-this._range_min[1])/this._nbins[1])
+        y.push(this._range_min[1]+(index%this._stride+.5)*(this._range_max[1]-this._range_min[1])/this._nbins[1])
         bin_top.push(this._range_min[1]+(index%this._stride+1)*(this._range_max[1]-this._range_min[1])/this._nbins[1])
       }
       this._bin_indices.length = this.source.length
