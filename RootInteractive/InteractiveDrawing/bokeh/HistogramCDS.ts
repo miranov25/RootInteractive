@@ -41,7 +41,7 @@ export class HistogramCDS extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[], "bin_left":[], "bin_right":[]}
+    this.data = {"bin_count":[], "bin_left":[], "bin_center":[], "bin_right":[], "errorbar_low":[], "errorbar_high":[]}
     this.view = null
     this.update_range()
   }
@@ -107,6 +107,8 @@ export class HistogramCDS extends ColumnarDataSource {
 
       }
       this.data["bin_count"] = bincount
+      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
+      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
       this.change.emit()
   }
 
@@ -122,6 +124,7 @@ export class HistogramCDS extends ColumnarDataSource {
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
       const bin_left = (this.data["bin_left"] as number[])
+      const bin_center = (this.data["bin_center"] as number[])
       const bin_right = (this.data["bin_right"] as number[])
       bin_left.length = 0
       bin_right.length = 0
@@ -138,6 +141,7 @@ export class HistogramCDS extends ColumnarDataSource {
       this._transform_origin = -this._range_min*this._transform_scale
       for (let index = 0; index < this._nbins; index++) {
         bin_left.push(this._range_min+index*(this._range_max-this._range_min)/this._nbins)
+        bin_center.push(this._range_min+(index+.5)*(this._range_max-this._range_min)/this._nbins)
         bin_right.push(this._range_min+(index+1)*(this._range_max-this._range_min)/this._nbins)
       }
       this.update_data()
