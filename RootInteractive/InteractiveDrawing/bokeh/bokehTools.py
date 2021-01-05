@@ -604,7 +604,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                 histoHandle = histogramDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
-                    addHistogramGlyph(figureI, histoHandle, colorHisto, optionLocal)
+                    addHistogramGlyph(figureI, histoHandle, marker, colorHisto, optionLocal)
                 elif histoHandle["type"] == "histo2d":
                     addHisto2dGlyph(figureI, varNameX, varNameY, histoHandle, colorMapperDict, color, marker, dfQuery,
                                     optionLocal)
@@ -683,15 +683,32 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         fig.add_layout(color_bar, 'right')
 
 
-def addHistogramGlyph(fig, histoHandle, colorHisto, options):
+def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
     cdsHisto = histoHandle["cds"]
     if options['color'] is not None:
         colorHisto = options['color']
-    if options['flip_histogram_axes']:
-        histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
-    else:
-        histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
-    fig.add_glyph(cdsHisto, histoGlyph)
+    visualization_type = "points"
+    if "visualization_type" in options:
+        visualization_type = options["visualization_type"]
+    if visualization_type == "bars":
+        if options['flip_histogram_axes']:
+            histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
+        else:
+            histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+        fig.add_glyph(cdsHisto, histoGlyph)
+    elif visualization_type == "points":
+        if options['flip_histogram_axes']:
+            fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+                        legend_label=histoHandle["variables"][0])
+            if "show_histogram_error" in options:
+                errorbar = HBar(y="bin_center", height=0, left="errorbar_low", right="errorbar_high", line_color=colorHisto)
+                fig.add_glyph(cdsHisto, errorbar)
+        else:
+            fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+                        legend_label=histoHandle["variables"][0])
+            if "show_histogram_error" in options:
+                errorbar = VBar(x="bin_center", width=0, top="errorbar_high", bottom="errorbar_low", line_color=colorHisto)
+                fig.add_glyph(cdsHisto, errorbar)
 
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
