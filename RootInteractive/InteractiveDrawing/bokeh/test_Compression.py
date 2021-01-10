@@ -3,6 +3,7 @@ import numpy as np
 from scipy.stats import entropy
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.compressArray import *
+import time
 
 # TODO
 #      if (User coding){
@@ -47,8 +48,12 @@ def simulatePandaDCA(fastTest=False):
     weight = np.exp(-(value - valueMean) ** 2 / (2 * valueSigma * valueSigma))
     weightPoisson = np.random.poisson(weight * entries, H.size)
     H = weightPoisson
-    df = pd.DataFrame({"qPtCenter": qPtCenter, "tglCenter": tgl, "mdEdxCenter": mdEdx, "V": value, "alphaCenter": alpha,
+    df = pd.DataFrame({"qPtCenter": qPtCenter, "tglCenter": tgl, "mdEdxCenter": mdEdx, "alphaCenter": alpha, "V": value,
                        "mean": valueMean, "rms": valueSigma, "weight": H})
+    df["qPtMean"]=np.random.normal(df["qPtCenter"],0.05)
+    df["tglMean"]=np.random.normal(df["tglCenter"],0.05)
+    df["mdEdxMean"]=np.random.normal(df["mdEdxCenter"],0.05)
+    df["alphaMean"]=np.random.normal(df["alphaCenter"],0.05)
     return df
 
 
@@ -99,28 +104,111 @@ def miTest_roundRelativeBinary(df):
     :param df:
     :return:
     """
-    df["weightR5"] = roundRelativeBinary(df["weight"], 5)
-    df["weightR7"] = roundRelativeBinary(df["weight"], 7)
-    df["weightR8"] = roundRelativeBinary(df["weight"], 8)
+    sizeCompress={}
+    sizeOrig={}
+    entropyM={}
+    for iBit in range(0,10):
+        dfR=roundRelativeBinary(df["weight"], iBit)
+        df["weightR{}".format(iBit)] = dfR
+        sizeCompress[iBit]=getCompressionSize(dfR.to_numpy())
+        sizeOrig[iBit]=getSize(dfR.to_numpy())
+        entropyM[iBit]=entropy(dfR.value_counts(), base=2)
+        print(iBit, entropyM[iBit], sizeCompress[iBit]/sizeOrig[iBit], entropyM[iBit]/64.)
     mapIndex, mapCodeI = codeMapDF(df, 0.5, 1)
-    sizeR0 = getCompressionSize(df["weight"].to_numpy()) / getSize(df["weight"].to_numpy())
-    sizeR5 = getCompressionSize(df["weightR5"].to_numpy().astype("int8")) / getSize(df["weight"].to_numpy())
-    sizeR7 = getCompressionSize(df["weightR7"].to_numpy().astype("int8")) / getSize(df["weight"].to_numpy())
-    sizeR8 = getCompressionSize(df["weightR8"].to_numpy().astype("int16")) / getSize(df["weight"].to_numpy())
-    entropy0 = entropy(df["weight"].value_counts(), base=2)
-    entropy5 = entropy(df["weightR5"].value_counts(), base=2)
-    entropy7 = entropy(df["weightR7"].value_counts(), base=2)
-    entropy8 = entropy(df["weightR8"].value_counts(), base=2)
-    print("mitest_roundRelativeBinary(df)")
-    print(sizeR0, sizeR8, sizeR7, sizeR5)
-    print(entropy0 / 64, entropy8 / 64, entropy7 / 64, entropy5 / 64)
-    print(entropy0, entropy8, entropy7, entropy5)
+    return mapIndex, mapCodeI
 
 
 def test_Compression0():
     df = simulatePandaDCA(True)
-    miTest_roundRelativeBinary(df)
+    mapIndexI, mapCodeI=miTest_roundRelativeBinary(df)
     # histogramDCAPlot(df)
+
+def test_CompressionSequence0(arraySize=10000):
+    actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
+        actionArray[3]=("unzip",coding)
+        arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSequence0: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()))
+
+def test_CompressionSequenceRel(arraySize=255,nBits=5):
+    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
+        actionArray[4]=("unzip",coding)
+        arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()/inputSize))
+
+def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
+    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
+        actionArray[4]=("unzip",coding)
+        arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()/inputSize))
+
+
+
+def test_CompressionSample0(arraySize=10000,scale=255):
+    actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
+        actionArray[3]=("unzip",coding)
+        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][1])
+        print("test_Compression0: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()))
+
+
+def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
+    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["float32", "float64"]:
+        actionArray[4]=("unzip",coding)
+        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (np.abs(arrayC["array"]-arrayInput)/(arrayC["array"]+arrayInput)).sum()/arraySize))
+
+def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
+    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    for coding in ["float32", "float64"]:
+        actionArray[4]=("unzip",coding)
+        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
+
+def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
+    actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8"),("decode",0)]
+    for coding in ["float32", "float64"]:
+        #actionArray[5]=("unzip",coding)
+        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][3])
+        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
 
 def testCompressionDecompressionInt8(stop=10, step=1):
