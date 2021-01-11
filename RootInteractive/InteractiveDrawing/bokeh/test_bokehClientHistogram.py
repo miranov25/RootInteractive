@@ -78,7 +78,7 @@ def testBokehClientHistogramOnlyHisto():
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)

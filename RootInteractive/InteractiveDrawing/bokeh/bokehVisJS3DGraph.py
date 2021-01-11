@@ -11,6 +11,7 @@ class BokehVisJSGraph3D(LayoutDOM):
 
     # The special class attribute ``__implementation__`` should contain a string
     # of JavaScript code that implements the browser side of the extension model.
+    __javascript__ = ["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.2/pako.min.js", "https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"]
     __implementation__ = "bokehVisJS3DGraph.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
