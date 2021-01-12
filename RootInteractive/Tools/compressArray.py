@@ -5,6 +5,11 @@ from bokeh.util.serialization import *
 import numpy as np
 import pandas as pdMap
 import sys
+import re
+
+arrayCompressionRelative8=[(".*",[("relative",8), ("code",0), ("zip",0), ("base64",0)])]
+arrayCompressionRelative16=[(".*",[("relative",16), ("code",0), ("zip",0), ("base64",0)])]
+arrayCompressionRelative32=[(".*",[("relative",32), ("code",0), ("zip",0), ("base64",0)])]
 
 def getCompressionSize(inputObject):
     return len(pickle.dumps(zlib.compress(inputObject)))
@@ -121,7 +126,7 @@ def compressArray0(inputArray, maxFraction=0.5, doZip=True, doBase64=True, keepO
 def compressArray(inputArray, actionArray, keepValues=False):
     arrayInfo = {"actionArray": actionArray, "history": []}
     currentArray = inputArray
-    counter=0;
+    counter=0
     for action, actionParam in actionArray:
         try:
             if keepValues:
@@ -135,7 +140,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if action == "unzip":
                 currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=actionParam)
             if action == "base64":
-                currentArray = base64.b64encode(currentArray)
+                currentArray = base64.b64encode(currentArray).decode("utf-8")
             if action == "debase64":
                 currentArray = base64.b64decode(currentArray)
             if action == "code":
@@ -165,6 +170,34 @@ def compressArray(inputArray, actionArray, keepValues=False):
             #pass
     arrayInfo["array"] = currentArray
     return arrayInfo
+
+
+def compressCDSPipe(df, arrayCompression, verbosity ):
+    """
+    compress CDSPipe - based on the arrayCompression
+    :param df:                   input map of arrays (DF)
+    :param arrayCompression:     compression descriptions array of pairs  (regular expression, array compression description)
+    :return:                     map
+    Example array description
+    actionArrayDelta=[("delta",0.01), ("code",0), ("zip",0), ("base64",0)]
+    actionArrayRel=[("relative",8), ("code",0), ("zip",0), ("base64",0)]
+    actionArrayRel4=[("relative",4), ("code",0), ("zip",0), ("base64",0)]
+    arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
+    """
+    outputMap={}
+    for col in df:
+        for action in arrayCompression:
+            if re.match(action[0],col)==None:
+                continue
+            arrayC = compressArray(df[col],action[1], False)
+            sizeIn=getSize(df[col])
+            sizeOut=getSize(arrayC)
+            if verbosity>0:
+                print("Compress",col, action[0], action[1])
+                print("Compress factor",col, sizeIn,sizeOut,sizeOut/sizeIn)
+            outputMap[col]=arrayC
+            break
+    return outputMap
 
 
 def codeCDS(df, doZip=0, printSize=0):
