@@ -7,3 +7,9 @@ build/
 .idea/
 test_*.html
 *.pkl
+*.d.ts
+*.html
+*.log
+*.js.map
+*.root
+*.orig
