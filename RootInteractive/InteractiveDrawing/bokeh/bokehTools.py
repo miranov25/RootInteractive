@@ -27,7 +27,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         "verbose": 0,
         "nPointRender": 10000,
         "cmapDict": None,
-        "cdsCompress":None,
         "histogramList": []
     }
     options.update(kwargs)
@@ -36,7 +35,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    const cdsCompress = options["cdsCompress"];
     let dataSel = null;
     if(cdsSel != null){
         dataSel = cdsSel.data;
@@ -467,7 +465,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "histo2d": False,
         "range": None,
         "flip_histogram_axes": False,
-        "show_histogram_error": False
+        "show_histogram_error": False,
+        "arrayCompression": None
     }
     options.update(kwargs)
     dfQuery = dataFrame.query(query)
@@ -640,6 +639,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
+    cdsCompress=None
+    if options['arrayCompression'] is not None:
+        print("compressCDSPipe")
+        cdsCompress0= compressCDSPipe(dfQuery,options["arrayCompression"],1)
+        cdsCompress=CDSCompress(source=None,inputData=cdsCompress0)
+        cdsFull=cdsCompress
     return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList
 
 
@@ -810,7 +815,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, nPointRender=10000):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, nPointRender=10000,cdsCompress=None):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -834,7 +839,6 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
     # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
-    cdsCompress=CDSCompress(source=cdsOrig,inputData=codeCDS(df,1))
     callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:

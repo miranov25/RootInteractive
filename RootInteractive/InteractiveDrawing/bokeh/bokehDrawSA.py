@@ -157,7 +157,8 @@ class bokehDrawSA(object):
         :return: VBox includes all widgets
         """
         if type(widgetsDescription)==list:
-            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList, self.cmapDict, nPointRender = self.options['nPointRender'])
+            widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList,
+                                         self.cmapDict, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout, list):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:

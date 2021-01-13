@@ -4,7 +4,7 @@ from scipy.stats import entropy
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.compressArray import *
 import time
-
+import re
 # TODO
 #      if (User coding){
 #          float-> integer
@@ -50,10 +50,10 @@ def simulatePandaDCA(fastTest=False):
     H = weightPoisson
     df = pd.DataFrame({"qPtCenter": qPtCenter, "tglCenter": tgl, "mdEdxCenter": mdEdx, "alphaCenter": alpha, "V": value,
                        "mean": valueMean, "rms": valueSigma, "weight": H})
-    df["qPtMean"]=np.random.normal(df["qPtCenter"],0.05)
-    df["tglMean"]=np.random.normal(df["tglCenter"],0.05)
-    df["mdEdxMean"]=np.random.normal(df["mdEdxCenter"],0.05)
-    df["alphaMean"]=np.random.normal(df["alphaCenter"],0.05)
+    df["qPtMeanD"]=np.random.normal(df["qPtCenter"]*0,0.05)
+    df["tglMeanD"]=np.random.normal(df["tglCenter"]*0,0.05)
+    df["mdEdxMeanD"]=np.random.normal(df["tglCenter"]*0,0.05)
+    df["alphaMeanD"]=np.random.normal(df["alphaCenter"]*0,0.05)
     return df
 
 
@@ -196,7 +196,7 @@ def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
         arrayC = compressArray(arrayInput,actionArray, True)
         toc = time.perf_counter()
         compSize=getSize(arrayC["history"][2])
-        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
+        print("test_CompressionSampleDelta: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
 def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8"),("decode",0)]
@@ -249,3 +249,47 @@ def testCompressionDecompressionInt16(stop=10, step=1):
     diffSum = (t5 - t0).sum()
     if diffSum > 0:
         raise ValueError("testCompressionDecompressionInt16 error")
+
+def test_compressCDSPipe():
+    df = simulatePandaDCA(True)
+    actionArrayDelta=[("delta",0.01), ("code",0), ("zip",0), ("base64",0)]
+    actionArrayRel=[("relative",8), ("code",0), ("zip",0), ("base64",0)]
+    actionArrayRel4=[("relative",4), ("code",0), ("zip",0), ("base64",0)]
+    arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
+    #
+    outputMap=compressCDSPipe(df,arrayCompression,1)
+    return outputMap
+
+def test_CompressionCDSPipeDraw():
+    df = pd.DataFrame(np.random.random_sample(size=(100000, 4)), columns=list('ABCD'))
+    figureArray = [
+       [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
+        [['A'], ['C+A', 'C-A', 'A/A']],
+        [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "C",  "rescaleColorMapper": True }],
+        [['D'], ['(A+B+C)*D'], {"size": 10} ],
+    ]
+    tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
+    widgetParams=[
+        ['range', ['A']],
+        ['range', ['B', 0, 1, 0.1, 0, 1]],
+        ['range', ['C'], {'type': 'minmax'}],
+        ['range', ['D'], {'type': 'minmax'}]
+    ]
+    widgetLayoutDesc=[[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'plot_height': 200, 'x_visible': 1, 'y_visible': 2}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    output_file("test_CompressionCDSPipeDrawComp8.html")
+    xComp8=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                            widgetLayout=widgetLayoutDesc, nPointRender=200,arrayCompression=arrayCompressionRelative8)
+    output_file("test_CompressionCDSPipeDrawCompNo.html")
+    xCompNo=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                            widgetLayout=widgetLayoutDesc, nPointRender=200)
+    #size8=getSize(xComp8)
+    #sizeNo=getSize(xCompNo)
+    #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
+    return df
+
+#df = test_CompressionCDSPipeDraw()
