@@ -34,6 +34,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     code = \
         """
     const t0 = performance.now();
+    const dataOrig = cdsOrig.data;
     let dataSel = null;
     if(cdsSel != null){
         dataSel = cdsSel.data;

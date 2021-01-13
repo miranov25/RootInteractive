@@ -250,12 +250,12 @@ def testCompressionDecompressionInt16(stop=10, step=1):
     if diffSum > 0:
         raise ValueError("testCompressionDecompressionInt16 error")
 
-def test_compressCDSPipe(df):
+def test_compressCDSPipe():
+    df = simulatePandaDCA(True)
     actionArrayDelta=[("delta",0.01), ("code",0), ("zip",0), ("base64",0)]
     actionArrayRel=[("relative",8), ("code",0), ("zip",0), ("base64",0)]
     actionArrayRel4=[("relative",4), ("code",0), ("zip",0), ("base64",0)]
     arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
-    arrayCompression=[(".*",("relative",16), ("code",0), ("zip",0), ("base64",0))]
     #
     outputMap=compressCDSPipe(df,arrayCompression,1)
     return outputMap
@@ -292,4 +292,4 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
     return df
 
-df = test_CompressionCDSPipeDraw()
+#df = test_CompressionCDSPipeDraw()
