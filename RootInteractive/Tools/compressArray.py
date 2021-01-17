@@ -172,11 +172,13 @@ def compressArray(inputArray, actionArray, keepValues=False):
     return arrayInfo
 
 
-def compressCDSPipe(df, arrayCompression, verbosity ):
+def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
     """
     compress CDSPipe - based on the arrayCompression
     :param df:                   input map of arrays (DF)
     :param arrayCompression:     compression descriptions array of pairs  (regular expression, array compression description)
+    :param verbosity
+    :param  columnsSelect        columsn which will be used to compress - in None all colusms from df are used
     :return:                     map
     Example array description
     actionArrayDelta=[("delta",0.01), ("code",0), ("zip",0), ("base64",0)]
@@ -186,6 +188,9 @@ def compressCDSPipe(df, arrayCompression, verbosity ):
     """
     outputMap={}
     for col in df:
+        if columnsSelect is not None:
+            if col not in columnsSelect:
+                continue
         for action in arrayCompression:
             if re.match(action[0],col)==None:
                 continue
