@@ -1,8 +1,13 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
-declare var Buffer : any
-declare var pako : any
+//import * as pako from './pako/'
+//declare var Buffer : any
+declare const  pako : any
+//const pako = require('pako');
+//declare namespace pako {
+//  function inflate(arrayOut:Uint8Array): Uint8Array;
+//}
 
 export namespace CDSCompress {
   export type Attrs = p.AttrsOf<Props>

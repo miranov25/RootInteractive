@@ -4,27 +4,10 @@
 //
 // Making it easy to hook up python data analytics tools (NumPy, SciPy,
 // Pandas, etc.) to web presentations using the Bokeh server.
-declare var pako :any;
-function testPako(s:string):Uint8Array{
-   let x;
-   try {
-      x=pako.deflate(s);
-      console.log(x);
-   } catch (err) {
-        console.log(err);
-   }
-  console.log(x);
-  return x;
-}
-
 import {LayoutDOM, LayoutDOMView} from "models/layouts/layout_dom"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import {LayoutItem} from "core/layout"
 import * as p from "core/properties"
-declare var Zlib : any;
-
-//import * as pako from 'pako'
-
 
 
 
@@ -76,7 +59,6 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     script.async = false
     script.src = url
     document.head.appendChild(script)
-    console.log(testPako("ABCD"));
   }
 
   private _init(): void {
@@ -109,10 +91,6 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
   // This is the callback executed when the Bokeh data has an change. Its basic
   // function is to adapt the Bokeh data source to the vis.js DataSet format.
   get_data(): vis.DataSet {
-    if (0){
-      testUnzip("12345");
-    }
-    testPako("abcdef");
     const data = new vis.DataSet()
     const source = this.model.data_source
     for (let i = 0; i < source.get_length()!; i++) {
@@ -188,20 +166,4 @@ export class BokehVisJSGraph3D extends LayoutDOM {
       data_source:  [ p.Instance ],
     })
   }
-}
-
-function testUnzip(s:string) {
-  //var s = atob("eJyrVkrLz1eyUlBKSixSqgUAIJgEVA==");
-  var data = new Array(s.length);
-  for(let i  = 0; i = s.length; ++i) {
-    data[i] = s.charCodeAt(i);
-  }
-  var inflate = new Zlib.Inflate(data);
-  var decompress = inflate.decompress();
-  var plain = new TextDecoder("utf-8").decode(decompress);
-  //let x=0; //:Uint8Array = pako.deflate(s);
-  let x=pako.deflate(s);
-  console.log(x);
-  //
-  return plain;
 }
