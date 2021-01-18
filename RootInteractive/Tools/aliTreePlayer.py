@@ -198,6 +198,8 @@ def findSelectedBranches(anyTree, include, exclude, **findOption):
                         break
             if isOK > 0:
                 variablesTree.append(path)
+    variablesTreeS=set(variablesTree)
+    variablesTree=list(variablesTreeS)
     return variablesTree
 
 
