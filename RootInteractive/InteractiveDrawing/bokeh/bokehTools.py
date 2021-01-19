@@ -495,6 +495,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     colorAll = all_palettes[options['colors']]
     colorMapperDict = {}
 
+    if options['arrayCompression'] is not None:
+        print("compressCDSPipe")
+        cdsCompress0= compressCDSPipe(dfQuery,options["arrayCompression"],1)
+        cdsCompress=CDSCompress(source=None,inputData=cdsCompress0)
+        cdsFull=cdsCompress
+
     histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
 
     histoList = []
@@ -642,12 +648,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
-    cdsCompress=None
-    if options['arrayCompression'] is not None:
-        print("compressCDSPipe")
-        cdsCompress0= compressCDSPipe(dfQuery,options["arrayCompression"],1)
-        cdsCompress=CDSCompress(source=None,inputData=cdsCompress0)
-        cdsFull=cdsCompress
     return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList
 
 
