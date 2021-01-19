@@ -466,17 +466,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "range": None,
         "flip_histogram_axes": False,
         "show_histogram_error": False,
-        "arrayCompression": None
+        "arrayCompression": None,
+        "removeExtraColumns": True
     }
     options.update(kwargs)
-    dfQuery = dataFrame.query(query)
-    output_cdsSel = False
-    if hasattr(dataFrame, 'metaData'):
-        dfQuery.metaData = dataFrame.metaData
-        logging.info(dfQuery.metaData)
+    if query is not None:
+        dfQuery = dataFrame.query(query)
+        if hasattr(dataFrame, 'metaData'):
+            dfQuery.metaData = dataFrame.metaData
+            logging.info(dfQuery.metaData)
+    else:
+        dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
     i: int
-    dfQuery, histogramDict, output_cdsSel = makeDerivedColumns(dfQuery, figureArray, histogramArray, options)
+    dfQuery, histogramDict, output_cdsSel, columnNameDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray, options=options)
 
     try:
         cdsFull = ColumnDataSource(dfQuery)
@@ -492,7 +495,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     colorAll = all_palettes[options['colors']]
     colorMapperDict = {}
 
-    histogramDict, dfQuery = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray)
+    histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
 
     histoList = []
     for i in histogramDict:
@@ -838,7 +841,6 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    # callback = makeJScallback(widgetDict, nPointRender=nPointRender)
     callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
@@ -852,7 +854,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
     return widgetArray
 
 
-def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], **kwargs):
+def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, **kwargs):
     options = {"range": None,
                "nbins": 10,
                "weights": None}
@@ -860,63 +862,94 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], **kwargs):
     for iHisto in histogramArray:
         sampleVars = iHisto["variables"]
         histoName = iHisto["name"]
+        if histogramDict is not None and not histogramDict[histoName]:
+            continue
         optionLocal = copy.copy(options)
         optionLocal.update(iHisto)
         if len(sampleVars) == 1:
-            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
+            _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
             cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histogram", "name":histoName, "variables": sampleVars}
         elif len(sampleVars) == 2:
-            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
-            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, sampleVars[1])
+            _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
+            _, varNameY = pandaGetOrMakeColumn(dfQuery, sampleVars[1])
             cdsHisto = Histo2dCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
-    return histoDict, dfQuery
+    return histoDict
 
 
-def makeDerivedColumns(dfQuery, figureArray, histogramArray, options):
+def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArray=None, options={}):
     histogramDict = {}
-    output_cdsSel = True
-    for i, histo in enumerate(histogramArray):
-        histogramDict[histo["name"]] = None
-        for j, variable in enumerate(histo["variables"]):
-            dfQuery, _ = pandaGetOrMakeColumn(dfQuery, variable)
+    columnNameDict = {}
+    output_cdsSel = False
+    if histogramArray is not None:
+        for i, histo in enumerate(histogramArray):
+            histogramDict[histo["name"]] = False
 
-    for i, variables in enumerate(figureArray):
-        if len(variables) > 1 and variables[0] != "table":
-            lengthX = len(variables[0])
-            lengthY = len(variables[1])
-            length = max(len(variables[0]), len(variables[1]))
-            if len(variables) > 2:
-                optionLocal = options.copy()
-                optionLocal.update(variables[2])
-            else:
-                optionLocal = options
-            for j in range(0, length):
-                if variables[1][j % lengthY] != "histo" and variables[1][j % lengthY] not in histogramDict:
-                    if not optionLocal["histo2d"]:
-                        output_cdsSel = True
-                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                    if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                        seriesErrY = dfQuery.eval(optionLocal['errY'])
-                        if varNameY+'_lower' not in dfQuery.columns:
-                            seriesLower = dfQuery[varNameY]-seriesErrY
-                            dfQuery[varNameY+'_lower'] = seriesLower
-                        if varNameY+'_upper' not in dfQuery.columns:
-                            seriesUpper = dfQuery[varNameY]+seriesErrY
-                            dfQuery[varNameY+'_upper'] = seriesUpper
-                    if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                        seriesErrX = dfQuery.eval(optionLocal['errX'])
-                        if varNameX+'_lower' not in dfQuery.columns:
-                            seriesLower = dfQuery[varNameX]-seriesErrX
-                            dfQuery[varNameX+'_lower'] = seriesLower
-                        if varNameX+'_upper' not in dfQuery.columns:
-                            seriesUpper = dfQuery[varNameX]+seriesErrX
-                            dfQuery[varNameX+'_upper'] = seriesUpper
+    if figureArray is not None:
+        for i, variables in enumerate(figureArray):
+            if len(variables) > 1 and variables[0] != "table":
+                lengthX = len(variables[0])
+                lengthY = len(variables[1])
+                length = max(len(variables[0]), len(variables[1]))
+                if len(variables) > 2:
+                    optionLocal = options.copy()
+                    optionLocal.update(variables[2])
                 else:
-                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-    return dfQuery, histogramDict, output_cdsSel
+                    optionLocal = options
+                for j in range(0, length):
+                    if variables[1][j % lengthY] not in histogramDict:
+                        output_cdsSel = True
+                        dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                        columnNameDict[varNameX] = True
+                        dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                        columnNameDict[varNameY] = True
+                        if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
+                            dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
+                            seriesErrY = dfQuery[varNameErrY]
+                            columnNameDict[varNameErrY] = True
+                            if varNameY+'_lower' not in dfQuery.columns:
+                                seriesLower = dfQuery[varNameY]-seriesErrY
+                                dfQuery[varNameY+'_lower'] = seriesLower
+                                columnNameDict[varNameY+'_lower'] = True
+                            if varNameY+'_upper' not in dfQuery.columns:
+                                seriesUpper = dfQuery[varNameY]+seriesErrY
+                                dfQuery[varNameY+'_upper'] = seriesUpper
+                                columnNameDict[varNameY+'_upper'] = True
+                        if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
+                            dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
+                            seriesErrX = dfQuery[varNameErrX]
+                            columnNameDict[varNameErrX] = True
+                            if varNameX+'_lower' not in dfQuery.columns:
+                                seriesLower = dfQuery[varNameX]-seriesErrX
+                                dfQuery[varNameX+'_lower'] = seriesLower
+                                columnNameDict[varNameX+'_lower'] = True
+                            if varNameX+'_upper' not in dfQuery.columns:
+                                seriesUpper = dfQuery[varNameX]+seriesErrX
+                                dfQuery[varNameX+'_upper'] = seriesUpper
+                                columnNameDict[varNameX+'_upper'] = True
+                    else:
+                        histogramDict[variables[1][j % lengthY]] = True
+
+    if histogramArray is not None:
+        for i, histo in enumerate(histogramArray):
+            if histogramDict[histo["name"]]:
+                for j, variable in enumerate(histo["variables"]):
+                    dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variable)
+                    columnNameDict[varName] = True
+                if "weights" in histo:
+                    dfQuery, varName = pandaGetOrMakeColumn(dfQuery, histo["weights"])
+                    columnNameDict[varName] = True
+
+    if widgetArray is not None:
+        for iWidget in widgetArray:
+            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
+            columnNameDict[varNameX] = True
+
+    if "removeExtraColumns" in options and options["removeExtraColumns"]:
+        dfQuery = dfQuery[columnNameDict]
+
+    return dfQuery, histogramDict, output_cdsSel, columnNameDict
