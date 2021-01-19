@@ -99,7 +99,7 @@ def testBokehDrawArrayQuery():
     output_file("test_BokehDrawArrayQuery.html")
     df0 = df.copy()
     xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
-    assert df0.keys() == df.keys()
+    assert (df0.keys() == df.keys()).all()
 
 def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
@@ -112,4 +112,4 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
-testBokehDrawArrayQuery()
+#testBokehDrawArrayQuery()
