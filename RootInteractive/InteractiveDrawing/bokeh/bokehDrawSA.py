@@ -138,7 +138,7 @@ class bokehDrawSA(object):
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         dfQuery, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
                                               widgetArray=widgetsDescription, options={"removeExtraColumns": True})
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict, self.cdsOrig, self.histoList = bokehDrawArray(dfQuery, query,
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict, self.cdsOrig, self.histoList = bokehDrawArray(dfQuery, None,
                                                                                                 figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)

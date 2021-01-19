@@ -470,11 +470,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "removeExtraColumns": True
     }
     options.update(kwargs)
-    dfQuery = dataFrame.query(query)
-    output_cdsSel = False
-    if hasattr(dataFrame, 'metaData'):
-        dfQuery.metaData = dataFrame.metaData
-        logging.info(dfQuery.metaData)
+    if query is not None:
+        dfQuery = dataFrame.query(query)
+        if hasattr(dataFrame, 'metaData'):
+            dfQuery.metaData = dataFrame.metaData
+            logging.info(dfQuery.metaData)
+    else:
+        dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
     i: int
     dfQuery, histogramDict, output_cdsSel, columnNameDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray, options=options)

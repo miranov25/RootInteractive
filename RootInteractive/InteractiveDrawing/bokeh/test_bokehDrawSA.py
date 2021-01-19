@@ -30,6 +30,7 @@ colorFactor=factor_cmap('DDC', 'Category10_6', ["A0","A1","A2","A3","A4"] )
 mapDDC={0:"A0",1:"A1",2:"A2",3:"A3",4:"A4"}
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
+df.eval("BoolC=C>0.1", inplace=True)
 df["A"]=df["A"].round(3);
 df["B"]=df["B"].round(3);
 df["C"]=df["C"].round(3);
@@ -94,6 +95,12 @@ def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
 
+def testBokehDrawArrayQuery():
+    output_file("test_BokehDrawArrayQuery.html")
+    df0 = df.copy()
+    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
+    assert df0.keys() == df.keys()
+
 def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
         pytest.skip("no ROOT module")
@@ -104,4 +111,5 @@ def testBokehDrawArraySA_tree():
 #testBokehDrawArraySA_tree()
 #testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
-testBokehDrawArrayDownsample()
+#testBokehDrawArrayDownsample()
+testBokehDrawArrayQuery()
