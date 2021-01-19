@@ -1,5 +1,6 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
+from RootInteractive.Tools.compressArray import arrayCompressionRelative8
 from bokeh.io import curdoc
 import pytest
 import matplotlib.pyplot as plt
@@ -46,3 +47,7 @@ df['D']=df["A"]-df["B"]
 output_file("test_bokehClientHistogramWeight.html")
 xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                             widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
+output_file("test_bokehClientHistogramWeight_Compressed.html")
+xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                            arrayCompression=arrayCompressionRelative16)
