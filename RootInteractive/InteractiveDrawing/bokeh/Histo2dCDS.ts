@@ -143,6 +143,8 @@ export class Histo2dCDS extends ColumnarDataSource {
       bin_right.length = 0
       bin_top.length = 0
       bin_bottom.length = 0
+      x.length = 0
+      y.length = 0
       this._range_min = [0, 0]
       this._range_max = [0, 0]
       this._nbins = [0, 0]
