@@ -905,8 +905,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                         columnNameDict[varNameX] = True
                         dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                         columnNameDict[varNameY] = True
-                        if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
-                            seriesErrY = dfQuery.eval(optionLocal['errY'])
+                        if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
+                            dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
+                            seriesErrY = dfQuery[varNameErrY]
+                            columnNameDict[varNameErrY] = True
                             if varNameY+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameY]-seriesErrY
                                 dfQuery[varNameY+'_lower'] = seriesLower
@@ -915,8 +917,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                                 seriesUpper = dfQuery[varNameY]+seriesErrY
                                 dfQuery[varNameY+'_upper'] = seriesUpper
                                 columnNameDict[varNameY+'_upper'] = True
-                        if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
-                            seriesErrX = dfQuery.eval(optionLocal['errX'])
+                        if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
+                            dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
+                            seriesErrX = dfQuery[varNameErrX]
+                            columnNameDict[varNameErrX] = True
                             if varNameX+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameX]-seriesErrX
                                 dfQuery[varNameX+'_lower'] = seriesLower

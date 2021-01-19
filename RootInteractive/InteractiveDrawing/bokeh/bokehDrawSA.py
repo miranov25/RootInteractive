@@ -108,7 +108,7 @@ class bokehDrawSA(object):
         """
         options={
             'nPointRender': 10000,
-            "histogramArray": None
+            "histogramArray": []
         }
         options.update(kwargs)
         kwargs=options
