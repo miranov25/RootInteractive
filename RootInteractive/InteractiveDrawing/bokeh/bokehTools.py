@@ -128,8 +128,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             if (isSelected[i]){
                 if(nSelected < nPointRender){
                     permutationFilter.push(i);
-                } else if(Math.random() < 1 / nSelected) {
-                    randomIndex = Math.floor(Math.random()*nPointRender);
+                } else if(Math.random() < nPointRender / (nSelected+1)) {
+                    randomIndex = Math.floor(Math.random()*nPointRender)|0;
                     permutationFilter[randomIndex] = i;
                 }
                 nSelected++;
