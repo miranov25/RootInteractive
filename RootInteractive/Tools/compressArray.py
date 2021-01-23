@@ -187,6 +187,9 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
     arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
     """
     outputMap={}
+    sizeMap={}
+    sizeInAll=0
+    sizeOutAll=0
     for col in df:
         if columnsSelect is not None:
             if col not in columnsSelect:
@@ -197,12 +200,18 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
             arrayC = compressArray(df[col],action[1], False)
             sizeIn=getSize(df[col])
             sizeOut=getSize(arrayC)
+            sizeOutAll+=sizeOut
+            sizeInAll+=sizeIn
+            sizeMap[col]=[sizeIn, sizeOut]
             if verbosity>0:
                 print("Compress",col, action[0], action[1])
                 print("Compress factor",col, sizeIn,sizeOut,sizeOut/sizeIn)
             outputMap[col]=arrayC
             break
-    return outputMap
+    sizeMap["_all"]=[sizeInAll,sizeOutAll]
+    if verbosity>0:
+        print("Compress","_all", sizeInAll, sizeOutAll, sizeOutAll/sizeInAll)
+    return outputMap, sizeMap
 
 
 def codeCDS(df, doZip=0, printSize=0):
