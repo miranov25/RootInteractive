@@ -173,7 +173,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
     return arrayInfo
 
 
-def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
+def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
     """
     compress CDSPipe - based on the arrayCompression
     :param df:                   input map of arrays (DF)
@@ -187,34 +187,35 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
     actionArrayRel4=[("relative",4), ("code",0), ("zip",0), ("base64",0)]
     arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
     """
-    outputMap={}
-    sizeMap={}
-    sizeInAll=0
-    sizeOutAll=0
-    counter=0
+    outputMap = {}
+    sizeMap = {}
+    sizeInAll = 0
+    sizeOutAll = 0
+    counter = 0
     for col in df:
-        counter+=1
+        counter += 1
         if columnsSelect is not None:
             if col not in columnsSelect:
                 continue
         for action in arrayCompression:
-            if re.match(action[0],col)==None:
+            if re.match(action[0], col) == None:
                 continue
-            arrayC = compressArray(df[col],action[1], False)
-            sizeIn=getSize(df[col])
-            sizeOut=getSize(arrayC)
-            sizeOutAll+=sizeOut
-            sizeInAll+=sizeIn
-            sizeMap[col]=[counter, sizeIn, sizeOut,sizeOut/sizeIn]
-            if verbosity>0:
-                print("Compress",counter, col, action[0], action[1])
-                print("Compress factor",counter, col, sizeIn,sizeOut,sizeOut/sizeIn)
-            outputMap[col]=arrayC
+            arrayC = compressArray(df[col], action[1], False)
+            sizeIn = getSize(df[col])
+            sizeOut = getSize(arrayC)
+            sizeOutAll += sizeOut
+            sizeInAll += sizeIn
+            sizeMap[col] = [sizeOut, sizeIn, sizeOut / sizeIn, counter]
+            if verbosity > 0:
+                print("Compress", counter, col, action[0], action[1])
+                print("Compress factor", sizeOut, sizeIn, sizeOut / sizeIn, counter, col)
+            outputMap[col] = arrayC
             break
-    sizeMap["_all"]=[counter, sizeInAll,sizeOutAll, sizeOutAll/sizeInAll]
+    sizeMap = {k: sizeMap[k] for k in sorted(sizeMap, key=sizeMap.get, reverse=True)}
+    sizeMap["_all"] = [sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter, df.shape]
 
-    if verbosity>0:
-        print("Compress","_all", counter, sizeInAll, sizeOutAll, sizeOutAll/sizeInAll)
+    if verbosity > 0:
+        print("Compress", "_all", sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter, df.shape)
     return outputMap, sizeMap
 
 
