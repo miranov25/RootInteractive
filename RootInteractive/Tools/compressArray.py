@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pdMap
 import sys
 import re
+import collections
 
 arrayCompressionRelative8=[(".*",[("relative",8), ("code",0), ("zip",0), ("base64",0)])]
 arrayCompressionRelative16=[(".*",[("relative",16), ("code",0), ("zip",0), ("base64",0)])]
@@ -202,13 +203,14 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
             sizeOut=getSize(arrayC)
             sizeOutAll+=sizeOut
             sizeInAll+=sizeIn
-            sizeMap[col]=[sizeIn, sizeOut]
+            sizeMap[col]=[sizeIn, sizeOut,sizeOut/sizeIn]
             if verbosity>0:
                 print("Compress",col, action[0], action[1])
                 print("Compress factor",col, sizeIn,sizeOut,sizeOut/sizeIn)
             outputMap[col]=arrayC
             break
-    sizeMap["_all"]=[sizeInAll,sizeOutAll]
+    sizeMap["_all"]=[sizeInAll,sizeOutAll, sizeOutAll/sizeInAll]
+
     if verbosity>0:
         print("Compress","_all", sizeInAll, sizeOutAll, sizeOutAll/sizeInAll)
     return outputMap, sizeMap

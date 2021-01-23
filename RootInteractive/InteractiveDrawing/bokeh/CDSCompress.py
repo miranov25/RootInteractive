@@ -15,4 +15,5 @@ class CDSCompress(ColumnarDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
     source = Instance(ColumnarDataSource)
     inputData=Dict(String, Any)
+    sizeMap=Dict(String, Any)
     print("Import ", __implementation__)

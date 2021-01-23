@@ -15,6 +15,7 @@ export namespace CDSCompress {
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnDataSource>
       inputData :    p.Property<Record<string, any>>
+      sizeMap :    p.Property<Record<string, any>>
   }
 }
 
@@ -33,7 +34,8 @@ export class CDSCompress extends ColumnarDataSource {
 
     this.define<CDSCompress.Props>(({Ref})=>({
       source:  [Ref(ColumnDataSource)],
-        inputData:    [ p.Instance ]
+        inputData:    [ p.Instance ],
+        sizeMap:    [ p.Instance ]
     }))
   }
 
