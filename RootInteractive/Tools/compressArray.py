@@ -191,7 +191,9 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
     sizeMap={}
     sizeInAll=0
     sizeOutAll=0
+    counter=0
     for col in df:
+        counter+=1
         if columnsSelect is not None:
             if col not in columnsSelect:
                 continue
@@ -203,16 +205,16 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None ):
             sizeOut=getSize(arrayC)
             sizeOutAll+=sizeOut
             sizeInAll+=sizeIn
-            sizeMap[col]=[sizeIn, sizeOut,sizeOut/sizeIn]
+            sizeMap[col]=[counter, sizeIn, sizeOut,sizeOut/sizeIn]
             if verbosity>0:
-                print("Compress",col, action[0], action[1])
-                print("Compress factor",col, sizeIn,sizeOut,sizeOut/sizeIn)
+                print("Compress",counter, col, action[0], action[1])
+                print("Compress factor",counter, col, sizeIn,sizeOut,sizeOut/sizeIn)
             outputMap[col]=arrayC
             break
-    sizeMap["_all"]=[sizeInAll,sizeOutAll, sizeOutAll/sizeInAll]
+    sizeMap["_all"]=[counter, sizeInAll,sizeOutAll, sizeOutAll/sizeInAll]
 
     if verbosity>0:
-        print("Compress","_all", sizeInAll, sizeOutAll, sizeOutAll/sizeInAll)
+        print("Compress","_all", counter, sizeInAll, sizeOutAll, sizeOutAll/sizeInAll)
     return outputMap, sizeMap
 
 
