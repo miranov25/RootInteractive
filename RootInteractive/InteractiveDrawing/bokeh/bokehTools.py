@@ -156,7 +156,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         }
         for (const histo of histogramList){
             histo.view = indicesAll;
-            histo.update_data();
+            histo.update_range();
         }
     }
     const t2 = performance.now();
