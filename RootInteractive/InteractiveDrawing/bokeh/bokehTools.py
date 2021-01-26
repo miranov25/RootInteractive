@@ -418,11 +418,12 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     data_table = DataTable(source=source, columns=columns, **kwargs)
     return data_table
 
-def makeBokehHistoTable(histoDict, **kwargs):
+def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     histo_names = []
     histo_columns = []
     bin_centers = []
     sources = []
+
     for iHisto in histoDict:
         if histoDict[iHisto]["type"] == "histo2d":
             histo_names.append(histoDict[iHisto]["name"]+"_X")
@@ -438,9 +439,16 @@ def makeBokehHistoTable(histoDict, **kwargs):
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
             sources.append(histoDict[iHisto]["cds"])
-    stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers)
-    data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean"),
-                                                     TableColumn(field="std"), TableColumn(field="entries")], **kwargs)
+    stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers, rowwise=rowwise)
+    if rowwise:
+        columns = [TableColumn(field="description")]
+        for i in histo_names:
+            columns.append(TableColumn(field=i))
+        data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
+    else:
+        data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean"),
+                                                          TableColumn(field="std"), TableColumn(field="entries")],
+                               **kwargs)
     return stats_cds, data_table
 
 
@@ -553,7 +561,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             plotArray.append(makeBokehDataTable(dfQuery, source, TOptions['include'], TOptions['exclude']))
             continue
         if variables[0] == 'tableHisto':
-            cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict)
+            TOptions = {'rowwise': False}
+            if len(variables) > 1:
+                TOptions.update(variables[1])
+            cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict, rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
             continue
         xAxisTitle = ""
@@ -925,7 +936,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
-            if len(variables) > 1 and variables[0] != "table":
+            if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
                 lengthX = len(variables[0])
                 lengthY = len(variables[1])
                 length = max(len(variables[0]), len(variables[1]))
