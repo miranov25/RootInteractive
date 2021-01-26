@@ -9,7 +9,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(200000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -73,11 +73,13 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoB'], {"flip_histogram_axes": True}]
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        ["tableHisto"]
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [4],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
