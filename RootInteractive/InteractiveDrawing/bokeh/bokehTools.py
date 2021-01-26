@@ -419,26 +419,25 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     return data_table
 
 def makeBokehHistoTable(histoDict, **kwargs):
-    """
-    Create widget for datatable
-
-    :param dataFrame:
-    input data frame
-    :param source:
-    :return:
-    """
     histo_names = []
     histo_columns = []
     bin_centers = []
     sources = []
     for iHisto in histoDict:
-        histo_names.append(histoDict[iHisto]["name"])
-        histo_columns.append("bin_count")
         if histoDict[iHisto]["type"] == "histo2d":
+            histo_names.append(histoDict[iHisto]["name"]+"_X")
+            histo_columns.append("bin_count")
             bin_centers.append("x")
+            sources.append(histoDict[iHisto]["cds"])
+            histo_names.append(histoDict[iHisto]["name"]+"_Y")
+            histo_columns.append("bin_count")
+            bin_centers.append("y")
+            sources.append(histoDict[iHisto]["cds"])
         else:
+            histo_names.append(histoDict[iHisto]["name"])
+            histo_columns.append("bin_count")
             bin_centers.append("bin_center")
-        sources.append(histoDict[iHisto]["cds"])
+            sources.append(histoDict[iHisto]["cds"])
     stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers)
     data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean"),
                                                      TableColumn(field="std"), TableColumn(field="entries")], **kwargs)
