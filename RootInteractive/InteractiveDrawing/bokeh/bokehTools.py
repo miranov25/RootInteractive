@@ -811,6 +811,9 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
         end = mean + options['sigma'] * sigma
         step = (end - start) / options['bins']
     if isRange:
+        if (start==end):
+            start-=1
+            end+=1
         value = (start, end)
         slider = RangeSlider(title=title, start=start, end=end, step=step, value=value)
     else:
