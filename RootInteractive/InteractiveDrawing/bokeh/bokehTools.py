@@ -23,6 +23,12 @@ from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
 
+# default tooltips for 1D and 2D histograms
+defaultHistoTooltips = [
+    ("range", "[@{bin_left}, {@{bin_right}]"),
+    ("count", "@bin_count")
+]
+
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
@@ -475,6 +481,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         'size': 2,
         'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset,save',
         'tooltips': [],
+        'histoTooltips': defaultHistoTooltips,
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
         'plot_width': 600,
@@ -504,7 +511,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
-        "removeExtraColumns": True
+        "removeExtraColumns": True,
     }
     options.update(kwargs)
     if query is not None:
@@ -604,7 +611,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             continue
         else:
             figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
-                             tools=options['tools'], tooltips=options['tooltips'], x_axis_type=options['x_axis_type'],
+                             tools=options['tools'], x_axis_type=options['x_axis_type'],
                              y_axis_type=options['y_axis_type'])
 
         figureI.xaxis.axis_label = xAxisTitle
@@ -627,6 +634,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                 else:
                     colorMapperDict[optionLocal["colorZvar"]] = [[source, mapperC]]
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=varColor)
+
+        defaultHoverToolRenderers = []
+
         for i in range(0, length):
             dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
             if variables[1][i % lengthY] in histogramDict:
@@ -665,12 +675,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             else:
                 #                zAxisTitle +=varColor + ","
                 #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
+                drawnGlyph = None
                 if optionLocal["legend_field"] is None:
-                    figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=varY + " vs " + varX)
                 else:
-                    figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                     figureI.add_glyph(source, errorX)
@@ -682,6 +694,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
+        if defaultHoverToolRenderers:
+            figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
         figureI.legend.click_policy = "hide"
         #        zAxisTitle=zAxisTitle[:-1]
         #        if(len(zAxisTitle)>0):
@@ -702,6 +716,12 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         visualization_type = options["visualization_type"]
     cdsHisto = histoHandle["cds"]
 
+    tooltips = None
+    if "tooltips" in histoHandle:
+        tooltips = histoHandle["tooltips"]
+    elif "tooltips" in options:
+        tooltips = options["histoTooltips"]
+
     if visualization_type == "heatmap":
         # Flipping histogram axes probably doesn't make sense in this case.
         mapperC = linear_cmap(field_name="bin_count", palette=options['palette'], low=0,
@@ -714,7 +734,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
                              title=x + " vs " + y)
         histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
                           fill_color=mapperC)
-        fig.add_glyph(cdsHisto, histoGlyph)
+        histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
         mapperC = linear_cmap(field_name="y", palette=options['palette'], low=min(dfQuery[y]),
@@ -726,22 +746,30 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=x + " vs " + y)
         if options["legend_field"] is None:
-            fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_label="Histogram of " + x)
         else:
-            fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
         if "show_histogram_error" in options:
             errorbar = VBar(x="x", width=0, top="errorbar_high", bottom="errorbar_low", line_color=mapperC)
             fig.add_glyph(cdsHisto, errorbar)
         fig.add_layout(color_bar, 'right')
+    if tooltips is not None:
+        fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
     cdsHisto = histoHandle["cds"]
     if options['color'] is not None:
         colorHisto = options['color']
+    tooltips = None
+    if "tooltips" in histoHandle:
+        tooltips = histoHandle["tooltips"]
+    elif "tooltips" in options:
+        tooltips = options["histoTooltips"]
     visualization_type = "points"
+    histoGlyphRenderer = None
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
     if visualization_type == "bars":
@@ -749,21 +777,22 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
             histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
         else:
             histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
-        fig.add_glyph(cdsHisto, histoGlyph)
+        histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
     elif visualization_type == "points":
         if options['flip_histogram_axes']:
-            fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = HBar(y="bin_center", height=0, left="errorbar_low", right="errorbar_high", line_color=colorHisto)
                 fig.add_glyph(cdsHisto, errorbar)
         else:
-            fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = VBar(x="bin_center", width=0, top="errorbar_high", bottom="errorbar_low", line_color=colorHisto)
                 fig.add_glyph(cdsHisto, errorbar)
-
+    if tooltips is not None:
+        fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
     options = {
