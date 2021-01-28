@@ -26,7 +26,13 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circl
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
-    ("range", "[@{bin_left}, {@{bin_right}]"),
+    ("range", "[@{bin_left}, @{bin_right}]"),
+    ("count", "@bin_count")
+]
+
+defaultHisto2DTooltips = [
+    ("range X", "[@{bin_left}, @{bin_right}]"),
+    ("range Y", "[@{bin_bottom}, @{bin_top}]"),
     ("count", "@bin_count")
 ]
 
@@ -488,6 +494,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         'tools': 'pan,box_zoom, wheel_zoom,box_select,lasso_select,reset,save',
         'tooltips': [],
         'histoTooltips': defaultHistoTooltips,
+        'histo2dTooltips': defaultHisto2DTooltips,
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
         'plot_width': 600,
@@ -726,7 +733,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
     if "tooltips" in histoHandle:
         tooltips = histoHandle["tooltips"]
     elif "tooltips" in options:
-        tooltips = options["histoTooltips"]
+        tooltips = options["histo2dTooltips"]
 
     if visualization_type == "heatmap":
         # Flipping histogram axes probably doesn't make sense in this case.
