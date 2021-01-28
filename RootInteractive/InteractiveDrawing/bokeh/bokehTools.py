@@ -734,7 +734,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
                              title=x + " vs " + y)
         histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
                           fill_color=mapperC)
-        fig.add_glyph(cdsHisto, histoGlyph)
+        histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
         mapperC = linear_cmap(field_name="y", palette=options['palette'], low=min(dfQuery[y]),
@@ -746,17 +746,17 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=x + " vs " + y)
         if options["legend_field"] is None:
-            histoGlyph = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_label="Histogram of " + x)
         else:
-            histoGlyph = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
         if "show_histogram_error" in options:
             errorbar = VBar(x="x", width=0, top="errorbar_high", bottom="errorbar_low", line_color=mapperC)
             fig.add_glyph(cdsHisto, errorbar)
         fig.add_layout(color_bar, 'right')
     if tooltips is not None:
-        fig.add_tools(HoverTool(renderers=[histoGlyph], tooltips=tooltips))
+        fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
@@ -769,7 +769,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
     elif "tooltips" in options:
         tooltips = options["histoTooltips"]
     visualization_type = "points"
-    histoGlyph = None
+    histoGlyphRenderer = None
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
     if visualization_type == "bars":
@@ -777,22 +777,22 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
             histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
         else:
             histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
-        fig.add_glyph(cdsHisto, histoGlyph)
+        histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
     elif visualization_type == "points":
         if options['flip_histogram_axes']:
-            histoGlyph = fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = HBar(y="bin_center", height=0, left="errorbar_low", right="errorbar_high", line_color=colorHisto)
                 fig.add_glyph(cdsHisto, errorbar)
         else:
-            histoGlyph = fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = VBar(x="bin_center", width=0, top="errorbar_high", bottom="errorbar_low", line_color=colorHisto)
                 fig.add_glyph(cdsHisto, errorbar)
     if tooltips is not None:
-        fig.add_tools(HoverTool(renderers=[histoGlyph], tooltips=tooltips))
+        fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
 def makeBokehSliderWidget(df, isRange, params, **kwargs):
     options = {
