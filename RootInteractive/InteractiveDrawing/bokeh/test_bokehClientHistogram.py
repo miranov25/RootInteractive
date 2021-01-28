@@ -74,7 +74,7 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
-        ["tableHisto", {"rowwise": True}]
+        ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],

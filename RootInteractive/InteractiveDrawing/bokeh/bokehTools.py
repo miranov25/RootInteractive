@@ -1,5 +1,6 @@
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, Image
+from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
@@ -430,6 +431,11 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     bin_centers = []
     sources = []
 
+    if "formatter" in kwargs:
+        formatter = kwargs["formatter"]
+    else:
+        formatter = ScientificFormatter(precision=3)
+
     for iHisto in histoDict:
         if histoDict[iHisto]["type"] == "histo2d":
             histo_names.append(histoDict[iHisto]["name"]+"_X")
@@ -449,11 +455,11 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     if rowwise:
         columns = [TableColumn(field="description")]
         for i in histo_names:
-            columns.append(TableColumn(field=i))
+            columns.append(TableColumn(field=i, formatter=formatter))
         data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
     else:
-        data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean"),
-                                                          TableColumn(field="std"), TableColumn(field="entries")],
+        data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean", formatter=formatter),
+                                                          TableColumn(field="std", formatter=formatter), TableColumn(field="entries", formatter=formatter)],
                                **kwargs)
     return stats_cds, data_table
 
