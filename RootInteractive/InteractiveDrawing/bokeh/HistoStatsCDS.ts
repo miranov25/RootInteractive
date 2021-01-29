@@ -94,9 +94,9 @@ export class HistoStatsCDS extends ColumnDataSource {
 
         }
         if(this.rowwise){
-          this.data = {"description":["mean", "std", "entries", "is_ok"]}
+          this.data = {"description":["mean", "std", "entries"]}
           for (let i = 0; i < this.names.length; i++) {
-            this.data[this.names[i]] = [mean_column[i], std_column[i], entries_column[i], isOK_column[i]]
+            this.data[this.names[i]] = [mean_column[i], std_column[i], entries_column[i]]
           }
         } else {
           this.data = {"name": this.names, "mean": mean_column, "std": std_column, "entries": entries_column, "isOK": isOK_column}
