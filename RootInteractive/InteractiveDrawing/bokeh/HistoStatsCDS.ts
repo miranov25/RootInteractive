@@ -38,6 +38,10 @@ export class HistoStatsCDS extends ColumnDataSource {
 
   initialize(): void {
     super.initialize()
+    // Hack to make this work with bokeh datatable - updating data triggers datatable update no matter what
+    if(this.rowwise){
+      this.data = {"description":["mean", "std", "entries"]}
+    }
     this.update()
   }
 
@@ -94,7 +98,7 @@ export class HistoStatsCDS extends ColumnDataSource {
 
         }
         if(this.rowwise){
-          this.data = {"description":["mean", "std", "entries"]}
+          //this.data = {"description":["mean", "std", "entries"]}
           for (let i = 0; i < this.names.length; i++) {
             this.data[this.names[i]] = [mean_column[i], std_column[i], entries_column[i]]
           }
