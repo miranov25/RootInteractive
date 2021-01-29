@@ -74,6 +74,24 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        ["tableHisto", {"rowwise": False}]
+    ]
+    figureLayoutDesc=[
+        [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [4, {'plot_height': 40}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+    ]
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
+
+def testBokehClientHistogramRowwiseTable():
+    output_file("test_BokehClientHistogramRowwiseTable.html")
+    figureArray = [
+        [['A'], ['histoA']],
+        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
+        [['A'], ['histoAB']],
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": True}]
     ]
     figureLayoutDesc=[
@@ -86,4 +104,5 @@ def testBokehClientHistogramOnlyHisto():
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 #testBokehClientHistogram()
-testBokehClientHistogramOnlyHisto()
+#testBokehClientHistogramOnlyHisto()
+#testBokehClientHistogramRowwiseTable()
