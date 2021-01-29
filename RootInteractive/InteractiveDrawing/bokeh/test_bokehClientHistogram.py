@@ -86,7 +86,7 @@ def testBokehClientHistogramOnlyHisto():
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 def testBokehClientHistogramRowwiseTable():
-    output_file("test_BokehClientHistogramOnlyHisto.html")
+    output_file("test_BokehClientHistogramRowwiseTable.html")
     figureArray = [
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
@@ -105,4 +105,4 @@ def testBokehClientHistogramRowwiseTable():
 
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
-testBokehClientHistogramRowwiseTable()
+#testBokehClientHistogramRowwiseTable()
