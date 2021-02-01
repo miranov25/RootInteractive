@@ -114,7 +114,7 @@ export class HistoStatsCDS extends ColumnDataSource {
             const edges_left = histoCDS.get_column(this.edges_left[i])
             const edges_right = histoCDS.get_column(this.edges_right[i])
             if(edges_left === null || edges_right === null ){
-              throw "Cannot compute quantiles without specifying bin edges";
+              throw "Cannot compute quantiles without specifying bin edges"
             }
             while(iQuantile < this.quantiles.length && this.quantiles[iQuantile] < 0){
               quantile_columns[iQuantile].push(NaN)
@@ -141,9 +141,17 @@ export class HistoStatsCDS extends ColumnDataSource {
           }
         }
         if(this.rowwise){
-          //this.data = {"description":["mean", "std", "entries"]}
+          let description:string[] = ["mean", "std", "entries"]
+          for (let j = 0; j < this.quantiles.length; j++) {
+            description.push("Quantile " + this.quantiles[j])
+          }
+          this.data.description = description
           for (let i = 0; i < this.names.length; i++) {
-            this.data[this.names[i]] = [mean_column[i], std_column[i], entries_column[i]]
+            let row:number[] = [mean_column[i], std_column[i], entries_column[i]]
+            for (let j = 0; j < this.quantiles.length; j++) {
+              row.push(quantile_columns[j][i])
+            }
+            this.data[this.names[i]] = row
           }
         } else {
           this.data["name"] = this.names
