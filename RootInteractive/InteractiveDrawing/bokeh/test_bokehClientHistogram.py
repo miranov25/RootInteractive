@@ -49,8 +49,8 @@ figureLayoutDesc=[
 ]
 
 histoArray = [
-    {"name": "histoA", "variables": ["A"],"nbins":20},
-    {"name": "histoB", "variables": ["B"],"nbins":20},
+    {"name": "histoA", "variables": ["A"],"nbins":20, "quantiles": [.05, .5, .95]},
+    {"name": "histoB", "variables": ["B"],"nbins":20, "range": [0, 1]},
     {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20},
     {"name": "histoAB", "variables": ["A", "B"], "nbins": [20, 20], "weights": "D"},
 ]
