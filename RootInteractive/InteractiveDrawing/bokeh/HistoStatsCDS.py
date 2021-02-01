@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, List, Bool
+from bokeh.core.properties import Instance, String, List, Bool, Float
 from bokeh.models import ColumnarDataSource
 
 
@@ -19,3 +19,7 @@ class HistoStatsCDS(ColumnarDataSource):
     bin_centers = List(String)
     bincount_columns = List(String)
     rowwise = Bool
+    quantiles = List(Float)
+    compute_quantile = List(Bool)
+    edges_left = List(String)
+    edges_right = List(String)

@@ -431,11 +431,16 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     data_table = DataTable(source=source, columns=columns, **kwargs)
     return data_table
 
+
 def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     histo_names = []
     histo_columns = []
     bin_centers = []
+    edges_left = []
+    edges_right = []
     sources = []
+    quantiles = []
+    compute_quantile = []
 
     if "formatter" in kwargs:
         formatter = kwargs["formatter"]
@@ -447,26 +452,43 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             histo_names.append(histoDict[iHisto]["name"]+"_X")
             histo_columns.append("bin_count")
             bin_centers.append("x")
+            edges_left.append("bin_left")
+            edges_right.append("bin_right")
             sources.append(histoDict[iHisto]["cds"])
+            compute_quantile.append(False)
             histo_names.append(histoDict[iHisto]["name"]+"_Y")
             histo_columns.append("bin_count")
             bin_centers.append("y")
+            edges_left.append("bin_bottom")
+            edges_right.append("bin_top")
             sources.append(histoDict[iHisto]["cds"])
+            compute_quantile.append(False)
         else:
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
+            edges_left.append("bin_left")
+            edges_right.append("bin_right")
             sources.append(histoDict[iHisto]["cds"])
-    stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers, rowwise=rowwise)
+            compute_quantile.append(True)
+            if "quantiles" in histoDict[iHisto]:
+                quantiles += histoDict[iHisto]["quantiles"]
+    quantiles.sort()
+    stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers,
+                              quantiles=quantiles, compute_quantile=compute_quantile, rowwise=rowwise,
+                              edges_left=edges_left, edges_right=edges_right)
     if rowwise:
         columns = [TableColumn(field="description")]
         for i in histo_names:
             columns.append(TableColumn(field=i, formatter=formatter))
         data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
     else:
-        data_table = DataTable(source=stats_cds, columns=[TableColumn(field="name"), TableColumn(field="mean", formatter=formatter),
-                                                          TableColumn(field="std", formatter=formatter), TableColumn(field="entries", formatter=formatter)],
-                               **kwargs)
+        columns = [TableColumn(field="name"), TableColumn(field="mean", formatter=formatter),
+                   TableColumn(field="std", formatter=formatter), TableColumn(field="entries", formatter=formatter)]
+        for (i, iQuantile) in enumerate(quantiles):
+            columns.append(TableColumn(field="quantile_"+format(i), title="Quantile "+format(iQuantile),
+                                       formatter=formatter))
+        data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
     return stats_cds, data_table
 
 
@@ -960,7 +982,8 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
             cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
-            histoDict[histoName] = {"cds": cdsHisto, "type": "histogram", "name":histoName, "variables": sampleVars}
+            histoDict[histoName] = iHisto.copy()
+            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
         elif len(sampleVars) == 2:
             _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
             _, varNameY = pandaGetOrMakeColumn(dfQuery, sampleVars[1])
