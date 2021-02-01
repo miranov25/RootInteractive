@@ -436,6 +436,8 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     histo_names = []
     histo_columns = []
     bin_centers = []
+    edges_left = []
+    edges_right = []
     sources = []
     quantiles = []
     compute_quantile = []
@@ -450,24 +452,31 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             histo_names.append(histoDict[iHisto]["name"]+"_X")
             histo_columns.append("bin_count")
             bin_centers.append("x")
+            edges_left.append("bin_left")
+            edges_right.append("bin_right")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(False)
             histo_names.append(histoDict[iHisto]["name"]+"_Y")
             histo_columns.append("bin_count")
             bin_centers.append("y")
+            edges_left.append("bin_bottom")
+            edges_right.append("bin_top")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(False)
         else:
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
+            edges_left.append("bin_left")
+            edges_right.append("bin_right")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(True)
             if "quantiles" in histoDict[iHisto]:
                 quantiles += histoDict[iHisto]["quantiles"]
     quantiles.sort()
     stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers,
-                              quantiles=quantiles, compute_quantile=compute_quantile, rowwise=rowwise)
+                              quantiles=quantiles, compute_quantile=compute_quantile, rowwise=rowwise,
+                              edges_left=edges_left, edges_right=edges_right)
     if rowwise:
         columns = [TableColumn(field="description")]
         for i in histo_names:

@@ -13,6 +13,8 @@ export namespace HistoStatsCDS {
     rowwise: p.Property<boolean>
     quantiles: p.Property<number[]> // This is the list of all quantiles to compute, length is NOT equal to CDS length
     compute_quantile: p.Property<boolean[] | null>
+    edges_left: p.Property<string[]>
+    edges_right: p.Property<string[]>
   }
 }
 
@@ -36,7 +38,9 @@ export class HistoStatsCDS extends ColumnDataSource {
       bin_centers: [Array(String)],
       rowwise: [Boolean],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
-      compute_quantile: [Nullable(Array(Boolean))]
+      compute_quantile: [Nullable(Array(Boolean))],
+      edges_left: [Array(String)],
+      edges_right: [Array(String)],
     }))
   }
 
@@ -107,16 +111,21 @@ export class HistoStatsCDS extends ColumnDataSource {
             let low = 0
             let high = 0
             let iQuantile = 0
+            const edges_left = histoCDS.get_column(this.edges_left[i])
+            const edges_right = histoCDS.get_column(this.edges_right[i])
+            if(edges_left === null || edges_right === null ){
+              throw "Cannot compute quantiles without specifying bin edges";
+            }
             while(iQuantile < this.quantiles.length && this.quantiles[iQuantile] < 0){
               quantile_columns[iQuantile].push(NaN)
               iQuantile++
             }
-            for (let j = 1; j < cumulative_histogram.length && iQuantile < this.quantiles.length; j++) {
+            for (let j = 0; j < cumulative_histogram.length && iQuantile < this.quantiles.length; j++) {
               high = cumulative_histogram[j]
               while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
                 // TODO: Use lerp
                 const m = (this.quantiles[iQuantile] * entries - low)/(high-low)
-                quantile_columns[iQuantile].push(bin_centers[j-1]*(1-m)+bin_centers[j]*m)
+                quantile_columns[iQuantile].push(edges_left[j]*(1-m)+edges_right[j]*m)
                 iQuantile++
               }
               low = high
