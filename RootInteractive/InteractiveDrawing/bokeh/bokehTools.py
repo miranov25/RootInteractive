@@ -476,10 +476,15 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
                 quantiles += histoDict[iHisto]["quantiles"]
             if "sum_range" in histoDict[iHisto]:
                 sum_range += histoDict[iHisto]["sum_range"]
-    quantiles.sort()
+
+    quantiles = [*{*quantiles}]
+    sum_range_uniq = []
+    for i in sum_range:
+        if i not in sum_range_uniq:
+            sum_range_uniq.append(i)
     stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers,
                               quantiles=quantiles, compute_quantile=compute_quantile, rowwise=rowwise,
-                              edges_left=edges_left, edges_right=edges_right, sum_range=sum_range)
+                              edges_left=edges_left, edges_right=edges_right, sum_range=sum_range_uniq)
     if rowwise:
         columns = [TableColumn(field="description")]
         for i in histo_names:
