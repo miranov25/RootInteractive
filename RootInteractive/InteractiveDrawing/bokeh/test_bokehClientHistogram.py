@@ -49,7 +49,7 @@ figureLayoutDesc=[
 ]
 
 histoArray = [
-    {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95]},
+    {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
     {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20, "sum_range": [[.25, .75]]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D"},
@@ -105,4 +105,4 @@ def testBokehClientHistogramRowwiseTable():
 
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
-#testBokehClientHistogramRowwiseTable()
+testBokehClientHistogramRowwiseTable()
