@@ -169,9 +169,9 @@ export class HistoStatsCDS extends ColumnDataSource {
                 val_left = 0
               } else if(index_left < 1){
                 val_left = index_left * cumulative_histogram[0]
-              } else if(index_left < cumulative_histogram.length - 1){
+              } else if(index_left < cumulative_histogram.length){
                 const m_left = index_left % 1
-                val_left = cumulative_histogram[index_left|0] * (1-m_left) + cumulative_histogram[(index_left|0)+1] * m_left
+                val_left = cumulative_histogram[(index_left|0)-1] * (1-m_left) + cumulative_histogram[index_left|0] * m_left
               } else {
                 val_left = entries
               }
@@ -180,9 +180,9 @@ export class HistoStatsCDS extends ColumnDataSource {
                 val_right = 0
               } else if(index_right < 1){
                 val_right = index_right * cumulative_histogram[0]
-              } else if(index_right < cumulative_histogram.length - 1){
+              } else if(index_right < cumulative_histogram.length){
                 const m_right = index_right % 1
-                val_right = cumulative_histogram[index_right|0] * (1-m_right) + cumulative_histogram[(index_right|0)+1] * m_right
+                val_right = cumulative_histogram[(index_right|0)-1] * (1-m_right) + cumulative_histogram[index_right|0] * m_right
               } else {
                 val_right = entries
               }
