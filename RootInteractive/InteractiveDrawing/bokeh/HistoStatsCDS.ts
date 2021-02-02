@@ -15,6 +15,7 @@ export namespace HistoStatsCDS {
     compute_quantile: p.Property<boolean[] | null>
     edges_left: p.Property<string[]>
     edges_right: p.Property<string[]>
+    sum_range: p.Property<number[][]>
   }
 }
 
@@ -41,6 +42,7 @@ export class HistoStatsCDS extends ColumnDataSource {
       compute_quantile: [Nullable(Array(Boolean))],
       edges_left: [Array(String)],
       edges_right: [Array(String)],
+      sum_range: [Array(Array(Number)), []]
     }))
   }
 
@@ -66,6 +68,14 @@ export class HistoStatsCDS extends ColumnDataSource {
         let quantile_columns:Array<Array<number>> = []
         for (let i = 0; i < this.quantiles.length; i++) {
           quantile_columns.push([])
+        }
+        let integral_columns:Array<Array<number>> = []
+        for (let i = 0; i < this.sum_range.length; i++) {
+          integral_columns.push([])
+        }
+        let efficiency_columns:Array<Array<number>> = []
+        for (let i = 0; i < this.sum_range.length; i++) {
+          efficiency_columns.push([])
         }
         for (let i = 0; i < this.sources.length; i++) {
           const histoCDS = this.sources[i]
@@ -139,17 +149,74 @@ export class HistoStatsCDS extends ColumnDataSource {
               quantile_columns[iQuantile].push(NaN)
             }
           }
+          if((this.compute_quantile === null || this.compute_quantile[i])){
+            const edges_left = histoCDS.get_column(this.edges_left[i]) as number[]
+            const edges_right = histoCDS.get_column(this.edges_right[i]) as number[]
+            if(edges_left === null || edges_right === null ){
+              throw "Cannot compute bounding box intersections without specifying bin edges"
+            }
+            // XXX: This assumes uniform binning
+            const low = edges_left[0]
+            const high = edges_right[edges_right.length-1]
+            const scale = cumulative_histogram.length / (high - low)
+            const origin = -low * scale
+            for (let iBox = 0; iBox < this.sum_range.length; iBox++) {
+              const bounding_box = this.sum_range[iBox];
+              const index_left = bounding_box[0] * scale + origin
+              let val_left = 0
+              let val_right = 0
+              if(index_left < 0){
+                val_left = 0
+              } else if(index_left < 1){
+                val_left = index_left * cumulative_histogram[0]
+              } else if(index_left < cumulative_histogram.length){
+                const m_left = index_left % 1
+                val_left = cumulative_histogram[index_left|0] * (1-m_left) + cumulative_histogram[(index_left|0)+1] * m_left
+              } else {
+                val_left = entries
+              }
+              const index_right = bounding_box[1] * scale + origin
+              if(index_right < 0){
+                val_right = 0
+              } else if(index_right < 1){
+                val_right = index_right * cumulative_histogram[0]
+              } else if(index_right < cumulative_histogram.length){
+                const m_right = index_right % 1
+                val_right = cumulative_histogram[index_right|0] * (1-m_right) + cumulative_histogram[(index_right|0)+1] * m_right
+              } else {
+                val_right = entries
+              }
+              const integral = val_right - val_left
+              integral_columns[iBox].push(integral)
+              efficiency_columns[iBox].push(integral/entries)
+            }
+          } else {
+            for (let iBox = 0; iBox < this.sum_range.length; iBox++) {
+              integral_columns[iBox].push(NaN)
+              efficiency_columns[iBox].push(NaN)
+            }
+          }
         }
         if(this.rowwise){
           let description:string[] = ["mean", "std", "entries"]
           for (let j = 0; j < this.quantiles.length; j++) {
             description.push("Quantile " + this.quantiles[j])
           }
+          for (let j = 0; j < this.sum_range.length; j++) {
+            description.push("Σ(" + this.sum_range[j][0] + "," + this.sum_range[j][1] + ")")
+            description.push("Σ_normed(" + this.sum_range[j][0] + "," + this.sum_range[j][1] + ")")
+          }
           this.data.description = description
           for (let i = 0; i < this.names.length; i++) {
             let row:number[] = [mean_column[i], std_column[i], entries_column[i]]
             for (let j = 0; j < this.quantiles.length; j++) {
               row.push(quantile_columns[j][i])
+            }
+            for (let j = 0; j < this.sum_range.length; j++) {
+              row.push(integral_columns[j][i])
+            }
+            for (let j = 0; j < this.sum_range.length; j++) {
+              row.push(efficiency_columns[j][i])
             }
             this.data[this.names[i]] = row
           }
@@ -161,6 +228,10 @@ export class HistoStatsCDS extends ColumnDataSource {
           this.data["isOK"] = isOK_column
           for (let iQuantile = 0; iQuantile < quantile_columns.length; iQuantile++) {
             this.data["quantile_"+iQuantile] = quantile_columns[iQuantile]
+          }
+          for (let iBox = 0; iBox < integral_columns.length; iBox++) {
+            this.data["integral_"+iBox] = integral_columns[iBox]
+            this.data["efficiency_"+iBox] = efficiency_columns[iBox]
           }
         }
         this.change.emit()
