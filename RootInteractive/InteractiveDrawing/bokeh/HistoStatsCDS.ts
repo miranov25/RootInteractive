@@ -214,8 +214,6 @@ export class HistoStatsCDS extends ColumnDataSource {
             }
             for (let j = 0; j < this.sum_range.length; j++) {
               row.push(integral_columns[j][i])
-            }
-            for (let j = 0; j < this.sum_range.length; j++) {
               row.push(efficiency_columns[j][i])
             }
             this.data[this.names[i]] = row
