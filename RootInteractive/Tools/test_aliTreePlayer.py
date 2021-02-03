@@ -1,6 +1,6 @@
 import logging
 import pytest
-from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
+#from RootInteractive.InteractiveDrawing.bokeh.bokehDraw import *
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.io import curdoc
 
