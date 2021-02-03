@@ -23,3 +23,4 @@ class HistoStatsCDS(ColumnarDataSource):
     compute_quantile = List(Bool)
     edges_left = List(String)
     edges_right = List(String)
+    sum_range = List(List(Float))

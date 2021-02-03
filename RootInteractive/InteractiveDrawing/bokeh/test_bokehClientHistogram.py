@@ -49,10 +49,10 @@ figureLayoutDesc=[
 ]
 
 histoArray = [
-    {"name": "histoA", "variables": ["A"],"nbins":20, "quantiles": [.05, .5, .95]},
-    {"name": "histoB", "variables": ["B"],"nbins":20, "range": [0, 1]},
-    {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20},
-    {"name": "histoAB", "variables": ["A", "B"], "nbins": [20, 20], "weights": "D"},
+    {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
+    {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
+    {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20, "sum_range": [[.25, .75]]},
+    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D"},
 ]
 
 def testBokehClientHistogram():
@@ -73,7 +73,7 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -91,7 +91,7 @@ def testBokehClientHistogramRowwiseTable():
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": True}]
     ]
     figureLayoutDesc=[
@@ -105,4 +105,4 @@ def testBokehClientHistogramRowwiseTable():
 
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
-#testBokehClientHistogramRowwiseTable()
+testBokehClientHistogramRowwiseTable()

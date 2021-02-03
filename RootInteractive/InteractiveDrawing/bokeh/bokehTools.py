@@ -441,6 +441,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     sources = []
     quantiles = []
     compute_quantile = []
+    sum_range = []
 
     if "formatter" in kwargs:
         formatter = kwargs["formatter"]
@@ -473,10 +474,17 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             compute_quantile.append(True)
             if "quantiles" in histoDict[iHisto]:
                 quantiles += histoDict[iHisto]["quantiles"]
-    quantiles.sort()
+            if "sum_range" in histoDict[iHisto]:
+                sum_range += histoDict[iHisto]["sum_range"]
+
+    quantiles = [*{*quantiles}]
+    sum_range_uniq = []
+    for i in sum_range:
+        if i not in sum_range_uniq:
+            sum_range_uniq.append(i)
     stats_cds = HistoStatsCDS(sources=sources, names=histo_names, bincount_columns=histo_columns, bin_centers=bin_centers,
                               quantiles=quantiles, compute_quantile=compute_quantile, rowwise=rowwise,
-                              edges_left=edges_left, edges_right=edges_right)
+                              edges_left=edges_left, edges_right=edges_right, sum_range=sum_range_uniq)
     if rowwise:
         columns = [TableColumn(field="description")]
         for i in histo_names:
@@ -487,6 +495,11 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
                    TableColumn(field="std", formatter=formatter), TableColumn(field="entries", formatter=formatter)]
         for (i, iQuantile) in enumerate(quantiles):
             columns.append(TableColumn(field="quantile_"+format(i), title="Quantile "+format(iQuantile),
+                                       formatter=formatter))
+        for (i, iBox) in enumerate(sum_range_uniq):
+            columns.append(TableColumn(field="sum_"+format(i), title="Σ("+format(iBox[0])+","+format(iBox[1])+")",
+                                       formatter=formatter))
+            columns.append(TableColumn(field="sum_normed_"+format(i), title="Σ_normed("+format(iBox[0])+","+format(iBox[1])+")",
                                        formatter=formatter))
         data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
     return stats_cds, data_table
