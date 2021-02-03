@@ -228,8 +228,8 @@ export class HistoStatsCDS extends ColumnDataSource {
             this.data["quantile_"+iQuantile] = quantile_columns[iQuantile]
           }
           for (let iBox = 0; iBox < integral_columns.length; iBox++) {
-            this.data["integral_"+iBox] = integral_columns[iBox]
-            this.data["efficiency_"+iBox] = efficiency_columns[iBox]
+            this.data["sum_"+iBox] = integral_columns[iBox]
+            this.data["sum_normed_"+iBox] = efficiency_columns[iBox]
           }
         }
         this.change.emit()

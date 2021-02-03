@@ -496,10 +496,10 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
         for (i, iQuantile) in enumerate(quantiles):
             columns.append(TableColumn(field="quantile_"+format(i), title="Quantile "+format(iQuantile),
                                        formatter=formatter))
-        for (i, iBox) in enumerate(sum_range):
-            columns.append(TableColumn(field="integral_"+format(i), title="Σ("+format(iBox[0])+","+format(iBox[1])+")",
+        for (i, iBox) in enumerate(sum_range_uniq):
+            columns.append(TableColumn(field="sum_"+format(i), title="Σ("+format(iBox[0])+","+format(iBox[1])+")",
                                        formatter=formatter))
-            columns.append(TableColumn(field="efficiency_"+format(i), title="Σ_normed("+format(iBox[0])+","+format(iBox[1])+")",
+            columns.append(TableColumn(field="sum_normed_"+format(i), title="Σ_normed("+format(iBox[0])+","+format(iBox[1])+")",
                                        formatter=formatter))
         data_table = DataTable(source=stats_cds, columns=columns, **kwargs)
     return stats_cds, data_table
