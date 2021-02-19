@@ -51,7 +51,7 @@ figureLayoutDesc=[
 histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
-    {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20, "sum_range": [[.25, .75]]},
+    {"name": "histoTransform", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "sum_range": [[.25, .75]]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D"},
 ]
 
@@ -73,7 +73,7 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -104,5 +104,5 @@ def testBokehClientHistogramRowwiseTable():
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 #testBokehClientHistogram()
-#testBokehClientHistogramOnlyHisto()
-testBokehClientHistogramRowwiseTable()
+testBokehClientHistogramOnlyHisto()
+#testBokehClientHistogramRowwiseTable()
