@@ -22,19 +22,25 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   constructor(attrs?: Partial<HistoNdCDS.Attrs>) {
     super(attrs)
+
+    this._range_min = []
+    this._range_max = []
+    this._transform_origin = []
+    this._transform_scale = []
+    this._strides = []
   }
 
-  static __name__ = "Histo2dCDS"
+  static __name__ = "HistoNdCDS"
 
-  static init_Histo2dCDS() {
+  static init_HistoNdCDS() {
 
-    this.define<Histo2dCDS.Props>(({Ref, Array, Nullable, Number, Int})=>({
+    this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String})=>({
       source:  [Ref(ColumnDataSource)],
 //      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
-      sample_variables:      [p.String],
-      weights:      [p.String, null]
+      sample_variables:      [Array(String)],
+      weights:      [String, null]
     }))
   }
 
@@ -66,7 +72,7 @@ export class HistoNdCDS extends ColumnarDataSource {
         bincount.fill(0, 0, length)
         let sample_array: number[][] = []
         for (const column_name of this.sample_variables) {
-          sample_array.push(this.source.data[column_name])
+          sample_array.push(this.source.get_array(column_name))
         }
         const view_indices = this.view
         if(view_indices === null){
@@ -128,20 +134,26 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   update_range(): void {
     this._nbins = this.nbins;
+
+    let sample_array: number[][] = []
+    for (const column_name of this.sample_variables) {
+      sample_array.push(this.source.get_array(column_name))
+    }
       // This code seems stupid
       if(this.range === null){
         for (let i = 0; i < this._nbins.length; i++) {
           this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
-          this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
+          this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
         }
       } else {
         for (let i = 0; i < this.range.length; i++) {
-          if(this.range[i] === null) {
+          const r = this.range[i]
+          if(r === null) {
             this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
             this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
           } else {
-            this._range_min[i] = this.range[i][0]
-            this._range_max[i] = this.range[i][1]
+            this._range_min[i] = r[0]
+            this._range_max[i] = r[1]
           }
         }
       }
@@ -158,14 +170,14 @@ export class HistoNdCDS extends ColumnarDataSource {
         this._strides[i+1] = this._strides[i]*this._nbins[i]
       }
 
-      const length = strides[dim]
+      const length = this._strides[dim]
       for(let i=0; i<dim; i++){
         let bin_bottom = []
         let bin_center = []
         let bin_top = []
         let inv_scale = 1/this._transform_scale[i]
         for (let index = 0; index < length; index++) {
-          let true_index = ((index%strides[i+1])/strides[i])|0
+          let true_index = ((index%this._strides[i+1])/this._strides[i])|0
           bin_bottom.push(this._range_min[i]+true_index*inv_scale)
           bin_center.push(this._range_min[i]+(true_index+.5)*inv_scale)
           bin_top.push(this._range_min[i]+(true_index+1)*inv_scale)

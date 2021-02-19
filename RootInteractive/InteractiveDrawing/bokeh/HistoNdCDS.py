@@ -2,9 +2,9 @@ from bokeh.core.properties import Instance, String, Float, Int, List
 from bokeh.models import ColumnarDataSource
 
 
-class HistogramCDS(ColumnarDataSource):
+class HistoNdCDS(ColumnarDataSource):
 
-    __implementation__ = "HistogramCDS.ts"
+    __implementation__ = "HistoNdCDS.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
