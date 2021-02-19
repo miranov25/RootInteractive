@@ -16,6 +16,7 @@ from RootInteractive.Tools.pandaTools import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.Histo2dCDS import Histo2dCDS
+from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 import copy
 from RootInteractive.Tools.compressArray import *
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
@@ -464,6 +465,15 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             edges_right.append("bin_top")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(False)
+        elif histoDict[iHisto]["type"] == "histoNd":
+            for i in range(len(histoDict[iHisto]["variables"])):
+                histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
+                histo_columns.append("bin_count")
+                bin_centers.append("bin_center_"+str(i))
+                edges_left.append("bin_bottom_"+str(i))
+                edges_right.append("bin_top_"+str(i))
+                sources.append(histoDict[iHisto]["cds"])
+                compute_quantile.append(False)
         else:
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
@@ -1004,6 +1014,16 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                     range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
+        else:
+            sampleVarNames = []
+            for i in sampleVars:
+                _, varName = pandaGetOrMakeColumn(dfQuery, i)
+                sampleVarNames.append(varName)
+            cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
+                                    range=optionLocal["range"], sample_variables=sampleVarNames,
+                                    weights=optionLocal["weights"])
+            histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
+                                    "variables": sampleVars}
     return histoDict
 
 
@@ -1013,7 +1033,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
     output_cdsSel = False
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
-            histogramDict[histo["name"]] = False
+            histogramDict[histo["name"]] = True
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
