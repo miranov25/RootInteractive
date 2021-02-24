@@ -215,4 +215,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       return bin
   }
 
+  public get_stride(idx: number): number{
+    return this._strides[idx]
+  }
+
 }
