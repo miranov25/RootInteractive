@@ -21,6 +21,7 @@ import copy
 from RootInteractive.Tools.compressArray import *
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
+from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
@@ -36,6 +37,7 @@ defaultHisto2DTooltips = [
     ("range Y", "[@{bin_bottom}, @{bin_top}]"),
     ("count", "@bin_count")
 ]
+
 
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -187,7 +189,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
                 cmapList[i][1].transform.high = high;
                 cmapList[i][1].transform.low = low;
-//                    cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs events might improve the performance
+    //          cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs
+    //                                                    events might improve the performance
             }
         }
     }
@@ -992,7 +995,10 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
 def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, **kwargs):
     options = {"range": None,
                "nbins": 10,
-               "weights": None}
+               "weights": None,
+               "quantiles": [],
+               "sumRange": []
+               }
     histoDict = {}
     for iHisto in histogramArray:
         sampleVars = iHisto["variables"]
@@ -1024,6 +1030,15 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                     weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
                                     "variables": sampleVars}
+            if "axis" in iHisto:
+                axisIndices = iHisto["axis"]
+                profilesDict = {}
+                for i in axisIndices:
+                    cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
+                                                sum_range=optionLocal["sum_range"])
+                    profilesDict[i] = cdsProfile
+                histoDict[histoName]["profiles"] = profilesDict
+
     return histoDict
 
 
