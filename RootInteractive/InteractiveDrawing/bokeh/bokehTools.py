@@ -610,8 +610,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
 
     histoList = []
+    profileList = []
     for i in histogramDict:
-        histoList.append(histogramDict[i]["cds"])
+        if histogramDict[i]["type"] == "profile":
+            profileList.append(histogramDict[i]["cds"])
+        else:
+            histoList.append(histogramDict[i]["cds"])
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -768,7 +772,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -956,7 +960,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, nPointRender=10000,cdsCompress=None):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, nPointRender=10000,cdsCompress=None):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -979,7 +983,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsHistoSummary=cdsHistoSummary, cdsCompress=cdsCompress)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
@@ -1037,6 +1041,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
+                    histoDict[histoName+"_projection_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_projection_"+str(i)}
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
