@@ -6,7 +6,7 @@ export namespace HistoNdProfile {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnarDataSource.Props & {
-    source: p.Property<ColumnarDataSource>
+    source: p.Property<HistoNdCDS>
     axis_idx: p.Property<number>
     quantiles: p.Property<number[]>
     sum_range: p.Property<number[][]>
@@ -26,8 +26,8 @@ export class HistoNdProfile extends ColumnarDataSource {
 
   static init_HistoNdProfile() {
 
-    this.define<HistoNdProfile.Props>(({Ref, Array, String, Boolean, Number, Nullable, Int})=>({
-      source:  [Ref(ColumnarDataSource)],
+    this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int})=>({
+      source:  [Ref(HistoNdCDS)],
       axis_idx: [Int],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       sum_range: [Array(Array(Number)), []]
@@ -37,13 +37,14 @@ export class HistoNdProfile extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
+    this.data = {}
     this.update()
   }
 
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.source.change, () => this.update_data())
+    this.connect(this.source.change, () => this.update())
   }
 
   update(): void {
@@ -64,31 +65,37 @@ export class HistoNdProfile extends ColumnarDataSource {
           efficiency_columns.push([])
         }
 
-        let new_data = {}
-        for(let i=0; i<source.dim; i++){
+        const stride_low = this.source.get_stride(this.axis_idx)
+        const stride_high = this.source.get_stride(this.axis_idx)
+        const length = stride_high/stride_low
+
+        for(let i=0; i<this.source.dim; i++){
           if(i != this.axis_idx){
-              new_data["bin_bottom_"+i] = []
-              new_data["bin_center_"+i] = []
-              new_data["bin_top_"+i] = []
+              this.data["bin_bottom_"+i] = []
+              this.data["bin_center_"+i] =[]
+              this.data["bin_top_"+i] = []
           }
         }
 
-        const stride_low = source.get_stride(this.axis_idx)
-        const stride_high = source.get_stride(this.axis_idx)
-        const length = stride_high/stride_low
+        let bin_centers_all:Array<Array<number>> = []
+        let bin_centers_filtered:Array<Array<number>> = []
+        for (let i = 0; i < this.source.dim; i++) {
+          bin_centers_all.push(this.source.get_array("bin_center_"+i) as number[])
+          bin_centers_filtered.push([])
+        }
 
-        const bin_count = this.source.get_array("bin_count")
-        const bin_centers = this.source.get_array("bin_center_"+axis_idx)
-        const edges_left = this.source.get_array("bin_bottom_"+axis_idx)
-        const edges_right = this.source.get_array("bin_top_"+axis_idx)
+        const bin_count = this.source.get_array("bin_count") as number[]
+        const bin_centers = this.source.get_array("bin_center_"+this.axis_idx) as number[]
+        const edges_left = this.source.get_array("bin_bottom_"+this.axis_idx) as number[]
+        const edges_right = this.source.get_array("bin_top_"+this.axis_idx) as number[]
 
         for(let x = 0; x < stride_low; x++){
-          for(let z = 0; z < source.length; z += stride_high){
-            for(let i=0; i<source.dim; i++){
+          for(let z = 0; z < this.source.length; z += stride_high){
+            for(let i=0; i<this.source.dim; i++){
               if(i != this.axis_idx){
-                  new_data["bin_bottom_"+i].push(source.get_column("bin_bottom_"+i)[z/length+x])
-                  new_data["bin_center_"+i].push(source.get_column("bin_center_"+i)[z/length+x])
-                  new_data["bin_top_"+i].push(source.get_column("bin_top_"+i)[z/length+x])
+              //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
+                  bin_centers_filtered[i].push(bin_centers_all[i][z/length+x])
+              //    (this.data["bin_top_"+i] as any[]).push(this.source.get_array("bin_top_"+i)[z/length+x])
               }
             }
             if(bin_count === null || bin_centers === null ){
@@ -98,7 +105,7 @@ export class HistoNdProfile extends ColumnarDataSource {
               isOK_column.push(false)
               continue
             }
-            let histogram_axis = []
+      //      let histogram_axis = []
             let cumulative_histogram = []
             let entries = 0
             for(let y=0; y < stride_high; y += stride_low){
@@ -198,6 +205,13 @@ export class HistoNdProfile extends ColumnarDataSource {
         for (let iBox = 0; iBox < integral_columns.length; iBox++) {
           this.data["sum_"+iBox] = integral_columns[iBox]
           this.data["sum_normed_"+iBox] = efficiency_columns[iBox]
+        }
+        for (let i = 0; i < this.source.dim; i++) {
+          if(i != this.axis_idx){
+          //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
+              this.data["bin_center_"+i] = bin_centers_filtered[i]
+          //    (this.data["bin_top_"+i] as any[]).push(this.source.get_array("bin_top_"+i)[z/length+x])
+          }
         }
 
         this.change.emit()
