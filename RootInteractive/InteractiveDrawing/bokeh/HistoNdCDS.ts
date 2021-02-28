@@ -123,6 +123,8 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public view: number[] | null
 
+  public dim: number
+
   private _bin_indices: number[] // Bin index caching
 
   private _range_min: number[]
@@ -187,6 +189,7 @@ export class HistoNdCDS extends ColumnarDataSource {
         this.data["bin_top_"+i]  = bin_top
       }
 
+      this.dim = dim
       this._bin_indices.length = this.source.length
       this._bin_indices.fill(-2, 0, this.source.length)
       this.update_data()
