@@ -78,10 +78,18 @@ export class HistoNdProfile extends ColumnarDataSource {
         }
 
         let bin_centers_all:Array<Array<number>> = []
+        let bin_top_all:Array<Array<number>> = []
+        let bin_bottom_all:Array<Array<number>> = []
         let bin_centers_filtered:Array<Array<number>> = []
+        let bin_top_filtered:Array<Array<number>> = []
+        let bin_bottom_filtered:Array<Array<number>> = []
         for (let i = 0; i < this.source.dim; i++) {
           bin_centers_all.push(this.source.get_array("bin_center_"+i) as number[])
           bin_centers_filtered.push([])
+          bin_top_all.push(this.source.get_array("bin_top_"+i) as number[])
+          bin_top_filtered.push([])
+          bin_bottom_all.push(this.source.get_array("bin_bottom_"+i) as number[])
+          bin_bottom_filtered.push([])
         }
 
         const bin_count = this.source.get_array("bin_count") as number[]
@@ -96,7 +104,9 @@ export class HistoNdProfile extends ColumnarDataSource {
             for(let i=0; i<this.source.dim; i++){
               if(i != this.axis_idx){
               //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
-                  bin_centers_filtered[i].push(bin_centers_all[i][z/length+x])
+                  bin_bottom_filtered[i].push(bin_bottom_all[i][x/length+z])
+                  bin_centers_filtered[i].push(bin_centers_all[i][x/length+z])
+                  bin_top_filtered[i].push(bin_top_all[i][x/length+z])
               //    (this.data["bin_top_"+i] as any[]).push(this.source.get_array("bin_top_"+i)[z/length+x])
               }
             }
@@ -210,9 +220,9 @@ export class HistoNdProfile extends ColumnarDataSource {
         }
         for (let i = 0; i < this.source.dim; i++) {
           if(i != this.axis_idx){
-          //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
+              this.data["bin_bottom_"+i] = bin_bottom_filtered[i]
               this.data["bin_center_"+i] = bin_centers_filtered[i]
-          //    (this.data["bin_top_"+i] as any[]).push(this.source.get_array("bin_top_"+i)[z/length+x])
+              this.data["bin_top_"+i] = bin_top_filtered[i]
           }
         }
 
