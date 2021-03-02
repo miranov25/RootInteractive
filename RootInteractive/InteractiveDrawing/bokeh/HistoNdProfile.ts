@@ -66,7 +66,7 @@ export class HistoNdProfile extends ColumnarDataSource {
         }
 
         const stride_low = this.source.get_stride(this.axis_idx)
-        const stride_high = this.source.get_stride(this.axis_idx)
+        const stride_high = this.source.get_stride(this.axis_idx+1)
         const length = stride_high/stride_low
 
         for(let i=0; i<this.source.dim; i++){
@@ -89,8 +89,10 @@ export class HistoNdProfile extends ColumnarDataSource {
         const edges_left = this.source.get_array("bin_bottom_"+this.axis_idx) as number[]
         const edges_right = this.source.get_array("bin_top_"+this.axis_idx) as number[]
 
-        for(let x = 0; x < stride_low; x++){
-          for(let z = 0; z < this.source.length; z += stride_high){
+        for(let x = 0; x < this.source.length; x += stride_high){
+          for(let z = 0; z < stride_low; z ++){
+      //      console.log(x)
+      //      console.log(z)
             for(let i=0; i<this.source.dim; i++){
               if(i != this.axis_idx){
               //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
