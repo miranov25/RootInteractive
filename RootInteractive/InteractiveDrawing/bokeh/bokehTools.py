@@ -477,7 +477,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
                 edges_right.append("bin_top_"+str(i))
                 sources.append(histoDict[iHisto]["cds"])
                 compute_quantile.append(False)
-        else:
+        elif histoDict[iHisto]["type"] == "histogram":
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
