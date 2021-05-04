@@ -99,12 +99,32 @@ class bokehDrawSA(object):
         * Constructor of  interactive standalone figure array
         * :Example usage in:
             * test_bokehDrawArray.py
+            * for list opf options see tutorials
+               * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/test_bokehClinetHistogram.ipynb
 
         :param widgetsDescription:
-        :param dataFrame:
-        :param query:
-        :param figureArray:
-        :param kwargs:
+        :param dataFrame:      input data frame currently it is panda plan intefrace others (vaex)
+        :param query:          panda (later vaex) query to select subset of the data
+        :param figureArray:    list of figure - [[varX ] [ varY], {figure options}]
+        :param kwargs:         widgetArray, layout=figureLayout, tooltips=tooltips,widgetLayout=widgetLayout,sizing_mode
+        :return:
+        Examples:
+           figureArray = [
+        [['A'], ['histoA']],
+        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
+        [['A'], ['histoAB']],
+        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
+        ["tableHisto", {"rowwise": False}]
+    ]
+    figureLayoutDesc=[
+        [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [4, {'plot_height': 40}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+    ]
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
+
         :return:
         """
         options={
