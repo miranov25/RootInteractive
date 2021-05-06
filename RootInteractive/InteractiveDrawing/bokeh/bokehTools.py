@@ -16,10 +16,12 @@ from RootInteractive.Tools.pandaTools import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.Histo2dCDS import Histo2dCDS
+from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 import copy
 from RootInteractive.Tools.compressArray import *
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
+from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
@@ -35,6 +37,7 @@ defaultHisto2DTooltips = [
     ("range Y", "[@{bin_bottom}, @{bin_top}]"),
     ("count", "@bin_count")
 ]
+
 
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -186,7 +189,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
                 cmapList[i][1].transform.high = high;
                 cmapList[i][1].transform.low = low;
-//                    cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs events might improve the performance
+    //          cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs
+    //                                                    events might improve the performance
             }
         }
     }
@@ -464,7 +468,16 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             edges_right.append("bin_top")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(False)
-        else:
+        elif histoDict[iHisto]["type"] == "histoNd":
+            for i in range(len(histoDict[iHisto]["variables"])):
+                histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
+                histo_columns.append("bin_count")
+                bin_centers.append("bin_center_"+str(i))
+                edges_left.append("bin_bottom_"+str(i))
+                edges_right.append("bin_top_"+str(i))
+                sources.append(histoDict[iHisto]["cds"])
+                compute_quantile.append(False)
+        elif histoDict[iHisto]["type"] == "histogram":
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
@@ -597,8 +610,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
 
     histoList = []
+    profileList = []
     for i in histogramDict:
-        histoList.append(histogramDict[i]["cds"])
+        if histogramDict[i]["type"] == "profile":
+            profileList.append(histogramDict[i]["cds"])
+        else:
+            histoList.append(histogramDict[i]["cds"])
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -755,7 +772,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -943,7 +960,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, nPointRender=10000,cdsCompress=None):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, nPointRender=10000,cdsCompress=None):
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -966,7 +983,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsHistoSummary=cdsHistoSummary, cdsCompress=cdsCompress)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
@@ -982,7 +999,10 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
 def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, **kwargs):
     options = {"range": None,
                "nbins": 10,
-               "weights": None}
+               "weights": None,
+               "quantiles": [],
+               "sumRange": []
+               }
     histoDict = {}
     for iHisto in histogramArray:
         sampleVars = iHisto["variables"]
@@ -1004,6 +1024,26 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                     range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
+        else:
+            sampleVarNames = []
+            for i in sampleVars:
+                _, varName = pandaGetOrMakeColumn(dfQuery, i)
+                sampleVarNames.append(varName)
+            cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
+                                    range=optionLocal["range"], sample_variables=sampleVarNames,
+                                    weights=optionLocal["weights"])
+            histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
+                                    "variables": sampleVars}
+            if "axis" in iHisto:
+                axisIndices = iHisto["axis"]
+                profilesDict = {}
+                for i in axisIndices:
+                    cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
+                                                sum_range=optionLocal["sum_range"])
+                    profilesDict[i] = cdsProfile
+                    histoDict[histoName+"_projection_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_projection_"+str(i)}
+                histoDict[histoName]["profiles"] = profilesDict
+
     return histoDict
 
 
@@ -1013,7 +1053,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
     output_cdsSel = False
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
-            histogramDict[histo["name"]] = False
+            histogramDict[histo["name"]] = True
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
