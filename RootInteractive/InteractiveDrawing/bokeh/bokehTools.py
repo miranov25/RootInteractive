@@ -1033,6 +1033,9 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                         columnNameDict[varNameX] = True
                         dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                         columnNameDict[varNameY] = True
+                        if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != ''):
+                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+                            columnNameDict[varNameZ] = True                            
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
                             seriesErrY = dfQuery[varNameErrY]
