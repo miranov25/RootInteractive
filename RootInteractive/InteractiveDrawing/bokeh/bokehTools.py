@@ -1,3 +1,4 @@
+from io import UnsupportedOperation
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, Image
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
@@ -1069,13 +1070,23 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                 for j in range(0, length):
                     if variables[1][j % lengthY] not in histogramDict:
                         output_cdsSel = True
-                        dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                        columnNameDict[varNameX] = True
-                        dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                        columnNameDict[varNameY] = True
+                        if '.' not in variables[0][j % lengthX]:
+                            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
+                            columnNameDict[varNameX] = True
+                        if '.' not in variables[0][j % lengthY]:
+                            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
+                            columnNameDict[varNameY] = True
                         if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != ''):
-                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
-                            columnNameDict[varNameZ] = True                            
+                            colorZvar = optionLocal['colorZvar']
+                            # We only care about default CDS here
+                            if type(colorZvar).__name__=='str':
+                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+                                columnNameDict[varNameZ] = True       
+                            elif "default" in colorZvar:
+                                colorZvar = colorZvar["default"]
+                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+                                columnNameDict[varNameZ] = True  
+                        # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
                             seriesErrY = dfQuery[varNameErrY]
@@ -1122,3 +1133,11 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
         dfQuery = dfQuery[columnNameDict]
 
     return dfQuery, histogramDict, output_cdsSel, columnNameDict
+
+def getOrMakeColumn(dfQuery, column):
+    if '.' in column:
+        c = column.split('.')
+        return [dfQuery, c[1], c[0]]
+    else:
+        dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
+        return [dfQuery, column, None]
