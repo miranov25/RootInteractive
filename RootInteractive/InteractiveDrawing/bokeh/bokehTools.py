@@ -24,8 +24,8 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 # tuple of Bokeh markers
-bokehMarkers = ["square", "circle", "triangle", "diamond", "squarecross", "circlecross", "diamondcross", "cross",
-                "dash", "hex", "invertedtriangle", "asterisk", "squareX", "X"]
+bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
+                "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
