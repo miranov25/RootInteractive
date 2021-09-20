@@ -574,6 +574,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "show_histogram_error": False,
         "arrayCompression": None,
         "removeExtraColumns": True,
+        "cdsDict": {}
     }
     options.update(kwargs)
     if query is not None:
@@ -609,6 +610,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         cdsFull=cdsCompress
 
     histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
+    cdsDict = options["cdsDict"]
 
     histoList = []
     profileList = []
@@ -617,6 +619,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             profileList.append(histogramDict[i]["cds"])
         else:
             histoList.append(histogramDict[i]["cds"])
+            if i not in cdsDict:
+                cdsDict[i] = histogramDict[i]["cds"]
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -665,13 +669,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             logging.info("Option %s", variables[2])
             optionLocal.update(variables[2])
         if 'varZ' in optionLocal.keys():
-            dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][0])
-            _, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][0])
-            _, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
-            _, varNameColor = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+            dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][0], None)
+            _, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][0], cds_name)
+            _, varNameZ, cds_name = getOrMakeColumn(dfQuery, optionLocal['varZ'], cds_name)
+            _, varNameColor, cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], cds_name)
             options3D = {"width": "99%", "height": "99%"}
+            cds_used = source
+            if cds_name is not None:
+                cds_used = cdsDict[cds_name]
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
-                                      data_source=source, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
+                                      data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
             plotArray.append(plotI)
             continue
@@ -984,7 +991,9 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender, cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
+    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
+                                       cmapDict=cmapDict, nPointRender=nPointRender,
+                                       cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iWidget in widgetArray:
         if isinstance(iWidget, CheckboxGroup):
@@ -1076,16 +1085,9 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                         if '.' not in variables[0][j % lengthY]:
                             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                             columnNameDict[varNameY] = True
-                        if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != ''):
-                            colorZvar = optionLocal['colorZvar']
-                            # We only care about default CDS here
-                            if type(colorZvar).__name__=='str':
-                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
-                                columnNameDict[varNameZ] = True       
-                            elif "default" in colorZvar:
-                                colorZvar = colorZvar["default"]
-                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
-                                columnNameDict[varNameZ] = True  
+                        if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('colorZvarSource' not in optionLocal):
+                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+                            columnNameDict[varNameZ] = True
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
@@ -1134,10 +1136,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
 
     return dfQuery, histogramDict, output_cdsSel, columnNameDict
 
-def getOrMakeColumn(dfQuery, column):
+def getOrMakeColumn(dfQuery, column, cdsName):
     if '.' in column:
         c = column.split('.')
-        return [dfQuery, c[1], c[0]]
+        if cdsName is None or cdsName == c[0]:
+            return [dfQuery, c[1], c[0]]
+        else:
+            raise ValueError("Inconsistent CDS")
     else:
         dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
         return [dfQuery, column, None]
