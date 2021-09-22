@@ -1082,7 +1082,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
                         if '.' not in variables[0][j % lengthX]:
                             dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
                             columnNameDict[varNameX] = True
-                        if '.' not in variables[0][j % lengthY]:
+                        if '.' not in variables[1][j % lengthY]:
                             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                             columnNameDict[varNameY] = True
                         if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('colorZvarSource' not in optionLocal):
