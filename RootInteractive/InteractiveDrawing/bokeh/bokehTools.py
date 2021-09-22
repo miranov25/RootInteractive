@@ -697,6 +697,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         color_bar = None
         mapperC = None
         if (len(optionLocal["colorZvar"]) > 0):
+            #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
+            #So far, color mappers are only supported for the main CDS
             logging.info("%s", optionLocal["colorZvar"])
             varColor = optionLocal["colorZvar"]
             mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=min(dfQuery[varColor]),
@@ -711,7 +713,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         defaultHoverToolRenderers = []
 
         for i in range(0, length):
-            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][i % lengthX])
+            cds_name = None
             if variables[1][i % lengthY] in histogramDict:
                 iHisto = histogramDict[variables[1][i % lengthY]]
                 if iHisto["type"] == "histogram":
@@ -720,8 +722,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][1])
             else:
-                dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][i % lengthY])
-            if mapperC is not None:
+                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name)
+                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name)
+            if mapperC is not None and cds_name is None:
                 color = mapperC
             else:
                 color = colorAll[max(length, 4)][i]
@@ -736,6 +739,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
+            cds_used = source
+            if cds_name is not None:
+                cds_used = cdsDict[cds_name]
 
             if varY in histogramDict:
                 histoHandle = histogramDict[varY]
@@ -750,16 +756,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                 #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
                 drawnGlyph = None
                 if optionLocal["legend_field"] is None:
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=varY + " vs " + varX)
                 else:
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=source, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
                 defaultHoverToolRenderers.append(drawnGlyph)
-                if ('errX' in optionLocal.keys()) & (optionLocal['errX'] != ''):
+                if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                     figureI.add_glyph(source, errorX)
-                if ('errY' in optionLocal.keys()) & (optionLocal['errY'] != ''):
+                if ('errY' in optionLocal.keys()) and (optionLocal['errY'] != '') and (cds_name is None):
                     errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
                     figureI.add_glyph(source, errorY)
                 #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
