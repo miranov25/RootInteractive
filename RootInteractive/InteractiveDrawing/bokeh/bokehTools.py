@@ -615,12 +615,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
     histoList = []
     profileList = []
     for i in histogramDict:
+        if i not in cdsDict:
+            cdsDict[i] = histogramDict[i]["cds"]
         if histogramDict[i]["type"] == "profile":
             profileList.append(histogramDict[i]["cds"])
         else:
             histoList.append(histogramDict[i]["cds"])
-            if i not in cdsDict:
-                cdsDict[i] = histogramDict[i]["cds"]
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -1057,7 +1057,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
-                    histoDict[histoName+"_projection_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_projection_"+str(i)}
+                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i)}
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict

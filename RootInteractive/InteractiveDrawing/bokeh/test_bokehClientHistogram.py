@@ -60,7 +60,7 @@ def testBokehClientHistogram():
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
         [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['(A+B)/2'], ['histoTransform', '(C+A)*200', '(C-A)*200']],
+        [['histoTransform_0.bin_center_1'], ['histoTransform_0.mean', 'histoTransform_0.quantile_0', 'histoTransform_0.sum_normed_0']],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True}]
     ]
@@ -104,5 +104,5 @@ def testBokehClientHistogramRowwiseTable():
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 #testBokehClientHistogram()
-testBokehClientHistogramOnlyHisto()
+#testBokehClientHistogramOnlyHisto()
 #testBokehClientHistogramRowwiseTable()
