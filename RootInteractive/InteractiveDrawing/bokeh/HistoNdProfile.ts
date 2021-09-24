@@ -151,7 +151,7 @@ export class HistoNdProfile extends ColumnarDataSource {
                 high = cumulative_histogram[j]
                 while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
                   const m = (this.quantiles[iQuantile] * entries - low)/(high-low)
-                  quantile_columns[iQuantile].push(edges_left[j]*(1-m)+edges_right[j]*m)
+                  quantile_columns[iQuantile].push(edges_left[j*stride_low]*(1-m)+edges_right[j*stride_low]*m)
                   iQuantile++
                 }
                 low = high
