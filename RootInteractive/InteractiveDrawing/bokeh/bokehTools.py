@@ -454,31 +454,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
         formatter = ScientificFormatter(precision=3)
 
     for iHisto in histoDict:
-        if histoDict[iHisto]["type"] == "histo2d":
-            histo_names.append(histoDict[iHisto]["name"]+"_X")
-            histo_columns.append("bin_count")
-            bin_centers.append("x")
-            edges_left.append("bin_left")
-            edges_right.append("bin_right")
-            sources.append(histoDict[iHisto]["cds"])
-            compute_quantile.append(False)
-            histo_names.append(histoDict[iHisto]["name"]+"_Y")
-            histo_columns.append("bin_count")
-            bin_centers.append("y")
-            edges_left.append("bin_bottom")
-            edges_right.append("bin_top")
-            sources.append(histoDict[iHisto]["cds"])
-            compute_quantile.append(False)
-        elif histoDict[iHisto]["type"] == "histoNd":
-            for i in range(len(histoDict[iHisto]["variables"])):
-                histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
-                histo_columns.append("bin_count")
-                bin_centers.append("bin_center_"+str(i))
-                edges_left.append("bin_bottom_"+str(i))
-                edges_right.append("bin_top_"+str(i))
-                sources.append(histoDict[iHisto]["cds"])
-                compute_quantile.append(False)
-        elif histoDict[iHisto]["type"] == "histogram":
+        if histoDict[iHisto]["type"] == "histogram":
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
@@ -490,6 +466,15 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
                 quantiles += histoDict[iHisto]["quantiles"]
             if "sum_range" in histoDict[iHisto]:
                 sum_range += histoDict[iHisto]["sum_range"]
+        elif histoDict[iHisto]["type"] in ["histo2d", "histoNd"]:
+            for i in range(len(histoDict[iHisto]["variables"])):
+                histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
+                histo_columns.append("bin_count")
+                bin_centers.append("bin_center_"+str(i))
+                edges_left.append("bin_bottom_"+str(i))
+                edges_right.append("bin_top_"+str(i))
+                sources.append(histoDict[iHisto]["cds"])
+                compute_quantile.append(False)
 
     quantiles = [*{*quantiles}]
     sum_range_uniq = []
@@ -811,27 +796,27 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
             colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=x + " vs " + y)
-        histoGlyph = Quad(left="bin_left", right="bin_right", bottom="bin_bottom", top="bin_top",
+        histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
                           fill_color=mapperC)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
-        mapperC = linear_cmap(field_name="y", palette=options['palette'], low=min(dfQuery[y]),
+        mapperC = linear_cmap(field_name="bin_center_1", palette=options['palette'], low=min(dfQuery[y]),
                                   high=max(dfQuery[y]))
-        if "y" in colorMapperDict:
-            colorMapperDict["y"] += [[cdsHisto, mapperC]]
+        if "bin_center_1" in colorMapperDict:
+            colorMapperDict["bin_center_1"] += [[cdsHisto, mapperC]]
         else:
-            colorMapperDict["y"] = [[cdsHisto, mapperC]]
+            colorMapperDict["bin_center_1"] = [[cdsHisto, mapperC]]
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=x + " vs " + y)
         if options["legend_field"] is None:
-            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_label="Histogram of " + x)
         else:
-            histoGlyphRenderer = fig.scatter(x="x", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
         if "show_histogram_error" in options:
-            errorbar = VBar(x="x", width=0, top="errorbar_high", bottom="errorbar_low", line_color=mapperC)
+            errorbar = VBar(x="bin_center_0", width=0, top="errorbar_high", bottom="errorbar_low", line_color=mapperC)
             fig.add_glyph(cdsHisto, errorbar)
         fig.add_layout(color_bar, 'right')
     if tooltips is not None:
@@ -1034,10 +1019,12 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             histoDict[histoName] = iHisto.copy()
             histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
         elif len(sampleVars) == 2:
-            _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
-            _, varNameY = pandaGetOrMakeColumn(dfQuery, sampleVars[1])
-            cdsHisto = Histo2dCDS(source=cdsFull, nbins=optionLocal["nbins"],
-                                    range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
+            sampleVarNames = []
+            for i in sampleVars:
+                _, varName = pandaGetOrMakeColumn(dfQuery, i)
+                sampleVarNames.append(varName)
+            cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
+                                    range=optionLocal["range"], sample_variables=sampleVarNames, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
             if "axis" in iHisto:
