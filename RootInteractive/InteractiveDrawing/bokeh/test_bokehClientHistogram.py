@@ -89,9 +89,9 @@ def testBokehClientHistogramProfile():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2']],
-        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean']],
+        [['A'], ['histoAB']],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.std']],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
