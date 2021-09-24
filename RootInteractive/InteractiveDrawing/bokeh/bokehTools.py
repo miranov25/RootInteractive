@@ -1040,6 +1040,15 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                     range=optionLocal["range"], sample_x=varNameX, sample_y=varNameY, weights=optionLocal["weights"])
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
+            if "axis" in iHisto:
+                axisIndices = iHisto["axis"]
+                profilesDict = {}
+                for i in axisIndices:
+                    cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
+                                                sum_range=optionLocal["sumRange"])
+                    profilesDict[i] = cdsProfile
+                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i)}
+                histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
             for i in sampleVars:
@@ -1055,7 +1064,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 profilesDict = {}
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
-                                                sum_range=optionLocal["sum_range"])
+                                                sum_range=optionLocal["sumRange"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i)}
                 histoDict[histoName]["profiles"] = profilesDict
