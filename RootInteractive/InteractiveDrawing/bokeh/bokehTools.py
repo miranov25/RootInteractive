@@ -16,7 +16,6 @@ from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
-from RootInteractive.InteractiveDrawing.bokeh.Histo2dCDS import Histo2dCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 import copy
 from RootInteractive.Tools.compressArray import *
