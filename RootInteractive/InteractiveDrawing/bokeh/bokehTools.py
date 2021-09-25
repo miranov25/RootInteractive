@@ -33,8 +33,8 @@ defaultHistoTooltips = [
 ]
 
 defaultHisto2DTooltips = [
-    ("range X", "[@{bin_left}, @{bin_right}]"),
-    ("range Y", "[@{bin_bottom}, @{bin_top}]"),
+    ("range X", "[@{bin_bottom_0}, @{bin_top_0}]"),
+    ("range Y", "[@{bin_bottom_1}, @{bin_top_1}]"),
     ("count", "@bin_count")
 ]
 
