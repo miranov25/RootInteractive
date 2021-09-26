@@ -72,7 +72,7 @@ def testBokehClientHistogramOnlyHisto():
     figureArray = [
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": False}]
     ]
@@ -90,7 +90,7 @@ def testBokehClientHistogramProfileA():
     figureArray = [
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2']],
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean']],
-        [['A'], ['histoAB']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['histoAB_1.bin_center_0'], ['histoAB_1.std']],
         ["tableHisto", {"rowwise": False}]
     ]
@@ -108,7 +108,7 @@ def testBokehClientHistogramProfileB():
     figureArray = [
         [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_0', 'histoAB_0.quantile_1', 'histoAB_0.quantile_2']],
         [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_1', 'histoAB_0.mean']],
-        [['A'], ['histoAB']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
         ["tableHisto", {"rowwise": False}]
     ]
@@ -127,7 +127,7 @@ def testBokehClientHistogramRowwiseTable():
     figureArray = [
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": True}]
     ]
