@@ -636,16 +636,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         # zAxisTitle = ""
         plotTitle = ""
         for varY in variables[1]:
-            if hasattr(dfQuery, "meta"):
+            if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
-                yAxisTitle += varY
+                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, varY, None)
+                yAxisTitle += getHistogramAxisTitle(histogramDict, varNameY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
-            if hasattr(dfQuery, "meta"):
+            if hasattr(dfQuery, "meta") and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
-                xAxisTitle += varX
+                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, varX, None)
+                xAxisTitle += getHistogramAxisTitle(histogramDict, varNameX, cds_name, False)
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
@@ -683,14 +685,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
         mapperC = None
+        cmap_cds_name = None
         if (len(optionLocal["colorZvar"]) > 0):
             #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
             #So far, rescaleColorMapper is only supported for the main CDS
             logging.info("%s", optionLocal["colorZvar"])
-            _, varColor, cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], None)
+            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], None)
             low = 0
             high = 1
-            if cds_name is None:
+            if cmap_cds_name is None:
                 low = min(dfQuery[varColor])
                 high=max(dfQuery[varColor])
             if "cmapLow" in optionLocal:
@@ -703,7 +706,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                     colorMapperDict[optionLocal["colorZvar"]] += [[source, mapperC]]
                 else:
                     colorMapperDict[optionLocal["colorZvar"]] = [[source, mapperC]]
-            axis_title = getHistogramAxisTitle(histogramDict, varColor, cds_name)
+            axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
 
         defaultHoverToolRenderers = []
@@ -722,7 +725,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             else:
                 dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name)
                 dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name)
-            if mapperC is not None and cds_name is None:
+            if mapperC is not None and cds_name == cmap_cds_name:
                 color = mapperC
             else:
                 color = colorAll[max(length, 4)][i]
