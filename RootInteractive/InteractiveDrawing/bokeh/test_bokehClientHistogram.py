@@ -38,10 +38,10 @@ widgetParams=[
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['multiSelect', ["DDC"]],
-    ['select',["CC", 0, 1, 2, 3]],
-    ['multiSelect',["BoolB"]],
+  #  ['select',["CC", 0, 1, 2, 3]],
+  #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -60,12 +60,12 @@ def testBokehClientHistogram():
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
         [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.mean', 'histoABC_0.quantile_0', 'histoABC_0.sum_normed_0']],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True}]
     ]
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointsRender=3000, histogramArray=histoArray)
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointsRender=300, histogramArray=histoArray)
 
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
