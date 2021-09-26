@@ -821,7 +821,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         else:
             colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
-                             title=x + " vs " + y)
+                             title="Count")
         histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
                           fill_color=mapperC)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
