@@ -549,6 +549,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "filter": '',
         'doDraw': 0,
         "legend_field": None,
+        "legendTitle": None,
         'nPointRender': 10000,
         "nbins": 10,
         "weights": None,
@@ -696,6 +697,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
 
         defaultHoverToolRenderers = []
 
+        figure_cds_name = None
+
         for i in range(0, length):
             cds_name = None
             if variables[1][i % lengthY] in histogramDict:
@@ -754,12 +757,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
                     figureI.add_glyph(source, errorY)
                 #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
                 #    figureI.add_layout(errors)
+            if figure_cds_name is None:
+                figure_cds_name = cds_name
+            elif figure_cds_name != cds_name:
+                figure_cds_name = ""
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         if defaultHoverToolRenderers:
             figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
         figureI.legend.click_policy = "hide"
+        if optionLocal["legendTitle"] is not None:
+            figureI.legend.title = optionLocal["legendTitle"]
+        elif figure_cds_name != "":
+            figureI.legend.title = figure_cds_name
         #        zAxisTitle=zAxisTitle[:-1]
         #        if(len(zAxisTitle)>0):
         #            plotTitle += " Color:" + zAxisTitle
