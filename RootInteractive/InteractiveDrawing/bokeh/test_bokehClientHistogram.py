@@ -65,7 +65,7 @@ def testBokehClientHistogram():
                                                     "rescaleColorMapper": True}]
     ]
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointsRender=300, histogramArray=histoArray)
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, histogramArray=histoArray)
 
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
