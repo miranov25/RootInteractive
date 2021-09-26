@@ -51,7 +51,7 @@ figureLayoutDesc=[
 histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
-    {"name": "histoTransform", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
+    {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D", "quantiles": [.25, .5, .75], "axis": [1]},
 ]
 
@@ -60,7 +60,7 @@ def testBokehClientHistogram():
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
         [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['histoTransform_0.bin_center_1'], ['histoTransform_0.mean', 'histoTransform_0.quantile_0', 'histoTransform_0.sum_normed_0']],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean', 'histoABC_0.quantile_0', 'histoABC_0.sum_normed_0']],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True}]
     ]
@@ -89,7 +89,7 @@ def testBokehClientHistogramProfile():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2']],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean']],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"legendTitle": "histoAB_1"}],
         [['A'], ['histoAB']],
         [['histoAB_1.bin_center_0'], ['histoAB_1.std']],
         ["tableHisto", {"rowwise": False}]
@@ -110,7 +110,7 @@ def testBokehClientHistogramRowwiseTable():
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB']],
-        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": True}]
     ]
     figureLayoutDesc=[
