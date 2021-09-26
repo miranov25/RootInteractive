@@ -561,7 +561,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         "removeExtraColumns": True,
         "cdsDict": {},
         "cmapLow": None,
-        "cmalHigh": None
+        "cmalHigh": None,
+        "xAxisTitle": None,
+        "yAxisTitle": None,
+        "plotTitle": None
     }
     options.update(kwargs)
     if query is not None:
@@ -635,6 +638,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         yAxisTitle = ""
         # zAxisTitle = ""
         plotTitle = ""
+
         for varY in variables[1]:
             if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
@@ -651,12 +655,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
-        plotTitle += yAxisTitle + " vs " + xAxisTitle
 
         optionLocal = copy.copy(options)
         if len(variables) > 2:
             logging.info("Option %s", variables[2])
             optionLocal.update(variables[2])
+
+        if optionLocal["xAxisTitle"] is not None:
+            xAxisTitle = optionLocal["xAxisTitle"]
+        if optionLocal["yAxisTitle"] is not None:
+            yAxisTitle = optionLocal["yAxisTitle"]
+        plotTitle += yAxisTitle + " vs " + xAxisTitle
+        if optionLocal["plotTitle"] is not None:
+            plotTitle = optionLocal["plotTitle"]
+
         if 'varZ' in optionLocal.keys():
             dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][0], None)
             _, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][0], cds_name)
