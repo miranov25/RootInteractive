@@ -38,10 +38,10 @@ widgetParams=[
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['multiSelect', ["DDC"]],
-    ['select',["CC", 0, 1, 2, 3]],
-    ['multiSelect',["BoolB"]],
+  #  ['select',["CC", 0, 1, 2, 3]],
+  #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -51,8 +51,8 @@ figureLayoutDesc=[
 histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
-    {"name": "histoTransform", "variables": ["(A+B)/2"],"nbins":20, "sum_range": [[.25, .75]]},
-    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D"},
+    {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
+    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
 ]
 
 def testBokehClientHistogram():
@@ -60,20 +60,20 @@ def testBokehClientHistogram():
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
         [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['(A+B)/2'], ['histoTransform', '(C+A)*200', '(C-A)*200']],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
                                                     "rescaleColorMapper": True}]
     ]
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointsRender=3000, histogramArray=histoArray)
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, histogramArray=histoArray)
 
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB']],
-        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -85,13 +85,50 @@ def testBokehClientHistogramOnlyHisto():
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
+def testBokehClientHistogramProfileA():
+    output_file("test_BokehClientHistogramProfileA.html")
+    figureArray = [
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2']],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.std']],
+        ["tableHisto", {"rowwise": False}]
+    ]
+    figureLayoutDesc=[
+        [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [4, {'plot_height': 40}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+    ]
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
+
+def testBokehClientHistogramProfileB():
+    output_file("test_BokehClientHistogramProfileB.html")
+    figureArray = [
+        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_0', 'histoAB_0.quantile_1', 'histoAB_0.quantile_2']],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_1', 'histoAB_0.mean']],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
+        ["tableHisto", {"rowwise": False}]
+    ]
+    figureLayoutDesc=[
+        [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [4, {'plot_height': 40}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+    ]
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
+
+
 def testBokehClientHistogramRowwiseTable():
     output_file("test_BokehClientHistogramRowwiseTable.html")
     figureArray = [
         [['A'], ['histoA']],
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB']],
-        [['B'], ['histoTransform'], {"flip_histogram_axes": True}],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
+        [['B'], ['histoB'], {"flip_histogram_axes": True}],
         ["tableHisto", {"rowwise": True}]
     ]
     figureLayoutDesc=[
@@ -105,4 +142,4 @@ def testBokehClientHistogramRowwiseTable():
 
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
-testBokehClientHistogramRowwiseTable()
+#testBokehClientHistogramRowwiseTable()

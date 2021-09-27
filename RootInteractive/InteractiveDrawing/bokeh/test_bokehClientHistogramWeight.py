@@ -21,6 +21,8 @@ figureArray = [
     [['A'], ['histoA1']],
     [['B'], ['histoB']],
     [['D'], ['histoD']],
+    [['histoB.bin_center'], ['histoB.bin_count']],
+    [['histoD.bin_center'], ['histoD.bin_count']],
 ]
 histogramArray = [
     {"name": "histoA", "variables": ["A"], "weights": "Wa", "nbins": 50, "range": [-1, 1]},
@@ -39,15 +41,20 @@ widgetLayoutDesc = [[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
 figureLayoutDesc = [
     [0, 1, {'y_visible': 1, 'x_visible': 1, 'plot_height': 150}],
     [2, 3, {'y_visible': 1, 'x_visible': 1, 'plot_height': 150}],
+    [4, 5, {'y_visible': 1, 'x_visible': 1, 'plot_height': 150}],
     {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible': 2}
 ]
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)")]
 df,a,b,c,d=makePanda(0.02,0.1)
 df['D']=df["A"]-df["B"]
-output_file("test_bokehClientHistogramWeight.html")
-xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
-output_file("test_bokehClientHistogramWeight_Compressed.html")
-xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                            widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
-                            arrayCompression=arrayCompressionRelative16)
+
+def test_clientHistogramWeight():
+    output_file("test_bokehClientHistogramWeight.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
+
+def test_clientHistogramWeightCompressed():
+    output_file("test_bokehClientHistogramWeight_Compressed.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                                arrayCompression=arrayCompressionRelative16)

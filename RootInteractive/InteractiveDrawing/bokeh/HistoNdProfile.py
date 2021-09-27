@@ -1,10 +1,11 @@
-from bokeh.core.properties import Instance, String, Float, Int, List
+from bokeh.core.properties import Instance, List, Float, Int
 from bokeh.models import ColumnarDataSource
+from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 
 
-class Histo2dCDS(ColumnarDataSource):
+class HistoNdProfile(ColumnarDataSource):
 
-    __implementation__ = "Histo2dCDS.ts"
+    __implementation__ = "HistoNdProfile.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -14,11 +15,7 @@ class Histo2dCDS(ColumnarDataSource):
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
-    source = Instance(ColumnarDataSource)
-    view = List(Int)
-    sample_x = String
-    sample_y = String
-    weights = String(default=None)
-    nbins = List(Int)
-    range = List(List(Float))
-    print("x", __implementation__)
+    source = Instance(HistoNdCDS)
+    axis_idx = Int
+    quantiles = List(Float)
+    sum_range = List(List(Float))
