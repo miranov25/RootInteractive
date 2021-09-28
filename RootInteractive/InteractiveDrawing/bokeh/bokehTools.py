@@ -1194,8 +1194,13 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
         return varName
     if cdsName in histoDict:
         if '_' in varName:
+            if varName == "bin_count":
+                # Maybe do something else
+                return "count"
             x = varName.split("_")
             if x[0] == "bin":
+                if len(x) == 2:
+                    return histoDict[cdsName]["variables"][0]
                 return histoDict[cdsName]["variables"][int(x[-1])]
             if x[0] == "quantile":
                 quantile = histoDict[cdsName]["quantiles"][int(x[-1])]
