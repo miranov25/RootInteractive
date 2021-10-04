@@ -30,10 +30,12 @@ def roundRelativeBinary(df, nBits):
     type=df.dtype
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
-    mantissa = ((mantissa * shiftN)+0.5).astype("int")
+    mantissa = ((mantissa * shiftN)+0.5)
+    mantissa = np.where(np.isnan(mantissa), 0, mantissa).astype("int")
     #mantissa = (mantissa * shiftN).rint()
-    mantissa /= shiftN
+    mantissa >>= nBits
     result=(mantissa * 2 ** exp2.astype(float)).astype(type)
+    result=df.where(df.notna(), result)
     return result
 
 
@@ -129,7 +131,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
     currentArray = inputArray
     counter=0
     for action, actionParam in actionArray:
-        try:
+       # try:
             if keepValues:
                 arrayInfo["history"].append(currentArray)
             if action == "relative":
@@ -163,11 +165,11 @@ def compressArray(inputArray, actionArray, keepValues=False):
                         currentArray = currentArray.map(dictValues).astype("int32")
                         arrayInfo["indexType"] = "int32"
             if action == "decode":
-                arrayAsPanda=pdMap.DataFrame(currentArray)[0]       # TODO - numpy does not have map function better solution to fine
+                arrayAsPanda=pdMap.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
             counter+=1
-        except:
-            print("compressArray - Unexpected error in ", action,  sys.exc_info()[0])
+       # except:
+        #    print("compressArray - Unexpected error in ", action,  sys.exc_info()[0])
             #pass
     arrayInfo["array"] = currentArray
     return arrayInfo
