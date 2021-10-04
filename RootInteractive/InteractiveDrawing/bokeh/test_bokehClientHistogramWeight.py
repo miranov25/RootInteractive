@@ -11,6 +11,7 @@ def makePanda(step,sigma):
     cc = np.arange(-2, 2, step)
     a, b, c = np.meshgrid(aa, bb, cc, sparse=False)
     w = np.exp(-(np.abs(a - b) ** 2) / (2 * sigma ** 2))
+    #w[0] = np.NaN
     wA = np.exp(-(a ** 2) / (2 * sigma ** 2))
     df0 = pd.DataFrame(data={'A': a.flatten(), 'B': b.flatten(), 'C': c.flatten(), 'W': w.flatten(),'Wa': w.flatten()})
     return df0,a,b,c,w
