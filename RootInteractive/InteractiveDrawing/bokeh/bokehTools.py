@@ -1050,10 +1050,13 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             continue
         optionLocal = copy.copy(options)
         optionLocal.update(iHisto)
+        weights = None
+        if optionLocal["weights"] is not None:
+            _, weights = pandaGetOrMakeColumn(dfQuery, optionLocal["weights"])
         if len(sampleVars) == 1:
             _, varNameX = pandaGetOrMakeColumn(dfQuery, sampleVars[0])
             cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
-                                    range=optionLocal["range"], sample=varNameX, weights=optionLocal["weights"])
+                                    range=optionLocal["range"], sample=varNameX, weights=weights)
             histoDict[histoName] = iHisto.copy()
             histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
         elif len(sampleVars) == 2:
@@ -1062,7 +1065,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 _, varName = pandaGetOrMakeColumn(dfQuery, i)
                 sampleVarNames.append(varName)
             cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
-                                    range=optionLocal["range"], sample_variables=sampleVarNames, weights=optionLocal["weights"])
+                                    range=optionLocal["range"], sample_variables=sampleVarNames, weights=weights)
             histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                     "variables": sampleVars}
             if "axis" in iHisto:
@@ -1082,7 +1085,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 sampleVarNames.append(varName)
             cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_variables=sampleVarNames,
-                                    weights=optionLocal["weights"])
+                                    weights=weights)
             histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
                                     "variables": sampleVars}
             if "axis" in iHisto:
