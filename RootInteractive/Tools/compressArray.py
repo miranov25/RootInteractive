@@ -30,12 +30,8 @@ def roundRelativeBinary(df, nBits):
     type=df.dtype
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
-    mantissa = ((mantissa * shiftN)+0.5)
-    mantissa = np.where(np.isnan(mantissa), 0, mantissa).astype("int")
-    #mantissa = (mantissa * shiftN).rint()
-    mantissa >>= nBits
+    mantissa = np.rint(((mantissa * shiftN)))/shiftN
     result=(mantissa * 2 ** exp2.astype(float)).astype(type)
-    result=df.where(df.notna(), result)
     return result
 
 
