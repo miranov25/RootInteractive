@@ -13,3 +13,5 @@ test_*.html
 *.js.map
 *.root
 *.orig
+workspace.xml
+.iws
