@@ -341,6 +341,11 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
     widgetRows = []
     row_names = []
     nRows = len(widgetArray)
+    same_size = True
+    rowWidget = widgetLayoutDesc[0]
+    if isinstance(rowWidget[-1], dict):
+        rowWidget = rowWidget[0:-1]
+    nColumns = len(rowWidget)
     # get/apply global options if exist
     if isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
@@ -354,6 +359,8 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         if isinstance(rowWidget[-1], dict):
             rowOptions.update(rowWidget[-1])
             rowWidget = rowWidget[0:-1]
+        if nColumns != len(rowWidget):
+            same_size = False
         rowWidgetArray0 = []
         for i, iWidget in enumerate(rowWidget):
             figure = widgetArray[iWidget]
@@ -416,8 +423,13 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
     }
             """
         widget_rows.js_on_change("value", CustomJS(args={"grid_inner": gridInner}, code=layout_widget_row_callback))
-        if 'column_names' in options:
-            widget_columns = MultiSelect(title="Show columns", value=options['column_names'], options=options['column_names'])
+        if same_size:
+            column_names = []
+            for i in range(nColumns):
+                column_names.append(str(i))
+            if 'column_names' in options:
+                column_names = options['column_names']
+            widget_columns = MultiSelect(title="Show columns", value=column_names, options=column_names)
             layout_widget_column_callback = \
                 """
     let j = 0
