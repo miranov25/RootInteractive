@@ -400,9 +400,6 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         widget_rows = MultiSelect(title="Show rows", value=row_names, options=row_names)
         layout_widget_row_callback = \
             """
-    console.log(this.value)
-    console.log(this.options)
-    console.log(grid_inner.children)
     let j = 0
     const l = this.value.length
     const rows = grid_inner.children
@@ -411,8 +408,6 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         if (j === l){
             rows[i].visible = false
         } else if(this.options[i] == this.value[j]){
-            console.log(i)
-            console.log(j)
             rows[i].visible = true
             j++
         } else {
@@ -422,25 +417,21 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
             """
         widget_rows.js_on_change("value", CustomJS(args={"grid_inner": gridInner}, code=layout_widget_row_callback))
         if 'column_names' in options:
-            widget_columns = MultiSelect(title="Show columns", value=optionsPlot, options=optionsPlot)
+            widget_columns = MultiSelect(title="Show columns", value=options['column_names'], options=options['column_names'])
             layout_widget_column_callback = \
                 """
-    console.log(this.value)
-    console.log(this.options)
-    console.log(grid_inner.children)
     let j = 0
     const l = this.value.length
     const rows = grid_inner.children
     const n_rows = rows.length
     const n_columns = this.options.length
-    for(let i_row=0; i<n_rows; i_row++){
-        columns = rows[i_row].children
-        for(let i; i<n_columns; i++){
+    for(let i_row=0; i_row<n_rows; i_row++){
+        const columns = rows[i_row].children
+        j = 0
+        for(let i = 0; i<n_columns; i++){
             if (j === l){
                 columns[i].visible = false
             } else if(this.options[i] == this.value[j]){
-                console.log(i)
-                console.log(j)
                 columns[i].visible = true
                 j++
             } else {
@@ -449,6 +440,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         }
     }
                 """
+            widget_columns.js_on_change("value", CustomJS(args={"grid_inner": gridInner}, code=layout_widget_column_callback))
             layout_widgets = row([widget_rows, widget_columns], sizing_mode=options['sizing_mode'])
         else:
             layout_widgets = row([widget_rows], sizing_mode=options['sizing_mode'])
