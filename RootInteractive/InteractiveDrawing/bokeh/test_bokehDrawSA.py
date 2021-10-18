@@ -95,12 +95,12 @@ def testBokehDrawArrayWidgetNoScale():
 
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=200)
 
 def testBokehDrawArrayQuery():
     output_file("test_BokehDrawArrayQuery.html")
     df0 = df.copy()
-    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
+    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=200)
     assert (df0.keys() == df.keys()).all()
 
 def testBokehDrawArraySA_tree():
