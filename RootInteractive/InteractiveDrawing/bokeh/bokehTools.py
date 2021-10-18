@@ -38,7 +38,6 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
-
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
@@ -335,10 +334,12 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         'x_visible': 1, 'y_visible': 1,
         'plot_width': -1, 'plot_height': -1,
         'sizing_mode': 'scale_width',
-        'legend_visible': True
+        'legend_visible': True,
+        'layout_widgets': False
     }
 
     widgetRows = []
+    row_names = []
     nRows = len(widgetArray)
     # get/apply global options if exist
     if isinstance(widgetLayoutDesc[-1], dict):
@@ -346,7 +347,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         options.update(widgetLayoutDesc[-1])
         widgetLayoutDesc = widgetLayoutDesc[0:-1]
 
-    for rowWidget in widgetLayoutDesc:
+    for j, rowWidget in enumerate(widgetLayoutDesc):
         rowOptions = {}
         rowOptions.update(options)
         # patch local option
@@ -386,10 +387,47 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
                     figure.width = plot_width
                 if rowOptions["plot_height"] > 0:
                     figure.height = rowOptions["plot_height"]
-
+        row_name = str(j)
+        if 'row_name' in rowOptions:
+            row_name = rowOptions['row_name']
+        row_names.append(row_name)
         rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
         widgetRows.append(rowWidgetArray)
-    return column(widgetRows, sizing_mode=options['sizing_mode'])
+    gridInner = column(widgetRows, sizing_mode=options['sizing_mode'])
+    if options['layout_widgets']:
+        if 'row_names' in options:
+            row_names = options['row_names']
+        widget_rows = MultiSelect(title="Show rows", value=row_names, options=row_names)
+        layout_widget_row_callback = \
+            """
+    console.log(this.value)
+    console.log(this.options)
+    console.log(grid_inner.children)
+    let j = 0
+    const l = this.value.length
+    const rows = grid_inner.children
+    const n_rows = rows.length
+    for(let i=0; i<n_rows; i++){
+        if (j === l){
+            rows[i].visible = false
+        } else if(this.options[i] == this.value[j]){
+            console.log(i)
+            console.log(j)
+            rows[i].visible = true
+            j++
+        } else {
+            rows[i].visible = false
+        }
+    }
+            """
+        widget_rows.js_on_change("value", CustomJS(args={"grid_inner": gridInner}, code=layout_widget_row_callback))
+        if 'column_names' in options:
+            widget_columns = MultiSelect(title="Show columns", value=optionsPlot, options=optionsPlot)
+            layout_widgets = row([widget_rows, widget_columns], sizing_mode=options['sizing_mode'])
+        else:
+            layout_widgets = row([widget_rows], sizing_mode=options['sizing_mode'])
+        return column([gridInner, layout_widgets], sizing_mode=options['sizing_mode'])
+    return gridInner
 
 
 def gridplotRow(figList0, **options):
@@ -838,6 +876,14 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
                           fill_color=mapperC)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
+        tooltips = None
+        if "tooltips" in histoHandle:
+            tooltips = histoHandle["tooltips"]
+        elif "tooltips" in options:
+            tooltips = options["histoTooltips"]
+        visualization_type = "points"
+        histoGlyphRenderer = None
+
     elif visualization_type == "colZ":
         mapperC = linear_cmap(field_name="bin_center_1", palette=options['palette'], low=min(dfQuery[y]),
                                   high=max(dfQuery[y]))
