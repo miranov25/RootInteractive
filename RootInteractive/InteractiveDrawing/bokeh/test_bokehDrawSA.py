@@ -80,7 +80,7 @@ widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7],[8,9], {'sizing_mode': 'scale_wid
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
     [3, 4, 5, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
-    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, 'column_names': ["3D", "markers", "yolo"], 'layout_widgets': True}
+    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, 'layout_widgets': True}
 ]
 
 
@@ -88,10 +88,18 @@ def testBokehDrawArrayWidget():
     output_file("test_BokehDrawArrayWidget.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
 
+def testBokehDrawArrayWidgetInconsistentColumns():
+    output_file("test_BokehDrawArrayWidgetInconsistentColumns.html")
+    figureLayoutDesc = [
+        [0, 1, 2],
+        [3, 4, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible': 2, 'layout_widgets': True}
+    ]
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
+
 def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None)
-
 
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
