@@ -53,9 +53,10 @@ figureArray = [
     [['A'], ['C+A', 'C-A', 'A/A']],
     [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "EE", "errY": "errY", "rescaleColorMapper": True }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
-#    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
+    #[['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
+    [['D'], ['D*D'], {"size": 10, "errY": "errY"}],
 ]
 #widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
@@ -78,8 +79,8 @@ widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7],[8,9], {'sizing_mode': 'scale_wid
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-    [3, 4, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
-    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    [3, 4, 5, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
+    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, 'column_names': ["3D", "markers", "yolo"], 'layout_widgets': True}
 ]
 
 
