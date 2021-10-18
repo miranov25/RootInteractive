@@ -53,6 +53,7 @@ figureArray = [
     [['A'], ['C+A', 'C-A', 'A/A']],
     [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "EE", "errY": "errY", "rescaleColorMapper": True }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
+    [['D'], ['(A+B)*D*(1-D)'], {"size": 10} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
@@ -78,8 +79,8 @@ widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7],[8,9], {'sizing_mode': 'scale_wid
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-    [3, 4, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
-    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    [3, 4, 5, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
+    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "col_names": ["3D", "A", "RescaleColorMap"], "row_names": ["A", "D"]}
 ]
 
 
