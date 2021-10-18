@@ -894,13 +894,6 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
                           fill_color=mapperC)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
-        tooltips = None
-        if "tooltips" in histoHandle:
-            tooltips = histoHandle["tooltips"]
-        elif "tooltips" in options:
-            tooltips = options["histoTooltips"]
-        visualization_type = "points"
-        histoGlyphRenderer = None
 
     elif visualization_type == "colZ":
         mapperC = linear_cmap(field_name="bin_center_1", palette=options['palette'], low=min(dfQuery[y]),
