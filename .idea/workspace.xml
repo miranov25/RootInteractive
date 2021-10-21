@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
     <generated />
   </component>
@@ -9,8 +12,8 @@
   <component name="ChangeListManager">
     <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="PWGPP-517,PWGPP-534 -interactive histograms and projections">
       <change beforePath="$PROJECT_DIR$/.idea/RootInteractive.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RootInteractive.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RootInteractive/Tools/test_makePDFMaps.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/Tools/test_makePDFMaps.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,18 +37,27 @@
   </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showExcludedFiles" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="RunOnceActivity.cidr.known.project.marker" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="cidr.known.project.marker" value="true" />
     <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunManager">
+    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="test_histoNDTools" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="RootInteractive" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -58,6 +70,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/RootInteractive/Tools/test_histoNDTools.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -85,6 +98,7 @@
       </list>
     </option>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="project-level" UseSingleDictionary="true" transferred="true" />
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -112,6 +126,9 @@
       <workItem from="1562298604097" duration="836000" />
       <workItem from="1578656728392" duration="5817000" />
       <workItem from="1579264295707" duration="2140000" />
+      <workItem from="1633915935741" duration="894000" />
+      <workItem from="1633980046209" duration="2454000" />
+      <workItem from="1634475677817" duration="1465000" />
     </task>
     <task id="LOCAL-00001" summary="PWGPP-517,PWGPP-534 - tools for histogramming and histogram visualization">
       <created>1561273506207</created>
@@ -145,7 +162,28 @@
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="1" />
+    <option name="version" value="3" />
+    <option name="exactExcludedFiles">
+      <list>
+        <option value="$PROJECT_DIR$/build/lib/RootInteractive/InteractiveDrawing/bokeh/HistogramCDS.d.ts" />
+        <option value="$PROJECT_DIR$/build/lib/RootInteractive/InteractiveDrawing/bokeh/CDSCompress.d.ts" />
+        <option value="$PROJECT_DIR$/build/lib/RootInteractive/InteractiveDrawing/bokeh/Histo2dCDS.d.ts" />
+        <option value="$PROJECT_DIR$/build/lib/RootInteractive/InteractiveDrawing/bokeh/bokehVisJS3DGraph.d.ts" />
+        <option value="$PROJECT_DIR$/build/lib/RootInteractive/InteractiveDrawing/bokeh/test/index.d.ts" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/CDSCompress.js.map" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/CDSCompress.js" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/CDSCompress.d.ts" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/HistogramCDS.js.map" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/HistogramCDS.js" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/HistogramCDS.d.ts" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehVisJS3DGraph.js.map" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehVisJS3DGraph.js" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehVisJS3DGraph.d.ts" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test/index.js.map" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test/index.js" />
+        <option value="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/test/index.d.ts" />
+      </list>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="PWGPP-517,PWGPP-534 - tools for histogramming and histogram visualization" />
@@ -153,12 +191,6 @@
     <MESSAGE value="PWGPP-517,PWGPP-534 -interactive histograms and projections" />
     <MESSAGE value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
     <option name="LAST_COMMIT_MESSAGE" value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
-  </component>
-  <component name="WindowStateProjectService">
-    <state x="525" y="174" key="SettingsEditor" timestamp="1579264341796">
-      <screen x="1051" y="0" width="869" height="1080" />
-    </state>
-    <state x="525" y="174" key="SettingsEditor/984.1080.1920.1080/1051.0.869.1080/1920.0.1920.1080@1051.0.869.1080" timestamp="1579264341796" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

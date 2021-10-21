@@ -183,10 +183,21 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         for(const key in cmapDict){
             const cmapList = cmapDict[key];
             for(let i=0; i<cmapList.length; i++){
+                const data = cmapList[i][0].data;
                 const col = cmapList[i][0].data[key];
                 if(col.length === 0) continue;
-                const low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
-                const high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+                let low = col[0];
+                let high = col[0];
+                if(data.isOK){
+                    const isOK = data.isOK;
+                    // In this case we do a generalized dot product
+                    // Code from https://stackoverflow.com/questions/64816766/dot-product-of-two-arrays-in-javascript
+                    low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
+                    high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
+                } else {
+                    low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
+                    high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
+                }
                 cmapList[i][1].transform.high = high;
                 cmapList[i][1].transform.low = low;
     //          cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs
@@ -713,11 +724,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             if "cmapHigh" in optionLocal:
                 high = optionLocal["cmapHigh"]               
             mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
+            cds_used = source
+            if cmap_cds_name is not None:
+                cds_used = cdsDict[cmap_cds_name]
             if optionLocal["rescaleColorMapper"]:
-                if optionLocal["colorZvar"] in colorMapperDict:
-                    colorMapperDict[optionLocal["colorZvar"]] += [[source, mapperC]]
+                if varColor in colorMapperDict:
+                    colorMapperDict[varColor] += [[cds_used, mapperC]]
                 else:
-                    colorMapperDict[optionLocal["colorZvar"]] = [[source, mapperC]]
+                    colorMapperDict[varColor] = [[cds_used, mapperC]]
             axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
 
