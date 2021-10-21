@@ -32,7 +32,13 @@ release = '0.0.9'
 # ones.
 extensions = [
 'sphinx.ext.autodoc',
-'sphinx.ext.autosummary'
+'sphinx.ext.todo',
+'sphinx.ext.viewcode',
+'sphinx.ext.autosummary',
+'sphinx.ext.intersphinx',
+'sphinx.ext.mathjax',
+'sphinx.ext.viewcode',
+'sphinx.ext.graphviz'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -50,6 +56,14 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = 'classic'
+html_theme_options = {
+    "rightsidebar": "false",
+    "relbarbgcolor": "black",
+    "collapsiblesidebar": "true",
+    "externalrefs":"true",
+    "stickysidebar":"false",
+    "body_max_width": "none"
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
