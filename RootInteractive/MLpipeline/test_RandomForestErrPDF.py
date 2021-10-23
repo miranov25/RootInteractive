@@ -6,6 +6,7 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.MLpipeline.NDFunctionInterface import *
 #from bokeh.io import output_notebook
 from RootInteractive.MLpipeline.RandoForestErrPDF import *
+from RootInteractive.MLpipeline.MIForestErrPDF import *
 
 widgetParams = [
     ['range', ['A']],
@@ -38,7 +39,7 @@ def generateInput(nPoints):
     return df
 
 
-def makeFits(df,n_jobs=-1):
+def makeFitsR(df,n_jobs=-1):
     varFit = 'value'
     #variableX = ['A', "B", "C", 'D']
     variableX = ['A', "expB", "csin", 'D']
@@ -51,6 +52,20 @@ def makeFits(df,n_jobs=-1):
     fitter.Fit()
     return fitter
 
-def doFit(nPoints, n_jobs):
+def doFitR(nPoints, n_jobs):
     df =generateInput(nPoints)
-    makeFits(df,n_jobs)
+    makeFitsR(df,n_jobs)
+
+
+def makeFits(df,n_jobs=-1):
+    varFit = 'value'
+    #variableX = ['A', "B", "C", 'D']
+    variableX = ['A', "expB", "csin", 'D']
+    nPoints = df.shape[0]
+    dataContainer = DataContainer(df, variableX, varFit, [nPoints // 2, nPoints // 2])
+    fitter = Fitter(dataContainer)
+    #
+    miErrPDF=MIForestErrPDF("Regressor",{"nSplit": 8, "max_depthBegin":-1, "n_jobs":n_jobs })
+    fitter.Register_Model('RFErrPDF',miErrPDF)
+    fitter.Fit()
+    return fitter
