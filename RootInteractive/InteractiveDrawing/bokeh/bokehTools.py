@@ -1092,7 +1092,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"]}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1112,7 +1112,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"]} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
@@ -1215,7 +1215,7 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
         if '_' in varName:
             if varName == "bin_count":
                 # Maybe do something else
-                return "count"
+                return "entries"
             x = varName.split("_")
             if x[0] == "bin":
                 if len(x) == 2:
@@ -1227,6 +1227,18 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
                     histoName, projectionIdx = cdsName.split("_")
                     return "quantile " + str(quantile) + " " + histoDict[histoName]["variables"][int(projectionIdx)]
                 return "quantile " + str(quantile)
+            if x[0] == "sum":
+                range = histoDict[cdsName]["sum_range"][int(x[-1])]
+                if len(x) == 2:
+                    if '_' in cdsName:
+                        histoName, projectionIdx = cdsName.split("_")
+                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[0]) + "]"
+                    return "sum in [" + str(range[0]) + ", " + str(range[0]) + "]"
+                else:
+                    if '_' in cdsName:
+                        histoName, projectionIdx = cdsName.split("_")
+                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[0]) + "]"
+                    return "p in ["+ str(range[0]) + ", " + str(range[0]) + "]"
         else:
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
