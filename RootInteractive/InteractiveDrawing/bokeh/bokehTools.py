@@ -388,7 +388,8 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
                     figure.plot_width = plot_width
                 if rowOptions["plot_height"] > 0:
                     figure.plot_height = rowOptions["plot_height"]
-                figure.legend.visible = rowOptions["legend_visible"]
+                if figure.legend:
+                    figure.legend.visible = rowOptions["legend_visible"]
             if type(figure).__name__ == "DataTable":
                 figure.height = int(rowOptions["plot_height"])
             if type(figure).__name__ == "BokehVisJSGraph3D":
@@ -808,11 +809,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             figureI.add_layout(color_bar, 'right')
         if defaultHoverToolRenderers:
             figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
-        figureI.legend.click_policy = "hide"
-        if optionLocal["legendTitle"] is not None:
-            figureI.legend.title = optionLocal["legendTitle"]
-        elif figure_cds_name != "":
-            figureI.legend.title = figure_cds_name
+        if figureI.legend:
+            figureI.legend.click_policy = "hide"
+            if optionLocal["legendTitle"] is not None:
+                figureI.legend.title = optionLocal["legendTitle"]
+            elif figure_cds_name != "":
+                figureI.legend.title = figure_cds_name
         #        zAxisTitle=zAxisTitle[:-1]
         #        if(len(zAxisTitle)>0):
         #            plotTitle += " Color:" + zAxisTitle
