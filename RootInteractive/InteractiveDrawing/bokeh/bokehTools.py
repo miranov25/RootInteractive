@@ -1054,7 +1054,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                "nbins": 10,
                "weights": None,
                "quantiles": [],
-               "sumRange": []
+               "sum_range": []
                }
     histoDict = {}
     for iHisto in histogramArray:
