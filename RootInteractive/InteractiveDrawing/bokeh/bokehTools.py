@@ -388,7 +388,8 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
                     figure.plot_width = plot_width
                 if rowOptions["plot_height"] > 0:
                     figure.plot_height = rowOptions["plot_height"]
-                figure.legend.visible = rowOptions["legend_visible"]
+                if figure.legend:
+                    figure.legend.visible = rowOptions["legend_visible"]
             if type(figure).__name__ == "DataTable":
                 figure.height = int(rowOptions["plot_height"])
             if type(figure).__name__ == "BokehVisJSGraph3D":
@@ -808,11 +809,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
             figureI.add_layout(color_bar, 'right')
         if defaultHoverToolRenderers:
             figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
-        figureI.legend.click_policy = "hide"
-        if optionLocal["legendTitle"] is not None:
-            figureI.legend.title = optionLocal["legendTitle"]
-        elif figure_cds_name != "":
-            figureI.legend.title = figure_cds_name
+        if figureI.legend:
+            figureI.legend.click_policy = "hide"
+            if optionLocal["legendTitle"] is not None:
+                figureI.legend.title = optionLocal["legendTitle"]
+            elif figure_cds_name != "":
+                figureI.legend.title = figure_cds_name
         #        zAxisTitle=zAxisTitle[:-1]
         #        if(len(zAxisTitle)>0):
         #            plotTitle += " Color:" + zAxisTitle
@@ -1054,7 +1056,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                "nbins": 10,
                "weights": None,
                "quantiles": [],
-               "sumRange": []
+               "sum_range": []
                }
     histoDict = {}
     for iHisto in histogramArray:
@@ -1087,10 +1089,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 profilesDict = {}
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
-                                                sum_range=optionLocal["sumRange"])
+                                                sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"]}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1107,10 +1109,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 profilesDict = {}
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
-                                                sum_range=optionLocal["sumRange"])
+                                                sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"]} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
@@ -1213,7 +1215,7 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
         if '_' in varName:
             if varName == "bin_count":
                 # Maybe do something else
-                return "count"
+                return "entries"
             x = varName.split("_")
             if x[0] == "bin":
                 if len(x) == 2:
@@ -1225,6 +1227,18 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
                     histoName, projectionIdx = cdsName.split("_")
                     return "quantile " + str(quantile) + " " + histoDict[histoName]["variables"][int(projectionIdx)]
                 return "quantile " + str(quantile)
+            if x[0] == "sum":
+                range = histoDict[cdsName]["sum_range"][int(x[-1])]
+                if len(x) == 2:
+                    if '_' in cdsName:
+                        histoName, projectionIdx = cdsName.split("_")
+                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                else:
+                    if '_' in cdsName:
+                        histoName, projectionIdx = cdsName.split("_")
+                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
         else:
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
