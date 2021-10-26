@@ -1232,13 +1232,13 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
                 if len(x) == 2:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[0]) + "]"
-                    return "sum in [" + str(range[0]) + ", " + str(range[0]) + "]"
+                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
                 else:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[0]) + "]"
-                    return "p in ["+ str(range[0]) + ", " + str(range[0]) + "]"
+                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
         else:
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
