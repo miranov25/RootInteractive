@@ -262,9 +262,10 @@ def test_compressCDSPipe():
 
 def test_CompressionCDSPipeDraw():
     df = pd.DataFrame(np.random.random_sample(size=(100000, 4)), columns=list('ABCD'))
+    df["AA"] = ((df.A * 10).round(0)).astype(CategoricalDtype(ordered=True))
     figureArray = [
-       [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
-        [['A'], ['C+A', 'C-A', 'A/A']],
+       [['A*10'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
+        [['AA'], ['C+A', 'C-A', 'A/A']],
         [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "C",  "rescaleColorMapper": True }],
         [['D'], ['(A+B+C)*D'], {"size": 10} ],
     ]
