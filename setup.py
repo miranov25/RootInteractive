@@ -46,7 +46,7 @@ setup(
         # 'scikit-garden',
         'scikit-hep',
         'forestci',
-        'tensorflow',
+        'tensorflow>=2.4.0',
         'keras',
         # ------------------      test and tutorials
         'pytest',

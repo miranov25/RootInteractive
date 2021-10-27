@@ -1,7 +1,7 @@
 import numpy as np
-from keras.layers import Dense, Dropout
-from keras.models import Sequential
-from keras import regularizers
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.models import Sequential
+from tensorflow.keras import regularizers
 from matplotlib import pyplot as plt
 from sklearn import metrics
 from sklearn.base import clone
