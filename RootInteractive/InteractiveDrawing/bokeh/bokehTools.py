@@ -1013,34 +1013,50 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, nPointRender=10000,cdsCompress=None):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, nPointRender=10000,cdsCompress=None, paramDict={}):
     widgetArray = []
     widgetDict = {}
+    options = {
+        "callback": "selection"
+    }
     for widget in widgetParams:
         type = widget[0]
         params = widget[1]
-        options = {}
+        optionLocal = options.copy()
         localWidget = None
         if len(widget) == 3:
-            options = widget[2]
+            optionLocal.update(widget[2])
         if type == 'range':
-            localWidget = makeBokehSliderWidget(df, True, params, **options)
+            localWidget = makeBokehSliderWidget(df, True, params, **optionLocal)
         if type == 'slider':
-            localWidget = makeBokehSliderWidget(df, False, params, **options)
+            localWidget = makeBokehSliderWidget(df, False, params, **optionLocal)
         if type == 'select':
-            localWidget = makeBokehSelectWidget(df, params, **options)
+            localWidget = makeBokehSelectWidget(df, params, **optionLocal)
         if type == 'multiSelect':
-            localWidget = makeBokehMultiSelectWidget(df, params, **options)
+            localWidget = makeBokehMultiSelectWidget(df, params, **optionLocal)
         # if type=='checkbox':
         #    localWidget=makeBokehCheckboxWidget(df,params,**options)
         if localWidget:
             widgetArray.append(localWidget)
         widgetDict[params[0]] = localWidget
-    callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
+    callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
-    for iWidget in widgetArray:
+    for iDesc, iWidget in zip(widgetParams, widgetArray):
+        optionLocal = options.copy()
+        localWidget = None
+        if len(iDesc) == 3:
+            optionLocal.update(iDesc[2])       
+        if optionLocal["callback"] == "selection":
+            callback = callbackSel
+        elif optionLocal["callback"] == "parameter":
+            paramControlled = iDesc[1][0]
+            iWidget.js_link("value", paramDict, paramControlled)
+            continue
+        else:
+            # TODO: Change this to custom JS callback
+            callback = None
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
         elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
