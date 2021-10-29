@@ -588,7 +588,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
     i: int
-    dfQuery, histogramDict, output_cdsSel, columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray, paremeterArray=parameterArray, options=options)
+    dfQuery, histogramDict, output_cdsSel, \
+    columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
+                                                       parameterArray=parameterArray, options=options)
 
     try:
         cdsFull = ColumnDataSource(dfQuery)
@@ -623,6 +625,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             profileList.append(histogramDict[i]["cds"])
         else:
             histoList.append(histogramDict[i]["cds"])
+
+    paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -714,7 +718,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
             #So far, rescaleColorMapper is only supported for the main CDS
             logging.info("%s", optionLocal["colorZvar"])
-            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], None)
+            colorZVar = optionLocal['colorZvar']
+            if colorZVar in paramDict:
+                colorZVar = paramDict[colorZVar]['value']
+            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, colorZVar, None)
             low = 0
             high = 1
             if cmap_cds_name is None:
@@ -735,6 +742,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     colorMapperDict[varColor] = [[cds_used, mapperC]]
             axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
+            if optionLocal['colorZvar'] in paramDict:
+                paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", mapperC, "field_name"])
 
         defaultHoverToolRenderers = []
 
@@ -825,7 +834,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -1013,7 +1022,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, nPointRender=10000,cdsCompress=None, paramDict={}):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, nPointRender=10000,cdsCompress=None):
     widgetArray = []
     widgetDict = {}
     options = {
@@ -1051,8 +1060,12 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if optionLocal["callback"] == "selection":
             callback = callbackSel
         elif optionLocal["callback"] == "parameter":
-            paramControlled = iDesc[1][0]
-            iWidget.js_link("value", paramDict, paramControlled)
+            paramControlled = paramDict[iDesc[1][0]]
+            for iEvent in paramControlled["subscribed_events"]:
+                if len(iEvent) == 2:
+                    iWidget.js_on_change(*iEvent)
+                elif len(iEvent) == 3:
+                    iWidget.js_link(*iEvent)
             continue
         else:
             # TODO: Change this to custom JS callback
@@ -1145,7 +1158,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if parameterArray is not None:
           for i, param in enumerate(parameterArray):
-            paramDict[param["name"]] = True      
+            paramDict[param["name"]] = param
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
@@ -1168,8 +1181,12 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                             columnNameDict[varNameY] = True
                         if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('.' not in optionLocal['colorZvar']):
-                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
-                            columnNameDict[varNameZ] = True
+                            if optionLocal['colorZvar'] in paramDict:
+                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, paramDict[optionLocal['colorZvar']]["value"])
+                                columnNameDict[varNameZ] = True
+                            else:
+                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
+                                columnNameDict[varNameZ] = True
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
@@ -1210,19 +1227,22 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if widgetArray is not None:
         for iWidget in widgetArray:
-            dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
-            columnNameDict[varNameX] = True
+            if len(iWidget) < 3 or 'callback' not in iWidget[2] or iWidget[2]['callback'] == 'selection':
+                dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
+                columnNameDict[varNameX] = True
 
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, output_cdsSel, columnNameDict
+    return dfQuery, histogramDict, output_cdsSel, columnNameDict, paramDict
 
-def bokehMakeParameters(parameterArray, histogramArray, figureArray, options={}):
+def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
     if parameterArray is not None:
         for param in parameterArray:
-            parameterDict[param["name"]] = param  
+            if "subscribed_events" not in param:
+                param["subscribed_events"] = []
+            parameterDict[param["name"]] = param
     if histogramArray is not None:
         for iHisto in histogramArray: 
             pass
@@ -1234,14 +1254,16 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, options={})
                     optionLocal.update(variables[2])
                 else:
                     optionLocal = options      
-                if 'colorZvar' in options:
-                    varColor = options['colorZvar']
+                if 'colorZvar' in optionLocal:
+                    varColor = optionLocal['colorZvar']
                     if varColor in parameterDict:
                         paramColor = parameterDict[varColor]
                         # Possibly also allow custom color mappers?
-                        paramColor["value"] = 
-
-
+                        if "type"  not in paramColor:
+                            paramColor["type"] = "varName"
+                        if "options" not in paramColor:
+                            paramColor["options"] = variableList
+                            # XXX: Add autofill for cases of histograms and main CDS
     return parameterDict
 
 def getOrMakeColumn(dfQuery, column, cdsName):
