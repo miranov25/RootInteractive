@@ -93,6 +93,7 @@ class bokehDrawSA(object):
         self.histoList = None
         self.cdsHistoSummary = None
         self.profileList = None
+        self.paramDict = None
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -159,7 +160,7 @@ class bokehDrawSA(object):
         kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         dfQuery, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
-                                              widgetArray=widgetsDescription, options={"removeExtraColumns": True})
+                                              widgetArray=widgetsDescription, paremeterArray=options["parameterArray"], options={"removeExtraColumns": True})
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict, self.cdsOrig, self.histoList,\
             self.cdsHistoSummary, self.profileList = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)

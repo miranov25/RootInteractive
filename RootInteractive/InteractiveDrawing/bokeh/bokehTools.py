@@ -515,7 +515,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     return stats_cds, data_table
 
 
-def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
+def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], **kwargs):
     """
     Wrapper bokeh draw array of figures
 
@@ -588,7 +588,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], **kwargs):
         dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
     i: int
-    dfQuery, histogramDict, output_cdsSel, columnNameDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray, options=options)
+    dfQuery, histogramDict, output_cdsSel, columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray, paremeterArray=parameterArray, options=options)
 
     try:
         cdsFull = ColumnDataSource(dfQuery)
@@ -1067,7 +1067,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
     return widgetArray
 
 
-def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, **kwargs):
+def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, parameterDict={}, **kwargs):
     options = {"range": None,
                "nbins": 10,
                "weights": None,
@@ -1134,13 +1134,18 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
     return histoDict
 
 
-def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArray=None, options={}):
+def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameterArray=None, widgetArray=None, options={}):
     histogramDict = {}
     columnNameDict = {}
+    paramDict = {}
     output_cdsSel = False
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
             histogramDict[histo["name"]] = True
+
+    if parameterArray is not None:
+          for i, param in enumerate(parameterArray):
+            paramDict[param["name"]] = True      
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
@@ -1212,6 +1217,32 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, widgetArr
         dfQuery = dfQuery[columnNameDict]
 
     return dfQuery, histogramDict, output_cdsSel, columnNameDict
+
+def bokehMakeParameters(parameterArray, histogramArray, figureArray, options={}):
+    parameterDict = {}
+    if parameterArray is not None:
+        for param in parameterArray:
+            parameterDict[param["name"]] = param  
+    if histogramArray is not None:
+        for iHisto in histogramArray: 
+            pass
+    if figureArray is not None:
+        for i, variables in enumerate(figureArray):
+            if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
+                if len(variables) > 2:
+                    optionLocal = options.copy()
+                    optionLocal.update(variables[2])
+                else:
+                    optionLocal = options      
+                if 'colorZvar' in options:
+                    varColor = options['colorZvar']
+                    if varColor in parameterDict:
+                        paramColor = parameterDict[varColor]
+                        # Possibly also allow custom color mappers?
+                        paramColor["value"] = 
+
+
+    return parameterDict
 
 def getOrMakeColumn(dfQuery, column, cdsName):
     if '.' in column:
