@@ -89,7 +89,7 @@ class bokehDrawSA(object):
         self.plotArray.append(self.initWidgets(widgetsDescription))
         self.pAll=gridplotRow(self.plotArray)
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)
-        self.cmapDist = None
+        self.cmapList = None
         self.histoList = None
         self.cdsHistoSummary = None
         self.profileList = None
@@ -161,7 +161,7 @@ class bokehDrawSA(object):
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         dfQuery, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
                                               widgetArray=widgetsDescription, parameterArray=options["parameterArray"], options={"removeExtraColumns": True})
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapDict, self.cdsOrig, self.histoList,\
+        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
             self.cdsHistoSummary, self.profileList, self.paramDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
@@ -184,7 +184,7 @@ class bokehDrawSA(object):
         """
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList,
-                                         self.cmapDict, self.cdsHistoSummary, self.profileList, self.paramDict, nPointRender = self.options['nPointRender'])
+                                         self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout, list):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
