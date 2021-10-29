@@ -45,13 +45,16 @@ df['errY']=df.A*0.02+0.02;
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
-
+parameterArray = [
+    {"name": "colorZ", "value":"EE", "options":["A", "B", "DD", "EE"], "type": "string"}
+]
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
     [['A'], ['C+A', 'C-A', 'A/A']],
-    [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "EE", "errY": "errY", "rescaleColorMapper": True }],
+
+    [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True }],
     [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
@@ -70,7 +73,7 @@ widgetParams=[
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC"]],
     ['select',["CC", 0, 1, 2, 3]],
-    ['select',["Bool"]],
+    ['select',["colorZ", "A", "B", "DD", "EE"], {"callback": "parameter", "default": 3}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 ]
@@ -85,21 +88,21 @@ figureLayoutDesc=[
 
 def testBokehDrawArrayWidget():
     output_file("test_BokehDrawArrayWidget.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width")
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width", parameterArray=parameterArray)
 
 def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray)
 
 
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
 
 def testBokehDrawArrayQuery():
     output_file("test_BokehDrawArrayQuery.html")
     df0 = df.copy()
-    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200)
+    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
     assert (df0.keys() == df.keys()).all()
 
 def testBokehDrawArraySA_tree():
