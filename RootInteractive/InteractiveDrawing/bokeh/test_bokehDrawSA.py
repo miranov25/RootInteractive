@@ -73,7 +73,7 @@ widgetParams=[
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC"]],
     ['select',["CC", 0, 1, 2, 3]],
-    ['select',["colorZ", "A", "B", "DD", "EE"], {"callback": "parameter", "default": 3}],
+    ['select',["colorZ"], {"callback": "parameter", "default": 3}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 ]
