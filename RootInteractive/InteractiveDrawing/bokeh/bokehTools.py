@@ -690,7 +690,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cmap_cds_name = None
         if (len(optionLocal["colorZvar"]) > 0):
             #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
-            #So far, rescaleColorMapper is only supported for the main CDS
+            #So far, parametrized colZ is only supported for the main CDS
             logging.info("%s", optionLocal["colorZvar"])
             colorZVar = optionLocal['colorZvar']
             if colorZVar in paramDict:
@@ -770,12 +770,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"color": drawnGlyph.glyph.fill_color}, code="color={...color, field=this.value}")])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"color": drawnGlyph.glyph.fill_color}, code="color={...color, field=this.value}")])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
