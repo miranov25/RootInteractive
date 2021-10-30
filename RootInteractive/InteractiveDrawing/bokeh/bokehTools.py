@@ -770,12 +770,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"color": drawnGlyph.glyph.fill_color}, code="color={...color, field=this.value}")])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code="console.log(this.value); glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}")])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"color": drawnGlyph.glyph.fill_color}, code="color={...color, field=this.value}")])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code="console.log(this.value); glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}")])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
