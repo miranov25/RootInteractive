@@ -1,6 +1,6 @@
 from io import UnsupportedOperation
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, BooleanFilter, VBar, HBar, Quad, Image
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
