@@ -769,13 +769,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
-                  #  if optionLocal["colorZvar"] in paramDict:
-                   #     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
+                    if optionLocal["colorZvar"] in paramDict:
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                   # if optionLocal["colorZvar"] in paramDict:
-                   #     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
+                    if optionLocal["colorZvar"] in paramDict:
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
@@ -1086,9 +1086,6 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
-                    isOkFilter = BooleanFilter()
-                    cdsProfile.js_on_change('change', CustomJS(code="filter.booleans = this.data.isOK", args={"filter": isOkFilter}))
-                    projectionView = CDSView(source=cdsProfile, filters=[isOkFilter])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
                     "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView}
@@ -1109,9 +1106,6 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
-                    isOkFilter = BooleanFilter()
-                    projectionView = CDSView(source=cdsProfile, filters=[isOkFilter])
-                    cdsProfile.js_on_change('change', CustomJS(code="filter.booleans = this.data.isOK", args={"filter": isOkFilter}))
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
                     "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView} 
