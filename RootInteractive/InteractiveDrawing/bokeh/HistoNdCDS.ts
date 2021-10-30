@@ -138,26 +138,39 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._nbins = this.nbins;
 
     let sample_array: number[][] = []
+    if(this.range === null || this.range.reduce((acc, cur) => acc || (cur === null), false))
     for (const column_name of this.sample_variables) {
-      sample_array.push(this.source.get_array(column_name))
+      const column = this.source.get_array(column_name) as number[]
+      if (this.view === null){
+        sample_array.push(column)
+      } else {
+        sample_array.push(this.view.map((val: number) => column[val]))
+      }
     }
       // This code seems stupid
+      let invalidate_bins = false
       if(this.range === null){
         for (let i = 0; i < this._nbins.length; i++) {
-          this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
-          this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
+          this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
+          this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
         }
+        invalidate_bins = true
       } else {
         for (let i = 0; i < this.range.length; i++) {
           const r = this.range[i]
           if(r === null) {
-            this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
-            this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
+            this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
+            this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
+            invalidate_bins = true
           } else {
             this._range_min[i] = r[0]
             this._range_max[i] = r[1]
           }
         }
+      }
+      if (invalidate_bins || this._bin_indices.length === 0){
+        this._bin_indices.length = this.source.length
+        this._bin_indices.fill(-2, 0, this.source.length)
       }
       const dim = this.nbins.length
       this._nbins.length = dim
@@ -190,8 +203,6 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
 
       this.dim = dim
-      this._bin_indices.length = this.source.length
-      this._bin_indices.fill(-2, 0, this.source.length)
       this.update_data()
   }
 
