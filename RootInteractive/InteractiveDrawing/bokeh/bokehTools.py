@@ -952,12 +952,15 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     return slider
 
 
-def makeBokehSelectWidget(df, params, **kwargs):
+def makeBokehSelectWidget(df, params, paramDict, **kwargs):
     options = {'default': 0, 'size': 10}
     options.update(kwargs)
     # optionsPlot = []
     if len(params) == 1:
-        optionsPlot = np.sort(df[params[0]].unique()).tolist()
+        if options['callback'] == 'parameter':
+            optionsPlot = paramDict[params[0]]["options"]
+        else:
+            optionsPlot = np.sort(df[params[0]].unique()).tolist()
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
@@ -1014,7 +1017,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if type == 'slider':
             localWidget = makeBokehSliderWidget(df, False, params, **optionLocal)
         if type == 'select':
-            localWidget = makeBokehSelectWidget(df, params, **optionLocal)
+            localWidget = makeBokehSelectWidget(df, params, paramDict, **optionLocal)
         if type == 'multiSelect':
             localWidget = makeBokehMultiSelectWidget(df, params, **optionLocal)
         # if type=='checkbox':
@@ -1157,8 +1160,11 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             columnNameDict[varNameY] = True
                         if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('.' not in optionLocal['colorZvar']):
                             if optionLocal['colorZvar'] in paramDict:
-                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, paramDict[optionLocal['colorZvar']]["value"])
-                                columnNameDict[varNameZ] = True
+                                parameter = paramDict[optionLocal['colorZvar']]
+                                if 'options' in parameter:
+                                    for i in parameter['options']:
+                                        dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, i)
+                                        columnNameDict[varNameZ] = True
                             else:
                                 dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
                                 columnNameDict[varNameZ] = True
