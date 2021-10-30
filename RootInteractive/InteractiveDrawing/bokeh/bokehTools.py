@@ -764,24 +764,32 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 #                zAxisTitle +=varColor + ","
                 #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
                 drawnGlyph = None
+                colorMapperCallback = """
+                glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}
+                glyph.line_color={field:this.value, transform:glyph.line_color.transform}
+                """
                 if optionLocal["legend_field"] is None:
                     x_label = getHistogramAxisTitle(histogramDict, varNameX, cds_name)
                     y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code="console.log(this.value); glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}")])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code="console.log(this.value); glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}")])
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
+                    if optionLocal["colorZvar"] in paramDict:
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorX)
                 if ('errY' in optionLocal.keys()) and (optionLocal['errY'] != '') and (cds_name is None):
                     errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
+                    if optionLocal["colorZvar"] in paramDict:
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorY)
                 #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
                 #    figureI.add_layout(errors)
