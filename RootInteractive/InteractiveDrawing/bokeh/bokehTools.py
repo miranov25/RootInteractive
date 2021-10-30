@@ -1099,7 +1099,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1119,7 +1119,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
