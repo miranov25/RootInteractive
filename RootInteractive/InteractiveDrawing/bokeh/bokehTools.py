@@ -1,6 +1,7 @@
 from io import UnsupportedOperation
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, GroupFilter, VBar, HBar, Quad, Image
+from bokeh.models import ColumnDataSource, ColorBar, HoverTool, CDSView, BooleanFilter, VBar, HBar, Quad, Image
+from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
 from RootInteractive.Tools.aliTreePlayer import *
@@ -178,33 +179,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
-    const cmapDict = options.cmapDict;
-    if (cmapDict !== undefined){
-        for(const key in cmapDict){
-            const cmapList = cmapDict[key];
-            for(let i=0; i<cmapList.length; i++){
-                const data = cmapList[i][0].data;
-                const col = cmapList[i][0].data[key];
-                if(col.length === 0) continue;
-                let low = col[0];
-                let high = col[0];
-                if(data.isOK){
-                    const isOK = data.isOK;
-                    // In this case we do a generalized dot product
-                    // Code from https://stackoverflow.com/questions/64816766/dot-product-of-two-arrays-in-javascript
-                    low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
-                    high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
-                } else {
-                    low = col.reduce((acc, cur)=>Math.min(acc,cur),col[0]);
-                    high = col.reduce((acc, cur)=>Math.max(acc,cur),col[0]);
-                }
-                cmapList[i][1].transform.high = high;
-                cmapList[i][1].transform.low = low;
-    //          cmapList[i][1].transform.change.emit(); - The previous two lines will emit an event - avoiding bokehjs
-    //                                                    events might improve the performance
-            }
-        }
-    }
     const t3 = performance.now();
     console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
@@ -730,20 +704,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "cmapLow" in optionLocal:
                 low = optionLocal["cmapLow"]
             if "cmapHigh" in optionLocal:
-                high = optionLocal["cmapHigh"]               
-            mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
+                high = optionLocal["cmapHigh"]   
+            if optionLocal["rescaleColorMapper"] or optionLocal["colorZvar"] in paramDict:            
+                mapperC = {"field": varColor, "transform": LinearColorMapper(palette=optionLocal['palette'])}
+            else:
+                mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
             cds_used = source
             if cmap_cds_name is not None:
                 cds_used = cdsDict[cmap_cds_name]
-            if optionLocal["rescaleColorMapper"]:
-                if varColor in colorMapperDict:
-                    colorMapperDict[varColor] += [[cds_used, mapperC]]
-                else:
-                    colorMapperDict[varColor] = [[cds_used, mapperC]]
             axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
             if optionLocal['colorZvar'] in paramDict:
-                paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", mapperC, "field_name"])
+                paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
 
         defaultHoverToolRenderers = []
 
@@ -797,9 +769,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
+                  #  if optionLocal["colorZvar"] in paramDict:
+                   #     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                   # if optionLocal["colorZvar"] in paramDict:
+                   #     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "fill_color", "field"])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
@@ -851,12 +827,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
 
     if visualization_type == "heatmap":
         # Flipping histogram axes probably doesn't make sense in this case.
-        mapperC = linear_cmap(field_name="bin_count", palette=options['palette'], low=0,
-                              high=1)
-        if ("bin_count") in colorMapperDict:
-            colorMapperDict["bin_count"] += [[cdsHisto, mapperC]]
-        else:
-            colorMapperDict["bin_count"] = [[cdsHisto, mapperC]]
+        mapperC = {"field": "bin_count", "transform": LinearColorMapper(palette=options['palette'])}
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title="Count")
         histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
@@ -864,12 +835,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
-        mapperC = linear_cmap(field_name="bin_center_1", palette=options['palette'], low=min(dfQuery[y]),
-                                  high=max(dfQuery[y]))
-        if "bin_center_1" in colorMapperDict:
-            colorMapperDict["bin_center_1"] += [[cdsHisto, mapperC]]
-        else:
-            colorMapperDict["bin_center_1"] = [[cdsHisto, mapperC]]
+        mapperC = {"field": "bin_count", "transform": LinearColorMapper(palette=options['palette'])}
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title=y)
         if options["legend_field"] is None:
@@ -1047,7 +1013,8 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         #    localWidget=makeBokehCheckboxWidget(df,params,**options)
         if localWidget:
             widgetArray.append(localWidget)
-        widgetDict[params[0]] = localWidget
+        if optionLocal["callback"] == "selection":
+            widgetDict[params[0]] = localWidget
     callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
@@ -1064,7 +1031,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             for iEvent in paramControlled["subscribed_events"]:
                 if len(iEvent) == 2:
                     iWidget.js_on_change(*iEvent)
-                elif len(iEvent) == 3:
+                else:
                     iWidget.js_link(*iEvent)
             continue
         else:
@@ -1119,9 +1086,12 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
+                    isOkFilter = BooleanFilter()
+                    cdsProfile.js_on_change('change', CustomJS(code="filter.booleans = this.data.isOK", args={"filter": isOkFilter}))
+                    projectionView = CDSView(source=cdsProfile, filters=[isOkFilter])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1139,9 +1109,12 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 for i in axisIndices:
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
+                    isOkFilter = BooleanFilter()
+                    projectionView = CDSView(source=cdsProfile, filters=[isOkFilter])
+                    cdsProfile.js_on_change('change', CustomJS(code="filter.booleans = this.data.isOK", args={"filter": isOkFilter}))
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "view": projectionView} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
@@ -1240,8 +1213,7 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
     parameterDict = {}
     if parameterArray is not None:
         for param in parameterArray:
-            if "subscribed_events" not in param:
-                param["subscribed_events"] = []
+            param["subscribed_events"] = []
             parameterDict[param["name"]] = param
     if histogramArray is not None:
         for iHisto in histogramArray: 
