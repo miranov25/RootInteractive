@@ -712,6 +712,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cds_used = source
             if cmap_cds_name is not None:
                 cds_used = cdsDict[cmap_cds_name]
+                if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
+                    histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                    const col = this.data[field]
+                    const isOK = this.data.isOK
+                    const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
+                    const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
+                    cmap.high = high;
+                    cmap.low = low;
+                    """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
             axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
             if optionLocal['colorZvar'] in paramDict:
