@@ -179,12 +179,10 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
-    const t3 = performance.now();
-    console.log(`Updating colormaps took ${t3 - t2} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
         cdsSel.change.emit();
-        const t4 = performance.now();
-        console.log(`Updating cds took ${t4 - t3} milliseconds.`);
+        const t3 = performance.now();
+        console.log(`Updating cds took ${t3 - t2} milliseconds.`);
     }
     if(options.cdsHistoSummary !== null){
         options.cdsHistoSummary.update();
@@ -916,7 +914,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
     if tooltips is not None:
         fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
-def makeBokehSliderWidget(df, isRange, params, **kwargs):
+def makeBokehSliderWidget(df, isRange, params, paramDict, **kwargs):
     options = {
         'type': 'auto',
         'bins': 30,
@@ -932,43 +930,62 @@ def makeBokehSliderWidget(df, isRange, params, **kwargs):
     start = 0
     end = 0
     step = 0
-    if options['type'] == 'user':
-        start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
-    elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
-        start = df[name].min()
-        end = df[name].max()
-        step = (end - start) / options['bins']
-    elif (options['type'] == 'unique'):
-        start = df[name].min()
-        end = df[name].max()
-        nbins=df[name].unique().size-1
-        step = (end - start) / float(nbins)
-    elif options['type'] == 'sigma':
-        mean = df[name].mean()
-        sigma = df[name].std()
-        start = mean - options['sigma'] * sigma
-        end = mean + options['sigma'] * sigma
-        step = (end - start) / options['bins']
-    elif options['type'] == 'sigmaMed':
-        mean = df[name].median()
-        sigma = df[name].std()
-        start = mean - options['sigma'] * sigma
-        end = mean + options['sigma'] * sigma
-        step = (end - start) / options['bins']
-    elif options['type'] == 'sigmaTM':
-        mean = df[name].trimmed_mean(options['limits'])
-        sigma = df[name].trimmed_std(options['limits'])
-        start = mean - options['sigma'] * sigma
-        end = mean + options['sigma'] * sigma
-        step = (end - start) / options['bins']
+    value=None
+    if options['callback'] == 'parameter':
+        if options['type'] == 'user':
+            start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
+        else:
+            param = paramDict[params[0]]
+            start = param['range'][0]
+            end = param['range'][1]
+            bins = options['bins']   
+            if 'bins' in param:
+                bins = param['bins']
+            if 'step' in param:
+                step = param['step']
+            else:
+                step = (end - start) / bins
+            value = paramDict[params[0]]["value"]
+    else:
+        if options['type'] == 'user':
+            start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
+        elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
+            start = df[name].min()
+            end = df[name].max()
+            step = (end - start) / options['bins']
+        elif (options['type'] == 'unique'):
+            start = df[name].min()
+            end = df[name].max()
+            nbins=df[name].unique().size-1
+            step = (end - start) / float(nbins)
+        elif options['type'] == 'sigma':
+            mean = df[name].mean()
+            sigma = df[name].std()
+            start = mean - options['sigma'] * sigma
+            end = mean + options['sigma'] * sigma
+            step = (end - start) / options['bins']
+        elif options['type'] == 'sigmaMed':
+            mean = df[name].median()
+            sigma = df[name].std()
+            start = mean - options['sigma'] * sigma
+            end = mean + options['sigma'] * sigma
+            step = (end - start) / options['bins']
+        elif options['type'] == 'sigmaTM':
+            mean = df[name].trimmed_mean(options['limits'])
+            sigma = df[name].trimmed_std(options['limits'])
+            start = mean - options['sigma'] * sigma
+            end = mean + options['sigma'] * sigma
+            step = (end - start) / options['bins']
     if isRange:
         if (start==end):
             start-=1
             end+=1
-        value = (start, end)
+        if value is None:
+            value = (start, end)
         slider = RangeSlider(title=title, start=start, end=end, step=step, value=value)
     else:
-        value = (start + end) * 0.5
+        if value is None:
+            value = (start + end) * 0.5
         slider = Slider(title=title, start=start, end=end, step=step, value=value)
     return slider
 
@@ -1034,9 +1051,9 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if len(widget) == 3:
             optionLocal.update(widget[2])
         if type == 'range':
-            localWidget = makeBokehSliderWidget(df, True, params, **optionLocal)
+            localWidget = makeBokehSliderWidget(df, True, params, paramDict, **optionLocal)
         if type == 'slider':
-            localWidget = makeBokehSliderWidget(df, False, params, **optionLocal)
+            localWidget = makeBokehSliderWidget(df, False, params, paramDict, **optionLocal)
         if type == 'select':
             localWidget = makeBokehSelectWidget(df, params, paramDict, **optionLocal)
         if type == 'multiSelect':
