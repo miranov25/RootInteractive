@@ -1260,7 +1260,7 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
     if parameterArray is not None:
         for param in parameterArray:
             param["subscribed_events"] = []
-            parameterDict[param["name"]] = param
+            parameterDict[param["name"]] = param.copy()
     if histogramArray is not None:
         for iHisto in histogramArray: 
             pass
