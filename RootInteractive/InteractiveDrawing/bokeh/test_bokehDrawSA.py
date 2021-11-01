@@ -73,11 +73,14 @@ widgetParams=[
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC"]],
     ['select',["CC", 0, 1, 2, 3]],
-    ['select',["colorZ"], {"callback": "parameter", "default": 3}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
+    ['select',["colorZ"], {"callback": "parameter", "default": 3}],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4, 5], [6, 7],[8,9], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc={
+    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
+    "Graphics": [[9], {'sizing_mode': 'scale_width'}]
+    }
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -113,7 +116,7 @@ def testBokehDrawArraySA_tree():
 
 
 #testBokehDrawArraySA_tree()
-#testBokehDrawArrayWidget()               # OK
+testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
 #testBokehDrawArrayQuery()
