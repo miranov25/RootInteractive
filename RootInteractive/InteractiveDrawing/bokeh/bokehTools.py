@@ -762,6 +762,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 marker = optionLocal['markers'][i]
             except:
                 marker = optionLocal['markers']
+            markerSize = optionLocal['size']
+            if markerSize in paramDict:
+                markerSize = paramDict[markerSize]['value']
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
@@ -775,7 +778,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoHandle = histogramDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
-                    addHistogramGlyph(figureI, histoHandle, marker, colorHisto, optionLocal)
+                    addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
                 elif histoHandle["type"] == "histo2d":
                     addHisto2dGlyph(figureI, varNameX, varNameY, histoHandle, colorMapperDict, color, marker, dfQuery,
                                     optionLocal)
@@ -790,15 +793,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionLocal["legend_field"] is None:
                     x_label = getHistogramAxisTitle(histogramDict, varNameX, cds_name)
                     y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                     if optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
+                    if optionLocal['size'] in paramDict:
+                        paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=optionLocal['size'],
+                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
+                    if optionLocal['size'] in paramDict:
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
@@ -879,7 +886,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
         fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
 
-def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
+def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     cdsHisto = histoHandle["cds"]
     if options['color'] is not None:
         colorHisto = options['color']
@@ -900,13 +907,13 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, options):
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
     elif visualization_type == "points":
         if options['flip_histogram_axes']:
-            histoGlyphRenderer = fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(y="bin_center", x="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=size,
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = HBar(y="bin_center", height=0, left="errorbar_low", right="errorbar_high", line_color=colorHisto)
                 fig.add_glyph(cdsHisto, errorbar)
         else:
-            histoGlyphRenderer = fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=options['size'],
+            histoGlyphRenderer = fig.scatter(x="bin_center", y="bin_count", color=colorHisto, marker=marker, source=cdsHisto, size=size,
                         legend_label=histoHandle["variables"][0])
             if "show_histogram_error" in options:
                 errorbar = VBar(x="bin_center", width=0, top="errorbar_high", bottom="errorbar_low", line_color=colorHisto)
@@ -1269,7 +1276,7 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
             if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
                 if len(variables) > 2:
                     optionLocal = options.copy()
-                    optionLocal.update(variables[2])
+                    optionLocal.update(variables[-1])
                 else:
                     optionLocal = options      
                 if 'colorZvar' in optionLocal:
@@ -1277,11 +1284,27 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
                     if varColor in parameterDict:
                         paramColor = parameterDict[varColor]
                         # Possibly also allow custom color mappers?
-                        if "type"  not in paramColor:
+                        if "type" not in paramColor:
                             paramColor["type"] = "varName"
                         if "options" not in paramColor:
                             paramColor["options"] = variableList
                             # XXX: Add autofill for cases of histograms and main CDS
+                if 'size' in optionLocal:
+                    varSize = optionLocal['size']
+                    if varSize in parameterDict:
+                        paramSize = parameterDict[varSize]
+                        if "type" not in paramSize:
+                            t = type(paramSize['value'])
+                            if t == str:
+                                paramSize["type"] = "varName"
+                            else:
+                                paramSize["type"] = "scalar"
+                        if paramSize["type"] == "varName":
+                            if "options" not in paramColor:
+                                paramSize["options"] = variableList
+                        elif paramSize["type"] == "scalar":
+                            if "range" not in paramSize:
+                                raise ValueError("Missing range for parameter: ", paramSize["name"])
     return parameterDict
 
 def getOrMakeColumn(dfQuery, column, cdsName):
