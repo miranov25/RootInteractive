@@ -496,6 +496,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     :param dataFrame:         - input data frame
     :param query:             - query
     :param figureArray:       - figure array
+    :param histogramArray:    - (optional) histogram array
+    :param parameterArray:    - (optional) parameter array for parameters controllable on client
     :param kwargs:
     :return:
         variable list:
