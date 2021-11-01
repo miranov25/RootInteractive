@@ -712,13 +712,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 low = optionLocal["cmapLow"]
             if "cmapHigh" in optionLocal:
                 high = optionLocal["cmapHigh"]   
-            if optionLocal["rescaleColorMapper"] or optionLocal["colorZvar"] in paramDict:            
-                mapperC = {"field": varColor, "transform": LinearColorMapper(palette=optionLocal['palette'])}
+            if optionLocal["rescaleColorMapper"] or optionLocal["colorZvar"] in paramDict:
+                if optionLocal["colorZvar"] in colorMapperDict:
+                    mapperC = colorMapperDict[optionLocal["colorZvar"]]
+                else:
+                    mapperC = {"field": varColor, "transform": LinearColorMapper(palette=optionLocal['palette'])}
+                    colorMapperDict[optionLocal["colorZvar"]] = mapperC
             else:
                 mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
             cds_used = source
             if cmap_cds_name is not None:
                 cds_used = cdsDict[cmap_cds_name]
+                # This is really hacky, will probably be removed when ND histogram joins start working
                 if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
                     histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
                     const col = this.data[field]
