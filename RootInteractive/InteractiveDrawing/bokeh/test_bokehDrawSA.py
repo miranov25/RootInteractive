@@ -46,16 +46,17 @@ df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
 parameterArray = [
-    {"name": "colorZ", "value":"EE", "options":["A", "B", "DD", "EE"], "type": "string"}
+    {"name": "colorZ", "value":"EE", "options":["A", "B", "DD", "EE"]},
+    {"name": "size", "value":7, "range":[0, 30]},
 ]
 
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
-    [['A'], ['C+A', 'C-A', 'A/A']],
+    [['A'], ['C+A', 'C-A', 'A/A'], {"size":"size"}],
 
-    [['B'], ['C+B', 'C-B'], { "size": 7, "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True }],
-    [['D'], ['(A+B+C)*D'], {"size": 10, "errY": "errY"} ],
+    [['B'], ['C+B', 'C-B'], { "size":"size", "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True }],
+    [['D'], ['(A+B+C)*D'], {"colorZvar": "colorZ", "size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
@@ -76,10 +77,11 @@ widgetParams=[
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
     ['select',["colorZ"], {"callback": "parameter", "default": 3}],
+    ['slider',["size"], {"callback": "parameter"}],
 ]
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[9], {'sizing_mode': 'scale_width'}]
+    "Graphics": [[9, 10], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc=[
