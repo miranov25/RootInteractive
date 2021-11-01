@@ -186,7 +186,7 @@ class bokehDrawSA(object):
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList,
                                          self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, nPointRender = self.options['nPointRender'])
-            if isinstance(self.widgetLayout, list):
+            if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
                 widgetList=column(widgetList)

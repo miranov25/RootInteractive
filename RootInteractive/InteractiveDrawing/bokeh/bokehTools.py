@@ -315,6 +315,11 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         {'width':10,'plot_height':200, 'sizing_mode':'scale_width'}
     ]
     """
+    if isinstance(widgetLayoutDesc, dict):
+        tabs = []
+        for i, iPanel in widgetLayoutDesc.items():
+            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
+        return Tabs(tabs=tabs)
     options = {
         'commonX': -1, 'commonY': -1,
         'x_visible': 1, 'y_visible': 1,
