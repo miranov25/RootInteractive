@@ -84,11 +84,17 @@ widgetLayoutDesc={
     "Graphics": [[9, 10], {'sizing_mode': 'scale_width'}]
     }
 
-figureLayoutDesc=[
-    [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-    [3, 4, {'plot_height': 100, 'x_visible': 1, 'y_visible': 2}],
-    {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
-]
+figureLayoutDesc={
+    "A": [
+        [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+        ],
+    "B": [
+        [3, 4, {'commonX': 1, 'y_visible': 3, 'x_visible':1, 'plot_height': 100}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+        ]
+}
+
 
 
 def testBokehDrawArrayWidget():

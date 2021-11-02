@@ -839,7 +839,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         #            plotTitle += " Color:" + zAxisTitle
         #        figureI.title = plotTitle
         plotArray.append(figureI)
-    if isinstance(options['layout'], list):
+    if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
         layoutList = [pAll]
     if options['doDraw'] > 0:
