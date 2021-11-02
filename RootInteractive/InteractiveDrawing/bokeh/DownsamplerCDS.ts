@@ -59,17 +59,20 @@ export class DownsamplerCDS extends ColumnDataSource {
         nSelected++;
       }
     }
-    _indices.sort() // Might not be needed
-    for(const column of selectedColumns){
-      this.data[column] = []
+  //  _indices.sort() // Might not be needed
+    for(const columnName of selectedColumns){
+      this.data[columnName] = []
+      const colSource = source.data[columnName]
+      const colDest = this.data[columnName]
       for(let i=0; i < _indices.length; i++){
-        this.data[column][i] = (source.data[column][_indices[i]])
+        colDest[i] = (colSource[_indices[i]])
       }
     }
-    this.data.index = []
-    for(let i=0; i < _indices.length; i++){
-      this.data.index[i] = this._indices[i]
-    }
+//    this.data.index = []
+//    for(let i=0; i < _indices.length; i++){
+//      this.data.index[i] = this._indices[i]
+//    }
+    this.data.index = _indices
     this.change.emit()
   }
 /*
