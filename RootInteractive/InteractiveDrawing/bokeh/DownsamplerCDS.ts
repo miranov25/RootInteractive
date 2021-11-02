@@ -4,10 +4,10 @@ import * as p from "core/properties"
 export namespace DownsamplerCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
+  export type Props = ColumnDataSource.Props & {
     source: p.Property<ColumnDataSource>
     nPoints: p.Property<number>
-    columns: p.Property<string[]>
+    selectedColumns: p.Property<string[]>
   }
 }
 
@@ -23,10 +23,10 @@ export class DownsamplerCDS extends ColumnDataSource {
   static __name__ = "DownsamplerCDS"
 
   static init_DownsamplerCDS() {
-    this.define<CDSCompress.Props>(({Ref, Int, Array, String})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String})=>({
       source:  [Ref(ColumnDataSource)],
       nPoints:    [ Int ],
-      columns:    [ List(String), [] ]
+      selectedColumns:    [ Array(String), [] ]
     }))
   }
 
@@ -38,11 +38,11 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.initialize()
     this.booleans = null
     this._indices = []
-    update()
+    this.update()
   }
 
   update(){
-    const {source, nPoints, columns, booleans, _indices} = this
+    const {source, nPoints, selectedColumns, booleans, _indices} = this
     let l = source.length
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
@@ -60,26 +60,27 @@ export class DownsamplerCDS extends ColumnDataSource {
       }
     }
     _indices.sort() // Might not be needed
-    for(const column of columns){
-      if(this.data[column] === undefined){
-        this.data[column] = []
-      } else {
-        this.data[column].length = 0
-      }
+    for(const column of selectedColumns){
+      this.data[column] = []
       for(let i=0; i < _indices.length; i++){
-        this.data[column].push(source.data[column][_indices[i]])
+        this.data[column][i] = (source.data[column][_indices[i]])
       }
     }
+    this.data.index = []
+    for(let i=0; i < _indices.length; i++){
+      this.data.index[i] = this._indices[i]
+    }
+    this.change.emit()
   }
-
+/*
   let j=0
   for(let i=0; i < _indices.length; i++){
-    //TODO: change selection indices
   }
+  */
 
   update_selection(){
-    const downsampled_indices = this.selected.indices
-    const original_indices = this.source.selected.indices
+    //const downsampled_indices = this.selected.indices
+    //const original_indices = this.source.selected.indices
     // TODO: Change original CDS selection indices
   }
 

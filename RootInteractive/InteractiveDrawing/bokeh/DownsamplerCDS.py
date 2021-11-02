@@ -16,5 +16,5 @@ class DownsamplerCDS(ColumnDataSource):
 
     source = Instance(ColumnDataSource)
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
-    columns = List(String, default=[], help="The columns from the CDS to keep")
+    selectedColumns = List(String, default=[], help="The columns from the CDS to keep")
     print("Import ", __implementation__)
