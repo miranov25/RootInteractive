@@ -1,9 +1,9 @@
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
-from RootInteractive.Tools.aliTreePlayer import *
-from RootInteractive.Tools.compressArray import arrayCompressionRelative8
-from bokeh.io import curdoc
-import pytest
-import matplotlib.pyplot as plt
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from RootInteractive.Tools.compressArray import arrayCompressionRelative16
+import numpy as np
+import pandas as pd
+from bokeh.plotting import output_file
+
 def makePanda(step,sigma):
     noise = 0.1
     aa = np.arange(-1, 1, step)
@@ -15,7 +15,6 @@ def makePanda(step,sigma):
     wA = np.exp(-(a ** 2) / (2 * sigma ** 2))
     df0 = pd.DataFrame(data={'A': a.flatten(), 'B': b.flatten(), 'C': c.flatten(), 'W': w.flatten(),'Wa': w.flatten()})
     return df0,a,b,c,w
-
 
 figureArray = [
     [['A'], ['histoA']],
