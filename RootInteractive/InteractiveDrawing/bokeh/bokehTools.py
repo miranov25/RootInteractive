@@ -54,16 +54,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    let dataSel = null;
-    if(cdsSel != null){
-        dataSel = cdsSel.data;
-        console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
-    }
     const nPointRender = options.nPointRender;
     let nSelected=0;
-    for (const i in dataSel){
-        dataSel[i] = [];
-    }
     const precision = 0.000001;
     const size = dataOrig.index.length;
     let isSelected = new Array(size);
@@ -141,29 +133,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
              }
         }*/
     }
-  /*  if(nPointRender > 0 && cdsSel != null){
-        for (let i = 0; i < size; i++){
-        let randomIndex = 0;
-            if (isSelected[i]){
-                if(nSelected < nPointRender){
-                    permutationFilter.push(i);
-                } else if(Math.random() < nPointRender / (nSelected+1)) {
-                    randomIndex = Math.floor(Math.random()*nPointRender)|0;
-                    permutationFilter[randomIndex] = i;
-                }
-                nSelected++;
-            }
-        }
-        nSelected = Math.min(nSelected, nPointRender);
-        for (const key in dataSel){
-            const colSel = dataSel[key];
-            const colOrig = dataOrig[key];
-            for(let i=0; i<nSelected; i++){
-                colSel[i] = colOrig[permutationFilter[i]];
-            }
-        }
-    }*/
-    
+   
     const t1 = performance.now();
     console.log(`Filtering took ${t1 - t0} milliseconds.`);
     const view = options.view;
@@ -182,7 +152,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
-        //cdsSel.change.emit();
         cdsSel.booleans = isSelected
         cdsSel.update()
         const t3 = performance.now();
