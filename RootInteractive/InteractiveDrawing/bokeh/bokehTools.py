@@ -1220,6 +1220,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                 dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
                                 columnNameDict[varNameZ] = True
                                 downsamplerColumns[varNameZ] = True
+                        if 'varZ' in optionLocal:
+                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
+                            columnNameDict[varNameZ] = True
+                            downsamplerColumns[varNameZ] = True                            
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
