@@ -1228,13 +1228,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             if varNameY+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameY]-seriesErrY
                                 dfQuery[varNameY+'_lower'] = seriesLower
-                                columnNameDict[varNameY+'_lower'] = True
-                                downsamplerColumns[varNameY+'_lower'] = True
+                            columnNameDict[varNameY+'_lower'] = True
+                            downsamplerColumns[varNameY+'_lower'] = True
                             if varNameY+'_upper' not in dfQuery.columns:
                                 seriesUpper = dfQuery[varNameY]+seriesErrY
                                 dfQuery[varNameY+'_upper'] = seriesUpper
-                                columnNameDict[varNameY+'_upper'] = True
-                                downsamplerColumns[varNameY+'_upper'] = True
+                            columnNameDict[varNameY+'_upper'] = True
+                            downsamplerColumns[varNameY+'_upper'] = True
                         if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
                             dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
                             seriesErrX = dfQuery[varNameErrX]
@@ -1242,13 +1242,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             if varNameX+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameX]-seriesErrX
                                 dfQuery[varNameX+'_lower'] = seriesLower
-                                columnNameDict[varNameX+'_lower'] = True
-                                downsamplerColumns[varNameX+'_lower'] = True
+                            columnNameDict[varNameX+'_lower'] = True
+                            downsamplerColumns[varNameX+'_lower'] = True
                             if varNameX+'_upper' not in dfQuery.columns:
                                 seriesUpper = dfQuery[varNameX]+seriesErrX
                                 dfQuery[varNameX+'_upper'] = seriesUpper
-                                columnNameDict[varNameX+'_upper'] = True
-                                downsamplerColumns[varNameX+'_upper'] = True
+                            columnNameDict[varNameX+'_upper'] = True
+                            downsamplerColumns[varNameX+'_upper'] = True
                     else:
                         histogramDict[variables[1][j % lengthY]] = True
 
@@ -1271,7 +1271,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, list(downsamplerColumns), columnNameDict, paramDict
+    return dfQuery, histogramDict, list(downsamplerColumns.keys()), columnNameDict, paramDict
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
