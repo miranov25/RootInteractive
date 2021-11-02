@@ -19,7 +19,7 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJ
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 import copy
-from RootInteractive.Tools.compressArray import *
+from RootInteractive.Tools.compressArray import compressCDSPipe
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
