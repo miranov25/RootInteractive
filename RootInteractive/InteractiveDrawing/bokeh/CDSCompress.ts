@@ -1,4 +1,3 @@
-import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 //import * as pako from './pako/'
@@ -12,8 +11,7 @@ declare const  pako : any
 export namespace CDSCompress {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
-    source: p.Property<ColumnDataSource>
+  export type Props = ColumnDataSource.Props & {
       inputData :    p.Property<Record<string, any>>
       sizeMap :    p.Property<Record<string, any>>
   }
@@ -21,7 +19,7 @@ export namespace CDSCompress {
 
 export interface CDSCompress extends CDSCompress.Attrs {}
 
-export class CDSCompress extends ColumnarDataSource {
+export class CDSCompress extends ColumnDataSource {
   properties: CDSCompress.Props
 
   constructor(attrs?: Partial<CDSCompress.Attrs>) {
@@ -32,8 +30,7 @@ export class CDSCompress extends ColumnarDataSource {
 
   static init_CDSCompress() {
 
-    this.define<CDSCompress.Props>(({Ref})=>({
-      source:  [Ref(ColumnDataSource)],
+    this.define<CDSCompress.Props>(()=>({
         inputData:    [ p.Instance ],
         sizeMap:    [ p.Instance ]
     }))
@@ -44,7 +41,6 @@ export class CDSCompress extends ColumnarDataSource {
     //this.data = {}
     console.info("CDSCompress::initialize")
     this.inflateCompressedBokehObjectBase64()
-    //this.update_range()
   }
   inflateCompressedBokehBase64(arrayIn: any ) {
     let arrayOut=arrayIn.array
@@ -100,7 +96,5 @@ export class CDSCompress extends ColumnarDataSource {
         }
     return objectOut
   }
-
-  public view: number[] | null
 
 }
