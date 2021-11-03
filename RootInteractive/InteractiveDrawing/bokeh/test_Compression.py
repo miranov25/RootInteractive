@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from bokeh.plotting import output_file
 from RootInteractive.Tools.compressArray import *
 import time
 import re
@@ -262,7 +263,7 @@ def test_compressCDSPipe():
 
 def test_CompressionCDSPipeDraw():
     df = pd.DataFrame(np.random.random_sample(size=(100000, 4)), columns=list('ABCD'))
-    df["AA"] = ((df.A * 10).round(0)).astype(CategoricalDtype(ordered=True))
+    df["AA"] = ((df.A * 10).round(0)).astype(pd.CategoricalDtype(ordered=True))
     figureArray = [
        [['A*10'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
         [['AA'], ['C+A', 'C-A', 'A/A']],

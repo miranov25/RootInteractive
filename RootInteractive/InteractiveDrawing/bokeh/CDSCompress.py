@@ -1,8 +1,8 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Any, Dict
-from bokeh.models import ColumnarDataSource
+from bokeh.models import ColumnDataSource
 
 
-class CDSCompress(ColumnarDataSource):
+class CDSCompress(ColumnDataSource):
     __javascript__ = ["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.2/pako.min.js","https://cdnjs.cloudflare.com/ajax/libs/Base64/1.1.0/base64.js"]
     __implementation__ = "CDSCompress.ts"
 
@@ -13,7 +13,6 @@ class CDSCompress(ColumnarDataSource):
     # can be found here:
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
-    source = Instance(ColumnarDataSource)
     inputData=Dict(String, Any)
     sizeMap=Dict(String, Any)
     print("Import ", __implementation__)

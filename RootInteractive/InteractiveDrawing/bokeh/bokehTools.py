@@ -544,26 +544,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
                                                        parameterArray=parameterArray, options=options)
 
-    try:
-        cdsFull = ColumnDataSource(dfQuery)
-        if downsamplerColumns:
-            source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
-        else:
-            source = None
-    except:
-        logging.error("Invalid source:", source)
-    # define default options
-
     plotArray = []
     colorAll = all_palettes[options['colors']]
     colorMapperDict = {}
     cdsHistoSummary = None
 
+    cdsFull = None
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
         cdsCompress0, sizeMap= compressCDSPipe(dfQuery,options["arrayCompression"],1)
-        cdsCompress=CDSCompress(source=None,inputData=cdsCompress0, sizeMap=sizeMap)
+        cdsCompress=CDSCompress(inputData=cdsCompress0, sizeMap=sizeMap)
         cdsFull=cdsCompress
+    else:
+        try:
+            cdsFull = ColumnDataSource(dfQuery)
+        except:
+            logging.error("Invalid source:", source)
+
+    if downsamplerColumns:
+        dummy_data = {}
+        for i in downsamplerColumns:
+            dummy_data[i] = []
+        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns, data=dummy_data)
+    else:
+        source = None
 
     histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict)
     cdsDict = options["cdsDict"]
