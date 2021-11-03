@@ -19,10 +19,11 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJ
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 import copy
-from RootInteractive.Tools.compressArray import *
+from RootInteractive.Tools.compressArray import compressCDSPipe
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
+from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
@@ -53,16 +54,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    let dataSel = null;
-    if(cdsSel != null){
-        dataSel = cdsSel.data;
-        console.log('%f\t%f\t',dataOrig.index.length, dataSel.index.length);
-    }
     const nPointRender = options.nPointRender;
     let nSelected=0;
-    for (const i in dataSel){
-        dataSel[i] = [];
-    }
     const precision = 0.000001;
     const size = dataOrig.index.length;
     let isSelected = new Array(size);
@@ -140,28 +133,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
              }
         }*/
     }
-    if(nPointRender > 0 && cdsSel != null){
-        for (let i = 0; i < size; i++){
-        let randomIndex = 0;
-            if (isSelected[i]){
-                if(nSelected < nPointRender){
-                    permutationFilter.push(i);
-                } else if(Math.random() < nPointRender / (nSelected+1)) {
-                    randomIndex = Math.floor(Math.random()*nPointRender)|0;
-                    permutationFilter[randomIndex] = i;
-                }
-                nSelected++;
-            }
-        }
-        nSelected = Math.min(nSelected, nPointRender);
-        for (const key in dataSel){
-            const colSel = dataSel[key];
-            const colOrig = dataOrig[key];
-            for(let i=0; i<nSelected; i++){
-                colSel[i] = colOrig[permutationFilter[i]];
-            }
-        }
-    }
+   
     const t1 = performance.now();
     console.log(`Filtering took ${t1 - t0} milliseconds.`);
     const view = options.view;
@@ -180,7 +152,8 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
-        cdsSel.change.emit();
+        cdsSel.booleans = isSelected
+        cdsSel.update()
         const t3 = performance.now();
         console.log(`Updating cds took ${t3 - t2} milliseconds.`);
     }
@@ -567,14 +540,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
     i: int
-    dfQuery, histogramDict, output_cdsSel, \
+    dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
                                                        parameterArray=parameterArray, options=options)
 
     try:
         cdsFull = ColumnDataSource(dfQuery)
-        if output_cdsSel:
-            source = ColumnDataSource(dfQuery.sample(min(dfQuery.shape[0], options['nPointRender'])))
+        if downsamplerColumns:
+            source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
         else:
             source = None
     except:
@@ -1174,7 +1147,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     histogramDict = {}
     columnNameDict = {}
     paramDict = {}
-    output_cdsSel = False
+    downsamplerColumns = {}
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
             histogramDict[histo["name"]] = True
@@ -1196,13 +1169,14 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                     optionLocal = options
                 for j in range(0, length):
                     if variables[1][j % lengthY] not in histogramDict:
-                        output_cdsSel = True
                         if '.' not in variables[0][j % lengthX]:
                             dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
                             columnNameDict[varNameX] = True
+                            downsamplerColumns[varNameX] = True
                         if '.' not in variables[1][j % lengthY]:
                             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
                             columnNameDict[varNameY] = True
+                            downsamplerColumns[varNameY] = True
                         if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('.' not in optionLocal['colorZvar']):
                             if optionLocal['colorZvar'] in paramDict:
                                 parameter = paramDict[optionLocal['colorZvar']]
@@ -1210,9 +1184,15 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                     for i in parameter['options']:
                                         dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, i)
                                         columnNameDict[varNameZ] = True
+                                        downsamplerColumns[varNameZ] = True
                             else:
                                 dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
                                 columnNameDict[varNameZ] = True
+                                downsamplerColumns[varNameZ] = True
+                        if 'varZ' in optionLocal:
+                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
+                            columnNameDict[varNameZ] = True
+                            downsamplerColumns[varNameZ] = True                            
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
@@ -1221,11 +1201,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             if varNameY+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameY]-seriesErrY
                                 dfQuery[varNameY+'_lower'] = seriesLower
-                                columnNameDict[varNameY+'_lower'] = True
+                            columnNameDict[varNameY+'_lower'] = True
+                            downsamplerColumns[varNameY+'_lower'] = True
                             if varNameY+'_upper' not in dfQuery.columns:
                                 seriesUpper = dfQuery[varNameY]+seriesErrY
                                 dfQuery[varNameY+'_upper'] = seriesUpper
-                                columnNameDict[varNameY+'_upper'] = True
+                            columnNameDict[varNameY+'_upper'] = True
+                            downsamplerColumns[varNameY+'_upper'] = True
                         if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
                             dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
                             seriesErrX = dfQuery[varNameErrX]
@@ -1233,11 +1215,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             if varNameX+'_lower' not in dfQuery.columns:
                                 seriesLower = dfQuery[varNameX]-seriesErrX
                                 dfQuery[varNameX+'_lower'] = seriesLower
-                                columnNameDict[varNameX+'_lower'] = True
+                            columnNameDict[varNameX+'_lower'] = True
+                            downsamplerColumns[varNameX+'_lower'] = True
                             if varNameX+'_upper' not in dfQuery.columns:
                                 seriesUpper = dfQuery[varNameX]+seriesErrX
                                 dfQuery[varNameX+'_upper'] = seriesUpper
-                                columnNameDict[varNameX+'_upper'] = True
+                            columnNameDict[varNameX+'_upper'] = True
+                            downsamplerColumns[varNameX+'_upper'] = True
                     else:
                         histogramDict[variables[1][j % lengthY]] = True
 
@@ -1260,7 +1244,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, output_cdsSel, columnNameDict, paramDict
+    return dfQuery, histogramDict, list(downsamplerColumns.keys()), columnNameDict, paramDict
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
