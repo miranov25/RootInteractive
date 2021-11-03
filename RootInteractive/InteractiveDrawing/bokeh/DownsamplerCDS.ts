@@ -47,7 +47,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     _indices.length = source.get_length()!
     // Deck shuffling algorithm - for each card drawn, swap it with a random card in hand
     for(let i=0; i<_indices.length; ++i){
-      let random_index = (Math.random()*i) | 0
+      let random_index = (Math.random()*(i+1)) | 0
       _indices[i] = i
       _indices[i] = _indices[random_index]
       _indices[random_index] = i
