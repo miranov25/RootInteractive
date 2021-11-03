@@ -804,9 +804,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
+                logging.warn("legendTitle is deprecated, please use the 'title' field in 'legend_options'")
                 figureI.legend.title = optionLocal["legendTitle"]
             elif figure_cds_name != "":
                 figureI.legend.title = figure_cds_name
+            if 'legend_options' in optionLocal:
+                legend_options = optionLocal['legend_options'].copy()
+                legend_options_parameters = {}
+                for i, iOption in legend_options.items():
+                    if iOption in parameterDict:
+                        legend_options_parameters[i] = paramDict[iOption]
+                for i, iOption in legend_options_parameters.items():
+                    legend_options[i] = iOption['value']
+                figureI.legend.update(**legend_options)
+                for i, iOption in legend_options_parameters.items():
+                    iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         #        zAxisTitle=zAxisTitle[:-1]
         #        if(len(zAxisTitle)>0):
         #            plotTitle += " Color:" + zAxisTitle
