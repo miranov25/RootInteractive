@@ -54,43 +54,91 @@ export class DownsamplerCDS extends ColumnDataSource {
     }
   }
 
+  connect_signals(): void {
+    super.connect_signals()
+
+    this.connect(this.selected.change, () => this.update_selection())
+  }
+
   update(){
     const {source, nPoints, selectedColumns, data, change, booleans, _indices} = this
     const l = source.length
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
-    const selected_indices: number[] = []
-    for(let i=0; i<l && selected_indices.length < nPoints; i++){
+    const downsampled_indices: number[] = []
+    for(let i=0; i<l && downsampled_indices.length < nPoints; i++){
       if (booleans === null || booleans[_indices[i]]){
-        selected_indices.push(_indices[i])
+        downsampled_indices.push(_indices[i])
       }
     }
-    
+
+    downsampled_indices.sort((a,b)=>a-b)
+
     for(const columnName of selectedColumns){
       data[columnName] = []
       const colSource = source.data[columnName]
       const colDest = data[columnName]
-      for(let i=0; i < selected_indices.length; i++){
-        colDest[i] = (colSource[selected_indices[i]])
+      for(let i=0; i < downsampled_indices.length; i++){
+        colDest[i] = (colSource[downsampled_indices[i]])
       }
     }
-//    this.data.index = []
-//    for(let i=0; i < _indices.length; i++){
-//      this.data.index[i] = this._indices[i]
-//    }
-    data.index = selected_indices
+
+    data.index = downsampled_indices
+    const selected_indices: number[] = []
+    const original_indices = this.source.selected.indices
+    let j=0
+    for(let i=0; i < original_indices.length; i++){
+      // TODO: Maybe do binary search, this won't assume selected indices are sorted and might be more performant
+      while(downsampled_indices[j] < original_indices[i]){
+        j++
+      }
+      if(downsampled_indices[j] === original_indices[i]){
+        selected_indices.push(j)
+        j++
+      }
+    }
     change.emit()
+    this.selected.indices = selected_indices
   }
-/*
-  let j=0
-  for(let i=0; i < _indices.length; i++){
-  }
-  */
+
 
   update_selection(){
-    //const downsampled_indices = this.selected.indices
-    //const original_indices = this.source.selected.indices
+    const downsampled_indices = this.data.index
+    const selected_indices = this.selected.indices.map((x:number)=>downsampled_indices[x])
+    selected_indices.sort((a,b)=>a-b)
+    const original_indices = this.source.selected.indices
     // TODO: Change original CDS selection indices
+    const old_indices: number[] = []
+    let iDownsampled=0
+    for(let i=0; i < original_indices.length; i++){
+      // TODO: Maybe do binary search, this won't assume selected indices are sorted and might be more performant
+      while(downsampled_indices[iDownsampled] < original_indices[i]){
+        iDownsampled++
+      }
+      if(downsampled_indices[iDownsampled] > original_indices[i]){
+        old_indices.push(original_indices[i])
+      } 
+    }
+    // Mergesort - the arrays are guaranteed to be disjoint and values in each to be unique
+    const merged_indices = []
+    let iSelected = 0
+    let iOld = 0
+    while(iOld < old_indices.length || iSelected < selected_indices.length){
+      if (iOld < old_indices.length){
+        if(iSelected < selected_indices.length && selected_indices[iSelected] < old_indices[iOld]){
+          merged_indices.push(selected_indices[iSelected])
+          iSelected++
+        } else {
+          merged_indices.push(old_indices[iOld])
+          iOld++
+        }
+      } else {
+        merged_indices.push(selected_indices[iSelected])
+        iSelected++
+      }
+    }
+    this.source.selected.indices = merged_indices
+        
   }
 
 }
