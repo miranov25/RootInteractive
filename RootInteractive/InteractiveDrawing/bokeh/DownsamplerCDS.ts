@@ -38,42 +38,48 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.initialize()
     this.booleans = null
     this._indices = []
+    this.shuffle_indices()
     this.update()
   }
 
+  shuffle_indices(){
+    const {_indices, source} = this
+    _indices.length = source.get_length()!
+    // Deck shuffling algorithm - for each card drawn, swap it with a random card in hand
+    for(let i=0; i<_indices.length; ++i){
+      let random_index = (Math.random()*i) | 0
+      _indices[i] = i
+      _indices[i] = _indices[random_index]
+      _indices[random_index] = i
+    }
+  }
+
   update(){
-    const {source, nPoints, selectedColumns, booleans, _indices} = this
-    let l = source.length
+    const {source, nPoints, selectedColumns, data, change, booleans, _indices} = this
+    const l = source.length
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
-    let nSelected = 0
-    _indices.length = 0
-    for (let i = 0; i < l; i++){
-      if(booleans === null || booleans[i]){
-        if(nSelected < nPoints){
-          _indices.push(i);
-        } else if(Math.random() < nPoints / (nSelected+1)) {
-          let randomIndex = Math.floor(Math.random()*nPoints)|0;
-          _indices[randomIndex] = i;
-        }
-        nSelected++;
+    const selected_indices: number[] = []
+    for(let i=0; i<l && selected_indices.length < nPoints; i++){
+      if (booleans === null || booleans[_indices[i]]){
+        selected_indices.push(_indices[i])
       }
     }
-  //  _indices.sort() // Might not be needed
+    
     for(const columnName of selectedColumns){
-      this.data[columnName] = []
+      data[columnName] = []
       const colSource = source.data[columnName]
-      const colDest = this.data[columnName]
-      for(let i=0; i < _indices.length; i++){
-        colDest[i] = (colSource[_indices[i]])
+      const colDest = data[columnName]
+      for(let i=0; i < selected_indices.length; i++){
+        colDest[i] = (colSource[selected_indices[i]])
       }
     }
 //    this.data.index = []
 //    for(let i=0; i < _indices.length; i++){
 //      this.data.index[i] = this._indices[i]
 //    }
-    this.data.index = _indices
-    this.change.emit()
+    data.index = selected_indices
+    change.emit()
   }
 /*
   let j=0
