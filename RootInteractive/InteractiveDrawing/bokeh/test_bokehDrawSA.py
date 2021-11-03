@@ -28,6 +28,7 @@ markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
 colorFactor=factor_cmap('DDC', 'Category10_6', ["A0","A1","A2","A3","A4"] )
 
 mapDDC={0:"A0",1:"A1",2:"A2",3:"A3",4:"A4"}
+df["B"]=np.linspace(0,1,20000)
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
 df.eval("BoolC=C>0.1", inplace=True)
