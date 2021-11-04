@@ -94,6 +94,15 @@ RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph module
    :show-inheritance:
    :private-members:
 
+RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS module
+-----------------------------------------------------------------
+
+.. automodule:: RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :private-members:
+
 Module contents
 ---------------
 
