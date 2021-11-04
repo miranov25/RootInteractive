@@ -64,11 +64,12 @@ figureArray = [
 ]
 #widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
-tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
+tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)"), ("ErrY", "@errY")]
 
 widgetParams=[
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1]],
+
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
@@ -107,7 +108,6 @@ def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray)
 
-
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
@@ -126,7 +126,7 @@ def testBokehDrawArraySA_tree():
 
 
 #testBokehDrawArraySA_tree()
-#testBokehDrawArrayWidget()               # OK
+testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
 #testBokehDrawArrayQuery()

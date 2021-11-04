@@ -14,7 +14,7 @@ import pyparsing
 from IPython import get_ipython
 from bokeh.models.widgets import *
 from bokeh.models import CustomJS, ColumnDataSource
-from RootInteractive.Tools.pandaTools import *
+from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
@@ -24,6 +24,8 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
+import re
+
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
@@ -713,7 +715,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if optionLocal['colorZvar'] in paramDict:
                 paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
 
-        defaultHoverToolRenderers = []
+        hover_tool_renderers = {}
 
         figure_cds_name = None
 
@@ -764,26 +766,37 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
                 drawnGlyph = None
                 colorMapperCallback = """
-                glyph.fill_color={field:this.value, transform:glyph.fill_color.transform}
-                glyph.line_color={field:this.value, transform:glyph.line_color.transform}
+                glyph.fill_color={...glyph.fill_color, field:this.value}
+                glyph.line_color={...glyph.line_color, field:this.value}
                 """
                 if optionLocal["legend_field"] is None:
                     x_label = getHistogramAxisTitle(histogramDict, varNameX, cds_name)
                     y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
-                    if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
-                    if optionLocal['size'] in paramDict:
-                        paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                    if optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
-                    if optionLocal['size'] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                defaultHoverToolRenderers.append(drawnGlyph)
+                if optionLocal["colorZvar"] in paramDict:
+                    if len(color["transform"].domain) == 0:
+                        color["transform"].domain = [(drawnGlyph, color["field"])]
+                        # HACK: This changes the color mapper's domain, which only consists of one field. 
+                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"transform": color["transform"]}, code="""
+                            transform.domain[0] = [transform.domain[0][0], this.value]
+                            transform.change.emit()
+                        """)])
+                    paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
+                if optionLocal['size'] in paramDict:
+                    paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
+                if cds_name is None:
+                    if "" not in hover_tool_renderers:
+                        hover_tool_renderers[""] = []
+                    hover_tool_renderers[""].append(drawnGlyph)
+                elif cds_name in histogramDict:
+                    if histogramDict[cds_name]["type"] == "profile":
+                        if cds_name not in hover_tool_renderers:
+                            hover_tool_renderers[cds_name] = []
+                        hover_tool_renderers[cds_name].append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                     if optionLocal["colorZvar"] in paramDict:
@@ -803,8 +816,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
-        if defaultHoverToolRenderers:
-            figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
+        for iCds, iRenderers in hover_tool_renderers.items():
+            if iCds == "":
+                tooltips = optionLocal["tooltips"]
+            elif iCds in histogramDict and histogramDict[iCds]["type"] == "profile":
+                profile_description = histogramDict[iCds]
+                tooltips = defaultNDProfileTooltips(profile_description["variables"], profile_description["axis"],
+                                                    profile_description["quantiles"],  profile_description["sum_range"])
+            figureI.add_tools(HoverTool(tooltips=tooltips, renderers=iRenderers))
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
@@ -1133,7 +1152,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1153,7 +1172,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
@@ -1238,6 +1257,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                 dfQuery[varNameX+'_upper'] = seriesUpper
                             columnNameDict[varNameX+'_upper'] = True
                             downsamplerColumns[varNameX+'_upper'] = True
+                        if 'tooltips' in optionLocal:
+                            tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
+                            columnNameDict.update(tooltipColumns)
+                            downsamplerColumns.update(tooltipColumns)
                     else:
                         histogramDict[variables[1][j % lengthY]] = True
 
@@ -1260,7 +1283,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, list(downsamplerColumns.keys()), columnNameDict, paramDict
+    return dfQuery, histogramDict, list(downsamplerColumns.keys() & columnNameDict.keys()), columnNameDict, paramDict
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
@@ -1307,6 +1330,19 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
                                 raise ValueError("Missing range for parameter: ", paramSize["name"])
     return parameterDict
 
+def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
+    tooltips = []
+    for i, iAxis in enumerate(varNames):
+        if i != axis_idx:
+            tooltips.append((iAxis, "[@{bin_bottom_" + str(i) + "}, @{bin_top_" + str(i) + "}]"))
+    tooltips.append(("Mean " + varNames[axis_idx], "@mean"))
+    tooltips.append(("Std. " + varNames[axis_idx], "@std"))
+    for i, iQuantile in enumerate(quantiles):
+        tooltips.append((f"Quantile {iQuantile} {varNames[axis_idx]}", "@quantile_" + str(i)))
+    for i, iRange in enumerate(sumRanges):
+        tooltips.append((f"Sum_normed {varNames[axis_idx]} in [{iRange[0]}, {iRange[1]}]", "@sum_normed_" + str(i)))
+    return tooltips
+
 def getOrMakeColumn(dfQuery, column, cdsName):
     if '.' in column:
         c = column.split('.')
@@ -1317,6 +1353,19 @@ def getOrMakeColumn(dfQuery, column, cdsName):
     else:
         dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
         return [dfQuery, column, None]
+
+def getTooltipColumns(tooltips):
+    if isinstance(tooltips, str):
+        return {}
+    result = {}
+    tooltip_regex = re.compile(r'@(?:\w+|\{[^\}]*\})')
+    for iTooltip in tooltips:
+        for iField in tooltip_regex.findall(iTooltip[1]):
+            if iField[1] == '{':
+                result[iField[2:-1]] = True
+            else:
+                result[iField[1:]] = True
+    return result
 
 def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
