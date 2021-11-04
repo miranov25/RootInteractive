@@ -14,7 +14,7 @@ import pyparsing
 from IPython import get_ipython
 from bokeh.models.widgets import *
 from bokeh.models import CustomJS, ColumnDataSource
-from RootInteractive.Tools.pandaTools import *
+from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
@@ -24,7 +24,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
-import string
+import re
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -715,7 +715,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if optionLocal['colorZvar'] in paramDict:
                 paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
 
-        defaultHoverToolRenderers = []
+        hover_tool_renderers = {}
 
         figure_cds_name = None
 
@@ -789,7 +789,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionLocal['size'] in paramDict:
                     paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 if cds_name is None:
-                    defaultHoverToolRenderers.append(drawnGlyph)
+                    if "" not in hover_tool_renderers:
+                        hover_tool_renderers[""] = []
+                    hover_tool_renderers[""].append(drawnGlyph)
+                elif cds_name in histogramDict:
+                    if histogramDict[cds_name]["type"] == "profile":
+                        if cds_name not in hover_tool_renderers:
+                            hover_tool_renderers[cds_name] = []
+                        hover_tool_renderers[cds_name].append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                     if optionLocal["colorZvar"] in paramDict:
@@ -809,8 +816,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
-        if defaultHoverToolRenderers:
-            figureI.add_tools(HoverTool(tooltips=optionLocal["tooltips"], renderers=defaultHoverToolRenderers))
+        for iCds, iRenderers in hover_tool_renderers.items():
+            if iCds == "":
+                tooltips = optionLocal["tooltips"]
+            elif iCds in histogramDict and histogramDict[iCds]["type"] == "profile":
+                profile_description = histogramDict[iCds]
+                tooltips = defaultNDProfileTooltips(profile_description["variables"], profile_description["axis"],
+                                                    profile_description["quantiles"],  profile_description["sum_range"])
+            figureI.add_tools(HoverTool(tooltips=tooltips, renderers=iRenderers))
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
@@ -1139,7 +1152,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]}
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i}
                 histoDict[histoName]["profiles"] = profilesDict
         else:
             sampleVarNames = []
@@ -1159,7 +1172,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
                     histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"]} 
+                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
                 histoDict[histoName]["profiles"] = profilesDict
 
     return histoDict
@@ -1317,6 +1330,17 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
                                 raise ValueError("Missing range for parameter: ", paramSize["name"])
     return parameterDict
 
+def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
+    tooltips = []
+    for i, iAxis in enumerate(varNames):
+        if i != axis_idx:
+            tooltips.append((iAxis, "[@{bin_bottom_" + str(i) + "}, @{bin_top_" + str(i) + "}]"))
+    tooltips.append(("Mean " + varNames[axis_idx], "@mean"))
+    tooltips.append(("Std. " + varNames[axis_idx], "@std"))
+    for i, iQuantile in enumerate(quantiles):
+        tooltips.append(("Quantile " + iQuantile + " " + varNames[axis_idx], "@quantile_" + str(i)))
+    return tooltips
+
 def getOrMakeColumn(dfQuery, column, cdsName):
     if '.' in column:
         c = column.split('.')
@@ -1332,21 +1356,13 @@ def getTooltipColumns(tooltips):
     if isinstance(tooltips, str):
         return {}
     result = {}
+    tooltip_regex = re.compile(r'@(?:\w+|\{[^\}]*\})')
     for iTooltip in tooltips:
-        fields = iTooltip[1].split('@')
-        for iField in fields[1:]:
-            if iField[0] == '{':
-                result[iField[1:].split('}')[0]] = True
+        for iField in tooltip_regex.findall(iTooltip[1]):
+            if iField[1] == '{':
+                result[iField[2:-1]] = True
             else:
-                # HACK: Ghetto regex - probably regexes aren't even the right way of parsing this
-                isOK = True
-                for i in range(len(iField)):  
-                    if iField[i] in string.whitespace + string.punctuation:
-                        result[iField[:i]] = True
-                        isOK = False
-                        break
-                if isOK:
-                    result[iField] = True
+                result[iField[1:]] = True
     return result
 
 def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
