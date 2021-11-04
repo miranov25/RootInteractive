@@ -24,6 +24,8 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
+import string
+
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
                 "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
@@ -786,7 +788,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if optionLocal['size'] in paramDict:
                     paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                defaultHoverToolRenderers.append(drawnGlyph)
+                if cds_name is None:
+                    defaultHoverToolRenderers.append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
                     if optionLocal["colorZvar"] in paramDict:
@@ -1241,6 +1244,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                 dfQuery[varNameX+'_upper'] = seriesUpper
                             columnNameDict[varNameX+'_upper'] = True
                             downsamplerColumns[varNameX+'_upper'] = True
+                        if 'tooltips' in optionLocal:
+                            tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
+                            columnNameDict.update(tooltipColumns)
+                            downsamplerColumns.update(tooltipColumns)
                     else:
                         histogramDict[variables[1][j % lengthY]] = True
 
@@ -1263,7 +1270,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, list(downsamplerColumns.keys()), columnNameDict, paramDict
+    return dfQuery, histogramDict, list(downsamplerColumns.keys() & columnNameDict.keys()), columnNameDict, paramDict
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
@@ -1320,6 +1327,23 @@ def getOrMakeColumn(dfQuery, column, cdsName):
     else:
         dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
         return [dfQuery, column, None]
+
+def getTooltipColumns(tooltips):
+    if isinstance(tooltips, str):
+        return {}
+    result = {}
+    for iTooltip in tooltips:
+        fields = iTooltip[1].split('@')
+        for iField in fields[1:]:
+            if iField[0] == '{':
+                result[iField[1:].split('}')[0]] = True
+            else:
+                # HACK: Ghetto regex - probably regexes aren't even the right way of parsing this
+                for i in range(len(iField)):  
+                    if iField[i] in string.whitespace + string.punctuation:
+                        result[iField[:i]] = True
+                        break
+    return result
 
 def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
