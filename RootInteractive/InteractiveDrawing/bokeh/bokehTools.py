@@ -1339,6 +1339,8 @@ def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
     tooltips.append(("Std. " + varNames[axis_idx], "@std"))
     for i, iQuantile in enumerate(quantiles):
         tooltips.append((f"Quantile {iQuantile} {varNames[axis_idx]}", "@quantile_" + str(i)))
+    for i, iRange in enumerate(sumRanges):
+        tooltips.append((f"Sum_normed {varNames[axis_idx]} in [{iRange[0]}, {iRange[1]}]", "@sum_normed_" + str(i)))
     return tooltips
 
 def getOrMakeColumn(dfQuery, column, cdsName):
