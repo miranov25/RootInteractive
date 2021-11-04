@@ -1339,10 +1339,14 @@ def getTooltipColumns(tooltips):
                 result[iField[1:].split('}')[0]] = True
             else:
                 # HACK: Ghetto regex - probably regexes aren't even the right way of parsing this
+                isOK = True
                 for i in range(len(iField)):  
                     if iField[i] in string.whitespace + string.punctuation:
                         result[iField[:i]] = True
+                        isOK = False
                         break
+                if isOK:
+                    result[iField] = True
     return result
 
 def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
