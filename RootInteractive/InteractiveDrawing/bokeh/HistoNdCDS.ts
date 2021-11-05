@@ -1,23 +1,23 @@
-import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
+  export type Props = ColumnDataSource.Props & {
     source: p.Property<ColumnDataSource>
 //    view: p.Property<number[] | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
     sample_variables:      p.Property<string[]>
     weights:      p.Property<string | null>
+    histograms: p.Property<Record<string, Record<string, any>>>
   }
 }
 
 export interface HistoNdCDS extends HistoNdCDS.Attrs {}
 
-export class HistoNdCDS extends ColumnarDataSource {
+export class HistoNdCDS extends ColumnDataSource {
   properties: HistoNdCDS.Props
 
   constructor(attrs?: Partial<HistoNdCDS.Attrs>) {
@@ -40,7 +40,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
-      weights:      [String, null]
+      weights:      [String, null],
+      histograms:  [p.Instance]
     }))
   }
 
