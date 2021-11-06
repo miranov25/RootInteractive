@@ -134,6 +134,7 @@ def test_customJsFunction():
     """))
 
     output_file("test_Alias.html")
+<<<<<<< HEAD
     fig = Figure()
     fig.scatter(x="a", y="b", source=cdsDownsampled)
     fig.scatter(x="a", y="a*x+b", source=cdsDownsampled)
@@ -168,3 +169,18 @@ def test_customJsFunctionBokehDrawArray_v():
                            aliasArray=aliasArray, histogramArray=histoArray)
 
 test_customJsFunctionBokehDrawArray()
+=======
+    xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, aliasArray=aliasArray)
+
+def test_makeColumns():
+    paramDict = {"paramA": {"value": "5"}}
+    aliasDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
+    cdsDict = {"histoA": {"nbins": 10}, None: df}
+    varList, ctx_updated, memoized_columns = getOrMakeColumns(["1", "Y", "10*X+Y", "saxpy(paramA, X, Y+1)", "histoA.entries"], None, cdsDict, paramDict, aliasDict)
+    assert len(varList) == 5
+    assert ctx_updated[-1] == "histoA"
+    print(ctx_updated)
+    print(memoized_columns)
+
+test_makeColumns()
+>>>>>>> ced6460 (Added new interface for string parsing of variable names)
