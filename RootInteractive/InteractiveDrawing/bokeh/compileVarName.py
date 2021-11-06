@@ -1,4 +1,5 @@
 import ast
+from typing import Set
 
 class ColumnEvaluator:
     def __init__(self, context, cdsDict, paramDict, aliasDict):
@@ -6,6 +7,7 @@ class ColumnEvaluator:
         self.paramDict = paramDict
         self.aliasDict = aliasDict
         self.context = context
+        self.usedNames = Set()
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -53,6 +55,7 @@ class ColumnEvaluator:
         if node.value.id not in self.cdsDict:
             raise KeyError("Column not found")
         self.context = node.value.id
+        self.usedNames.add(node.attr)
         return {
             "name": node.attr,
             "type": "column"
@@ -64,6 +67,7 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "parameter"
             }
+        self.usedNames.add(node.id)
         return {
             "name": node.id,
             "type": "column"
@@ -80,6 +84,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
     n_context = len(context)
     variables = []
     ctx_updated = []
+    used_names = Set()
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
@@ -90,7 +95,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
         column = evaluator.visit(queryAST.body)
         variables.append(column)
         i_context = evaluator.context
+        used_names.update(evaluator.usedNames)
         ctx_updated.append(i_context)
         memoizedColumns[(i_var, i_context)] = column
         
-    return variables, ctx_updated, memoizedColumns
+    return variables, ctx_updated, memoizedColumns, used_names
