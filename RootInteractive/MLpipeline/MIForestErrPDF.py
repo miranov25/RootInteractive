@@ -18,101 +18,110 @@ class MIForestErrPDF:
         :param kwargs: All options from sklearn can be used. For instance
         """
         defaultErrPDFOptions = {
-            "n_trees":-1,                       #
+            "mean_depth":10,                    # mean depth of the tree
+            "min_tree":32,                      # minimal number of trees for fit
+            "niter_max":3,                      # number of itterations
             "n_jobs":4,                         # nJobs
             "verbose":1
         }
         self.optionsErrPDF=defaultErrPDFOptions
         self.optionsErrPDF.update(optionsErrPDF0)
-        self.trees=[]
+        self.method="MIForestErrPDF"
+        self.trees={}
+        self.trees[0]=[]                       # trees for data
+        self.trees[1]=[]                       # trees for refernce data
         self.type=switch
         self.options=kwargs
         self.model_name=''
-        self.n_trees=self.optionsErrPDF["nTrees"]
 
+    def fit(self, xIn, yIn,  sample_weight=None):
+        self.fitWithParam(xIn,yIn,self.optionsErrPDF["mean_depth"], self.optionsErrPDF["niter_max"])
 
-    def fit(self, x, y, sample_weight=None):
+    def fitWithParam(self, x0, y0, meanDepth, nIterMax, sample_weight=None):
         """
+        make fits in iteration
         :param X_train:         input data set
-        :param y_train:
-        :param sample_weight:
+        :param y_train:         input data set
+        :param meanDepth        mean depth of te tree
         :return:
         """
-        maxDepth= int(np.log2(x.shape[0]+1))
-
-
-        time0=time.perf_counter()
-        # 0.) split data sets to nSplit
-        dataSet=[]
-        for i in range(0,self.optionsErrPDF['nSplit']):
-            x0, x1, y0, y1 = train_test_split(x, y)
-            dataSet.append([x0,y0])
-            dataSet.append([x1,y1])
-        # 1.) define initial value of the  max_depth
-        maxDepth= int(np.log2(x.shape[0]+1))
-        if self.optionsErrPDF['max_depthBegin'] <1:
-            self.optionsErrPDF['max_depthBegin'] =  int(np.log2(x.shape[0]/256)+1)
-        if self.optionsErrPDF['max_depthEnd'] <1:
-            self.optionsErrPDF['max_depthEnd'] =  int(np.log2(x.shape[0]/4)+1)
-        self.max_depth=self.optionsErrPDF["max_depthBegin"]
-        stdPredBestDepth=0
-        stdPointBestDepth=0
-        # 2.) make fits  in loop increasing the deepness and n_estimators until precission still improved
-        for depth in range(self.optionsErrPDF['max_depthBegin'], self.optionsErrPDF['max_depthEnd']):
-            currentModels=[]
-            for i in range(0, 2 * self.optionsErrPDF['nSplit']):
+        assert len(x0) == len(y0)
+        nRows=x0.shape[0]
+        nTrees=nRows/(2**meanDepth)
+        nTrees=np.exp2(np.log2(nTrees)).astype(int)                  # number of independent trees forced to be 2**N
+        if nTrees<self.optionsErrPDF["min_tree"]:
+            nTrees=self.optionsErrPDF["min_tree"]
+        bucketSize=((nRows/nTrees)//2)
+        #
+        xIn, _, yIn, _ = train_test_split(x0, y0, test_size=0.0)
+        #  nRows=100; xIn=np.linspace(0.0, 1.0, num=nRows); yIn=np.linspace(0.0, 1.0, num=nRows);
+        x={}
+        y={}
+        ypred={}
+        statDict={"mean":0,"median":0,"std":0}
+        for tIter in range(0,nIterMax):
+            #create permutations in 2 groups data and reference data - to be fitted with tree and refernce tree
+            permutation= np.random.permutation(nRows//2)
+            #x[0]=xIn[0:nRows//2][permutation]
+            x[0]=xIn[0:nRows//2].iloc[permutation].reset_index(drop=True)
+            y[0]=yIn[0:nRows//2][permutation]
+            permutation= np.random.permutation(nRows-nRows//2)
+            #x[1]=xIn[nRows//2:nRows][permutation]
+            x[1]=xIn[nRows//2:nRows].iloc[permutation].reset_index(drop=True)
+            y[1]=yIn[nRows//2:nRows][permutation]
+            #
+            # fit trees
+            for iTree in range(0,nTrees):
+                iter=(2*iTree//nTrees)
+                i0=int(iTree*bucketSize)
+                i1=int((iTree+1)*bucketSize)
                 if self.type == 'Classifier':
-                    clf = RandomForestClassifier(**(self.options), warm_start=True, max_depth=depth,n_jobs=self.optionsErrPDF['n_jobs'],
-                                                 n_estimators=self.optionsErrPDF['n_estimatorsBegin'],max_samples=self.optionsErrPDF['max_samples'])
+                    clf = DecisionTreeClassifier()
                 elif self.type == 'Regressor':
-                    clf = RandomForestRegressor(**(self.options), warm_start=True, max_depth=depth,n_jobs=self.optionsErrPDF['n_jobs'],
-                                                n_estimators=self.optionsErrPDF['n_estimatorsBegin'],max_samples=self.optionsErrPDF['max_samples'])
-                currentModels.append(clf)
-            rmsSum=0
-            stdPredBestN=0
-            stdPointBestN=0
-            while currentModels[0].n_estimators < self.optionsErrPDF['n_estimatorsEnd']:
-                for i in range(0,2*self.optionsErrPDF['nSplit']):
-                    currentModels[i].fit(dataSet[i][0],dataSet[i][1])
+                    clf = DecisionTreeRegressor()
+                clf.fit(x[iter][i0:i1],y[iter][i0:i1])
+                self.trees[iter].append(clf)
+            # estimate reducible error
+            treeSlice=slice(0,(nTrees//2)*(tIter+1)-1)
+            yPred0=self.predictStat(xIn,0,statDict,treeSlice)
+            yPredMed0=statDict["median"];
+            yPredStd0=statDict["std"];
+            yPred1=self.predictStat(xIn,1,statDict,treeSlice)
+            yPredMed1=statDict["median"];
+            yPredStd1=statDict["std"];
+            rmsPred=np.std(yPred0-yPred1)
+            rmsPredMed=np.std(yPredMed0-yPredMed1)
+            meanStd=np.mean(0.5*(yPredStd0+yPredStd1))
+            meanDeltaRelStd=np.std((yPredStd0-yPredStd1))/np.mean(0.5*(yPredStd0+yPredStd1))
+            rmsPoint=np.std(0.5*(yPred0+yPred1)-yIn)
+            print(tIter,nTrees, rmsPoint, meanStd, meanDeltaRelStd,  rmsPred,rmsPredMed )
 
-                # caclulate prcession rms
-                stdPred=0
-                stdPoint=0
-                for i in range(0,self.optionsErrPDF['nSplit']):
-                    dy0=currentModels[2*i].predict(dataSet[2*i][0])-currentModels[2*i+1].predict(dataSet[2*i][0])
-                    dy1=currentModels[2*i].predict(dataSet[2*i+1][0])-currentModels[2*i+1].predict(dataSet[2*i+1][0])
-                    stdPoint+=(dataSet[2*i][1]- currentModels[2*i+1].predict(dataSet[2*i][0])).std()
-                    stdPoint+=(dataSet[2*i+1][1]- currentModels[2*i].predict(dataSet[2*i+1][0])).std()
-                    stdPred+=dy0.std()
-                    stdPred+=dy1.std()
+        return 0
 
-                stdPred/=(2*self.optionsErrPDF['nSplit'])
-                stdPoint/=(2*self.optionsErrPDF['nSplit'])
-                stdIrr=np.sqrt(max(stdPoint*stdPoint-stdPred*stdPred/2.,0))
-                nBucketMean=(x.shape[0]/(2**depth))
-                stdRedStat=stdIrr/np.sqrt(nBucketMean)
-                print(depth, currentModels[i].n_estimators, stdPred, stdRedStat, stdPoint, stdIrr,   nBucketMean,time.perf_counter()-time0)
-                if (stdPointBestN>0) and (stdPred/stdPredBestN>(1.-self.optionsErrPDF["n_estimatorsFractionEnd"])) and (stdPred/stdPredOld>(1.-self.optionsErrPDF["n_estimatorsFractionEnd"])):
-                    print("I will stop now", stdPred/stdPredBestN, stdPoint/stdPointBestN, self.optionsErrPDF["n_estimatorsFractionEnd"],time.perf_counter()-time0)
-                    break
-                stdPredOld=stdPred
-                for i in range(0,2*self.optionsErrPDF['nSplit']):
-                    deltaJobs= 1+((self.optionsErrPDF['n_estimatorsEnd'] - self.optionsErrPDF['n_estimatorsBegin'])//10)//self.optionsErrPDF['n_jobs']
-                    deltaJobs*=self.optionsErrPDF['n_jobs']
-                    currentModels[i].n_estimators += deltaJobs
+    def predictStat(self, data, treeType, statDictionary, treeSlice):
+        """
+        predict value
+        :param data:           inout data
+        :param treeType:
+        :param statDictonary:  statistics to output
+        :param treeSlice:      slice to use for prediction  e.g. s=slice(0,a)
+        :return:
+        """
+        #assert(treeType!=0 & treeType!=1)
+        counter=0
+        for counter, tree in enumerate(self.trees[treeType][treeSlice]): pass
+        selTree = np.zeros((counter+1, data.shape[0]))
 
-            if (stdPointBestDepth>0) and (stdPointBestN/stdPointBestDepth>(1.-self.optionsErrPDF["depthFractionEnd"])):
-                print("Deepnes scan stops now", stdPointBestN/stdPointBestDepth, self.optionsErrPDF["depthFractionEnd"],time.perf_counter()-time0)
-                break
-            else:
-                self.models.clear()
-                for i in range(0, 2 * self.optionsErrPDF['nSplit']):
-                    self.models.append(currentModels[i])
-            stdPointBestDepth=stdPointBestN
-
-
-
-
+        for counter, tree in enumerate(self.trees[treeType][treeSlice]) :
+            selTree[counter] = tree.predict(data)
+        #
+        #stat={"Mean":np.mean(selTree[0:counter], 0), "Median":np.median(selTree[0:counter], 0), "RMS": np.std(selTree[counter], 0)}
+        for i,stat in enumerate(statDictionary):
+            #print(i,stat)
+            if stat=="mean": statDictionary["mean"]= np.mean(selTree[0:counter], 0)
+            if stat=="median": statDictionary["median"]= np.median(selTree[0:counter], 0)
+            if stat=="std": statDictionary["std"]= np.std(selTree[0:counter], 0)
+        return np.mean(selTree[0:counter], 0);
 
 
 
@@ -124,19 +133,6 @@ class MIForestErrPDF:
         :return: array of the predicted values.
         """
 
-    def predictStat(self, data, **kwargs):
-        """
-        TODO
-        :param data     - input matrix
-        :param kwargs   - optional arguments
-        :return: predict statistic mean, median, rms over trees
-        """
-        defaultOptions = {
-            "group": -1,
-            "n_groups":-1
-        }
-        options=defaultOptions
-        options.update(kwargs)
 
 
     def printImportance(self, varNames, **kwargs):

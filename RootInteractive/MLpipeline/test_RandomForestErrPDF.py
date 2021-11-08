@@ -21,7 +21,7 @@ tooltips = [("A", "@A"), ("B", "@B"), ("C", "@C"), ("RF", "@RF")]
 methods = ['RF']
 rfErrPDF=0
 
-def generateInput(nPoints):
+def generateInput(nPoints, outFraction=0.2):
     """
     Generate random panda+tree random vectors A,B,C,D
         * generate function value = A+exp(3B)*sin(6.28C)
@@ -30,6 +30,7 @@ def generateInput(nPoints):
     df = pd.DataFrame(np.random.random_sample(size=(nPoints, 4)), columns=list('ABCD'))
     # df["noise"] = np.random.normal(0, 0.05, nPoints) + np.random.normal(0, 0.5, nPoints)*(np.random.random(nPoints)>0.8)
     df["noise"] = np.random.normal(0, 0.2, nPoints)
+    df["noise"] += (np.random.random(nPoints)<outFraction)*np.random.normal(0, 2, nPoints)
     df["csin"] = np.sin(6.28 * df["C"])
     df["ccos"] = np.cos(6.28 * df["C"])
     df["valueOrig"] = 3 * df["A"] + np.exp(2 * df["B"]) * df["csin"]
@@ -39,7 +40,7 @@ def generateInput(nPoints):
     return df
 
 
-def makeFitsR(df,n_jobs=-1):
+def makeFitsRF(df,n_jobs=-1):
     varFit = 'value'
     #variableX = ['A', "B", "C", 'D']
     variableX = ['A', "expB", "csin", 'D']
@@ -52,12 +53,12 @@ def makeFitsR(df,n_jobs=-1):
     fitter.Fit()
     return fitter
 
-def doFitR(nPoints, n_jobs):
+def doFitRF(nPoints, n_jobs):
     df =generateInput(nPoints)
-    makeFitsR(df,n_jobs)
+    makeFitsRF(df,n_jobs)
 
 
-def makeFits(df,n_jobs=-1):
+def makeFitsErrPDF(df,n_jobs=-1, mean_depth=14, niter_max=8):
     varFit = 'value'
     #variableX = ['A', "B", "C", 'D']
     variableX = ['A', "expB", "csin", 'D']
@@ -65,7 +66,13 @@ def makeFits(df,n_jobs=-1):
     dataContainer = DataContainer(df, variableX, varFit, [nPoints // 2, nPoints // 2])
     fitter = Fitter(dataContainer)
     #
-    miErrPDF=MIForestErrPDF("Regressor",{"nSplit": 8, "max_depthBegin":-1, "n_jobs":n_jobs })
+    miErrPDF=MIForestErrPDF("Regressor",{"mean_depth":mean_depth, "n_jobs":n_jobs,"niter_max":niter_max })
     fitter.Register_Model('RFErrPDF',miErrPDF)
     fitter.Fit()
     return fitter
+
+def doFitErrRF(nPoints, n_jobs):
+    df =generateInput(nPoints)
+    makeFitsErrPDF(df,10)
+
+#doFitErrRF(400000,1)
