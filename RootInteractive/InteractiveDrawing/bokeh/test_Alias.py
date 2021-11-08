@@ -1,55 +1,41 @@
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
-from bokeh.plotting import output_file
+from bokeh.io.showing import show
+from bokeh.models.callbacks import CustomJS
+from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
+from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
+
+from bokeh.models.sources import ColumnDataSource
+from bokeh.models.widgets import Slider
+from bokeh.models.layouts import Column
+
+from bokeh.plotting import Figure, output_file
+
 import pandas as pd
 import numpy as np
 
-df = pd.DataFrame(np.random.random_sample(size=(100000, 2)), columns=list('XY'))
+df = pd.DataFrame(np.random.random_sample(size=(2000, 6)), columns=list('ABCDEF'))
 
-aliasArray = [
-    {
-        "name": "saxpy", 
-        "v_func": """
-            let result = []
-            for(let i=0; i<x.length; i++){
-                result.push(a*x[i]+y[i])
-            }
-            return result
-        """,
-        "fields": ["a", "x", "y"]
-    },
-    {
-        "name": "saxpy_v2", 
-        "func": """
-            return a*x+y
-        """,
-        "fields": ["a", "x", "y"]
-    }
-]
+jsFunction = """
+"use strict";
+return a*x+y;
+"""
 
-parameterArray = [
- {"name": "paramA", "value":1, "range":[0, 10]}
-]
+sliderWidget = Slider(title='X', start=-20, end=20, step=1, value=10)
 
-figureArray = [
-    [["X"], ["Y", "10*X+Y", "saxpy(paramA, X, Y)"]],
-    [["X"], ["Y", "10*X+Y", "saxpy_v2(paramA, X, Y)"]]
-]
+jsMapper = CustomJSNAryFunction(parameters={"a": sliderWidget.value}, fields=["x", "y"], func=jsFunction)
 
-figureLayoutDesc=[
-        [0, 1]
-        ]
+cdsOrig = ColumnDataSource(df)
+cdsAlias = CDSAlias(source=cdsOrig, mapping={"a":{"field":"A"}, "b":{"field":"B"}, "a*x+b": {"fields":["A", "B"], "transform": jsMapper}})
 
-widgetParams=[
-    ['range', ['X']],
-    ['range', ['Y']],
-    ['slider',["paramA"], {"callback": "parameter"}],
-]
+sliderWidget.js_on_change("value", CustomJS(args = {"jsMapper": jsMapper, "cdsAlias": cdsAlias}, code="""
+    jsMapper.parameters = {value: this.value}
+    jsMapper.update_args()
+    console.log("Boo!")
+    cdsAlias.compute_functions()
+"""))
 
-widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[9, 10, 11], {'sizing_mode': 'scale_width'}]
-    }
+output_file("test_Alias.html")
+fig = Figure()
+fig.scatter(x="a", y="b", source=cdsAlias)
+fig.scatter(x="a", y="a*x+b", source=cdsAlias)
+show(Column(fig, sliderWidget))
 
-def test_Alias():
-    output_file("test_Alias.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, aliasArray=aliasArray)
