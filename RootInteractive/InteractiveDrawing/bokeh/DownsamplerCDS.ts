@@ -58,6 +58,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.connect_signals()
 
     this.connect(this.selected.change, () => this.update_selection())
+    // TODO: Add the use case when source grows in size
     this.connect(this.source.change, () => this.update())
   }
 

@@ -1,10 +1,11 @@
+import {ColumnDataSource} from "models/sources/column_data_source"
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
 
 export namespace CDSAlias {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
+  export type Props = ColumnDataSource.Props & {
     source: p.Property<ColumnarDataSource>
     mapping: p.Property<Record<string, any>>
   }
@@ -12,7 +13,7 @@ export namespace CDSAlias {
 
 export interface CDSAlias extends CDSAlias.Attrs {}
 
-export class CDSAlias extends ColumnarDataSource {
+export class CDSAlias extends ColumnDataSource {
   properties: CDSAlias.Props
 
   constructor(attrs?: Partial<CDSAlias.Attrs>) {
