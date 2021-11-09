@@ -25,7 +25,7 @@ export class DownsamplerCDS extends ColumnDataSource {
   static init_DownsamplerCDS() {
     this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String})=>({
       source:  [Ref(ColumnDataSource)],
-      nPoints:    [ Int ],
+      nPoints:    [ Int, 300 ],
       selectedColumns:    [ Array(String), [] ]
     }))
   }
@@ -58,6 +58,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.connect_signals()
 
     this.connect(this.selected.change, () => this.update_selection())
+    this.connect(this.source.change, () => this.update())
   }
 
   update(){
