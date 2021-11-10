@@ -1,23 +1,23 @@
-import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
+  export type Props = ColumnDataSource.Props & {
     source: p.Property<ColumnDataSource>
 //    view: p.Property<number[] | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
     sample_variables:      p.Property<string[]>
     weights:      p.Property<string | null>
+    histograms: p.Property<Record<string, Record<string, any>>>
   }
 }
 
 export interface HistoNdCDS extends HistoNdCDS.Attrs {}
 
-export class HistoNdCDS extends ColumnarDataSource {
+export class HistoNdCDS extends ColumnDataSource {
   properties: HistoNdCDS.Props
 
   constructor(attrs?: Partial<HistoNdCDS.Attrs>) {
@@ -40,7 +40,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
-      weights:      [String, null]
+      weights:      [String, null],
+      histograms:  [p.Instance]
     }))
   }
 
@@ -138,26 +139,59 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._nbins = this.nbins;
 
     let sample_array: number[][] = []
+    if(this.range === null || this.range.reduce((acc, cur) => acc || (cur === null), false))
     for (const column_name of this.sample_variables) {
-      sample_array.push(this.source.get_array(column_name))
+      const column = this.source.get_array(column_name) as number[]
+      sample_array.push(column)
     }
       // This code seems stupid
-      if(this.range === null){
-        for (let i = 0; i < this._nbins.length; i++) {
-          this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
-          this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
-        }
-      } else {
-        for (let i = 0; i < this.range.length; i++) {
-          const r = this.range[i]
-          if(r === null) {
-            this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), sample_array[i][0])
-            this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), sample_array[i][0])
-          } else {
-            this._range_min[i] = r[0]
-            this._range_max[i] = r[1]
+      let invalidate_bins = false
+      if(this.view === null){
+        if(this.range === null){
+          for (let i = 0; i < this._nbins.length; i++) {
+            this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
+            this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
+          }
+          invalidate_bins = true
+        } else {
+          for (let i = 0; i < this.range.length; i++) {
+            const r = this.range[i]
+            if(r === null) {
+              this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
+              this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
+              invalidate_bins = true
+            } else {
+              this._range_min[i] = r[0]
+              this._range_max[i] = r[1]
+            }
           }
         }
+      } else {
+        if(this.range === null){
+          for (let i = 0; i < this._nbins.length; i++) {
+            const col = sample_array[i]
+            this._range_min[i] = this.view.reduce((acc, cur) => Math.min(acc, col[cur]), Infinity)
+            this._range_max[i] = this.view.reduce((acc, cur) => Math.max(acc, col[cur]), -Infinity)
+          }
+          invalidate_bins = true
+        } else {
+          for (let i = 0; i < this.range.length; i++) {
+            const r = this.range[i]
+            if(r === null) {
+              const col = sample_array[i]
+              this._range_min[i] = this.view.reduce((acc, cur) => Math.min(acc, col[cur]), Infinity)
+              this._range_max[i] = this.view.reduce((acc, cur) => Math.max(acc, col[cur]), -Infinity)
+              invalidate_bins = true
+            } else {
+              this._range_min[i] = r[0]
+              this._range_max[i] = r[1]
+            }
+          }
+        }        
+      }
+      if (invalidate_bins || this._bin_indices.length === 0){
+        this._bin_indices.length = this.source.length
+        this._bin_indices.fill(-2, 0, this.source.length)
       }
       const dim = this.nbins.length
       this._nbins.length = dim
@@ -190,8 +224,6 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
 
       this.dim = dim
-      this._bin_indices.length = this.source.length
-      this._bin_indices.fill(-2, 0, this.source.length)
       this.update_data()
   }
 

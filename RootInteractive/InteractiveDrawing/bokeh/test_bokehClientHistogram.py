@@ -32,16 +32,21 @@ widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1
 figureLayout: str = '((0,1,2, plot_height=300),commonX=1,plot_height=300,plot_width=1200)'
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
 
+parameterArray=[
+    {'name':"size", "value":7, "range": [0, 20]}
+]
+
 widgetParams=[
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1]],
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['multiSelect', ["DDC"]],
+    ['slider',["size"], {"callback": "parameter"}],
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], [5], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -59,12 +64,13 @@ def testBokehClientHistogram():
     output_file("test_BokehClientHistogram.html")
     figureArray = [
         #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
-        [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2"}],
+        [['A'], ['histoA', '(A*A-C*C)*100'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX": "0.01", "size":"size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2",
+                                                            "rescaleColorMapper": True, "size":"size"}],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
-                                                    "rescaleColorMapper": True}]
+                                                    "rescaleColorMapper": True, "size":"size"}]
     ]
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, histogramArray=histoArray)
 
 def testBokehClientHistogramOnlyHisto():
@@ -82,16 +88,16 @@ def testBokehClientHistogramOnlyHisto():
         [4, {'plot_height': 40}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 def testBokehClientHistogramProfileA():
     output_file("test_BokehClientHistogramProfileA.html")
     figureArray = [
-        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2']],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean']],
-        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.std']],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2'], {"size":"size"}],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"size":"size"}],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}, {"size":"size"}],
+        [['histoAB_1.bin_center_0'], ['histoAB_1.std']], {"size":"size"},
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -100,16 +106,16 @@ def testBokehClientHistogramProfileA():
         [4, {'plot_height': 40}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 def testBokehClientHistogramProfileB():
     output_file("test_BokehClientHistogramProfileB.html")
     figureArray = [
-        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_0', 'histoAB_0.quantile_1', 'histoAB_0.quantile_2']],
-        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_1', 'histoAB_0.mean']],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_0', 'histoAB_0.quantile_1', 'histoAB_0.quantile_2'], {"size":"size"}],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_1', 'histoAB_0.mean'], {"size":"size"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
-        [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.std'], {"size":"size"}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -118,7 +124,7 @@ def testBokehClientHistogramProfileB():
         [4, {'plot_height': 40}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 
@@ -137,9 +143,72 @@ def testBokehClientHistogramRowwiseTable():
         [4, {'plot_height': 40}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
     ]
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
+def testBokehClientHistogram3d():
+    output_file("test_BokehClientHistogram.html")
+    histoArray = [
+        {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]]},
+    ]
+    figureArray = [
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
+    ]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
+
+def testBokehClientHistogram3d_colormap():
+    output_file("test_BokehClientHistogram_colormap.html")
+    histoArray = [
+        {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]],
+        "range": [[0,1],[0,1],[0,1]]},
+    ]
+    figureArray = [
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }]
+    ]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
+
+def testBokehClientHistogram3d_colormap_noscale():
+    output_file("test_BokehClientHistogram_colormap_noscale.html")
+    histoArray = [
+        {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]],
+        "range": [[0,1],[0,1],[0,1]]},
+    ]
+    figureArray = [
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
+    ]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
+
+#testBokehClientHistogram3d()
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
 #testBokehClientHistogramRowwiseTable()

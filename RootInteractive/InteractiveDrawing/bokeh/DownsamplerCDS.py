@@ -1,10 +1,10 @@
-from bokeh.core.properties import Instance, String, Float, Int, List, Any, Dict
+from bokeh.core.properties import Instance, String, Int, List
 from bokeh.models import ColumnDataSource
 
 
-class CDSCompress(ColumnDataSource):
-    __javascript__ = ["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.2/pako.min.js","https://cdnjs.cloudflare.com/ajax/libs/Base64/1.1.0/base64.js"]
-    __implementation__ = "CDSCompress.ts"
+class DownsamplerCDS(ColumnDataSource):
+
+    __implementation__ = "DownsamplerCDS.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -13,6 +13,8 @@ class CDSCompress(ColumnDataSource):
     # can be found here:
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
-    inputData=Dict(String, Any)
-    sizeMap=Dict(String, Any)
+
+    source = Instance(ColumnDataSource)
+    nPoints = Int(default=300, help="Number of points to downsample CDS to")
+    selectedColumns = List(String, default=[], help="The columns from the CDS to keep")
     print("Import ", __implementation__)

@@ -28,6 +28,9 @@ def roundRelativeBinary(df, nBits):
     :return:                - rounded array
     """
     type=df.dtype
+    # If dtype is not floating point number or int, skip this step
+    if type.kind not in ['f', 'c', 'i', 'u']:
+        return df
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
     mantissa = np.rint(((mantissa * shiftN)))/shiftN
@@ -37,6 +40,8 @@ def roundRelativeBinary(df, nBits):
 
 def roundAbsolute(df, delta):
     type=df.dtype
+    if type.kind not in ['f', 'c', 'i', 'u']:
+        return df
     result = np.rint(df / delta) * delta
     deltaMean = (df - result).mean()
     result -= deltaMean

@@ -1,8 +1,8 @@
-from bokeh.core.properties import Instance, String, Float, Int, List
-from bokeh.models import ColumnarDataSource
+from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
+from bokeh.models import ColumnDataSource
 
 
-class HistoNdCDS(ColumnarDataSource):
+class HistoNdCDS(ColumnDataSource):
 
     __implementation__ = "HistoNdCDS.ts"
 
@@ -14,8 +14,15 @@ class HistoNdCDS(ColumnarDataSource):
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
-    source = Instance(ColumnarDataSource)
-    sample_variables = List(String)
-    weights = String(default=None)
-    nbins = List(Int)
-    range = List(List(Float))
+    source = Instance(ColumnDataSource, help="Source from which to take the data to histogram")
+    sample_variables = List(String, help="")
+    weights = String(default=None, help="Deprecated. The weights to use for histogramming. If histograms is used, this is ignored.")
+    # TODO: Support auto nbins in the future - 2n-th root of total entries?
+    nbins = List(Int, help="Number of bins")
+    # TODO: When migrating to new version of bokeh, make this Nullable
+    range = List(List(Float), help="Ranges in the same order as sample_variables")
+    # TODO: Make this nullable too
+    histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
+        Dictionary of the values to histogram.
+        Keys are the names of the resulting columns, values are dictionaries with options "weights", "reducer" and "transform"
+        """)

@@ -5,11 +5,11 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    author_email='marian.ivanov@cern.ch',
-    author='Marian Ivanov',
+    author_email='marian.ivanov@cern.ch, ivanov6@uniba.sk',
+    author='Marian Ivanov ',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.01.00.dev0',
+    version='v0.01.02',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
