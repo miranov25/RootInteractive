@@ -20,8 +20,9 @@ widgetLayoutDesc = [[0, 1, 2], [3, 4,5], {'sizing_mode': 'scale_width'}]
 tooltips = [("A", "@A"), ("B", "@B"), ("C", "@C"), ("RF", "@RF")]
 methods = ['RF']
 rfErrPDF=0
-
-def generateInput(nPoints, outFraction=0.2):
+df=0
+fitter=0
+def generateInput(nPoints, outFraction=0.0):
     """
     Generate random panda+tree random vectors A,B,C,D
         * generate function value = A+exp(3B)*sin(6.28C)
@@ -71,8 +72,107 @@ def makeFitsErrPDF(df,n_jobs=-1, mean_depth=14, niter_max=8):
     fitter.Fit()
     return fitter
 
-def doFitErrRF(nPoints, n_jobs):
-    df =generateInput(nPoints)
-    makeFitsErrPDF(df,10)
+def doFitErrRF(nPoints, n_jobs, mean_depth, niter_max):
+    df =generateInput(nPoints,0)
+    fitter=makeFitsErrPDF(df,10,mean_depth, niter_max)
+    return fitter,df
 
-#doFitErrRF(400000,1)
+def appendPrediction():
+    fitter,df=doFitErrRF(500000,1,14,10)
+    reducibleErrorEst = {}
+    statDict={"mean":0,"median":0,"std":0}
+    dataIn=df[fitter.data.X_values]
+    #
+    yPred0 = fitter.Models[0].predictStat(dataIn, 0, statDict, slice(0,dataIn.shape[0]))
+    df["pred0"]=statDict["mean"]
+    df["predMedian0"]=statDict["median"]
+    yPred1 = fitter.Models[0].predictStat(dataIn, 1, statDict, slice(0,dataIn.shape[0]))
+    df["pred1"]=statDict["mean"]
+    df["predMedian1"]=statDict["median"]
+    df["pred"]=0.5*(df["pred0"]+df["pred1"])
+    df["predMedian"]=0.5*(df["predMedian0"]+df["predMedian1"])
+    df["dpred"]=0.5*(df["pred0"]+df["pred1"])-df["valueOrig"]
+    df["dpredF"]=0.5*(df["pred0"]+df["pred1"])-df["value"]
+    df["dpred01"]=(df["pred0"]-df["pred1"])
+    df["dpredMedian"]=0.5*(df["predMedian0"]+df["predMedian1"])-df["valueOrig"]
+
+    fitter.Models[0].predictReducibleError(dataIn,reducibleErrorEst,64,[0.5,0.7,0.8,0.9])
+    deltaPred = fitter.Models[0].predictStat(dataIn, -1, statDict, slice(0,dataIn.shape[0]))
+    df["redErrEst05"]=reducibleErrorEst[0.5]
+    df["redErrEst07"]=reducibleErrorEst[0.7]
+    df["redErrEst08"]=reducibleErrorEst[0.8]
+    df["redErrEst09"]=reducibleErrorEst[0.9]
+    df["stdPoint"]=statDict["std"]
+    df["irrError"]=np.sqrt(df["stdPoint"]**2-df["redErrEst08"]**2)
+    #
+    df["ppredF"]=df["dpredF"]/df["stdPoint"]
+    df["ppred"]=df["dpred"]/df["stdPoint"]
+    df["ppred01"]=df["dpred01"]/df["redErrEst08"]
+
+def makeDashboard():
+    histoArray = [
+        {"name": "hisDpredF", "variables": ["dpredF"], "nbins": 50},
+        {"name": "hisDpred", "variables":   ["dpred"], "nbins":50},
+        {"name": "hisDpred01", "variables": ["dpred01"], "nbins":50},
+        {"name": "hisppredF", "variables": ["ppredF"], "nbins": 50},
+        {"name": "hisppred", "variables":   ["ppred"], "nbins":50},
+        {"name": "hisppred01", "variables": ["ppred01"], "nbins":50},
+    ]
+    figureArray = [
+        [['value'], ['dpredF'], {"errY":"stdPoint"}],
+        [['valueOrig'], ['dpred'], {"errY":"redErrEst09"}],
+        [['valueOrig'], ['dpred01'], {"errY":"redErrEst09"}],
+        #
+        [['hisDpredF'], ['hisDpredF']],
+        [['hisDpred'], ['hisDpred']],
+        [['hisDpred01'], ['hisDpred01']],
+        #
+        [['hisppredF'], ['hisppredF']],
+        [['hisppred'], ['hisppred']],
+        [['hisppred01'], ['hisppred01']],
+        ["tableHisto", {"rowwise": True}],
+        #
+        [['value'], ['redErrEst08'], {"errY":"stdPoint"}],
+        [['value'], ['stdPoint'], {"errY":"stdPoint"}],
+        [['expB'], ['redErrEst08'], {"errY":"stdPoint"}],
+        [['expB'], ['stdPoint'], {"errY":"stdPoint"}],
+    ]
+
+    figureLayoutDesc=[
+        [0, 1, 2,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [3, 4, 5,  {'commonX': 4, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [6, 7, 8,  {'commonX': 6, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [9,{'plot_height': 40}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+    ]
+    figureLayoutDescT1=[
+        [10,11],
+        [12,13]
+    ]
+    figureLayoutDescT={
+        "Value":figureLayoutDesc,
+        "Errors":figureLayoutDescT1
+    }
+
+
+    widgetParams=[
+        ['range', ['A']],
+        ['range', ['B']],
+        ['range', ['C']],
+        ['range', ['D']],
+        #
+        ['range', ['expB']],
+        ['range', ['csin']],
+        ['range', ['ccos']],
+        ['range',["noise"]]
+    ]
+    widgetLayoutDesc=[[0, 1, 2,3], [4, 5,6,7], {'sizing_mode': 'scale_width'}]
+    output_file("test_ErrPdf0.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=500, histogramArray=histoArray)
+    return 0
+
+
+
+
+#doFitErrRF(400000,1,12,8)
