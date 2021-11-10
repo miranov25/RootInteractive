@@ -38,6 +38,13 @@ export class CDSAlias extends ColumnDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => this.compute_functions())
+    for( const key in this.mapping){
+      const column = this.mapping[key]
+      if(column.hasOwnProperty("transform")){
+        this.connect(column.transform.change, () => this.compute_functions())
+      }
+    }
+
     this.connect(this.selected.change, () => this.update_selection())
   }
 
