@@ -77,7 +77,10 @@ class bokehDrawSA(object):
             variableList = constructVariables(query, varX, varY, varColor, widgetsDescription, self.verbosity, **kwargs)
             df = treeToPanda(source, variableList, query, nEntries=treeoptions['nEntries'], firstEntry=treeoptions['firstEntry'], columnMask=treeoptions['columnMask'])
 
-        self.dataSource = df.query(query)
+        if query is None:
+            self.dataSource = df.copy()
+        else:
+            self.dataSource = df.query(query)
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
         self.cdsOrig = ColumnDataSource(self.dataSource)
@@ -132,7 +135,8 @@ class bokehDrawSA(object):
         options={
             'nPointRender': 10000,
             "histogramArray": [],
-            'parameterArray': []
+            'parameterArray': [],
+            "aliasArray": []
         }
         options.update(kwargs)
         kwargs=options
@@ -161,7 +165,8 @@ class bokehDrawSA(object):
         kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         dfQuery, _, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
-                                              widgetArray=widgetsDescription, parameterArray=options["parameterArray"], options={"removeExtraColumns": True})
+                                              widgetArray=widgetsDescription, parameterArray=options["parameterArray"], 
+                                              aliasArray=options["aliasArray"], options={"removeExtraColumns": True})
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
             self.cdsHistoSummary, self.profileList, self.paramDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
