@@ -4,6 +4,7 @@ from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
+from jinja2.defaults import VARIABLE_END_STRING
 from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
 from bokeh.layouts import *
@@ -24,6 +25,8 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
+from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
+from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 import re
 
 # tuple of Bokeh markers
@@ -42,6 +45,7 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
+BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field"]
 
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -467,7 +471,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     return stats_cds, data_table
 
 
-def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], **kwargs):
+def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], jsFunctionArray=[], aliasArray=[], **kwargs):
     """
     Wrapper bokeh draw array of figures
 
@@ -506,11 +510,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'layout': '',
         'widgetLayout': '',
         'palette': Spectral6,
-        "marker": "square",
         "markers": bokehMarkers,
         "color": None,
         "colors": 'Category10',
-        "colorZvar": '',
         "rescaleColorMapper": False,
         "filter": '',
         'doDraw': 0,
@@ -543,8 +545,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     # Check/resp. load derived variables
     i: int
     dfQuery, histogramDict, downsamplerColumns, \
-    columnNameDict, parameterDict = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
-                                                       parameterArray=parameterArray, options=options)
+    columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
+                                                       parameterArray=parameterArray, aliasArray=aliasArray, options=options)
 
     plotArray = []
     colorAll = all_palettes[options['colors']]
@@ -561,7 +563,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         try:
             cdsFull = ColumnDataSource(dfQuery)
         except:
-            logging.error("Invalid source:", source)
+            logging.error("Invalid source:", cdsFull)
 
     if downsamplerColumns:
         dummy_data = {}
@@ -672,7 +674,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         color_bar = None
         mapperC = None
         cmap_cds_name = None
-        if (len(optionLocal["colorZvar"]) > 0):
+        if 'colorZvar' in optionLocal:
             #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
             #So far, parametrized colZ is only supported for the main CDS
             logging.info("%s", optionLocal["colorZvar"])
@@ -777,7 +779,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                if optionLocal["colorZvar"] in paramDict:
+                if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
                         # HACK: This changes the color mapper's domain, which only consists of one field. 
@@ -799,12 +801,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         hover_tool_renderers[cds_name].append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
                     errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
-                    if optionLocal["colorZvar"] in paramDict:
+                    if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorX)
                 if ('errY' in optionLocal.keys()) and (optionLocal['errY'] != '') and (cds_name is None):
                     errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
-                    if optionLocal["colorZvar"] in paramDict:
+                    if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorY)
                 #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
@@ -1178,14 +1180,21 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
     return histoDict
 
 
-def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameterArray=None, widgetArray=None, options={}):
+def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameterArray=None, widgetArray=None, aliasArray=None, options={}):
     histogramDict = {}
     columnNameDict = {}
     paramDict = {}
     downsamplerColumns = {}
+
+    aliasDict = {}
+
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
             histogramDict[histo["name"]] = True
+
+    if aliasArray is not None:
+        for i, func in enumerate(aliasArray):
+            aliasDict[func["name"]] = False
 
     if parameterArray is not None:
           for i, param in enumerate(parameterArray):
@@ -1193,41 +1202,49 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
-            if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
-                lengthX = len(variables[0])
-                lengthY = len(variables[1])
-                length = max(len(variables[0]), len(variables[1]))
-                if len(variables) > 2:
+            if variables[0] != "table" and variables[0] != "tableHisto":
+                nvars = len(variables)
+                if isinstance(variables[-1], dict):
                     optionLocal = options.copy()
-                    optionLocal.update(variables[2])
+                    optionLocal.update(variables[-1])
+                    nvars = nvars - 1
                 else:
                     optionLocal = options
+                variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
+                for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
+                    if axis_index < nvars:
+                        variablesLocal[axis_index] = variables[axis_index]
+                    elif axis_name in optionLocal:
+                        variablesLocal[axis_index] = optionLocal[axis_name]
+                    if variablesLocal[axis_index] is not None and not isinstance(variablesLocal[axis_index], list):
+                        variablesLocal[axis_index] = [variablesLocal[axis_index]]
+                lengthX = len(variables[0])
+                lengthY = len(variables[1])
+                length = max(j is not None and len(j) for j in variablesLocal)
+
                 for j in range(0, length):
                     if variables[1][j % lengthY] not in histogramDict:
+                        for iVariable in variablesLocal:
+                            if iVariable is not None and ('.' not in iVariable[j % len(iVariable)]):
+                                if iVariable[j % len(iVariable)] in paramDict:
+                                    parameter = paramDict[iVariable[j % len(iVariable)]]
+                                    if 'options' in parameter:
+                                        for i in parameter['options']:
+                                            dfQuery, varName = pandaGetOrMakeColumn(dfQuery, i)
+                                            columnNameDict[varName] = True
+                                            downsamplerColumns[varName] = True
+                                elif iVariable[j % len(iVariable)] in aliasDict:
+                                    aliasDict[iVariable[j % len(iVariable)]] = True
+                                else:
+                                    dfQuery, varName = pandaGetOrMakeColumn(dfQuery, iVariable[j % len(iVariable)])
+                                    columnNameDict[varName] = True
+                                    downsamplerColumns[varName] = True    
+                        
+                        # These are kept because of error bars which will be moved to the client later
                         if '.' not in variables[0][j % lengthX]:
                             dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[0][j % lengthX])
-                            columnNameDict[varNameX] = True
-                            downsamplerColumns[varNameX] = True
                         if '.' not in variables[1][j % lengthY]:
                             dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, variables[1][j % lengthY])
-                            columnNameDict[varNameY] = True
-                            downsamplerColumns[varNameY] = True
-                        if ('colorZvar' in optionLocal) and (optionLocal['colorZvar'] != '') and ('.' not in optionLocal['colorZvar']):
-                            if optionLocal['colorZvar'] in paramDict:
-                                parameter = paramDict[optionLocal['colorZvar']]
-                                if 'options' in parameter:
-                                    for i in parameter['options']:
-                                        dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, i)
-                                        columnNameDict[varNameZ] = True
-                                        downsamplerColumns[varNameZ] = True
-                            else:
-                                dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['colorZvar'])
-                                columnNameDict[varNameZ] = True
-                                downsamplerColumns[varNameZ] = True
-                        if 'varZ' in optionLocal:
-                            dfQuery, varNameZ = pandaGetOrMakeColumn(dfQuery, optionLocal['varZ'])
-                            columnNameDict[varNameZ] = True
-                            downsamplerColumns[varNameZ] = True                            
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
@@ -1283,7 +1300,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
 
-    return dfQuery, histogramDict, list(downsamplerColumns.keys() & columnNameDict.keys()), columnNameDict, paramDict
+    return dfQuery, histogramDict, list(downsamplerColumns.keys() & columnNameDict.keys()), columnNameDict, paramDict, aliasDict
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}
