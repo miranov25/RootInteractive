@@ -72,6 +72,8 @@ export class CDSAlias extends ColumnDataSource {
                 }
                 data[key] = new_column
             }
+        } else if(Object.prototype.toString.call(column) === '[object String]'){
+          data[key] = source.data[column] as any[]
         }
     }
     this.data = data
