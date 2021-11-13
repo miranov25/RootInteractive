@@ -86,7 +86,7 @@ class LocalLinearForestRegressor(RandomForestRegressor):
         self._incidence_matrix = self._extract_leaf_nodes_ids(X)
         return self
 
-    def _get_forest_coefficients(self, observation_leaf_ids):
+    def _get_forest_coefficientsOld(self, observation_leaf_ids):
         '''
         1   B   {1 | Xi € Lb(X_actual)}
         -  sum -------------------------
@@ -101,12 +101,30 @@ class LocalLinearForestRegressor(RandomForestRegressor):
         for i in range(0, self._X_train.shape[0]):
             count = 0
             for j in range(0, observation_leaf_ids.shape[1]):
-                if self._incidence_matrix[i, j] == observation_leaf_ids[0, j]:
+                if self._incidence_matrix[i, j] == observation_leaf_ids[0, j]:  #if obervation leaf ID the same as training leaf in tree j
                     count += 1 / (self._incidence_matrix[:, j] == observation_leaf_ids[0, j]).sum()
             #coeffs.append(1 / self.n_estimators * count)
             coeffNP[i]=(1 / self.n_estimators) * count
         return coeffNP
-    
+
+    def _get_forest_coefficients(self, observation_leaf_ids):
+        '''
+        1   B   {1 | Xi € Lb(X_actual)}
+        -  sum -------------------------
+        B  b=1       |Lb(X_actual)|
+
+        Parameters:
+        -----------
+        observation_leaf_ids: numpy.array [1, n_estimators_]
+        '''
+        coeffNP = np.zeros(self._X_train.shape[0])
+        for j in range(0, observation_leaf_ids.shape[1]):
+            oleafId=observation_leaf_ids[0, j]
+            indexMatch=np.nonzero(self._incidence_matrix[:,j]==oleafId)
+            coeffNP[indexMatch] += 1 / (self._incidence_matrix[:, j] == oleafId).sum()
+        coeffNP/=self.n_estimators
+        return coeffNP
+
     def predict(self, X):
         '''
         Override
