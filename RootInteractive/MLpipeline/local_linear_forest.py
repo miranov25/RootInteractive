@@ -97,13 +97,15 @@ class LocalLinearForestRegressor(RandomForestRegressor):
         observation_leaf_ids: numpy.array [1, n_estimators_]
         '''
         coeffs = []
+        coeffNP = np.zeros(self._X_train.shape[0])
         for i in range(0, self._X_train.shape[0]):
             count = 0
             for j in range(0, observation_leaf_ids.shape[1]):
                 if self._incidence_matrix[i, j] == observation_leaf_ids[0, j]:
                     count += 1 / (self._incidence_matrix[:, j] == observation_leaf_ids[0, j]).sum()
-            coeffs.append(1 / self.n_estimators * count)
-        return coeffs
+            #coeffs.append(1 / self.n_estimators * count)
+            coeffNP[i]=(1 / self.n_estimators) * count
+        return coeffNP
     
     def predict(self, X):
         '''
@@ -119,11 +121,15 @@ class LocalLinearForestRegressor(RandomForestRegressor):
             # we can calulate the coefficients for one row at a time
             actual_leaf_ids = self._extract_leaf_nodes_ids(X_actual)
             # calculate coefficients weights alpha_i(X_actual)
-            alphas = self._get_forest_coefficients(actual_leaf_ids).csr_matrix()
+            alphas = self._get_forest_coefficients(actual_leaf_ids)
             # X_i - X_actual
-            X_disc = self._X_train - X_actual
+            X_disc = (self._X_train - X_actual).to_numpy()
             # ridge
-            ridge = RidgeCV(alphas=[1e-3, 1e-2, 1e-1, 1]).fit(X_disc, self._Y_train, alphas)
+            index0=np.nonzero(alphas)
+            alpha0=alphas[index0]
+            x0=X_disc[index0]
+            y0=self._Y_train[index0]
+            ridge = RidgeCV(alphas=[1e-3, 1e-2, 1e-1, 1]).fit(x0, y0, alpha0)
             # ridge predictions
             results.append(ridge.predict(X_actual)[0])
 
