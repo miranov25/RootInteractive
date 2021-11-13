@@ -945,7 +945,7 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     cdsHisto = histoHandle["cds"]
-    if options['color'] is not None:
+    if 'color' in options:
         colorHisto = options['color']
     tooltips = None
     if "tooltips" in histoHandle:
