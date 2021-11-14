@@ -47,27 +47,42 @@ aliasArray = [
         "variables": ["C"],
         "parameters": ["C_cut"],
         "func": "return C < C_cut"
+    },
+    {
+        "name": "efficiency_A",
+        "variables": ["entries", "entries_C_cut"],
+        "func": "return entries_C_cut / entries",
+        "context": "histoA"
     }
 ]
 
 figureArray = [
     [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B'], {"size":"size"}],
     [['B'], ['C+B', 'C-B'], { "size":"size", "colorZvar": "colorZ", "rescaleColorMapper": True }],
-    [['D'], ['(A+B+C)*D'], {"colorZvar": "colorZ", "size": 10}],
+    [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
     # This interface is not implemented yet
     # [['bin_center_0'], ['entries', 'entries_C_cut'], {"context":"histoA"}],
-    [['histoA.bin_center'], ['histoA.bin_count'], {"context":"histoA"}]
+    [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}]
+    # ['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}]
 ]
 
 histoArray = [
     {
-        "name": "histoA", "variables": ["A"], "histograms": {
+        "name": "histoA", "variables": ["A"], "nbins": 10, "histograms": {
             "entries": None,
             "entries_C_cut": {
                 "weights": "C_cut"
             }
-        },
-        "weights": "C_cut"
+        }
+    },
+    {
+        "name": "histoAC", "variables": ["A", "C"], "nbins": [6, 6], 
+        "histograms": {
+            "entries": None,
+            "entries_C_cut": {
+                "weights": "C_cut"
+            }
+        }
     }
 ]
 
@@ -94,7 +109,7 @@ widgetLayoutDesc={
 
 figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-        [2, 3, {'plot_height': 200, 'sizing_mode': 'scale_width', 'y_visible' : 2}]
+        [2, 3, {'plot_height': 200, 'sizing_mode': 'scale_width'}]
         ]
 
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)")]
@@ -150,4 +165,8 @@ def test_customJsFunctionBokehDrawArray_v():
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
 
+<<<<<<< HEAD
 test_customJsFunctionBokehDrawArray_v()
+=======
+test_customJsFunctionBokehDrawArray()
+>>>>>>> b898231 (Efficiencies should now work for 1D histograms)

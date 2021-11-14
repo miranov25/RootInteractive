@@ -9,7 +9,7 @@ from RootInteractive.Tools.aliTreePlayer import *
 # from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
-from bokeh.io import push_notebook
+from bokeh.io import push_notebook, curdoc
 import logging
 import pyparsing
 from IPython import get_ipython
@@ -564,24 +564,36 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         mapper.update_args()
                 """)])
 
-    aliasDict = {}
+    aliasDict = {"":{}}
+    aliasSet = set()
     for i in aliasArray:
         customJsArgList = {}
         transform = None
         if customJsColumns[i["name"]]:
+            aliasSet.add(i["name"])
             if "transform" in i:
                 if i["transform"] in jsFunctionDict:
-                    aliasDict[i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+                    if "context" in i:
+                        if i["context"] not in aliasDict:
+                            aliasDict[i["context"]] = {}
+                        aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+                    else:
+                        aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
             else:
-                if isinstance(i["parameters"], list):
+                if "parameters" in i:
                     for j in i["parameters"]:
                         customJsArgList[j] = paramDict[j]["value"]
                 if "v_func" in i:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
                 else:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
-                aliasDict[i["name"]] = {"fields": i["variables"], "transform": transform}
-                if isinstance(i["parameters"], list):
+                if "context" in i:
+                    if i["context"] not in aliasDict:
+                        aliasDict[i["context"]] = {}
+                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+                else:
+                    aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": transform}
+                if "parameters" in i:
                     for j in i["parameters"]:
                         paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
                 mapper.parameters[param] = this.value
@@ -597,7 +609,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in dfQuery.keys():
         columnNameDict[i] = i
 
-    columnNameDict.update(aliasDict)
+    columnNameDict.update(aliasDict[""])
 
     cdsFull = None
     if options['arrayCompression'] is not None:
@@ -622,7 +634,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         source = None
 
-    histogramDict = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
+    histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
     cdsDict = options["cdsDict"]
 
     histoList = []
@@ -630,10 +642,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in histogramDict:
         if i not in cdsDict:
             cdsDict[i] = histogramDict[i]["cds"]
-        if histogramDict[i]["type"] == "profile":
-            profileList.append(histogramDict[i]["cds"])
-        else:
-            histoList.append(histogramDict[i]["cds"])
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
@@ -666,14 +674,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
-                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, varY, None, aliasDict)
+                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, varY, None, aliasSet)
                 yAxisTitle += getHistogramAxisTitle(histogramDict, varNameY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
             if hasattr(dfQuery, "meta") and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
-                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, varX, None, aliasDict)
+                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, varX, None, aliasSet)
                 xAxisTitle += getHistogramAxisTitle(histogramDict, varNameX, cds_name, False)
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
@@ -693,10 +701,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             plotTitle = optionLocal["plotTitle"]
 
         if 'varZ' in optionLocal.keys():
-            dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][0], None, aliasDict)
-            _, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][0], cds_name, aliasDict)
-            _, varNameZ, cds_name = getOrMakeColumn(dfQuery, optionLocal['varZ'], cds_name, aliasDict)
-            _, varNameColor, cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], cds_name, aliasDict)
+            dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][0], None, aliasSet)
+            _, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][0], cds_name, aliasSet)
+            _, varNameZ, cds_name = getOrMakeColumn(dfQuery, optionLocal['varZ'], cds_name, aliasSet)
+            _, varNameColor, cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], cds_name, aliasSet)
             options3D = {"width": "99%", "height": "99%"}
             cds_used = source
             if cds_name is not None:
@@ -728,7 +736,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             colorZVar = optionLocal['colorZvar']
             if colorZVar in paramDict:
                 colorZVar = paramDict[colorZVar]['value']
-            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, colorZVar, None, aliasDict)
+            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, colorZVar, None, aliasSet)
             low = 0
             high = 1
             if cmap_cds_name is None:
@@ -778,8 +786,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
                     dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][1])
             else:
-                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name, aliasDict)
-                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name, aliasDict)
+                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name, aliasSet)
+                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name, aliasSet)
             if mapperC is not None and cds_name == cmap_cds_name:
                 color = mapperC
             else:
@@ -901,7 +909,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         layoutList = [pAll]
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict
+    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -1101,7 +1109,7 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, nPointRender=10000,cdsCompress=None):
+def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
     options = {
@@ -1130,7 +1138,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             widgetDict[params[0]] = localWidget
     callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
-                                       cdsHistoSummary=cdsHistoSummary, profileList=profileList, cdsCompress=cdsCompress)
+                                       cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = options.copy()
@@ -1165,9 +1173,11 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                "nbins": 10,
                "weights": None,
                "quantiles": [],
-               "sum_range": []
+               "sum_range": [],
+               "histograms": {}
                }
     histoDict = {}
+    histoList = []
     for iHisto in histogramArray:
         sampleVars = iHisto["variables"]
         histoName = iHisto["name"]
@@ -1178,42 +1188,35 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
         weights = None
         cdsUsed = None
         if optionLocal["weights"] is not None:
-            _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict)
+            _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
         if len(sampleVars) == 1:
-            _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict)
-            cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"],
+            _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict[""])
+            cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
                                     range=optionLocal["range"], sample=varNameX, weights=weights)
+            if iHisto["name"] in aliasDict:
+                mapping = aliasDict[iHisto["name"]]
+                mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})
+                for i in optionLocal["histograms"].keys():
+                    mapping.update({i:i})
+                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             histoDict[histoName] = iHisto.copy()
             histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
-        elif len(sampleVars) == 2:
-            sampleVarNames = []
-            for i in sampleVars:
-                _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict)
-                sampleVarNames.append(varName)
-            cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
-                                    range=optionLocal["range"], sample_variables=sampleVarNames, weights=weights)
-            histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
-                                    "variables": sampleVars}
-            if "axis" in iHisto:
-                axisIndices = iHisto["axis"]
-                profilesDict = {}
-                for i in axisIndices:
-                    cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
-                                                sum_range=optionLocal["sum_range"])
-                    profilesDict[i] = cdsProfile
-                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i}
-                histoDict[histoName]["profiles"] = profilesDict
+            histoList.append(cdsHisto)
         else:
             sampleVarNames = []
             for i in sampleVars:
-                _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict)
+                _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict[""])
                 sampleVarNames.append(varName)
             cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_variables=sampleVarNames,
-                                    weights=weights)
-            histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
-                                    "variables": sampleVars}
+                                    weights=weights, histograms=optionLocal["histograms"])
+            if len(sampleVars) == 2:
+                histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
+                                        "variables": sampleVars}
+            else:
+                histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
+                                        "variables": sampleVars}
+            histoList.append(cdsHisto)
             if "axis" in iHisto:
                 axisIndices = iHisto["axis"]
                 profilesDict = {}
@@ -1225,7 +1228,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
                 histoDict[histoName]["profiles"] = profilesDict
 
-    return histoDict
+    return histoDict, histoList
 
 
 def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameterArray=None, widgetArray=None, aliasArray=None, options={}):
@@ -1345,12 +1348,26 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                     else:
                         dfQuery, varName = pandaGetOrMakeColumn(dfQuery, histo["weights"])
                         columnNameDict[varName] = True
+                if "histograms" in histo:
+                    for iColumn in histo["histograms"].values():
+                        if iColumn is not None:
+                            if "weights" in iColumn:
+                                if iColumn["weights"] in aliasDict:
+                                    aliasDict[iColumn["weights"]] = True
+                                else:
+                                    dfQuery, varName = pandaGetOrMakeColumn(dfQuery, iColumn["weights"])
+                                    columnNameDict[varName] = True
 
     if widgetArray is not None:
         for iWidget in widgetArray:
             if len(iWidget) < 3 or 'callback' not in iWidget[2] or iWidget[2]['callback'] == 'selection':
                 dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
                 columnNameDict[varNameX] = True
+
+    if aliasArray is not None:
+        for func in aliasArray:
+            if "context" in func:
+                downsamplerColumns.pop(func["name"])
 
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
         dfQuery = dfQuery[columnNameDict]
@@ -1424,7 +1441,7 @@ def getOrMakeColumn(dfQuery, column, cdsName, ignoreDict={}):
             raise ValueError("Inconsistent CDS")
     else:
         if column in ignoreDict:
-            return [dfQuery, column, None]
+            return [dfQuery, column, cdsName]
         dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
         return [dfQuery, column, None]
 

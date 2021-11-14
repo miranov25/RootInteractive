@@ -97,6 +97,7 @@ class bokehDrawSA(object):
         self.cdsHistoSummary = None
         self.profileList = None
         self.paramDict = None
+        self.aliasDict = None
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -168,7 +169,7 @@ class bokehDrawSA(object):
                                               widgetArray=widgetsDescription, parameterArray=options["parameterArray"], 
                                               aliasArray=options["aliasArray"], options={"removeExtraColumns": True})
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         widgetList=self.initWidgets(widgetsDescription)
@@ -190,7 +191,7 @@ class bokehDrawSA(object):
         """
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList,
-                                         self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, nPointRender = self.options['nPointRender'])
+                                         self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:
