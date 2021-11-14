@@ -637,7 +637,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
     cdsDict = options["cdsDict"]
 
-    histoList = []
     profileList = []
     for i in histogramDict:
         if i not in cdsDict:
@@ -1193,6 +1192,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict[""])
             cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
                                     range=optionLocal["range"], sample=varNameX, weights=weights)
+            histoList.append(cdsHisto)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
                 mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})
@@ -1201,7 +1201,6 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             histoDict[histoName] = iHisto.copy()
             histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
-            histoList.append(cdsHisto)
         else:
             sampleVarNames = []
             for i in sampleVars:
@@ -1210,6 +1209,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_variables=sampleVarNames,
                                     weights=weights, histograms=optionLocal["histograms"])
+            histoList.append(cdsHisto)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
                 mapping.update({"bin_count": "bin_count"})
@@ -1224,7 +1224,6 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             else:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
                                         "variables": sampleVars}
-            histoList.append(cdsHisto)
             if "axis" in iHisto:
                 axisIndices = iHisto["axis"]
                 profilesDict = {}
