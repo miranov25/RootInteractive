@@ -168,8 +168,4 @@ def test_customJsFunctionBokehDrawArray_v():
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
 
-<<<<<<< HEAD
-test_customJsFunctionBokehDrawArray_v()
-=======
 test_customJsFunctionBokehDrawArray()
->>>>>>> b898231 (Efficiencies should now work for 1D histograms)
