@@ -53,17 +53,20 @@ aliasArray = [
         "variables": ["entries", "entries_C_cut"],
         "func": "return entries_C_cut / entries",
         "context": "histoA"
+    },
+    {
+        "name": "efficiency_AC",
+        "variables": ["entries", "entries_C_cut"],
+        "func": "return entries_C_cut / entries",
+        "context": "histoAC"
     }
 ]
 
 figureArray = [
     [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B'], {"size":"size"}],
-    [['B'], ['C+B', 'C-B'], { "size":"size", "colorZvar": "colorZ", "rescaleColorMapper": True }],
     [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
-    # This interface is not implemented yet
-    # [['bin_center_0'], ['entries', 'entries_C_cut'], {"context":"histoA"}],
-    [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}]
-    # ['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}]
+    [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}],
+    [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}]
 ]
 
 histoArray = [
