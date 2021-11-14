@@ -1210,6 +1210,14 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_variables=sampleVarNames,
                                     weights=weights, histograms=optionLocal["histograms"])
+            if iHisto["name"] in aliasDict:
+                mapping = aliasDict[iHisto["name"]]
+                mapping.update({"bin_count": "bin_count"})
+                for i in range(len(sampleVarNames)):
+                    mapping.update({f"bin_center_{i}": f"bin_center_{i}", f"bin_bottom_{i}": f"bin_bottom_{i}", f"bin_top_{i}": f"bin_top_{i}"})
+                for i in optionLocal["histograms"].keys():
+                    mapping.update({i:i})
+                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             if len(sampleVars) == 2:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
                                         "variables": sampleVars}
