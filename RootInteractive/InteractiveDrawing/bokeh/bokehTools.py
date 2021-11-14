@@ -623,7 +623,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         except:
             logging.error("Invalid source:", cdsFull)
 
-    if aliasDict:
+    if aliasDict[""]:
         cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
 
     if downsamplerColumns:
