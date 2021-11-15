@@ -425,8 +425,8 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
             bin_centers.append("bin_center")
-            edges_left.append("bin_left")
-            edges_right.append("bin_right")
+            edges_left.append("bin_bottom")
+            edges_right.append("bin_top")
             sources.append(histoDict[iHisto]["cds"])
             compute_quantile.append(True)
             if "quantiles" in histoDict[iHisto]:
