@@ -25,7 +25,7 @@ export class DownsamplerCDS extends ColumnDataSource {
   static init_DownsamplerCDS() {
     this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String})=>({
       source:  [Ref(ColumnDataSource)],
-      nPoints:    [ Int ],
+      nPoints:    [ Int, 300 ],
       selectedColumns:    [ Array(String), [] ]
     }))
   }
@@ -58,6 +58,8 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.connect_signals()
 
     this.connect(this.selected.change, () => this.update_selection())
+    // TODO: Add the use case when source grows in size
+    this.connect(this.source.change, () => this.update())
   }
 
   update(){
@@ -75,6 +77,9 @@ export class DownsamplerCDS extends ColumnDataSource {
     downsampled_indices.sort((a,b)=>a-b)
 
     for(const columnName of selectedColumns){
+      if (source.data[columnName] === undefined){
+        throw ReferenceError("Invalid column name")
+      }
       data[columnName] = []
       const colSource = source.data[columnName]
       const colDest = data[columnName]

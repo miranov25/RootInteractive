@@ -77,7 +77,10 @@ class bokehDrawSA(object):
             variableList = constructVariables(query, varX, varY, varColor, widgetsDescription, self.verbosity, **kwargs)
             df = treeToPanda(source, variableList, query, nEntries=treeoptions['nEntries'], firstEntry=treeoptions['firstEntry'], columnMask=treeoptions['columnMask'])
 
-        self.dataSource = df.query(query)
+        if query is None:
+            self.dataSource = df.copy()
+        else:
+            self.dataSource = df.query(query)
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
         self.cdsOrig = ColumnDataSource(self.dataSource)
@@ -94,6 +97,7 @@ class bokehDrawSA(object):
         self.cdsHistoSummary = None
         self.profileList = None
         self.paramDict = None
+        self.aliasDict = None
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -132,7 +136,8 @@ class bokehDrawSA(object):
         options={
             'nPointRender': 10000,
             "histogramArray": [],
-            'parameterArray': []
+            'parameterArray': [],
+            "aliasArray": []
         }
         options.update(kwargs)
         kwargs=options
@@ -160,10 +165,11 @@ class bokehDrawSA(object):
                 varList+=w[1][0]+":"
         kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
-        dfQuery, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
-                                              widgetArray=widgetsDescription, parameterArray=options["parameterArray"], options={"removeExtraColumns": True})
+        dfQuery, _, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
+                                              widgetArray=widgetsDescription, parameterArray=options["parameterArray"], 
+                                              aliasArray=options["aliasArray"], options={"removeExtraColumns": True})
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         widgetList=self.initWidgets(widgetsDescription)
@@ -185,7 +191,7 @@ class bokehDrawSA(object):
         """
         if type(widgetsDescription)==list:
             widgetList= makeBokehWidgets(self.dataSource, widgetsDescription, self.cdsOrig, self.cdsSel, self.histoList,
-                                         self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, nPointRender = self.options['nPointRender'])
+                                         self.cmapList, self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, nPointRender = self.options['nPointRender'])
             if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
                 widgetList=processBokehLayoutArray(self.widgetLayout, widgetList)
             else:

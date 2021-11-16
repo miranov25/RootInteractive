@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, Float, Int, List
+from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
 from bokeh.models import ColumnarDataSource
 
 
@@ -20,4 +20,8 @@ class HistogramCDS(ColumnarDataSource):
     weights = String(default=None)
     nbins = Int
     range = List(Float)
+    histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
+    Dictionary of the values to histogram.
+    Keys are the names of the resulting columns, values are dictionaries with options "weights", "reducer" and "transform"
+    """)
     print("x", __implementation__)

@@ -97,7 +97,7 @@ def testBokehClientHistogramProfileA():
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2'], {"size":"size"}],
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"size":"size"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}, {"size":"size"}],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.std']], {"size":"size"},
+        [['histoAB_1.bin_center_0'], ['histoAB_1.std'], {"size":"size"}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
