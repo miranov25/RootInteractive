@@ -1395,6 +1395,8 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
             pass
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
+            if isinstance(variables, dict):
+                continue
             if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
                 if len(variables) > 2:
                     optionLocal = options.copy()
