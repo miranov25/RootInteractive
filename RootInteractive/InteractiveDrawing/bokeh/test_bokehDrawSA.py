@@ -55,12 +55,13 @@ parameterArray = [
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
-    [['A'], ['C+A', 'C-A', 'A/A'], {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}],
-    [['B'], ['C+B', 'C-B'], { "size":"size", "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True , "legend_options": {"label_text_font_size": "legendFontSize"}}],
+    [['A'], ['C+A', 'C-A', 'A/A'], {"legend_options": {"label_text_font_size": "legendFontSize"}}],
+    [['B'], ['C+B', 'C-B'], { "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True , "legend_options": {"label_text_font_size": "legendFontSize"}}],
     [['D'], ['(A+B+C)*D'], {"colorZvar": "colorZ", "size": 10, "errY": "errY", "legend_options": {"label_text_font_size": "legendFontSize"}} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY", "legend_options": {"label_text_font_size": "legendFontSize"}}],
+    {"size":"size"}
 ]
 #widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"

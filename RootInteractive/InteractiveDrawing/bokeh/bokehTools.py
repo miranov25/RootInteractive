@@ -540,7 +540,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
-    i: int
+
+    if isinstance(figureArray[-1], dict):
+        options.update(figureArray[-1])
+
     dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
                                                        parameterArray=parameterArray, aliasArray=aliasArray, options=options)
@@ -642,8 +645,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if i not in cdsDict:
             cdsDict[i] = histogramDict[i]["cds"]
 
-    if isinstance(figureArray[-1], dict):
-        options.update(figureArray[-1])
     for i, variables in enumerate(figureArray):
         logging.info("%d\t%s", i, variables)
         if isinstance(variables, dict):
@@ -1260,6 +1261,8 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
+            if isinstance(variables, dict):
+                continue
             if variables[0] != "table" and variables[0] != "tableHisto":
                 nvars = len(variables)
                 if isinstance(variables[-1], dict):
