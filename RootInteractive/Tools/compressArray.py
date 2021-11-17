@@ -33,7 +33,7 @@ def roundRelativeBinary(df, nBits):
         return df
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
-    mantissa = np.rint(((mantissa * shiftN)))/shiftN
+    mantissa = np.rint(mantissa * shiftN)/shiftN
     result=(mantissa * 2 ** exp2.astype(float)).astype(type)
     return result
 
@@ -140,14 +140,21 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if action == "delta":
                 currentArray = roundAbsolute(currentArray, actionParam)
             if action == "zip":
+                arrayInfo["dtype"] = currentArray.to_numpy().dtype.name
                 currentArray = zlib.compress(currentArray.to_numpy())
             if action == "unzip":
-                currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=actionParam)
+                currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
             if action == "base64":
                 currentArray = base64.b64encode(currentArray).decode("utf-8")
             if action == "debase64":
                 currentArray = base64.b64decode(currentArray)
             if action == "code":
+                # Skip for normal number types, these can be unpacked in an easier way.
+                # Do not send int64 arrays to the client, it will not work
+                if currentArray.dtype.kind not in ['O', 'S', 'U']:
+                    arrayInfo["skipCode"] = True
+                    continue
+                arrayInfo["skipCode"] = False
                 values = currentArray.unique()
                 dictValues = {}
                 dictValuesI = {}
@@ -157,21 +164,19 @@ def compressArray(inputArray, actionArray, keepValues=False):
                     arrayInfo["valueCode"] = dictValuesI
                 if values.size < 2 ** 8:
                     currentArray = currentArray.map(dictValues).astype("int8")
-                    arrayInfo["indexType"] = "int8"
+                elif values.size < 2 ** 16:
+                    currentArray = currentArray.map(dictValues).astype("int16")
                 else:
-                    if values.size < 2 ** 16:
-                        currentArray = currentArray.map(dictValues).astype("int16")
-                        arrayInfo["indexType"] = "int16"
-                    else:
-                        currentArray = currentArray.map(dictValues).astype("int32")
-                        arrayInfo["indexType"] = "int32"
+                    currentArray = currentArray.map(dictValues).astype("int32")
             if action == "decode":
-                arrayAsPanda=pdMap.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
-                currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
+                if not arrayInfo["skipCode"]:
+                    arrayAsPanda=pdMap.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
+                    currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
             counter+=1
        # except:
         #    print("compressArray - Unexpected error in ", action,  sys.exc_info()[0])
             #pass
+    arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
     return arrayInfo
 
