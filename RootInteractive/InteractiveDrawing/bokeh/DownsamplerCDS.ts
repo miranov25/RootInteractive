@@ -120,7 +120,7 @@ export class DownsamplerCDS extends ColumnDataSource {
       while(downsampled_indices[iDownsampled] < original_indices[i]){
         iDownsampled++
       }
-      if(downsampled_indices[iDownsampled] > original_indices[i]){
+      if(iDownsampled == downsampled_indices.length || downsampled_indices[iDownsampled] > original_indices[i]){
         old_indices.push(original_indices[i])
       } 
     }
