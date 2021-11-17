@@ -103,6 +103,25 @@ RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS module
    :show-inheritance:
    :private-members:
 
+RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction module
+-----------------------------------------------------------------
+
+.. automodule:: RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :private-members:
+
+RootInteractive.InteractiveDrawing.bokeh.CDSAlias module
+-----------------------------------------------------------------
+
+.. automodule:: RootInteractive.InteractiveDrawing.bokeh.CDSAlias
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :private-members:
+
+
 Module contents
 ---------------
 
