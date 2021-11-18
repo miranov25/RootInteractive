@@ -33,7 +33,7 @@ df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
 df.eval("BoolC=C>0.1", inplace=True)
 df["A"]=df["A"].round(3)
-df.loc[15]["A"] = math.nan
+df.loc[15, "A"] = math.nan
 df["B"]=df["B"].round(3)
 df["C"]=df["C"].round(3)
 df["D"]=df["D"].round(3)
