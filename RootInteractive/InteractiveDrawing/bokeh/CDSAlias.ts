@@ -30,6 +30,7 @@ export class CDSAlias extends ColumnarDataSource {
 
   initialize(){
     super.initialize()
+    this.data = {}
     this.compute_functions()
   }
 
