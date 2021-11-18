@@ -80,7 +80,7 @@ class bokehDrawSA(object):
         if query is None:
             self.dataSource = df.copy()
         else:
-            self.dataSource = df.query(query)
+            self.dataSource = df.query(query).copy()
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
         self.cdsOrig = ColumnDataSource(self.dataSource)

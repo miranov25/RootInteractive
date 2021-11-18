@@ -535,7 +535,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     }
     options.update(kwargs)
     if query is not None:
-        dfQuery = dataFrame.query(query)
+        dfQuery = dataFrame.query(query).copy()
         if hasattr(dataFrame, 'metaData'):
             dfQuery.metaData = dataFrame.metaData
             logging.info(dfQuery.metaData)
