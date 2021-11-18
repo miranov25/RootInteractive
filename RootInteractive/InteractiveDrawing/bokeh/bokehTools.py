@@ -632,10 +632,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
 
     if downsamplerColumns:
-        dummy_data = {}
-        for i in downsamplerColumns:
-            dummy_data[i] = []
-        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns, data=dummy_data)
+        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
     else:
         source = None
 

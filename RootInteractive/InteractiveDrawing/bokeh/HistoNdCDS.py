@@ -1,8 +1,8 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnarDataSource
 
 
-class HistoNdCDS(ColumnDataSource):
+class HistoNdCDS(ColumnarDataSource):
 
     __implementation__ = "HistoNdCDS.ts"
 
@@ -14,7 +14,7 @@ class HistoNdCDS(ColumnDataSource):
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
-    source = Instance(ColumnDataSource, help="Source from which to take the data to histogram")
+    source = Instance(ColumnarDataSource, help="Source from which to take the data to histogram")
     sample_variables = List(String, help="Names of the columns used for binning")
     weights = String(default=None)
     # TODO: Support auto nbins in the future - 2n-th root of total entries?

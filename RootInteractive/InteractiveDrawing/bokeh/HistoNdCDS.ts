@@ -1,11 +1,11 @@
-import {ColumnDataSource} from "models/sources/column_data_source"
+import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnDataSource.Props & {
-    source: p.Property<ColumnDataSource>
+  export type Props = ColumnarDataSource.Props & {
+    source: p.Property<ColumnarDataSource>
 //    view: p.Property<number[] | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
@@ -17,7 +17,7 @@ export namespace HistoNdCDS {
 
 export interface HistoNdCDS extends HistoNdCDS.Attrs {}
 
-export class HistoNdCDS extends ColumnDataSource {
+export class HistoNdCDS extends ColumnarDataSource {
   properties: HistoNdCDS.Props
 
   constructor(attrs?: Partial<HistoNdCDS.Attrs>) {
@@ -35,7 +35,7 @@ export class HistoNdCDS extends ColumnDataSource {
   static init_HistoNdCDS() {
 
     this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String})=>({
-      source:  [Ref(ColumnDataSource)],
+      source:  [Ref(ColumnarDataSource)],
 //      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],

@@ -1,8 +1,8 @@
 from bokeh.core.properties import Instance, String, Any, Dict
-from bokeh.models import ColumnarDataSource, ColumnDataSource
+from bokeh.models import ColumnarDataSource
 
 
-class CDSAlias(ColumnDataSource):
+class CDSAlias(ColumnarDataSource):
     __implementation__ = "CDSAlias.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
