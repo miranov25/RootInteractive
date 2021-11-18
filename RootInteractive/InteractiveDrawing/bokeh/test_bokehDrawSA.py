@@ -32,17 +32,17 @@ df["B"]=np.linspace(0,1,20000)
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
 df.eval("BoolC=C>0.1", inplace=True)
-df["A"]=df["A"].round(3);
-df["A"][15] = math.nan
-df["B"]=df["B"].round(3);
-df["C"]=df["C"].round(3);
-df["D"]=df["D"].round(3);
+df["A"]=df["A"].round(3)
+df.loc[15, "A"] = math.nan
+df["B"]=df["B"].round(3)
+df["C"]=df["C"].round(3)
+df["D"]=df["D"].round(3)
 df["AA"]=((df.A*10).round(0)).astype(CategoricalDtype(ordered=True))
 df["CC"]=((df.C*5).round(0)).astype(int)
 df["DD"]=((df.D*4).round(0)).astype(int)
 df["DDC"]=((df.D*4).round(0)).astype(int).map(mapDDC)
 df["EE"]=(df.E*4).round(0)
-df['errY']=df.A*0.02+0.02;
+df['errY']=df.A*0.02+0.02
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 

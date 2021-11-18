@@ -1,6 +1,7 @@
 from io import UnsupportedOperation
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
+from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
@@ -27,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfi
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
+from bokeh.transform import transform as bokehTransform
 import re
 
 # tuple of Bokeh markers
@@ -533,7 +535,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     }
     options.update(kwargs)
     if query is not None:
-        dfQuery = dataFrame.query(query)
+        dfQuery = dataFrame.query(query).copy()
         if hasattr(dataFrame, 'metaData'):
             dfQuery.metaData = dataFrame.metaData
             logging.info(dfQuery.metaData)
@@ -630,10 +632,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
 
     if downsamplerColumns:
-        dummy_data = {}
-        for i in downsamplerColumns:
-            dummy_data[i] = []
-        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns, data=dummy_data)
+        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
     else:
         source = None
 
@@ -855,12 +854,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             hover_tool_renderers[cds_name] = []
                         hover_tool_renderers[cds_name].append(drawnGlyph)
                 if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
-                    errorX = HBar(y=varNameY, height=0, left=varNameX+"_lower", right=varNameX+"_upper", line_color=color)
+                    dfQuery, varErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
+                    errWidthX = bokehTransform(varErrX, CustomJSTransform(v_func="return xs.map((x)=>2*x)"))
+                    errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorX)
                 if ('errY' in optionLocal.keys()) and (optionLocal['errY'] != '') and (cds_name is None):
-                    errorY = VBar(x=varNameX, width=0, bottom=varNameY+"_lower", top=varNameY+"_upper", line_color=color)
+                    dfQuery, varErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
+                    errWidthY = bokehTransform(varErrY, CustomJSTransform(v_func="return xs.map((x)=>2*x)"))
+                    errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorY)
@@ -1312,30 +1315,12 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
                             seriesErrY = dfQuery[varNameErrY]
                             columnNameDict[varNameErrY] = True
-                            if varNameY+'_lower' not in dfQuery.columns:
-                                seriesLower = dfQuery[varNameY]-seriesErrY
-                                dfQuery[varNameY+'_lower'] = seriesLower
-                            columnNameDict[varNameY+'_lower'] = True
-                            downsamplerColumns[varNameY+'_lower'] = True
-                            if varNameY+'_upper' not in dfQuery.columns:
-                                seriesUpper = dfQuery[varNameY]+seriesErrY
-                                dfQuery[varNameY+'_upper'] = seriesUpper
-                            columnNameDict[varNameY+'_upper'] = True
-                            downsamplerColumns[varNameY+'_upper'] = True
+                            downsamplerColumns[varNameErrY] = True
                         if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
                             dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
                             seriesErrX = dfQuery[varNameErrX]
                             columnNameDict[varNameErrX] = True
-                            if varNameX+'_lower' not in dfQuery.columns:
-                                seriesLower = dfQuery[varNameX]-seriesErrX
-                                dfQuery[varNameX+'_lower'] = seriesLower
-                            columnNameDict[varNameX+'_lower'] = True
-                            downsamplerColumns[varNameX+'_lower'] = True
-                            if varNameX+'_upper' not in dfQuery.columns:
-                                seriesUpper = dfQuery[varNameX]+seriesErrX
-                                dfQuery[varNameX+'_upper'] = seriesUpper
-                            columnNameDict[varNameX+'_upper'] = True
-                            downsamplerColumns[varNameX+'_upper'] = True
+                            downsamplerColumns[varNameErrX] = True
                         if 'tooltips' in optionLocal:
                             tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                             columnNameDict.update(tooltipColumns)
