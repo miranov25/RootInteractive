@@ -79,9 +79,9 @@ widgetParams=[
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-    ['select',["colorZ"], {"callback": "parameter"}],
-    ['slider',["size"], {"callback": "parameter"}],
-    ['select',["legendFontSize"], {"callback": "parameter"}],
+    ['select',["colorZ"]],
+    ['slider',["size"]],
+    ['select',["legendFontSize"]],
 ]
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
@@ -127,7 +127,7 @@ def testBokehDrawArraySA_tree():
 
 
 #testBokehDrawArraySA_tree()
-#testBokehDrawArrayWidget()               # OK
+testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
 #testBokehDrawArrayQuery()
