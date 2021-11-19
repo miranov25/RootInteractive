@@ -1,4 +1,4 @@
-from io import UnsupportedOperation
+from __future__ import annotations
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -7,7 +7,6 @@ from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
 from jinja2.defaults import VARIABLE_END_STRING
 from RootInteractive.Tools.aliTreePlayer import *
-# from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
@@ -30,6 +29,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from bokeh.transform import transform as bokehTransform
 import re
+
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -989,7 +989,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     if tooltips is not None:
         fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
-def makeBokehSliderWidget(df, isRange, params, paramDict, **kwargs):
+def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDict: dict, **kwargs):
     options = {
         'type': 'auto',
         'bins': 30,
@@ -1065,8 +1065,8 @@ def makeBokehSliderWidget(df, isRange, params, paramDict, **kwargs):
     return slider
 
 
-def makeBokehSelectWidget(df, params, paramDict, **kwargs):
-    options = {'default': 0, 'size': 10}
+def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default: int | str | None = None, **kwargs):
+    options = {'size': 10}
     options.update(kwargs)
     # optionsPlot = []
     if len(params) == 1:
@@ -1078,10 +1078,21 @@ def makeBokehSelectWidget(df, params, paramDict, **kwargs):
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
-    return Select(title=params[0], value=optionsPlot[options['default']], options=optionsPlot)
+    default_value = 0
+    if isinstance(default, int):
+        if 0 <= default < len(optionsPlot):
+            default_value = default
+        else:
+            raise IndexError("Default value out of range for select widget.")
+    elif default is None:
+        if options['callback'] == 'parameter':
+            default_value = optionsPlot.index(paramDict[params[0]]["value"])
+    else:
+        default_value = optionsPlot.index(paramDict[params[0]]["value"])
+    return Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
 
 
-def makeBokehMultiSelectWidget(df, params, **kwargs):
+def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
     # print("makeBokehMultiSelectWidget",params,kwargs)
     options = {'default': 0, 'size': 4}
     options.update(kwargs)
@@ -1099,7 +1110,7 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
     return MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
 
 
-def makeBokehCheckboxWidget(df, params, **kwargs):
+def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
     options = {'default': 0, 'size': 10}
     options.update(kwargs)
     # optionsPlot = []
@@ -1132,7 +1143,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if type == 'select':
             localWidget = makeBokehSelectWidget(df, params, paramDict, **optionLocal)
         if type == 'multiSelect':
-            localWidget = makeBokehMultiSelectWidget(df, params, **optionLocal)
+            localWidget = makeBokehMultiSelectWidget(df, params, paramDict, **optionLocal)
         # if type=='checkbox':
         #    localWidget=makeBokehCheckboxWidget(df,params,**options)
         if localWidget:
