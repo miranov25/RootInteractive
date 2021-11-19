@@ -76,12 +76,12 @@ widgetParams=[
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC"]],
-    ['select',["CC", 0, 1, 2, 3]],
+    ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-    ['select',["colorZ"], {"callback": "parameter", "default": 3}],
+    ['select',["colorZ"], {"callback": "parameter"}],
     ['slider',["size"], {"callback": "parameter"}],
-    ['select',["legendFontSize"], {"callback": "parameter", "default": 2}],
+    ['select',["legendFontSize"], {"callback": "parameter"}],
 ]
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
