@@ -1,4 +1,3 @@
-from __future__ import annotations
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -1065,7 +1064,7 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
     return slider
 
 
-def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default: int | str | None = None, **kwargs):
+def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default, **kwargs):
     options = {'size': 10}
     options.update(kwargs)
     # optionsPlot = []
