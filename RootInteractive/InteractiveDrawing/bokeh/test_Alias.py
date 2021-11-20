@@ -18,7 +18,6 @@ import numpy as np
 df = pd.DataFrame(np.random.random_sample(size=(200000, 6)), columns=list('ABCDEF'))
 
 parameterArray = [
-    {"name": "colorZ", "value":"A", "options":["A", "B"]},
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "paramX", "value":10, "range": [-20, 20]},
@@ -66,7 +65,8 @@ figureArray = [
     [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B'], {"size":"size"}],
     [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
     [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}],
-    [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}]
+    [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}],
+    {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}
 ]
 
 histoArray = [
@@ -97,17 +97,16 @@ widgetParams=[
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-    ['select',["colorZ"], {"callback": "parameter", "default": 0}],
-    ['slider',["size"], {"callback": "parameter"}],
-    ['select',["legendFontSize"], {"callback": "parameter", "default": 2}],
-    ['slider',["C_cut"], {"callback": "parameter"}],
-    ['slider',["paramX"], {"callback": "parameter"}],
+    ['slider',["size"]],
+    ['select',["legendFontSize"]],
+    ['slider',["C_cut"]],
+    ['slider',["paramX"]],
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[5, 6, 7], {'sizing_mode': 'scale_width'}],
-    "CustomJS functions": [[8, 9]]
+    "Graphics": [[5, 6], {'sizing_mode': 'scale_width'}],
+    "CustomJS functions": [[7, 8]]
     }
 
 figureLayoutDesc=[

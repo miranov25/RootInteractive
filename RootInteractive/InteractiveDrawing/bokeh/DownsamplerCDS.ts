@@ -1,11 +1,11 @@
-import {ColumnDataSource} from "models/sources/column_data_source"
+import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
 
 export namespace DownsamplerCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnDataSource.Props & {
-    source: p.Property<ColumnDataSource>
+  export type Props = ColumnarDataSource.Props & {
+    source: p.Property<ColumnarDataSource>
     nPoints: p.Property<number>
     selectedColumns: p.Property<string[]>
   }
@@ -13,7 +13,7 @@ export namespace DownsamplerCDS {
 
 export interface DownsamplerCDS extends DownsamplerCDS.Attrs {}
 
-export class DownsamplerCDS extends ColumnDataSource {
+export class DownsamplerCDS extends ColumnarDataSource {
   properties: DownsamplerCDS.Props
 
   constructor(attrs?: Partial<DownsamplerCDS.Attrs>) {
@@ -24,7 +24,7 @@ export class DownsamplerCDS extends ColumnDataSource {
 
   static init_DownsamplerCDS() {
     this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String})=>({
-      source:  [Ref(ColumnDataSource)],
+      source:  [Ref(ColumnarDataSource)],
       nPoints:    [ Int, 300 ],
       selectedColumns:    [ Array(String), [] ]
     }))
@@ -38,6 +38,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     super.initialize()
     this.booleans = null
     this._indices = []
+    this.data = {}
     this.shuffle_indices()
     this.update()
   }

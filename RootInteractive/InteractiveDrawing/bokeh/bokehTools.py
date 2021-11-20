@@ -1,4 +1,3 @@
-from io import UnsupportedOperation
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -7,7 +6,6 @@ from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
 from jinja2.defaults import VARIABLE_END_STRING
 from RootInteractive.Tools.aliTreePlayer import *
-# from bokehTools import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
@@ -30,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from bokeh.transform import transform as bokehTransform
 import re
+
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -989,7 +988,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     if tooltips is not None:
         fig.add_tools(HoverTool(renderers=[histoGlyphRenderer], tooltips=tooltips))
 
-def makeBokehSliderWidget(df, isRange, params, paramDict, **kwargs):
+def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDict: dict, **kwargs):
     options = {
         'type': 'auto',
         'bins': 30,
@@ -1065,8 +1064,8 @@ def makeBokehSliderWidget(df, isRange, params, paramDict, **kwargs):
     return slider
 
 
-def makeBokehSelectWidget(df, params, paramDict, **kwargs):
-    options = {'default': 0, 'size': 10}
+def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default=None, **kwargs):
+    options = {'size': 10}
     options.update(kwargs)
     # optionsPlot = []
     if len(params) == 1:
@@ -1078,10 +1077,21 @@ def makeBokehSelectWidget(df, params, paramDict, **kwargs):
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
-    return Select(title=params[0], value=optionsPlot[options['default']], options=optionsPlot)
+    default_value = 0
+    if isinstance(default, int):
+        if 0 <= default < len(optionsPlot):
+            default_value = default
+        else:
+            raise IndexError("Default value out of range for select widget.")
+    elif default is None:
+        if options['callback'] == 'parameter':
+            default_value = optionsPlot.index(paramDict[params[0]]["value"])
+    else:
+        default_value = optionsPlot.index(paramDict[params[0]]["value"])
+    return Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
 
 
-def makeBokehMultiSelectWidget(df, params, **kwargs):
+def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
     # print("makeBokehMultiSelectWidget",params,kwargs)
     options = {'default': 0, 'size': 4}
     options.update(kwargs)
@@ -1099,7 +1109,7 @@ def makeBokehMultiSelectWidget(df, params, **kwargs):
     return MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
 
 
-def makeBokehCheckboxWidget(df, params, **kwargs):
+def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
     options = {'default': 0, 'size': 10}
     options.update(kwargs)
     # optionsPlot = []
@@ -1115,16 +1125,18 @@ def makeBokehCheckboxWidget(df, params, **kwargs):
 def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
     widgetArray = []
     widgetDict = {}
-    options = {
-        "callback": "selection"
-    }
     for widget in widgetParams:
         type = widget[0]
         params = widget[1]
-        optionLocal = options.copy()
+        optionLocal = {}
         localWidget = None
         if len(widget) == 3:
-            optionLocal.update(widget[2])
+            optionLocal = widget[2]
+        if "callback" not in optionLocal:
+            if params[0] in paramDict:
+                optionLocal["callback"] = "parameter"
+            else:
+                optionLocal["callback"] = "selection"
         if type == 'range':
             localWidget = makeBokehSliderWidget(df, True, params, paramDict, **optionLocal)
         if type == 'slider':
@@ -1132,7 +1144,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         if type == 'select':
             localWidget = makeBokehSelectWidget(df, params, paramDict, **optionLocal)
         if type == 'multiSelect':
-            localWidget = makeBokehMultiSelectWidget(df, params, **optionLocal)
+            localWidget = makeBokehMultiSelectWidget(df, params, paramDict, **optionLocal)
         # if type=='checkbox':
         #    localWidget=makeBokehCheckboxWidget(df,params,**options)
         if localWidget:
@@ -1144,10 +1156,15 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     for iDesc, iWidget in zip(widgetParams, widgetArray):
-        optionLocal = options.copy()
-        localWidget = None
+        optionLocal = {}
+        params = iDesc[1]
         if len(iDesc) == 3:
-            optionLocal.update(iDesc[2])       
+            optionLocal = iDesc[2]
+        if "callback" not in optionLocal:
+            if params[0] in paramDict:
+                optionLocal["callback"] = "parameter"
+            else:
+                optionLocal["callback"] = "selection"
         if optionLocal["callback"] == "selection":
             callback = callbackSel
         elif optionLocal["callback"] == "parameter":
@@ -1158,9 +1175,6 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                 else:
                     iWidget.js_link(*iEvent)
             continue
-        else:
-            # TODO: Change this to custom JS callback
-            callback = None
         if isinstance(iWidget, CheckboxGroup):
             iWidget.js_on_click(callback)
         elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
@@ -1355,7 +1369,11 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if widgetArray is not None:
         for iWidget in widgetArray:
-            if len(iWidget) < 3 or 'callback' not in iWidget[2] or iWidget[2]['callback'] == 'selection':
+            if len(iWidget) < 3 or 'callback' not in iWidget[2]:
+                if iWidget[1][0] not in paramDict:
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
+                    columnNameDict[varNameX] = True
+            elif iWidget[2]['callback'] == 'selection':
                 dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
                 columnNameDict[varNameX] = True
 
