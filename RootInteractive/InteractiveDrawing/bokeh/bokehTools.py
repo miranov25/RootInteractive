@@ -1064,7 +1064,7 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
     return slider
 
 
-def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default, **kwargs):
+def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default=None, **kwargs):
     options = {'size': 10}
     options.update(kwargs)
     # optionsPlot = []
