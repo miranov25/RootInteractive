@@ -210,7 +210,49 @@ def testBokehClientHistogram3d_colormap_noscale():
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
 
+def testJoin():
+    output_file("test_BokehClientHistogramJoin.html")
+    aliasArray = [
+        {
+            "name": "mean_A",
+            "variables": ["sum_A", "bin_count"],
+            "func": "return sum_A / bin_count",
+            "context": "histoB"
+        },
+        {
+            "name": "delta_mean",
+            "variables": ["mean", "mean_A"],
+            "func": "return mean - mean_A",
+            "context": "histoB_join_histoAB_0"
+        }
+    ]
+    histoArray = [
+        {"name": "histoAB", "variables": ["A", "B"], "nbins": [10, 10], "axis": [0]},
+        {"name": "histoB", "variables": ["B"], "nbins": 10,
+            "histograms": {
+                "sum_A": {"weights": "A"}
+            }
+        },
+        {"name": "histoB_join_histoAB_0", "left": "histoAB_0", "right":"histoB"}
+    ]
+    figureArray = [
+        [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.mean', 'mean_A']],
+        [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.entries', 'histoB.bin_count']],
+        [['histoB_join_histoAB_0.bin_center_1'], ['histoB_join_histoAB_0.delta_mean']],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
+        {"size": "size"}
+    ]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
 #testBokehClientHistogram3d()
 #testBokehClientHistogram()
 #testBokehClientHistogramOnlyHisto()
 #testBokehClientHistogramRowwiseTable()
+testJoin()
