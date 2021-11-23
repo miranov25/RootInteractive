@@ -26,6 +26,7 @@ from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfi
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
+from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from bokeh.transform import transform as bokehTransform
 import re
 
@@ -1196,14 +1197,31 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
     histoDict = {}
     histoList = []
     for iHisto in histogramArray:
-        sampleVars = iHisto["variables"]
         histoName = iHisto["name"]
+        # XXX: This is not a histogram, this is a join
+        if "left" in iHisto:
+            left = histoDict[iHisto["left"]]["cds"]
+            right = histoDict[iHisto["right"]]["cds"]
+            on_left = []
+            on_right = []
+            join_type = "inner"
+            cdsHisto = CDSJoin(left=left, right=right, on_left=on_left, on_right=on_right, join_type=join_type)
+            if iHisto["name"] in aliasDict:
+                mapping = aliasDict[iHisto["name"]]
+                mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})
+                for i in optionLocal["histograms"].keys():
+                    mapping.update({i:i})
+                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
+            histoDict[histoName] = iHisto.copy()
+            histoDict[histoName].update({"cds": cdsHisto, "type": "join"})
+            continue
         if histogramDict is not None and not histogramDict[histoName]:
             continue
         optionLocal = copy.copy(options)
         optionLocal.update(iHisto)
         weights = None
         cdsUsed = None
+        sampleVars = iHisto["variables"]
         if optionLocal["weights"] is not None:
             _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
         if len(sampleVars) == 1:
@@ -1270,7 +1288,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if aliasArray is not None:
         for i, func in enumerate(aliasArray):
-            aliasDict[func["name"]] = False
+            aliasDict[func["name"]] = True
 
     if parameterArray is not None:
           for i, param in enumerate(parameterArray):
@@ -1345,12 +1363,13 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
             if histogramDict[histo["name"]]:
-                for j, variable in enumerate(histo["variables"]):
-                    if variable in aliasDict:
-                        aliasDict[variable] = True
-                    else:
-                        dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variable)
-                        columnNameDict[varName] = True
+                if "variables" in histo:
+                    for j, variable in enumerate(histo["variables"]):
+                        if variable in aliasDict:
+                            aliasDict[variable] = True
+                        else:
+                            dfQuery, varName = pandaGetOrMakeColumn(dfQuery, variable)
+                            columnNameDict[varName] = True
                 if "weights" in histo:
                     if histo["weights"] in aliasDict:
                         aliasDict[histo["weights"]] = True
@@ -1379,7 +1398,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if aliasArray is not None:
         for func in aliasArray:
-            if "context" in func:
+            if "context" in func and func["name"] in downsamplerColumns:
                 downsamplerColumns.pop(func["name"])
 
     if "removeExtraColumns" in options and options["removeExtraColumns"]:
@@ -1477,6 +1496,8 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return varName
     if cdsName in histoDict:
+        if "variables" not in histoDict[cdsName]:
+            return varName
         if '_' in varName:
             if varName == "bin_count":
                 # Maybe do something else
