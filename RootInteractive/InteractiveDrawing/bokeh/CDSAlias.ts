@@ -7,6 +7,7 @@ export namespace CDSAlias {
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnarDataSource>
     mapping: p.Property<Record<string, any>>
+    includeOrigColumns: p.Property<boolean>
   }
 }
 
@@ -22,9 +23,10 @@ export class CDSAlias extends ColumnarDataSource {
   static __name__ = "CDSAlias"
 
   static init_CDSAlias() {
-    this.define<CDSAlias.Props>(({Ref})=>({
+    this.define<CDSAlias.Props>(({Ref, Boolean})=>({
       source:  [Ref(ColumnarDataSource)],
-      mapping:    [ p.Instance ]
+      mapping:    [ p.Instance ],
+      includeOrigColumns: [Boolean, true]
     }))
   }
 
@@ -52,11 +54,17 @@ export class CDSAlias extends ColumnarDataSource {
   }
 
   compute_functions(){
-    const {mapping, change, selected} = this
+    const {mapping, change, selected, source, data, includeOrigColumns} = this
     for (const key in mapping) {
       this.compute_function(key)
     }
-    selected.indices = this.source.selected.indices
+    if(includeOrigColumns)
+    for (const key in source.data) {
+      if(mapping[key] === undefined){
+        data[key] = source.get_array(key)
+      }
+    }
+    selected.indices = source.selected.indices
     change.emit()
   }
 

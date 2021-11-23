@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, Any, Dict
+from bokeh.core.properties import Instance, String, Any, Dict, Bool
 from bokeh.models import ColumnarDataSource
 
 
@@ -14,4 +14,5 @@ class CDSAlias(ColumnarDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
     source=Instance(ColumnarDataSource, help="The source to draw from")
     mapping=Dict(String, Any, help="The mapping from new columns to old columns and possibly mappers")
+    includeOrigColumns=Bool
     print("Import ", __implementation__)
