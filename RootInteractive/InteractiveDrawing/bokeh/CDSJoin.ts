@@ -9,7 +9,7 @@ export namespace CDSJoin {
     right: p.Property<ColumnarDataSource>
     on_left: p.Property<string[]>
     on_right: p.Property<string[]>
-    join_type: p.Property<string>
+    how: p.Property<string>
   }
 }
 
@@ -25,12 +25,12 @@ export class CDSJoin extends ColumnarDataSource {
   static __name__ = "CDSJoin"
 
   static init_CDSJoin() {
-    this.define<CDSJoin.Props>(({Ref, Array, String})=>({
+    this.define<CDSJoin.Props>(({Ref, Array, String, Number})=>({
       left:  [Ref(ColumnarDataSource)],
       right: [Ref(ColumnarDataSource)],
       on_left: [ Array(String), [] ],
       on_right: [ Array(String), [] ],
-      join_type: [ String ]
+      how: [ String ]
     }))
   }
 
@@ -60,7 +60,9 @@ export class CDSJoin extends ColumnarDataSource {
   }
 
   compute_indices(): void{
-    const {left, right, on_left, on_right, join_type, change} = this
+    const {left, right, on_left, on_right, how, change} = this
+    const is_left_join = how === "left" || how === "outer"
+    const is_right_join = how === "right" || how === "outer"
     if (on_left.length === 0){
       if (on_right.length === 0){
         this._indices_left = null
@@ -73,7 +75,7 @@ export class CDSJoin extends ColumnarDataSource {
         console.warn("Cannot make join: column doesn't exist")
         return
       }
-      if (join_type == "inner" || join_type == "right"){
+      if (!is_left_join){
         const l = right.get_length()
         if (l !== null) this._indices_right = this._indices_right.filter(x => x > 0 && x < l)
       }
@@ -84,7 +86,7 @@ export class CDSJoin extends ColumnarDataSource {
         console.warn("Cannot make join: column doesn't exist")
         return
       }
-      if (join_type == "inner" || join_type == "left"){
+      if (!is_right_join){
         const l = left.get_length()
         if (l !== null) this._indices_left = this._indices_left.filter(x => x > 0 && x < l)
       }
@@ -92,7 +94,74 @@ export class CDSJoin extends ColumnarDataSource {
         console.warn("Cannot make join: incompatible numbers of columns")
         return
     } else {
-      // TODO: Make the logic for nontrivial joins
+      // So far, we assume sorted keys
+      // Adding bisect and some way of avoiding invalidating indices would possibly help - or possibly using hash tables
+      // Something more elegant would also be easier to maintain
+      const len_left = left.length
+      const len_right = right.length
+      let down_left = 0
+      let down_right = 0
+      let indices_left = this._indices_left ?? []
+      indices_left.length = 0
+      let indices_right = this._indices_right ?? []
+      indices_right.length = 0
+      const arr_left: number[][] = on_left.map((x: string) => left.get_array(x))
+      const arr_right: number[][] = on_right.map((x: string) => right.get_array(x))
+      while(down_left < len_left && down_right < len_right){
+        const comparison_result = arr_left.reduceRight((acc: number, cur: number[], idx: number) => acc === 0 ? cur[down_left] - arr_right[idx][down_right] : acc, 0)
+        if(comparison_result > 0){
+          if(is_left_join){
+            indices_left.push(down_left)
+            indices_right.push(-1)
+          }
+          down_left ++
+        } else if(comparison_result < 0){
+          if(is_right_join){
+            indices_left.push(-1)
+            indices_right.push(down_right)
+          }
+          down_right ++
+        } else {
+          let up_left = down_left
+          let up_right = down_right
+          let is_greater = 0
+          while(is_greater === 0 && up_left < len_left){
+            up_left ++
+            is_greater = arr_left.reduceRight((acc: number, cur: number[]) => acc === 0 ? cur[up_left] - cur[down_left] : acc, 0)
+          }
+          is_greater = 0
+          while(is_greater === 0 && up_right < len_right){
+            up_right ++
+            is_greater = arr_right.reduceRight((acc: number, cur: number[]) => acc === 0 ? cur[up_right] - cur[down_right] : acc, 0)
+          }
+
+          for(let i_left = down_left; i_left < up_left; i_left ++){
+            for(let i_right = down_right; i_right < up_right; i_right ++){
+              indices_left.push(i_left)
+              indices_right.push(i_right)
+            }
+          }
+
+          down_left = up_left
+          down_right = up_right
+        }
+      }
+      if(is_left_join){
+        while(down_left < len_left){
+          indices_left.push(down_left)
+          indices_right.push(-1)
+          down_left ++   
+        }       
+      }
+      if(is_right_join){
+        while(down_right < len_right){
+          indices_left.push(-1)
+          indices_right.push(down_right) 
+          down_right ++         
+        }       
+      }
+      this._indices_left = indices_left
+      this._indices_right = indices_right
     }
     for (const key in left.data) {
       const col = left.get_array(key)
@@ -105,6 +174,7 @@ export class CDSJoin extends ColumnarDataSource {
     // selected.indices = this.source.selected.indices
     change.emit()
   }
+
 
   /*update_selection(){
     this.source.selected.indices = this.selected.indices

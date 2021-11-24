@@ -1203,9 +1203,13 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             left = histoDict[iHisto["left"]]["cds"]
             right = histoDict[iHisto["right"]]["cds"]
             on_left = []
+            if "left_on" in iHisto:
+                on_left = iHisto["left_on"]
             on_right = []
-            join_type = "inner"
-            cdsHisto = CDSJoin(left=left, right=right, on_left=on_left, on_right=on_right, join_type=join_type)
+            if "right_on" in iHisto:
+                on_right = iHisto["right_on"]
+            how  = "inner"
+            cdsHisto = CDSJoin(left=left, right=right, on_left=on_left, on_right=on_right, how=how)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
                 mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})

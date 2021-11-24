@@ -16,5 +16,5 @@ class CDSJoin(ColumnarDataSource):
     right = Instance(ColumnarDataSource)
     on_left = List(String)
     on_right = List(String)
-    join_type = String
+    how = String(default="inner")
     print("Import ", __implementation__)
