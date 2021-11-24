@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, Any, List, String, Either, Dict
+from bokeh.core.properties import Instance, Any, List, String, Float
 from bokeh.models import ColumnarDataSource
 
 
@@ -17,4 +17,5 @@ class CDSJoin(ColumnarDataSource):
     on_left = List(String)
     on_right = List(String)
     how = String(default="inner")
+    tolerance = Float(default=1e-5)
     print("Import ", __implementation__)

@@ -10,6 +10,7 @@ export namespace CDSJoin {
     on_left: p.Property<string[]>
     on_right: p.Property<string[]>
     how: p.Property<string>
+    tolerance: p.Property<number>
   }
 }
 
@@ -30,7 +31,8 @@ export class CDSJoin extends ColumnarDataSource {
       right: [Ref(ColumnarDataSource)],
       on_left: [ Array(String), [] ],
       on_right: [ Array(String), [] ],
-      how: [ String ]
+      how: [ String ],
+      tolerance: [Number, 1e-5]
     }))
   }
 
@@ -60,7 +62,7 @@ export class CDSJoin extends ColumnarDataSource {
   }
 
   compute_indices(): void{
-    const {left, right, on_left, on_right, how, change} = this
+    const {left, right, on_left, on_right, how, change, tolerance} = this
     const is_left_join = how === "left" || how === "outer"
     const is_right_join = how === "right" || how === "outer"
     if (on_left.length === 0){
@@ -108,7 +110,14 @@ export class CDSJoin extends ColumnarDataSource {
       const arr_left: number[][] = on_left.map((x: string) => left.get_array(x))
       const arr_right: number[][] = on_right.map((x: string) => right.get_array(x))
       while(down_left < len_left && down_right < len_right){
-        const comparison_result = arr_left.reduceRight((acc: number, cur: number[], idx: number) => acc === 0 ? cur[down_left] - arr_right[idx][down_right] : acc, 0)
+        const comparison_result = arr_left.reduceRight(
+          (acc: number, cur: number[], idx: number) => {
+            let r = acc === 0 ? cur[down_left] - arr_right[idx][down_right] : acc
+            if(Math.abs(r) > tolerance){
+              return r
+            }
+            return 0
+          }, 0)
         if(comparison_result > 0){
           if(is_left_join){
             indices_left.push(down_left)
