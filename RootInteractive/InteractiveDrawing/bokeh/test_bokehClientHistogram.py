@@ -233,7 +233,7 @@ def testJoin():
                 "sum_A": {"weights": "A"}
             }
         },
-        {"name": "histoB_join_histoAB_0", "left": "histoAB_0", "right":"histoB"}
+        {"name": "histoB_join_histoAB_0", "left": "histoAB_0", "right":"histoB", "left_on":["bin_center_1"], "right_on": ["bin_center"]}
     ]
     figureArray = [
         [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.mean', 'mean_A']],
