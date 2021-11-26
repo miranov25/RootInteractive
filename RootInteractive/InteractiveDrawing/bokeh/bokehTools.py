@@ -473,7 +473,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     return stats_cds, data_table
 
 
-def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], jsFunctionArray=[], aliasArray=[], **kwargs):
+def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], jsFunctionArray=[], aliasArray=[], sourceArray=None, **kwargs):
     """
     Wrapper bokeh draw array of figures
 
@@ -545,6 +545,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
+
+    if sourceArray is not None:
+        histogramArray = histogramArray + sourceArray
 
     dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
@@ -1198,6 +1201,8 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
     histoList = []
     for iHisto in histogramArray:
         histoName = iHisto["name"]
+        if histogramDict is not None and not histogramDict[histoName]:
+            continue
         # XXX: This is not a histogram, this is a join
         if "left" in iHisto:
             left = histoDict[iHisto["left"]]["cds"]
@@ -1212,15 +1217,25 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             cdsHisto = CDSJoin(left=left, right=right, on_left=on_left, on_right=on_right, how=how)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
-                mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})
-                for i in optionLocal["histograms"].keys():
-                    mapping.update({i:i})
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             histoDict[histoName] = iHisto.copy()
             histoDict[histoName].update({"cds": cdsHisto, "type": "join"})
             continue
-        if histogramDict is not None and not histogramDict[histoName]:
-            continue
+        # XXX: Just rename this function already
+        if "data" in iHisto:
+            source = None
+            if 'arrayCompression' in iHisto:
+                print("compressCDSPipe")
+                cdsCompress0, sizeMap= compressCDSPipe(iHisto["data"].copy(), iHisto["arrayCompression"],1)
+                cdsCompress=CDSCompress(inputData=cdsCompress0, sizeMap=sizeMap)
+                source=cdsCompress
+            else:
+                source = ColumnDataSource(dfQuery)
+            if iHisto["name"] in aliasDict:
+                mapping = aliasDict[iHisto["name"]]
+                source = CDSAlias(source=source, mapping=mapping)  
+            histoDict[histoName] = iHisto.copy()
+            histoDict[histoName].update({"cds": source, "type": "join"})          
         optionLocal = copy.copy(options)
         optionLocal.update(iHisto)
         weights = None
