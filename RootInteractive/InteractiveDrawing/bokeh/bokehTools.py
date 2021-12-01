@@ -1245,7 +1245,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
         if len(sampleVars) == 1:
             _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict[""])
-            cdsHisto = HistogramCDS(source=cdsFull, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
+            source = cdsFull
+            if "source" in iHisto:
+                source = iHisto["source"]
+            cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
                                     range=optionLocal["range"], sample=varNameX, weights=weights)
             histoList.append(cdsHisto)
             if iHisto["name"] in aliasDict:
@@ -1261,7 +1264,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             for i in sampleVars:
                 _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict[""])
                 sampleVarNames.append(varName)
-            cdsHisto = HistoNdCDS(source=cdsFull, nbins=optionLocal["nbins"],
+            source = cdsFull
+            if "source" in iHisto:
+                source = iHisto["source"]
+            cdsHisto = HistoNdCDS(source=source, nbins=optionLocal["nbins"],
                                     range=optionLocal["range"], sample_variables=sampleVarNames,
                                     weights=weights, histograms=optionLocal["histograms"])
             histoList.append(cdsHisto)
@@ -1364,12 +1370,10 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                         # TODO: Make error bars client side to get rid of this mess. At least ND histogram does support them.
                         if ('errY' in optionLocal) and (optionLocal['errY'] != ''):
                             dfQuery, varNameErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
-                            seriesErrY = dfQuery[varNameErrY]
                             columnNameDict[varNameErrY] = True
                             downsamplerColumns[varNameErrY] = True
                         if ('errX' in optionLocal) and (optionLocal['errX'] != ''):
                             dfQuery, varNameErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
-                            seriesErrX = dfQuery[varNameErrX]
                             columnNameDict[varNameErrX] = True
                             downsamplerColumns[varNameErrX] = True
                         if 'tooltips' in optionLocal:
