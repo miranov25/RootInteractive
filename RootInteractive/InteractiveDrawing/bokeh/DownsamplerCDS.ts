@@ -78,7 +78,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     downsampled_indices.sort((a,b)=>a-b)
 
     for(const columnName of selectedColumns){
-      if (source.get_column(columnName) === undefined){
+      if (source.get_column(columnName) == null){
         throw ReferenceError("Invalid column name " + columnName)
       }
       data[columnName] = []
