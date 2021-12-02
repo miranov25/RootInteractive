@@ -1155,9 +1155,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
     #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
+    return widgetArray
+
+def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = {}
         params = iDesc[1]
+        callback = None
         if len(iDesc) == 3:
             optionLocal = iDesc[2]
         if "callback" not in optionLocal:
@@ -1166,7 +1171,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             else:
                 optionLocal["callback"] = "selection"
         if optionLocal["callback"] == "selection":
-            callback = callbackSel
+            callback = defaultCallback
         elif optionLocal["callback"] == "parameter":
             paramControlled = paramDict[iDesc[1][0]]
             for iEvent in paramControlled["subscribed_events"]:
@@ -1175,15 +1180,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                 else:
                     iWidget.js_link(*iEvent)
             continue
-        if isinstance(iWidget, CheckboxGroup):
-            iWidget.js_on_click(callback)
-        elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
-            iWidget.js_on_change("value", callback)
-        else:
-            iWidget.js_on_change("value", callback)
-        iWidget.js_on_event("value", callback)
-    return widgetArray
-
+        if callback is not None:
+            if isinstance(iWidget, CheckboxGroup):
+                iWidget.js_on_click(callback)
+            elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
+                iWidget.js_on_change("value", callback)
+            else:
+                iWidget.js_on_change("value", callback)
+            iWidget.js_on_event("value", callback)
 
 def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, parameterDict={}, aliasDict={}, **kwargs):
     options = {"range": None,
