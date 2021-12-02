@@ -457,11 +457,15 @@ def tree2Panda(tree, include, selection, **kwargs):
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):
         if (tree.GetLeaf(a)):
+            try:
               if (tree.GetLeaf(a).ClassName() == 'TLeafC'): df[a]=df[a].astype(np.int8)
               if (tree.GetLeaf(a).ClassName() == 'TLeafS'): df[a]=df[a].astype(np.int16)
               if (tree.GetLeaf(a).ClassName() == 'TLeafI'): df[a]=df[a].astype(np.int32)
               if (tree.GetLeaf(a).ClassName() == 'TLeafL'): df[a]=df[a].astype(np.int64)
               if (tree.GetLeaf(a).ClassName() == 'TLeafB'): df[a] = df[a].astype(bool)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafF'): df[a] = df[a].astype(np.float32)
+            except:
+                print(f"invalid branch content branch: {a} branch type: {tree.GetLeaf(a).ClassName()}")
         if (options["category"]>0):
             dfUniq=df[a].unique()
             if dfUniq.shape[0]<=options["category"] :
