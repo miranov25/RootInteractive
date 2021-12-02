@@ -274,7 +274,7 @@ def __processBokehLayoutOption(layoutOptions):
     return options
 
 
-def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
     :param widgetLayoutDesc: array desciption of layout
@@ -298,66 +298,68 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         for i, iPanel in widgetLayoutDesc.items():
             tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
         return Tabs(tabs=tabs)
-    options = {
-        'commonX': -1, 'commonY': -1,
-        'x_visible': 1, 'y_visible': 1,
-        'plot_width': -1, 'plot_height': -1,
-        'sizing_mode': 'scale_width',
-        'legend_visible': True
-    }
+    if options is None:
+        options = {
+            'commonX': -1, 'commonY': -1,
+            'x_visible': 1, 'y_visible': 1,
+            'plot_width': -1, 'plot_height': -1,
+            'sizing_mode': 'scale_width',
+            'legend_visible': True
+        }
 
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
     if isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
-        options.update(widgetLayoutDesc[-1])
+        optionLocal = options.copy()
+        optionLocal.update(widgetLayoutDesc[-1])
         widgetLayoutDesc = widgetLayoutDesc[0:-1]
+    else:
+        optionLocal = options
 
-    for rowWidget in widgetLayoutDesc:
-        rowOptions = {}
-        rowOptions.update(options)
-        # patch local option
-        if isinstance(rowWidget[-1], dict):
-            rowOptions.update(rowWidget[-1])
-            rowWidget = rowWidget[0:-1]
-        rowWidgetArray0 = []
-        for i, iWidget in enumerate(rowWidget):
-            figure = widgetArray[iWidget]
-            rowWidgetArray0.append(figure)
-            if hasattr(figure, 'x_range'):
-                if rowOptions['commonX'] >= 0:
-                    figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
-                if rowOptions['commonY'] >= 0:
-                    figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
-                if rowOptions['x_visible'] == 0:
-                    figure.xaxis.visible = False
-                else:
-                     figure.xaxis.visible = True
-                #figure.xaxis.visible = bool(rowOptions["x_visible"])
-                if rowOptions['y_visible'] == 0:
-                    figure.yaxis.visible = False
-                if rowOptions['y_visible'] == 2:
-                    if i > 0: figure.yaxis.visible = False
-            if hasattr(figure, 'plot_width'):
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.plot_width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.plot_height = rowOptions["plot_height"]
-                if figure.legend:
-                    figure.legend.visible = rowOptions["legend_visible"]
-            if type(figure).__name__ == "DataTable":
-                figure.height = int(rowOptions["plot_height"])
-            if type(figure).__name__ == "BokehVisJSGraph3D":
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.height = rowOptions["plot_height"]
+    for i, iWidget in enumerate(widgetLayoutDesc):
+        if isinstance(iWidget, dict):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=False, options=optionLocal))
+            continue
+        if isinstance(iWidget, list):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=not isHorizontal, options=optionLocal))
+            continue
 
-        rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
-        widgetRows.append(rowWidgetArray)
+        figure = widgetArray[iWidget]
+        widgetRows.append(figure)
+        if hasattr(figure, 'x_range'):
+            if optionLocal['commonX'] >= 0:
+                figure.x_range = widgetArray[int(optionLocal["commonX"])].x_range
+            if optionLocal['commonY'] >= 0:
+                figure.y_range = widgetArray[int(optionLocal["commonY"])].y_range
+            if optionLocal['x_visible'] == 0:
+                figure.xaxis.visible = False
+            else:
+                figure.xaxis.visible = True
+            if optionLocal['y_visible'] == 0:
+                figure.yaxis.visible = False
+            if optionLocal['y_visible'] == 2:
+                if i > 0: figure.yaxis.visible = False
+        if hasattr(figure, 'plot_width'):
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.plot_width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.plot_height = optionLocal["plot_height"]
+            if figure.legend:
+                figure.legend.visible = optionLocal["legend_visible"]
+        if type(figure).__name__ == "DataTable":
+            figure.height = int(optionLocal["plot_height"])
+        if type(figure).__name__ == "BokehVisJSGraph3D":
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.height = optionLocal["plot_height"]
+
+    if isHorizontal:
+        return row(widgetRows, sizing_mode=options['sizing_mode'])
     return column(widgetRows, sizing_mode=options['sizing_mode'])
 
 
