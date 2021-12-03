@@ -48,6 +48,8 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field"]
 
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
+
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
@@ -277,8 +279,10 @@ def __processBokehLayoutOption(layoutOptions):
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
-    :param widgetLayoutDesc: array desciption of layout
+    :param widgetLayoutDesc: array or dict desciption of layout
     :param widgetArray: input plain array of widgets/figures
+    :param isHorizontal: whether to create a row or column
+    :param options: options to use - can also be specified as the last element of widgetArray
     :return: combined figure
     Example:  in tutorial/bokehDraw/makePandaWidgets.ipynb
     widgetLayoutDesc=[
@@ -544,14 +548,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         dfQuery = dataFrame.copy()
     # Check/resp. load derived variables
 
-    if isinstance(figureArray[-1], dict):
-        options.update(figureArray[-1])
-
     dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
                                                        parameterArray=parameterArray, aliasArray=aliasArray, options=options)
 
     paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+
+    widgetParams = []
+    widgetArray = []
+    widgetDict = {}
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -645,9 +650,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if i not in cdsDict:
             cdsDict[i] = histogramDict[i]["cds"]
 
+    optionsChangeList = []
+    for i, variables in enumerate(figureArray):
+        if isinstance(variables, dict):
+            optionsChangeList.append(i)
+
+    optionsIndex = 0
+    if len(optionsChangeList) != 0:
+        optionGroup = options.copy()
+        optionGroup.update(figureArray[optionsChangeList[0]])
+    else:
+        optionGroup = options
     for i, variables in enumerate(figureArray):
         logging.info("%d\t%s", i, variables)
         if isinstance(variables, dict):
+            optionsIndex = optionsIndex + 1
+            if optionsIndex < len(optionsChangeList):
+                optionGroup = options.copy()
+                optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+            else:
+                optionGroup = options
             continue
         if variables[0] == 'table':
             TOptions = {
@@ -664,6 +686,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 TOptions.update(variables[1])
             cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict, rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
+            continue
+        if variables[0] in ALLOWED_WIDGET_TYPES:
+            optionWidget = {}
+            if len(variables) == 3:
+                optionWidget = variables[2].copy()
+            if "callback" not in optionLocal:
+                if variables[1][0] in paramDict:
+                    optionWidget["callback"] = "parameter"
+                else:
+                    optionWidget["callback"] = "selection"
+            if variables[0] == 'slider':
+                localWidget = makeBokehSliderWidget(dfQuery, False, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'range':
+                localWidget = makeBokehSliderWidget(dfQuery, True, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'select':
+                localWidget = makeBokehSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'multiSelect':
+                localWidget = makeBokehMultiSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+            plotArray.append(localWidget)
+            if localWidget:
+                widgetArray.append(localWidget)
+                widgetParams.append(variables)
+            if optionWidget["callback"] == "selection":
+                widgetDict[variables[1][0]] = localWidget
             continue
         xAxisTitle = ""
         yAxisTitle = ""
@@ -687,10 +733,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
 
-        optionLocal = copy.copy(options)
-        if len(variables) > 2:
-            logging.info("Option %s", variables[2])
-            optionLocal.update(variables[2])
+        optionLocal = optionGroup.copy()
+        if isinstance(variables[-1], dict):
+            logging.info("Option %s", variables[-1])
+            optionLocal.update(variables[-1])
 
         if optionLocal["xAxisTitle"] is not None:
             xAxisTitle = optionLocal["xAxisTitle"]
@@ -908,12 +954,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         #            plotTitle += " Color:" + zAxisTitle
         #        figureI.title = plotTitle
         plotArray.append(figureI)
+    callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
+                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
-        layoutList = [pAll]
+    else:
+        pAll = row(plotArray)
     if options['doDraw'] > 0:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, source, plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -1125,6 +1175,9 @@ def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **k
 
 
 def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
+    """
+    DEPRECATED - do not use this function - functionality already in bokehDrawArray
+    """
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1133,7 +1186,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         optionLocal = {}
         localWidget = None
         if len(widget) == 3:
-            optionLocal = widget[2]
+            optionLocal = widget[2].copy()
         if "callback" not in optionLocal:
             if params[0] in paramDict:
                 optionLocal["callback"] = "parameter"
@@ -1156,7 +1209,6 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
     callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
-    #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
     return widgetArray
 
@@ -1283,17 +1335,43 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
             paramDict[param["name"]] = param
 
     if figureArray is not None:
+        optionsChangeList = []
         for i, variables in enumerate(figureArray):
             if isinstance(variables, dict):
+                optionsChangeList.append(i)
+
+        optionsIndex = 0
+        if len(optionsChangeList) != 0:
+            optionGroup = options.copy()
+            optionGroup.update(figureArray[optionsChangeList[0]])
+        else:
+            optionGroup = options
+        for i, variables in enumerate(figureArray):
+            if isinstance(variables, dict):
+                optionsIndex = optionsIndex + 1
+                if optionsIndex < len(optionsChangeList):
+                    optionGroup = options.copy()
+                    optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+                else:
+                    optionGroup = options
+                continue
+            if variables[0] in ALLOWED_WIDGET_TYPES:
+                if len(variables) < 3 or 'callback' not in variables[2]:
+                    if variables[1][0] not in paramDict:
+                        dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                        columnNameDict[varNameX] = True
+                elif variables[2]['callback'] == 'selection':
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                    columnNameDict[varNameX] = True
                 continue
             if variables[0] != "table" and variables[0] != "tableHisto":
                 nvars = len(variables)
                 if isinstance(variables[-1], dict):
-                    optionLocal = options.copy()
+                    optionLocal = optionGroup.copy()
                     optionLocal.update(variables[-1])
                     nvars = nvars - 1
                 else:
-                    optionLocal = options
+                    optionLocal = optionGroup
                 variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
                 for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
                     if axis_index < nvars:
@@ -1373,6 +1451,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                     dfQuery, varName = pandaGetOrMakeColumn(dfQuery, iColumn["weights"])
                                     columnNameDict[varName] = True
 
+    # Probably zombie code
     if widgetArray is not None:
         for iWidget in widgetArray:
             if len(iWidget) < 3 or 'callback' not in iWidget[2]:
