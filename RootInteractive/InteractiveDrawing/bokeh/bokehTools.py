@@ -516,7 +516,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "colors": 'Category10',
         "rescaleColorMapper": False,
         "filter": '',
-        'doDraw': 0,
+        'doDraw': False,
         "legend_field": None,
         "legendTitle": None,
         'nPointRender': 10000,
@@ -913,7 +913,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
         layoutList = [pAll]
-    if options['doDraw'] > 0:
+    if options['doDraw']:
         show(pAll)
     return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
@@ -1205,8 +1205,14 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             continue
         # XXX: This is not a histogram, this is a join
         if "left" in iHisto:
-            left = histoDict[iHisto["left"]]["cds"]
-            right = histoDict[iHisto["right"]]["cds"]
+            if iHisto["left"] is not None:
+                left = histoDict[iHisto["left"]]["cds"]
+            else:
+                left = cdsFull
+            if iHisto["right"] is not None:
+                right = histoDict[iHisto["right"]]["cds"]
+            else:
+                right = cdsFull
             on_left = []
             if "left_on" in iHisto:
                 on_left = iHisto["left_on"]
@@ -1235,11 +1241,14 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 mapping = aliasDict[iHisto["name"]]
                 source = CDSAlias(source=source, mapping=mapping)  
             histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": source, "type": "join"})          
+            histoDict[histoName].update({"cds": source, "type": "source"})
+            continue          
         optionLocal = copy.copy(options)
         optionLocal.update(iHisto)
         weights = None
         cdsUsed = None
+        if "source" in optionLocal:
+            cdsUsed = optionLocal["source"]
         sampleVars = iHisto["variables"]
         if optionLocal["weights"] is not None:
             _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
@@ -1331,6 +1340,8 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                     nvars = nvars - 1
                 else:
                     optionLocal = options
+                if "source" in optionLocal:
+                    continue
                 variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
                 for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
                     if axis_index < nvars:
@@ -1385,7 +1396,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if histogramArray is not None:
         for i, histo in enumerate(histogramArray):
-            if histogramDict[histo["name"]]:
+            if histogramDict[histo["name"]] and "source" not in histo:
                 if "variables" in histo:
                     for j, variable in enumerate(histo["variables"]):
                         if variable in aliasDict:
