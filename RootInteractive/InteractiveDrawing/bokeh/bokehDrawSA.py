@@ -137,7 +137,8 @@ class bokehDrawSA(object):
             'nPointRender': 10000,
             "histogramArray": [],
             'parameterArray': [],
-            "aliasArray": []
+            "aliasArray": [],
+            "sourceArray": []
         }
         options.update(kwargs)
         kwargs=options
@@ -167,7 +168,7 @@ class bokehDrawSA(object):
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         if "arrayCompression" in options:
             self.isNotebook = False
-        dfQuery, _, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"],
+        dfQuery, _, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"] + options["sourceArray"],
                                               widgetArray=widgetsDescription, parameterArray=options["parameterArray"], 
                                               aliasArray=options["aliasArray"], options={"removeExtraColumns": True})
         self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\

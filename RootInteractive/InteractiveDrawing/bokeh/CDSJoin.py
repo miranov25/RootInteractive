@@ -1,9 +1,9 @@
-from bokeh.core.properties import Instance, String, Any, Dict, Bool
+from bokeh.core.properties import Instance, Any, List, String, Float
 from bokeh.models import ColumnarDataSource
 
 
-class CDSAlias(ColumnarDataSource):
-    __implementation__ = "CDSAlias.ts"
+class CDSJoin(ColumnarDataSource):
+    __implementation__ = "CDSJoin.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -12,7 +12,10 @@ class CDSAlias(ColumnarDataSource):
     # can be found here:
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
-    source=Instance(ColumnarDataSource, help="The source to draw from")
-    mapping=Dict(String, Any, help="The mapping from new columns to old columns and possibly mappers")
-    includeOrigColumns=Bool
+    left = Instance(ColumnarDataSource)
+    right = Instance(ColumnarDataSource)
+    on_left = List(String)
+    on_right = List(String)
+    how = String(default="inner")
+    tolerance = Float(default=1e-5)
     print("Import ", __implementation__)
