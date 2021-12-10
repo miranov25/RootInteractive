@@ -416,7 +416,8 @@ def tree2Panda(tree, include, selection, **kwargs):
         "nEntries": 100000000,
         "columnMask": [[".fX$", "_X"], [".fY$", "_y"], [".fElements", ""]],
         "category":0,
-        "verbose": 0
+        "verbose": 0,
+        "estimate":-1
     }
     options.update(kwargs)
     if not hasattr(tree, 'anyTree'):
@@ -438,8 +439,14 @@ def tree2Panda(tree, include, selection, **kwargs):
         if (formula.GetNdim()>0):
             variables += var + ":"
     variables = variables[0:-1]
-
+    if options["estimate"]>0 & options["estimate"] > tree.GetEstimate():
+        tree.SetEstimate(options["estimate"])
+    estimate0=tree.GetEstimate()
     entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+    if entries>estimate0:
+        tree.SetEstimate(entries)
+        entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+
     columns = variables.split(":")
     for i, column in enumerate(columns):
         columns[i] = column.replace(".", "_")
@@ -454,6 +461,7 @@ def tree2Panda(tree, include, selection, **kwargs):
     for i, a in enumerate(columns):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+        # TODO - conversion not needed  - proper type to be used here
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):
         if (tree.GetLeaf(a)):
