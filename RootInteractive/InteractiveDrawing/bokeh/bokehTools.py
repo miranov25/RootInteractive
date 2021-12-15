@@ -4,11 +4,7 @@ from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
-<<<<<<< HEAD
-from jinja2.defaults import VARIABLE_END_STRING
-=======
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
->>>>>>> be976b3 (This is broken, trying a different approach)
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
 from bokeh.palettes import *
@@ -477,11 +473,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
     return stats_cds, data_table
 
 
-<<<<<<< HEAD
 def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], jsFunctionArray=[], aliasArray=[], sourceArray=None, **kwargs):
-=======
-def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterArray=[], aliasArray = [], extraColumns={}, **kwargs):
->>>>>>> be976b3 (This is broken, trying a different approach)
     """
     Wrapper bokeh draw array of figures
 
@@ -740,10 +732,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         color_bar = None
         mapperC = None
         cmap_cds_name = None
-<<<<<<< HEAD
-=======
-
->>>>>>> be976b3 (This is broken, trying a different approach)
         if 'colorZvar' in optionLocal:
             #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
             #So far, parametrized colZ is only supported for the main CDS
@@ -1443,7 +1431,6 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                 dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iWidget[1][0])
                 columnNameDict[varNameX] = True
 
-<<<<<<< HEAD
     if aliasArray is not None:
         for func in aliasArray:
             if "context" in func and func["name"] in downsamplerColumns:
@@ -1453,9 +1440,6 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
         dfQuery = dfQuery[columnNameDict]
 
     return dfQuery, histogramDict, list(downsamplerColumns.keys()), columnNameDict, paramDict, aliasDict
-=======
-    return 
->>>>>>> be976b3 (This is broken, trying a different approach)
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
     parameterDict = {}

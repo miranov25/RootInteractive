@@ -77,17 +77,10 @@ class bokehDrawSA(object):
             variableList = constructVariables(query, varX, varY, varColor, widgetsDescription, self.verbosity, **kwargs)
             df = treeToPanda(source, variableList, query, nEntries=treeoptions['nEntries'], firstEntry=treeoptions['firstEntry'], columnMask=treeoptions['columnMask'])
 
-<<<<<<< HEAD
         if query is None:
             self.dataSource = df.copy()
         else:
             self.dataSource = df.query(query).copy()
-=======
-        if query is not None:
-            self.dataSource = df.query(query)
-        else:
-            self.dataSource = df.copy()
->>>>>>> 192125c (Allowed query for bokehDrawSA to be None)
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
         self.cdsOrig = ColumnDataSource(self.dataSource)

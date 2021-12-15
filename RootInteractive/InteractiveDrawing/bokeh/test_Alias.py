@@ -5,6 +5,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import Custom
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets import Slider
@@ -134,7 +135,6 @@ def test_customJsFunction():
     """))
 
     output_file("test_Alias.html")
-<<<<<<< HEAD
     fig = Figure()
     fig.scatter(x="a", y="b", source=cdsDownsampled)
     fig.scatter(x="a", y="a*x+b", source=cdsDownsampled)
@@ -167,20 +167,18 @@ def test_customJsFunctionBokehDrawArray_v():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
-
-test_customJsFunctionBokehDrawArray()
-=======
-    xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, aliasArray=aliasArray)
-
+    
 def test_makeColumns():
+    df = pd.DataFrame(np.random.random_sample(size=(200000, 2)), columns=list('XY'))
     paramDict = {"paramA": {"value": "5"}}
     aliasDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10}, None: df}
-    varList, ctx_updated, memoized_columns = getOrMakeColumns(["1", "Y", "10*X+Y", "saxpy(paramA, X, Y+1)", "histoA.entries"], None, cdsDict, paramDict, aliasDict)
-    assert len(varList) == 5
+    varList, ctx_updated, memoized_columns, used_names = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "saxpy(paramA, X, Y+1)", "paramA", "histoA.entries"], None, cdsDict, paramDict, aliasDict)
+    print(varList)
+    assert len(varList) == 7
     assert ctx_updated[-1] == "histoA"
     print(ctx_updated)
     print(memoized_columns)
+    print(used_names)
 
 test_makeColumns()
->>>>>>> ced6460 (Added new interface for string parsing of variable names)
