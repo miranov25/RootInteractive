@@ -1,13 +1,21 @@
 import ast
-from typing import Set
 
+JS_MATH_FUNCTIONS = {
+    "log": "Math.log",
+    "abs": "Math.abs",
+    "sin": "Math.sin"
+}
+
+# This seems really stupid and overengineered, might as well use LLVM
 class ColumnEvaluator:
-    def __init__(self, context, cdsDict, paramDict, aliasDict):
+    def __init__(self, context, cdsDict, paramDict, aliasDict, code, fallback_eval=True):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
         self.aliasDict = aliasDict
         self.context = context
-        self.usedNames = Set()
+        self.usedNames = set()
+        self.code = code
+        self.javascript = ""
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -17,7 +25,7 @@ class ColumnEvaluator:
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
         else:
-            code = compile(ast.Expression(body=node), "<string>", "eval")
+            code = compile(ast.Expression(body=node), self.code, "eval")
             return {
                 "value": eval(code, globals(), self.cdsDict[self.context]),
                 "type": "server_derived_column"
@@ -84,14 +92,16 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
     n_context = len(context)
     variables = []
     ctx_updated = []
-    used_names = Set()
+    used_names = set()
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
         if (i_var, i_context) in memoizedColumns:
             variables.append(memoizedColumns[(i_var, i_context)])
+            ctx_updated.append(i_context)
+            continue
         queryAST = ast.parse(i_var, mode="eval")
-        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, aliasDict)
+        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, aliasDict, i_var)
         column = evaluator.visit(queryAST.body)
         variables.append(column)
         i_context = evaluator.context
