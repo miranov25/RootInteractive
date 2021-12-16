@@ -47,7 +47,9 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
-BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field"]
+BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
+
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
 
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -178,108 +180,13 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     return callback
 
 
-def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
-    """
-    :param layoutRow:
-    :param figureList:
-    :param layoutList:
-    :param optionsMother:
-    :param verbose:
-    :return:
-    """
-    if verbose > 0: logging.info("Raw", layoutRow)
-    array = []
-    layoutList.append(array)
-    option = __processBokehLayoutOption(layoutRow)
-    if verbose > 0: logging.info("Option", option)
-    for key in optionsMother:
-        if not (key in option):
-            option[key] = optionsMother[key]
-    for idx, y in enumerate(layoutRow):
-        if not y.isdigit(): continue
-        try:
-            fig = figureList[int(y)]
-        except:
-            logging.error("out of range index", y)
-        array.append(fig)
-        if type(fig).__name__ == 'DataTable':
-            continue
-        if 'commonY' in option:
-            if option["commonY"] >= 0:
-                try:
-                    fig.y_range = figureList[int(option["commonY"])].y_range
-                except ValueError:
-                    logging.info('Failed: to process option ' + option["commonY"])
-                    continue
-                except AttributeError:
-                    logging.info('Failed: to process option ' + option["commonY"])
-                    continue
-        if 'commonX' in option:
-            if option["commonX"] >= 0:
-                try:
-                    fig.x_range = figureList[int(option["commonX"])].x_range
-                except ValueError:
-                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
-                    continue
-                except AttributeError:
-                    logging.info('Failed: to process option ')
-                    continue
-
-        if (idx > 0) & ('y_visible' in option):
-            fig.yaxis.visible = bool(option["y_visible"]==1)
-        if (idx == 0) & ('y_visible' in option):
-            fig.yaxis.visible = bool(option["y_visible"]!=0)
-        if 'x_visible' in option:
-            fig.xaxis.visible = bool(option["x_visible"]==1)
-    nCols = len(array)
-    for fig in array:
-        if type(fig).__name__ == 'Figure':
-            if 'plot_width' in option:
-                fig.plot_width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.plot_height = int(option["plot_height"])
-        if type(fig).__name__ == 'DataTable':
-            if 'plot_width' in option:
-                fig.width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.height = int(option["plot_height"])
-        if type(fig).__name__ == 'BokehVisJSGraph3D':
-            if 'plot_width' in option:
-                fig.width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.height = int(option["plot_height"])
-
-
-def __processBokehLayoutOption(layoutOptions):
-    """
-    :param layoutOptions:
-    :return:
-    """
-    # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
-    options = {}
-    for x in layoutOptions:
-        if not (type(x) == str): continue
-        if "=" in str(x):  # one of the way to see if it's list
-            try:
-                k, v = x.split("=")
-            except ValueError:
-                continue
-            options[k] = v
-            if v.isdigit():
-                options[k] = int(v)
-            else:
-                try:
-                    options[k] = float(v)
-                except ValueError:
-                    options[k] = v
-    return options
-
-
-def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
-    :param widgetLayoutDesc: array desciption of layout
+    :param widgetLayoutDesc: array or dict desciption of layout
     :param widgetArray: input plain array of widgets/figures
+    :param isHorizontal: whether to create a row or column
+    :param options: options to use - can also be specified as the last element of widgetArray
     :return: combined figure
     Example:  in tutorial/bokehDraw/makePandaWidgets.ipynb
     widgetLayoutDesc=[
@@ -299,66 +206,68 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         for i, iPanel in widgetLayoutDesc.items():
             tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
         return Tabs(tabs=tabs)
-    options = {
-        'commonX': -1, 'commonY': -1,
-        'x_visible': 1, 'y_visible': 1,
-        'plot_width': -1, 'plot_height': -1,
-        'sizing_mode': 'scale_width',
-        'legend_visible': True
-    }
+    if options is None:
+        options = {
+            'commonX': -1, 'commonY': -1,
+            'x_visible': 1, 'y_visible': 1,
+            'plot_width': -1, 'plot_height': -1,
+            'sizing_mode': 'scale_width',
+            'legend_visible': True
+        }
 
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
     if isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
-        options.update(widgetLayoutDesc[-1])
+        optionLocal = options.copy()
+        optionLocal.update(widgetLayoutDesc[-1])
         widgetLayoutDesc = widgetLayoutDesc[0:-1]
+    else:
+        optionLocal = options
 
-    for rowWidget in widgetLayoutDesc:
-        rowOptions = {}
-        rowOptions.update(options)
-        # patch local option
-        if isinstance(rowWidget[-1], dict):
-            rowOptions.update(rowWidget[-1])
-            rowWidget = rowWidget[0:-1]
-        rowWidgetArray0 = []
-        for i, iWidget in enumerate(rowWidget):
-            figure = widgetArray[iWidget]
-            rowWidgetArray0.append(figure)
-            if hasattr(figure, 'x_range'):
-                if rowOptions['commonX'] >= 0:
-                    figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
-                if rowOptions['commonY'] >= 0:
-                    figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
-                if rowOptions['x_visible'] == 0:
-                    figure.xaxis.visible = False
-                else:
-                     figure.xaxis.visible = True
-                #figure.xaxis.visible = bool(rowOptions["x_visible"])
-                if rowOptions['y_visible'] == 0:
-                    figure.yaxis.visible = False
-                if rowOptions['y_visible'] == 2:
-                    if i > 0: figure.yaxis.visible = False
-            if hasattr(figure, 'plot_width'):
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.plot_width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.plot_height = rowOptions["plot_height"]
-                if figure.legend:
-                    figure.legend.visible = rowOptions["legend_visible"]
-            if type(figure).__name__ == "DataTable":
-                figure.height = int(rowOptions["plot_height"])
-            if type(figure).__name__ == "BokehVisJSGraph3D":
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.height = rowOptions["plot_height"]
+    for i, iWidget in enumerate(widgetLayoutDesc):
+        if isinstance(iWidget, dict):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=False, options=optionLocal))
+            continue
+        if isinstance(iWidget, list):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=not isHorizontal, options=optionLocal))
+            continue
 
-        rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
-        widgetRows.append(rowWidgetArray)
+        figure = widgetArray[iWidget]
+        widgetRows.append(figure)
+        if hasattr(figure, 'x_range'):
+            if optionLocal['commonX'] >= 0:
+                figure.x_range = widgetArray[int(optionLocal["commonX"])].x_range
+            if optionLocal['commonY'] >= 0:
+                figure.y_range = widgetArray[int(optionLocal["commonY"])].y_range
+            if optionLocal['x_visible'] == 0:
+                figure.xaxis.visible = False
+            else:
+                figure.xaxis.visible = True
+            if optionLocal['y_visible'] == 0:
+                figure.yaxis.visible = False
+            if optionLocal['y_visible'] == 2:
+                if i > 0: figure.yaxis.visible = False
+        if hasattr(figure, 'plot_width'):
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.plot_width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.plot_height = optionLocal["plot_height"]
+            if figure.legend:
+                figure.legend.visible = optionLocal["legend_visible"]
+        if type(figure).__name__ == "DataTable":
+            figure.height = int(optionLocal["plot_height"])
+        if type(figure).__name__ == "BokehVisJSGraph3D":
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.height = optionLocal["plot_height"]
+
+    if isHorizontal:
+        return row(widgetRows, sizing_mode=options['sizing_mode'])
     return column(widgetRows, sizing_mode=options['sizing_mode'])
 
 
@@ -504,8 +413,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'x_axis_type': 'auto',
         'plot_width': 600,
         'plot_height': 400,
-        'errX': '',
-        'errY': '',
         'commonX': 0,
         'commonY': 0,
         'ncols': -1,
@@ -555,6 +462,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                        parameterArray=parameterArray, aliasArray=aliasArray, options=options)
 
     paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+
+    widgetParams = []
+    widgetArray = []
+    widgetDict = {}
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -648,9 +559,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if i not in cdsDict:
             cdsDict[i] = histogramDict[i]["cds"]
 
+    optionsChangeList = []
+    for i, variables in enumerate(figureArray):
+        if isinstance(variables, dict):
+            optionsChangeList.append(i)
+
+    optionsIndex = 0
+    if len(optionsChangeList) != 0:
+        optionGroup = options.copy()
+        optionGroup.update(figureArray[optionsChangeList[0]])
+    else:
+        optionGroup = options
     for i, variables in enumerate(figureArray):
         logging.info("%d\t%s", i, variables)
         if isinstance(variables, dict):
+            optionsIndex = optionsIndex + 1
+            if optionsIndex < len(optionsChangeList):
+                optionGroup = options.copy()
+                optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+            else:
+                optionGroup = options
             continue
         if variables[0] == 'table':
             TOptions = {
@@ -667,6 +595,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 TOptions.update(variables[1])
             cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict, rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
+            continue
+        if variables[0] in ALLOWED_WIDGET_TYPES:
+            optionWidget = {}
+            if len(variables) == 3:
+                optionWidget = variables[2].copy()
+            if "callback" not in optionLocal:
+                if variables[1][0] in paramDict:
+                    optionWidget["callback"] = "parameter"
+                else:
+                    optionWidget["callback"] = "selection"
+            if variables[0] == 'slider':
+                localWidget = makeBokehSliderWidget(dfQuery, False, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'range':
+                localWidget = makeBokehSliderWidget(dfQuery, True, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'select':
+                localWidget = makeBokehSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'multiSelect':
+                localWidget = makeBokehMultiSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+            plotArray.append(localWidget)
+            if localWidget:
+                widgetArray.append(localWidget)
+                widgetParams.append(variables)
+            if optionWidget["callback"] == "selection":
+                widgetDict[variables[1][0]] = localWidget
             continue
         xAxisTitle = ""
         yAxisTitle = ""
@@ -690,10 +642,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
 
-        optionLocal = copy.copy(options)
-        if len(variables) > 2:
-            logging.info("Option %s", variables[2])
-            optionLocal.update(variables[2])
+        optionLocal = optionGroup.copy()
+        if isinstance(variables[-1], dict):
+            logging.info("Option %s", variables[-1])
+            optionLocal.update(variables[-1])
 
         if optionLocal["xAxisTitle"] is not None:
             xAxisTitle = optionLocal["xAxisTitle"]
@@ -911,12 +863,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         #            plotTitle += " Color:" + zAxisTitle
         #        figureI.title = plotTitle
         plotArray.append(figureI)
+    callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
+                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
         layoutList = [pAll]
     if options['doDraw']:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, source, plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
 def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
@@ -1128,6 +1083,9 @@ def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **k
 
 
 def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
+    """
+    DEPRECATED - do not use this function - functionality already in bokehDrawArray
+    """
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1136,7 +1094,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         optionLocal = {}
         localWidget = None
         if len(widget) == 3:
-            optionLocal = widget[2]
+            optionLocal = widget[2].copy()
         if "callback" not in optionLocal:
             if params[0] in paramDict:
                 optionLocal["callback"] = "parameter"
@@ -1159,10 +1117,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
     callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
-    #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
+    return widgetArray
+
+def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = {}
         params = iDesc[1]
+        callback = None
         if len(iDesc) == 3:
             optionLocal = iDesc[2]
         if "callback" not in optionLocal:
@@ -1171,7 +1133,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             else:
                 optionLocal["callback"] = "selection"
         if optionLocal["callback"] == "selection":
-            callback = callbackSel
+            callback = defaultCallback
         elif optionLocal["callback"] == "parameter":
             paramControlled = paramDict[iDesc[1][0]]
             for iEvent in paramControlled["subscribed_events"]:
@@ -1180,15 +1142,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                 else:
                     iWidget.js_link(*iEvent)
             continue
-        if isinstance(iWidget, CheckboxGroup):
-            iWidget.js_on_click(callback)
-        elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
-            iWidget.js_on_change("value", callback)
-        else:
-            iWidget.js_on_change("value", callback)
-        iWidget.js_on_event("value", callback)
-    return widgetArray
-
+        if callback is not None:
+            if isinstance(iWidget, CheckboxGroup):
+                iWidget.js_on_click(callback)
+            elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
+                iWidget.js_on_change("value", callback)
+            else:
+                iWidget.js_on_change("value", callback)
+            iWidget.js_on_event("value", callback)
 
 def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, parameterDict={}, aliasDict={}, **kwargs):
     options = {"range": None,
@@ -1327,16 +1288,42 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if parameterArray is not None:
           for i, param in enumerate(parameterArray):
-            paramDict[param["name"]] = True
+            paramDict[param["name"]] = param.copy()
 
     if figureArray is not None:
+        optionsChangeList = []
         for i, variables in enumerate(figureArray):
             if isinstance(variables, dict):
+                optionsChangeList.append(i)
+
+        optionsIndex = 0
+        if len(optionsChangeList) != 0:
+            optionGroup = options.copy()
+            optionGroup.update(figureArray[optionsChangeList[0]])
+        else:
+            optionGroup = options
+        for i, variables in enumerate(figureArray):
+            if isinstance(variables, dict):
+                optionsIndex = optionsIndex + 1
+                if optionsIndex < len(optionsChangeList):
+                    optionGroup = options.copy()
+                    optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+                else:
+                    optionGroup = options
+                continue
+            if variables[0] in ALLOWED_WIDGET_TYPES:
+                if len(variables) < 3 or 'callback' not in variables[2]:
+                    if variables[1][0] not in paramDict:
+                        dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                        columnNameDict[varNameX] = True
+                elif variables[2]['callback'] == 'selection':
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                    columnNameDict[varNameX] = True
                 continue
             if variables[0] != "table" and variables[0] != "tableHisto":
                 nvars = len(variables)
                 if isinstance(variables[-1], dict):
-                    optionLocal = options.copy()
+                    optionLocal = optionGroup.copy()
                     optionLocal.update(variables[-1])
                     nvars = nvars - 1
                 else:
@@ -1421,6 +1408,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                     dfQuery, varName = pandaGetOrMakeColumn(dfQuery, iColumn["weights"])
                                     columnNameDict[varName] = True
 
+    # Probably zombie code
     if widgetArray is not None:
         for iWidget in widgetArray:
             if len(iWidget) < 3 or 'callback' not in iWidget[2]:
