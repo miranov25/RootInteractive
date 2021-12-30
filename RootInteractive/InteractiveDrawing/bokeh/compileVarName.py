@@ -1,17 +1,13 @@
 import ast
 
-JS_MATH_FUNCTIONS = {
-    "log": "Math.log",
-    "abs": "Math.abs",
-    "sin": "Math.sin"
-}
+from bokeh.models.layouts import Panel
 
 # This seems really stupid and overengineered, might as well use LLVM
 class ColumnEvaluator:
-    def __init__(self, context, cdsDict, paramDict, aliasDict, code, fallback_eval=True):
+    def __init__(self, context, cdsDict, paramDict, funcDict, code, fallback_eval=True):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
-        self.aliasDict = aliasDict
+        self.funcDict = funcDict
         self.context = context
         self.usedNames = set()
         self.code = code
@@ -24,17 +20,19 @@ class ColumnEvaluator:
             return self.visit_Call(node)
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
+        elif isinstance(node, ast.Num):
+            return self.visit_Num(node)
         else:
             code = compile(ast.Expression(body=node), self.code, "eval")
             return {
-                "value": eval(code, globals(), self.cdsDict[self.context]),
+                "value": eval(code, {}, self.cdsDict[self.context]),
                 "type": "server_derived_column"
-                }        
+                }
 
     def visit_Call(self, node: ast.Call):
         if not isinstance(node.func, ast.Name):
             raise ValueError("Functions in variables list can only be specified by names")
-        if node.func.id in self.aliasDict:
+        if node.func.id in self.funcDict:
             args = []
             for iArg in node.args:
                 args.append(self.visit(iArg))
@@ -43,15 +41,24 @@ class ColumnEvaluator:
                     "func": node.func.id,
                     "args": args
                 },
-                "type": "client_function"
+                "type": "client_function",
+                "name": self.code
             }
         else:
-            code = compile(ast.Expression(body=node), "<string>", "eval")
+            code = compile(ast.Expression(body=node), self.code, "eval")
             return {
-                "name": "anonymous",
-                "value": eval(code, globals(), self.cdsDict[self.context]),
+                "name": self.code,
+                "value": eval(code, {}, self.cdsDict[self.context]),
                 "type": "server_derived_column"
                 }
+
+    def visit_Num(self, node: ast.Num):
+        # This is deprecated, kept for compatibility with old Python
+        return {
+            "name": self.code,
+            "type": "constant",
+            "value": node.n
+        }
 
     def visit_Attribute(self, node: ast.Attribute):
         # TODO: When adding joins on client, expand the functionality of this
@@ -83,7 +90,9 @@ class ColumnEvaluator:
         
         
 
-def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, aliasDict: dict = {}, memoizedColumns: dict = {}):
+def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {}, memoizedColumns: dict = {}):
+    if variableNames is None:
+        return variableNames, context, memoizedColumns, {}
     if not isinstance(variableNames, list):
         variableNames = [variableNames]
     if not isinstance(context, list):
@@ -101,11 +110,11 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
             ctx_updated.append(i_context)
             continue
         queryAST = ast.parse(i_var, mode="eval")
-        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, aliasDict, i_var)
+        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var)
         column = evaluator.visit(queryAST.body)
         variables.append(column)
         i_context = evaluator.context
-        used_names.update(evaluator.usedNames)
+        used_names.update({(i_context, i) for  i in evaluator.usedNames})
         ctx_updated.append(i_context)
         memoizedColumns[(i_var, i_context)] = column
         
