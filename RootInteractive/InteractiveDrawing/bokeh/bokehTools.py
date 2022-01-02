@@ -11,7 +11,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import *
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -26,7 +26,6 @@ from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerC
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
-from bokeh.transform import transform as bokehTransform
 import re
 
 
