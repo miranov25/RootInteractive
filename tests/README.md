@@ -16,4 +16,24 @@
     
 ## Example usage
 
+```
+pytest --json-report --json-report-file  test_bokehAll.json
+jq '.tests[] | .nodeid, .call.duration'  test_bokehAll.json
+```
+-->
+```
+...
+RootInteractive/InteractiveDrawing/bokeh/test_Compression.py::test_compressCDSPipe"
+8.266445378001663
+"RootInteractive/InteractiveDrawing/bokeh/test_Compression.py::test_CompressionCDSPipeDraw"
+10.080579579996993
+"RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py::testBokehClientHistogram"
+12.836207999003818
+"RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py::testBokehClientHistogramOnlyHisto"
+7.535426512011327
+"RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py::testBokehClientHistogramProfileA"
+15.859309413004667
+...
+```
+
 
