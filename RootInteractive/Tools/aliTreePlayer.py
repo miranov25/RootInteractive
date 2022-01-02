@@ -416,7 +416,8 @@ def tree2Panda(tree, include, selection, **kwargs):
         "nEntries": 100000000,
         "columnMask": [[".fX$", "_X"], [".fY$", "_y"], [".fElements", ""]],
         "category":0,
-        "verbose": 0
+        "verbose": 0,
+        "estimate":-1
     }
     options.update(kwargs)
     if not hasattr(tree, 'anyTree'):
@@ -438,8 +439,14 @@ def tree2Panda(tree, include, selection, **kwargs):
         if (formula.GetNdim()>0):
             variables += var + ":"
     variables = variables[0:-1]
-
+    if options["estimate"]>0 & options["estimate"] > tree.GetEstimate():
+        tree.SetEstimate(options["estimate"])
+    estimate0=tree.GetEstimate()
     entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+    if entries>estimate0:
+        tree.SetEstimate(entries)
+        entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+
     columns = variables.split(":")
     for i, column in enumerate(columns):
         columns[i] = column.replace(".", "_")
@@ -454,14 +461,19 @@ def tree2Panda(tree, include, selection, **kwargs):
     for i, a in enumerate(columns):
         val = tree.GetVal(i)
         ex_dict[a] = np.frombuffer(val, dtype=float, count=entries)
+        # TODO - conversion not needed  - proper type to be used here
     df = pd.DataFrame(ex_dict, columns=columns)
     for i, a in enumerate(columns):
         if (tree.GetLeaf(a)):
+            try:
               if (tree.GetLeaf(a).ClassName() == 'TLeafC'): df[a]=df[a].astype(np.int8)
               if (tree.GetLeaf(a).ClassName() == 'TLeafS'): df[a]=df[a].astype(np.int16)
               if (tree.GetLeaf(a).ClassName() == 'TLeafI'): df[a]=df[a].astype(np.int32)
               if (tree.GetLeaf(a).ClassName() == 'TLeafL'): df[a]=df[a].astype(np.int64)
               if (tree.GetLeaf(a).ClassName() == 'TLeafB'): df[a] = df[a].astype(bool)
+              if (tree.GetLeaf(a).ClassName() == 'TLeafF'): df[a] = df[a].astype(np.float32)
+            except:
+                print(f"invalid branch content branch: {a} branch type: {tree.GetLeaf(a).ClassName()}")
         if (options["category"]>0):
             dfUniq=df[a].unique()
             if dfUniq.shape[0]<=options["category"] :

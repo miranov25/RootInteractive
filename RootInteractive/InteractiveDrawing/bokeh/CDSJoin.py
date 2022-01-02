@@ -1,10 +1,9 @@
-from bokeh.core.properties import Instance, String, Int, List
+from bokeh.core.properties import Instance, Any, List, String, Float
 from bokeh.models import ColumnarDataSource
 
 
-class DownsamplerCDS(ColumnarDataSource):
-
-    __implementation__ = "DownsamplerCDS.ts"
+class CDSJoin(ColumnarDataSource):
+    __implementation__ = "CDSJoin.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -13,8 +12,10 @@ class DownsamplerCDS(ColumnarDataSource):
     # can be found here:
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
-
-    source = Instance(ColumnarDataSource)
-    nPoints = Int(default=300, help="Number of points to downsample CDS to")
-    selectedColumns = List(String, default=[], help="The columns from the CDS to keep")
+    left = Instance(ColumnarDataSource)
+    right = Instance(ColumnarDataSource)
+    on_left = List(String)
+    on_right = List(String)
+    how = String(default="inner")
+    tolerance = Float(default=1e-5)
     print("Import ", __implementation__)

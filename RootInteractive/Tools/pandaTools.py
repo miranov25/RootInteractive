@@ -39,7 +39,7 @@ def pandaGetOrMakeColumn(df, variableName):
     varName = re.sub(r"""\.""", "_Dot_", varName)
     varName = re.sub(r"""@""", "_At_", varName)
     varName = re.sub(r"""(\(|\))""", "_", varName)
-    if variableName in df.columns:
+    if varName in df.columns:
         return df, varName
     expression = variableName
     df.meta.metaData[varName + ".OrigName"] = variableName

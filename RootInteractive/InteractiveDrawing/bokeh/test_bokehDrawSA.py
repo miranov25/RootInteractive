@@ -32,22 +32,22 @@ df["B"]=np.linspace(0,1,20000)
 df.eval("Bool=A>0.5", inplace=True)
 df.eval("BoolB=B>0.5", inplace=True)
 df.eval("BoolC=C>0.1", inplace=True)
-df["A"]=df["A"].round(3);
-df["A"][15] = math.nan
-df["B"]=df["B"].round(3);
-df["C"]=df["C"].round(3);
-df["D"]=df["D"].round(3);
+df["A"]=df["A"].round(3)
+df.loc[15, "A"] = math.nan
+df["B"]=df["B"].round(3)
+df["C"]=df["C"].round(3)
+df["D"]=df["D"].round(3)
 df["AA"]=((df.A*10).round(0)).astype(CategoricalDtype(ordered=True))
 df["CC"]=((df.C*5).round(0)).astype(int)
 df["DD"]=((df.D*4).round(0)).astype(int)
 df["DDC"]=((df.D*4).round(0)).astype(int).map(mapDDC)
 df["EE"]=(df.E*4).round(0)
-df['errY']=df.A*0.02+0.02;
+df['errY']=df.A*0.02+0.02
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
 parameterArray = [
-    {"name": "colorZ", "value":"EE", "options":["A", "B", "DD", "EE"]},
+    {"name": "colorZ", "value":"EE", "options":["A", "B", "EE"]},
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
 ]
@@ -55,14 +55,15 @@ parameterArray = [
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
-    [['A'], ['C+A', 'C-A', 'A/A'], {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}],
-    [['B'], ['C+B', 'C-B'], { "size":"size", "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True , "legend_options": {"label_text_font_size": "legendFontSize"}}],
-    [['D'], ['(A+B+C)*D'], {"colorZvar": "colorZ", "size": 10, "errY": "errY", "legend_options": {"label_text_font_size": "legendFontSize"}} ],
+    [['A'], ['C+A', 'C-A', 'A/A']],
+    [['B'], ['C+B', 'C-B'], { "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True}],
+    [['D'], ['(A+B+C)*DD'], {"colorZvar": "colorZ", "size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
-    [['D'], ['D*10'], {"size": 10, "errY": "errY", "legend_options": {"label_text_font_size": "legendFontSize"}}],
+    [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
+    {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}
 ]
-#widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
+
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)"), ("ErrY", "@errY")]
 
@@ -75,12 +76,12 @@ widgetParams=[
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC"]],
-    ['select',["CC", 0, 1, 2, 3]],
+    ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-    ['select',["colorZ"], {"callback": "parameter", "default": 3}],
-    ['slider',["size"], {"callback": "parameter"}],
-    ['select',["legendFontSize"], {"callback": "parameter", "default": 2}],
+    ['select',["colorZ"]],
+    ['slider',["size"]],
+    ['select',["legendFontSize"]],
 ]
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
@@ -102,7 +103,7 @@ figureLayoutDesc={
 
 def testBokehDrawArrayWidget():
     output_file("test_BokehDrawArrayWidget.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode="scale_width", parameterArray=parameterArray)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
 
 def testBokehDrawArrayWidgetNoScale():
     output_file("test_BokehDrawArrayWidgetNoScale.html")
@@ -110,7 +111,7 @@ def testBokehDrawArrayWidgetNoScale():
 
 def testBokehDrawArrayDownsample():
     output_file("test_BokehDrawArrayDownsample.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray)
 
 def testBokehDrawArrayQuery():
     output_file("test_BokehDrawArrayQuery.html")

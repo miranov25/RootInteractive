@@ -5,7 +5,7 @@
 // Making it easy to hook up python data analytics tools (NumPy, SciPy,
 // Pandas, etc.) to web presentations using the Bokeh server.
 import {LayoutDOM, LayoutDOMView} from "models/layouts/layout_dom"
-import {ColumnDataSource} from "models/sources/column_data_source"
+import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {LayoutItem} from "core/layout"
 import * as p from "core/properties"
 
@@ -127,7 +127,7 @@ export namespace BokehVisJSGraph3D {
     z: p.Property<string>
     style: p.Property<string>
     options3D:  p.Property<Record<string, any>>
-    data_source: p.Property<ColumnDataSource>
+    data_source: p.Property<ColumnarDataSource>
   }
 }
 

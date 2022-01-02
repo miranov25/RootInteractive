@@ -1,11 +1,11 @@
-import {ColumnDataSource} from "models/sources/column_data_source"
+import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnDataSource.Props & {
-    source: p.Property<ColumnDataSource>
+  export type Props = ColumnarDataSource.Props & {
+    source: p.Property<ColumnarDataSource>
 //    view: p.Property<number[] | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
@@ -17,7 +17,7 @@ export namespace HistoNdCDS {
 
 export interface HistoNdCDS extends HistoNdCDS.Attrs {}
 
-export class HistoNdCDS extends ColumnDataSource {
+export class HistoNdCDS extends ColumnarDataSource {
   properties: HistoNdCDS.Props
 
   constructor(attrs?: Partial<HistoNdCDS.Attrs>) {
@@ -35,7 +35,7 @@ export class HistoNdCDS extends ColumnDataSource {
   static init_HistoNdCDS() {
 
     this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String})=>({
-      source:  [Ref(ColumnDataSource)],
+      source:  [Ref(ColumnarDataSource)],
 //      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
@@ -60,61 +60,26 @@ export class HistoNdCDS extends ColumnDataSource {
     this.connect(this.source.change, () => {
       this._bin_indices.length = this.source.length
       this._bin_indices.fill(-2, 0, this.source.length)
+      this.update_data()
     })
   }
 
   update_data(indices: number[] | null = null): void {
       let bincount = this.data["bin_count"] as number[]
-      const length = this._strides[this._strides.length-1]
       bincount.length = length
       if(indices != null){
         //TODO: Make this actually do something
       } else {
-        bincount.fill(0, 0, length)
-        let sample_array: number[][] = []
-        for (const column_name of this.sample_variables) {
-          sample_array.push(this.source.get_array(column_name))
-        }
-        const view_indices = this.view
-        if(view_indices === null){
-          const n_indices = this.source.length
-          if(this.weights != null){
-            const weights_array = this.source.data[this.weights]
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(i, sample_array)
-              if(bin >= 0 && bin < length){
-                bincount[bin] += weights_array[i]
-              }
-            }
-          } else {
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(i, sample_array)
-              if(bin >= 0 && bin < length){
-                bincount[bin] += 1
-              }
-            }
-          }
-        } else {
-          const n_indices = view_indices.length
-          if(this.weights != null){
-            const weights_array = this.source.data[this.weights]
-            for(let i=0; i<n_indices; i++){
-              let j = view_indices[i]
-              const bin = this.getbin(j, sample_array)
-              if(bin >= 0 && bin < length){
-                bincount[bin] += weights_array[j]
-              }
-            }
-          } else {
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(view_indices[i], sample_array)
-              if(bin >= 0 && bin < length){
-                bincount[bin] += 1
-              }
+        bincount = this.histogram(this.weights)
+        if(this.histograms !== null){
+          for (const key in this.histograms){
+            if(this.histograms[key] === null){
+              this.data[key] = this.histogram(null)
+            } else {
+              this.data[key] = this.histogram(this.histograms[key].weights)
             }
           }
         }
-
       }
       this.data["bin_count"] = bincount
       this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
@@ -227,9 +192,61 @@ export class HistoNdCDS extends ColumnDataSource {
       this.update_data()
   }
 
+  histogram(weights: string | null): number[]{
+    const length = this._strides[this._strides.length-1]
+    let sample_array: number[][] = []
+    for (const column_name of this.sample_variables) {
+      sample_array.push(this.source.get_array(column_name))
+    }
+    let bincount: number[] = Array(length)
+    bincount.fill(0)
+    const view_indices = this.view
+    if(view_indices === null){
+      const n_indices = this.source.length
+      if(weights != null){
+        const weights_array = this.source.data[weights]
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(i, sample_array)
+          if(bin >= 0 && bin < length){
+            bincount[bin] += weights_array[i]
+          }
+        }
+      } else {
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(i, sample_array)
+          if(bin >= 0 && bin < length){
+            bincount[bin] += 1
+          }
+        }
+      }
+    } else {
+      const n_indices = view_indices.length
+      if(weights != null){
+        const weights_array = this.source.data[weights]
+        for(let i=0; i<n_indices; i++){
+          let j = view_indices[i]
+          const bin = this.getbin(j, sample_array)
+          if(bin >= 0 && bin < length){
+            bincount[bin] += weights_array[j]
+          }
+        }
+      } else {
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(view_indices[i], sample_array)
+          if(bin >= 0 && bin < length){
+            bincount[bin] += 1
+          }
+        }
+      }
+    }
+    return bincount
+  }
+
   getbin(idx: number, sample: number[][]): number{
       // This can be optimized using loop fission, but in our use case the data doeswn't change often, which means
       // that the cached bin indices are invalidated infrequently.
+      // Another approach would be to cache index in the sorted array, this would require sorting the array, 
+      // but would make subsequent hisogramming even quicker.
       const cached_value = this._bin_indices[idx]
       if(cached_value != -2) return cached_value
       let bin = 0
@@ -237,7 +254,10 @@ export class HistoNdCDS extends ColumnDataSource {
       for (let i = 0; i < this._nbins.length; i++) {
         const val = sample[i][idx];
         // Overflow bins
-        if(val < this._range_min[i] || val > this._range_max[i]) return -1
+        if(val < this._range_min[i] || val > this._range_max[i]) {
+          bin = -1
+          break
+        }
 
         // Make the max value inclusive
         if(val === this._range_max[i]){

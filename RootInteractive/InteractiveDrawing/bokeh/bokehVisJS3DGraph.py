@@ -1,5 +1,5 @@
 from bokeh.core.properties import Instance, String, Dict, Any
-from bokeh.models import ColumnDataSource, LayoutDOM
+from bokeh.models import ColumnarDataSource, LayoutDOM
 # see options in https://visjs.github.io/vis-graph3d/docs/graph3d/index.html
 
 
@@ -24,7 +24,7 @@ class BokehVisJSGraph3D(LayoutDOM):
 
     # This is a Bokeh ColumnDataSource that can be updated in the Bokeh
     # server by Python code
-    data_source = Instance(ColumnDataSource)
+    data_source = Instance(ColumnarDataSource)
 
     # The vis.js library that we are wrapping expects data for x, y, and z.
     # The data will actually be stored in the ColumnDataSource, but these

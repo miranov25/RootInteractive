@@ -1,9 +1,6 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.io import curdoc
-import os
-import sys
-import pytest
 from pandas import CategoricalDtype
 
 output_file("test_bokehClientHistogram.html")
@@ -42,7 +39,7 @@ widgetParams=[
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['multiSelect', ["DDC"]],
-    ['slider',["size"], {"callback": "parameter"}],
+    ['slider',["size"]],
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
@@ -97,7 +94,7 @@ def testBokehClientHistogramProfileA():
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2'], {"size":"size"}],
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"size":"size"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}, {"size":"size"}],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.std']], {"size":"size"},
+        [['histoAB_1.bin_center_0'], ['histoAB_1.std'], {"size":"size"}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -173,10 +170,11 @@ def testBokehClientHistogram3d_colormap():
         "range": [[0,1],[0,1],[0,1]]},
     ]
     figureArray = [
-        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size", "rescaleColorMapper": True }]
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2" }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2" }],
+        {"size": "size", "rescaleColorMapper": True}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -191,13 +189,14 @@ def testBokehClientHistogram3d_colormap_noscale():
     output_file("test_BokehClientHistogram_colormap_noscale.html")
     histoArray = [
         {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]],
-        "range": [[0,1],[0,1],[0,1]]},
+        "range": [[0,1],[0,1],[0,1]]}
     ]
     figureArray = [
-        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
+        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2"}],
+        {"size": "size"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -208,7 +207,47 @@ def testBokehClientHistogram3d_colormap_noscale():
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
 
-#testBokehClientHistogram3d()
-#testBokehClientHistogram()
-#testBokehClientHistogramOnlyHisto()
-#testBokehClientHistogramRowwiseTable()
+def testJoin():
+    output_file("test_BokehClientHistogramJoin.html")
+    aliasArray = [
+        {
+            "name": "unbinned_mean_A",
+            "variables": ["sum_A", "bin_count"],
+            "func": "return sum_A / bin_count",
+            "context": "histoB"
+        },
+        {
+            "name": "delta_mean",
+            "variables": ["mean", "unbinned_mean_A"],
+            "func": "return mean - unbinned_mean_A",
+            "context": "histoB_join_histoAB_0"
+        }
+    ]
+    histoArray = [
+        {"name": "histoAB", "variables": ["A", "B"], "nbins": [10, 10], "axis": [0]},
+        {"name": "histoB", "variables": ["B"], "nbins": 10,
+            "histograms": {
+                "sum_A": {"weights": "A"}
+            }
+        }
+    ]
+    sourceArray = [
+        {"name": "histoB_join_histoAB_0", "left": "histoAB_0", "right":"histoB", "left_on":["bin_center_1"], "right_on": ["bin_center"]}
+    ]
+    figureArray = [
+        [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.mean', 'unbinned_mean_A']],
+        [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.entries', 'histoB.bin_count']],
+        [['histoB_join_histoAB_0.bin_center_1'], ['histoB_join_histoAB_0.delta_mean']],
+        [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
+        {"size": "size"}
+    ]
+    figureLayoutDesc=[
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
+    ]
+    
+    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, sourceArray=sourceArray, aliasArray=aliasArray)
+
+testJoin()

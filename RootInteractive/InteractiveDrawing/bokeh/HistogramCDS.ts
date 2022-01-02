@@ -12,6 +12,7 @@ export namespace HistogramCDS {
     range:    p.Property<number[] | null>
     sample:      p.Property<string>
     weights:      p.Property<string | null>
+    histograms: p.Property<Record<string, Record<string, any>>>
   }
 }
 
@@ -31,17 +32,18 @@ export class HistogramCDS extends ColumnarDataSource {
     this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable})=>({
       source:  [Ref(ColumnDataSource)],
 //      view:         [Nullable(Array(Int)), null],
-      nbins:        [p.Number],
+      nbins:        [Number],
       range:    [Nullable(Array(Number))],
       sample:      [p.String],
-      weights:      [p.String, null]
+      weights:      [p.String, null],
+      histograms:  [p.Instance]
     }))
   }
 
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[], "bin_left":[], "bin_center":[], "bin_right":[], "errorbar_low":[], "errorbar_high":[]}
+    this.data = {"bin_count":[], "bin_bottom":[], "bin_center":[], "bin_top":[], "errorbar_low":[], "errorbar_high":[]}
     this.view = null
     this.update_range()
   }
@@ -63,48 +65,16 @@ export class HistogramCDS extends ColumnarDataSource {
       if(indices != null){
         //TODO: Make this actually do something
       } else {
-        bincount.fill(0, 0, this.nbins)
-        const sample_array = this.source.data[this.sample]
-        const view_indices = this.view
-        if(view_indices === null){
-          const n_indices = this.source.length
-          if(this.weights != null){
-            const weights_array = this.source.data[this.weights]
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(sample_array[i])
-              if(bin >= 0 && bin < this.nbins){
-                bincount[bin] += weights_array[i]
-              }
-            }
-          } else {
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(sample_array[i])
-              if(bin >= 0 && bin < this.nbins){
-                bincount[bin] += 1
-              }
-            }
-          }
-        } else {
-          const n_indices = view_indices.length
-          if(this.weights != null){
-            const weights_array = this.source.data[this.weights]
-            for(let i=0; i<n_indices; i++){
-              let j = view_indices[i]
-              const bin = this.getbin(sample_array[j])
-              if(bin >= 0 && bin < this.nbins){
-                bincount[bin] += weights_array[j]
-              }
-            }
-          } else {
-            for(let i=0; i<n_indices; i++){
-              const bin = this.getbin(sample_array[view_indices[i]])
-              if(bin >= 0 && bin < this.nbins){
-                bincount[bin] += 1
-              }
+        bincount = this.histogram(this.weights)
+        if(this.histograms !== null){
+          for (const key in this.histograms){
+            if(this.histograms[key] === null){
+              this.data[key] = this.histogram(null)
+            } else {
+              this.data[key] = this.histogram(this.histograms[key].weights)
             }
           }
         }
-
       }
       this.data["bin_count"] = bincount
       this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
@@ -123,9 +93,9 @@ export class HistogramCDS extends ColumnarDataSource {
 
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
-      const bin_left = (this.data["bin_left"] as number[])
+      const bin_left = (this.data["bin_bottom"] as number[])
       const bin_center = (this.data["bin_center"] as number[])
-      const bin_right = (this.data["bin_right"] as number[])
+      const bin_right = (this.data["bin_top"] as number[])
       bin_left.length = 0
       bin_center.length = 0
       bin_right.length = 0
@@ -157,6 +127,52 @@ export class HistogramCDS extends ColumnarDataSource {
         bin_right.push(this._range_min+(index+1)*(this._range_max-this._range_min)/this._nbins)
       }
       this.update_data()
+  }
+
+  histogram(weights: string | null): number[]{
+    const bincount = Array<number>(this._nbins)
+    bincount.fill(0)
+    const sample_array = this.source.data[this.sample]
+    const view_indices = this.view
+    if(view_indices === null){
+      const n_indices = this.source.length
+      if(weights != null){
+        const weights_array = this.source.data[weights]
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(sample_array[i])
+          if(bin >= 0 && bin < this.nbins){
+            bincount[bin] += weights_array[i]
+          }
+        }
+      } else {
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(sample_array[i])
+          if(bin >= 0 && bin < this.nbins){
+            bincount[bin] += 1
+          }
+        }
+      }
+    } else {
+      const n_indices = view_indices.length
+      if(weights != null){
+        const weights_array = this.source.data[weights]
+        for(let i=0; i<n_indices; i++){
+          let j = view_indices[i]
+          const bin = this.getbin(sample_array[j])
+          if(bin >= 0 && bin < this.nbins){
+            bincount[bin] += weights_array[j]
+          }
+        }
+      } else {
+        for(let i=0; i<n_indices; i++){
+          const bin = this.getbin(sample_array[view_indices[i]])
+          if(bin >= 0 && bin < this.nbins){
+            bincount[bin] += 1
+          }
+        }
+      }
+    }
+    return bincount
   }
 
   getbin(val: number): number{
