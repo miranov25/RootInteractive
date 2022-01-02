@@ -13,7 +13,10 @@
     ```
     pip install pytest-regressions --target=/data/miranov/JIRA/ATO-500/tensorflow_latest-gpuCUDA/usr/local/lib/python3.6/dist-packages
     ```
-    
+* Data dir pytest-datadir 
+  ```
+    pip install --target=/data/miranov/JIRA/ATO-500/tensorflow_latest-gpuCUDA/usr/local/lib/python3.6/dist-packages pytest-datadir   
+  ```
 ## Example usage
 
 ```
