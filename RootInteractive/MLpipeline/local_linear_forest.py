@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import RidgeCV,Ridge
 
 class LocalLinearForestRegressor(RandomForestRegressor):
     def __init__(self,
@@ -61,10 +61,15 @@ class LocalLinearForestRegressor(RandomForestRegressor):
             (R x C), where R == X.rows and C == number of trees in the forest
         '''
         leafs = []
+        leaf_nodes_ids2=np.zeros((len(self.estimators_),X.shape[0]))
         for e in self.estimators_:
+            leaf=e.apply(X)
             leafs.append(e.apply(X).reshape(-1, 1))
-
         leaf_nodes_ids = np.concatenate(leafs, axis=1)
+
+
+        #for i, e in enumerate(self.estimators_):
+        #    leaf_nodes_ids2[i]= e.apply(X)
 
         # the number of the rows must be the same of the number of observation
         assert leaf_nodes_ids.shape[0] == X.shape[0]
@@ -147,7 +152,8 @@ class LocalLinearForestRegressor(RandomForestRegressor):
             alpha0=alphas[index0]
             x0=X_disc[index0]
             y0=self._Y_train[index0]
-            ridge = RidgeCV(alphas=[1e-3, 1e-2, 1e-1, 1]).fit(x0, y0, alpha0)
+            #ridge = RidgeCV(alphas=[1e-3, 1e-2, 1e-1, 1]).fit(x0, y0, alpha0)
+            ridge = Ridge().fit(x0, y0, alpha0)
             # ridge predictions
             results.append(ridge.predict(X_actual)[0])
 
