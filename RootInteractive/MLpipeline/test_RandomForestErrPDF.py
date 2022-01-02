@@ -7,6 +7,8 @@ from RootInteractive.MLpipeline.NDFunctionInterface import *
 #from bokeh.io import output_notebook
 from RootInteractive.MLpipeline.RandoForestErrPDF import *
 from RootInteractive.MLpipeline.MIForestErrPDF import *
+from RootInteractive.MLpipeline.local_linear_forest import LocalLinearForestRegressor
+
 
 widgetParams = [
     ['range', ['A']],
@@ -68,7 +70,9 @@ def makeFitsErrPDF(df,n_jobs=-1, mean_depth=14, niter_max=8):
     fitter = Fitter(dataContainer)
     #
     miErrPDF=MIForestErrPDF("Regressor",{"mean_depth":mean_depth, "n_jobs":n_jobs,"niter_max":niter_max })
-    fitter.Register_Model('RFErrPDF',miErrPDF)
+    llfForest=LocalLinearForestRegressor(n_estimators=mean_depth,n_jobs=n_jobs)
+    #fitter.Register_Model('RFErrPDF',miErrPDF)
+    fitter.Register_Model('llfForest',llfForest)
     fitter.Fit()
     return fitter
 
@@ -77,11 +81,17 @@ def doFitErrRF(nPoints, n_jobs, mean_depth, niter_max):
     fitter=makeFitsErrPDF(df,10,mean_depth, niter_max)
     return fitter,df
 
-def appendPrediction():
-    fitter,df=doFitErrRF(500000,1,14,10)
+def doFitLLR(n_estimators=200):
+    llf=  LocalLinearForestRegressor(n_estimators=5)
+
+
+def appendPrediction(nPoints):
+    fitter,df=doFitErrRF(nPoints,1,8,10)
     reducibleErrorEst = {}
     statDict={"mean":0,"median":0,"std":0}
     dataIn=df[fitter.data.X_values]
+    fitter.Models[0].predict(dataIn)
+    return
     #
     yPred0 = fitter.Models[0].predictStat(dataIn, 0, statDict, slice(0,dataIn.shape[0]))
     df["pred0"]=statDict["mean"]
@@ -108,8 +118,10 @@ def appendPrediction():
     df["ppredF"]=df["dpredF"]/df["stdPoint"]
     df["ppred"]=df["dpred"]/df["stdPoint"]
     df["ppred01"]=df["dpred01"]/df["redErrEst08"]
+    return fitter, df
 
-def makeDashboard():
+def makeDashboard(fitter,df):
+    #fitter,df=appendPrediction()
     histoArray = [
         {"name": "hisDpredF", "variables": ["dpredF"], "nbins": 50},
         {"name": "hisDpred", "variables":   ["dpred"], "nbins":50},
@@ -167,12 +179,12 @@ def makeDashboard():
         ['range',["noise"]]
     ]
     widgetLayoutDesc=[[0, 1, 2,3], [4, 5,6,7], {'sizing_mode': 'scale_width'}]
-    output_file("test_ErrPdf0.html")
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+    output_file("test_ErrPdf500000.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDescT, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=500, histogramArray=histoArray)
     return 0
 
 
-
+appendPrediction(10000)
 
 #doFitErrRF(400000,1,12,8)
