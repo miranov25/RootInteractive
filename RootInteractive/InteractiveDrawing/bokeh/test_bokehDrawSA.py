@@ -4,7 +4,9 @@ from bokeh.io import curdoc
 import os
 import sys
 import pytest
+#import pickle
 from pandas import CategoricalDtype
+import typing as ty
 
 if "ROOT" in sys.modules:
     from ROOT import TFile, gSystem
@@ -99,24 +101,41 @@ figureLayoutDesc={
         ]
 }
 
+def test_record(record_property: ty.Callable[[str, ty.Any], None]):
+    record_property("value1", "value1")
+    record_property("value2", "value2")
 
-
-def testBokehDrawArrayWidget():
+def testBokehDrawArrayWidget(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayWidget.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
+    record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
+    record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
 
-def testBokehDrawArrayWidgetNoScale():
+
+def testBokehDrawArrayWidgetNoScale(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayWidgetNoScale.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray)
+    record_property("html_size",os.stat("test_BokehDrawArrayWidgetNoScale.html").st_size)
+    record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
 
-def testBokehDrawArrayDownsample():
+def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], None], data_regression):
     output_file("test_BokehDrawArrayDownsample.html")
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray)
+#    print(xxx.cdsOrig)
+    record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
+    record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
+    record_property("cdsSel_size",len(fig.cdsSel.selectedColumns))
+    data_regression.check(list(fig.cdsSel.selectedColumns),"test_bokehDrawSA.testBokehDrawArrayDownsample")
 
-def testBokehDrawArrayQuery():
+
+def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayQuery.html")
     df0 = df.copy()
-    xxx=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
+    record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
+    record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
+    record_property("cdsSel_size",len(fig.cdsSel.selectedColumns))
+
     assert (df0.keys() == df.keys()).all()
 
 def testBokehDrawArraySA_tree():
@@ -127,7 +146,7 @@ def testBokehDrawArraySA_tree():
 
 
 #testBokehDrawArraySA_tree()
-testBokehDrawArrayWidget()               # OK
+#testBokehDrawArrayWidget()               # OK
 #testBokehDrawArrayWidgetNoScale()
 #testBokehDrawArrayDownsample()
 #testBokehDrawArrayQuery()
