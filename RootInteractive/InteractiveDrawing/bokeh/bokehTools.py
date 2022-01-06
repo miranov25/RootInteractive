@@ -755,8 +755,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_name = cds_names[i]
             if variables[1][i % lengthY] not in histogramDict:
-                dfQuery, varNameX, _ = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name, aliasSet)
-                dfQuery, varNameY, _ = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name, aliasSet)
+                varNameX = makeBokehDataSpec(variables_dict["X"], paramDict)
+                varNameY = makeBokehDataSpec(variables_dict["Y"], paramDict)
             if mapperC is not None and cds_name == cmap_cds_name:
                 color = mapperC
             else:

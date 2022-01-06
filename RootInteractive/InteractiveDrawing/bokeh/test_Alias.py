@@ -175,6 +175,7 @@ def test_makeColumns():
     cdsDict = {"histoA": {"nbins": 10}, None: df}
     varList, ctx_updated, memoized_columns, used_names = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "saxpy(paramA, X, Y+1)", "paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
     assert len(varList) == 7
+    assert len(used_names) == 5
     assert ctx_updated[-1] == "histoA"
     print(ctx_updated)
     print(memoized_columns)

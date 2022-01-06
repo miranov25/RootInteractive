@@ -23,8 +23,10 @@ class ColumnEvaluator:
         elif isinstance(node, ast.Num):
             return self.visit_Num(node)
         else:
+            self.usedNames.add(self.code)
             code = compile(ast.Expression(body=node), self.code, "eval")
             return {
+                "name": self.code,
                 "value": eval(code, {}, self.cdsDict[self.context]),
                 "type": "server_derived_column"
                 }
@@ -45,6 +47,7 @@ class ColumnEvaluator:
                 "name": self.code
             }
         else:
+            self.usedNames.add(self.code)
             code = compile(ast.Expression(body=node), self.code, "eval")
             return {
                 "name": self.code,
@@ -87,12 +90,20 @@ class ColumnEvaluator:
             "name": node.id,
             "type": "column"
         }
-        
+    
+    def eval_fallback(self, node):
+        self.usedNames.add(self.code)
+        code = compile(ast.Expression(body=node), self.code, "eval")
+        return {
+            "name": self.code,
+            "value": eval(code, {}, self.cdsDict[self.context]),
+            "type": "server_derived_column"
+            }
         
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {}, memoizedColumns: dict = {}):
     if variableNames is None:
-        return variableNames, context, memoizedColumns, {}
+        return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
         variableNames = [variableNames]
     if not isinstance(context, list):
