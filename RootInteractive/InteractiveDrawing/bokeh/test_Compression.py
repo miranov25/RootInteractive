@@ -5,6 +5,7 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from bokeh.plotting import output_file
 from RootInteractive.Tools.compressArray import *
 import time
+import pytest
 import re
 # TODO
 #      if (User coding){
@@ -124,6 +125,7 @@ def test_Compression0():
     mapIndexI, mapCodeI=miTest_roundRelativeBinary(df)
     # histogramDCAPlot(df)
 
+@pytest.mark.unittest
 def test_CompressionSequence0(arraySize=10000):
     actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
@@ -136,6 +138,7 @@ def test_CompressionSequence0(arraySize=10000):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSequence0: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()))
 
+@pytest.mark.unittest
 def test_CompressionSequenceRel(arraySize=255,nBits=5):
     actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
@@ -148,6 +151,7 @@ def test_CompressionSequenceRel(arraySize=255,nBits=5):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()/inputSize))
 
+@pytest.mark.unittest
 def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
     actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
@@ -161,7 +165,7 @@ def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
         print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()/inputSize))
 
 
-
+@pytest.mark.unittest
 def test_CompressionSample0(arraySize=10000,scale=255):
     actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
@@ -174,7 +178,7 @@ def test_CompressionSample0(arraySize=10000,scale=255):
         compSize=getSize(arrayC["history"][1])
         print("test_Compression0: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()))
 
-
+@pytest.mark.unittest
 def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
     actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
@@ -187,6 +191,7 @@ def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (np.abs(arrayC["array"]-arrayInput)/(arrayC["array"]+arrayInput)).sum()/arraySize))
 
+@pytest.mark.unittest
 def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
@@ -199,6 +204,7 @@ def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSampleDelta: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
+@pytest.mark.unittest
 def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8"),("decode",0)]
     for coding in ["float32", "float64"]:
