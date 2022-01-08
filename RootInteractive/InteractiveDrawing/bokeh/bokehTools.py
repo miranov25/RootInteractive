@@ -533,14 +533,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     cdsFull = None
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
-        cdsCompress0, sizeMap= compressCDSPipe(dfQuery,options["arrayCompression"],1)
-        cdsCompress=CDSCompress(inputData=cdsCompress0, sizeMap=sizeMap)
+        cdsCompress=CDSCompress()
         cdsFull=cdsCompress
     else:
-        try:
-            cdsFull = ColumnDataSource(dfQuery)
-        except:
-            logging.error("Invalid source:", cdsFull)
+        cdsFull = ColumnDataSource()
 
     if aliasDict[""]:
         cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
@@ -869,6 +865,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         plotArray.append(figureI)
+    if options['arrayCompression'] is not None:
+        print("compressCDSPipe")
+        cdsCompress0, sizeMap= compressCDSPipe(dfQuery,options["arrayCompression"],1)
+        cdsCompress.update({"inputData":cdsCompress0, "sizeMap":sizeMap})
+        cdsFull=cdsCompress
+    else:
+        cdsFull.data = dfQuery
     callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
                                           cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
