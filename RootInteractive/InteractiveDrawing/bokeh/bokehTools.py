@@ -668,10 +668,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         if variablesLocal[2] is not None:
             cds_name = cds_names[0]
-            dfQuery, varNameY, _ = getOrMakeColumn(dfQuery, variables[1][0], None, aliasSet)
-            _, varNameX, _ = getOrMakeColumn(dfQuery, variables[0][0], cds_name, aliasSet)
-            _, varNameZ, _ = getOrMakeColumn(dfQuery, optionLocal['varZ'], cds_name, aliasSet)
-            _, varNameColor, _ = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], cds_name, aliasSet)
+            varNameX = variablesLocal[0][0]["name"]
+            varNameY = variablesLocal[1][0]["name"]
+            varNameZ = variablesLocal[2][0]["name"]
+            if variablesLocal[3] is not None:
+                varNameColor = variablesLocal[3][0]["name"]
+            else:
+                varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
             cds_used = source
             if cds_name is not None:
@@ -871,7 +874,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsCompress.update({"inputData":cdsCompress0, "sizeMap":sizeMap})
         cdsFull=cdsCompress
     else:
-        cdsFull.data = dfQuery
+        sent_data = {}
+        for key, value in memoized_columns[None].items():
+            if value["type"] == "server_derived_column":
+                sent_data[key] = value["value"]
+            elif value["type"] == "column":
+                sent_data[key] = dfQuery[key]
+        cdsFull.data = sent_data
     callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
                                           cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
