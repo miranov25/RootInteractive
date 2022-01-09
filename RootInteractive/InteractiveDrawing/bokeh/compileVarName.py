@@ -116,8 +116,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
-        if (i_var, i_context) in memoizedColumns:
-            variables.append(memoizedColumns[(i_var, i_context)])
+        if i_context in memoizedColumns and i_var in memoizedColumns[i_context]:
+            variables.append(memoizedColumns[i_context][i_var])
             ctx_updated.append(i_context)
             continue
         queryAST = ast.parse(i_var, mode="eval")
@@ -127,6 +127,9 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
         i_context = evaluator.context
         used_names.update({(i_context, i) for  i in evaluator.usedNames})
         ctx_updated.append(i_context)
-        memoizedColumns[(i_var, i_context)] = column
+        if i_context in memoizedColumns:
+            memoizedColumns[i_context][i_var] = column
+        else:
+            memoizedColumns[i_context] = {i_var: column}
         
     return variables, ctx_updated, memoizedColumns, used_names
