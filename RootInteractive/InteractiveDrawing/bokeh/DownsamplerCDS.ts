@@ -34,6 +34,8 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   private _indices: number[]
 
+  private _downsampled_indices: number[]
+
   initialize(){
     super.initialize()
     this.booleans = null
@@ -64,41 +66,29 @@ export class DownsamplerCDS extends ColumnarDataSource {
   }
 
   update(){
-    const {source, nPoints, selectedColumns, data, change, booleans, _indices} = this
+    const {source, nPoints, change, booleans, _indices} = this
     const l = source.length
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
-    const downsampled_indices: number[] = []
-    for(let i=0; i<l && downsampled_indices.length < nPoints; i++){
+    this._downsampled_indices = []
+    for(let i=0; i<l && this._downsampled_indices.length < nPoints; i++){
       if (booleans === null || booleans[_indices[i]]){
-        downsampled_indices.push(_indices[i])
+        this._downsampled_indices.push(_indices[i])
       }
     }
 
-    downsampled_indices.sort((a,b)=>a-b)
+    this._downsampled_indices.sort((a,b)=>a-b)
+    this.data = {}
 
-    for(const columnName of selectedColumns){
-      if (!source.get_column(columnName)){
-        throw ReferenceError("Invalid column name " + columnName)
-      }
-      data[columnName] = []
-      const colSource = source.get_array(columnName)
-      const colDest = data[columnName]
-      for(let i=0; i < downsampled_indices.length; i++){
-        colDest[i] = (colSource[downsampled_indices[i]])
-      }
-    }
-
-    data.index = downsampled_indices
     const selected_indices: number[] = []
     const original_indices = this.source.selected.indices
     let j=0
     for(let i=0; i < original_indices.length; i++){
       // TODO: Maybe do binary search, this won't assume selected indices are sorted and might be more performant
-      while(downsampled_indices[j] < original_indices[i]){
+      while(this._downsampled_indices[j] < original_indices[i]){
         j++
       }
-      if(downsampled_indices[j] === original_indices[i]){
+      if(this._downsampled_indices[j] === original_indices[i]){
         selected_indices.push(j)
         j++
       }
@@ -147,4 +137,20 @@ export class DownsamplerCDS extends ColumnarDataSource {
         
   }
 
+  get_column(columnName: string){
+    const {data, source, _downsampled_indices} = this
+    if (data[columnName] != undefined){
+      return data[columnName]
+    }
+    const column_orig = source.get_column(columnName)
+    if (column_orig == null){
+      throw ReferenceError("Invalid column name " + columnName)
+    }
+    data[columnName] = _downsampled_indices.map((x: number) => column_orig[x])
+    return data[columnName]
+  }
+
+  get_length(){
+    return this._downsampled_indices.length
+  }
 }
