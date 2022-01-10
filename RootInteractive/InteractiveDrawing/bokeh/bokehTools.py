@@ -76,7 +76,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         const widget = widgetDict[key];
         const widgetType = widget.type;
         if(widgetType == "Slider"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             const widgetStep = widget.step;
             for(let i=0; i<size; i++){
@@ -85,7 +85,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "RangeSlider"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const low = widget.value[0];
             const high = widget.value[1];
             for(let i=0; i<size; i++){
@@ -94,7 +94,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "Select"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
@@ -105,7 +105,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "MultiSelect"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value.map((val)=>{
                 if(val === "True") return true;
                 if(val === "False") return false;
@@ -121,7 +121,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "CheckboxGroup"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             for(let i=0; i<size; i++){
                 isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
@@ -595,19 +595,24 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionWidget = {}
             if len(variables) == 3:
                 optionWidget = variables[2].copy()
+            fakeDf = None
             if "callback" not in optionLocal:
                 if variables[1][0] in paramDict:
                     optionWidget["callback"] = "parameter"
+                    varName = variables[1]
                 else:
                     optionWidget["callback"] = "selection"
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+                    varName = column[0]["name"]
+                    fakeDf = {varName: dfQuery[varName]}
             if variables[0] == 'slider':
-                localWidget = makeBokehSliderWidget(dfQuery, False, variables[1], paramDict, **optionWidget)
+                localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
             if variables[0] == 'range':
-                localWidget = makeBokehSliderWidget(dfQuery, True, variables[1], paramDict, **optionWidget)
+                localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
             if variables[0] == 'select':
-                localWidget = makeBokehSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+                localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'multiSelect':
-                localWidget = makeBokehMultiSelectWidget(dfQuery, variables[1], paramDict, **optionWidget)
+                localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             plotArray.append(localWidget)
             if localWidget:
                 widgetArray.append(localWidget)
