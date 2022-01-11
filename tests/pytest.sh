@@ -78,7 +78,7 @@ HELP_USAGE
 uploadPyTest(){
      cat <<HELP_USAGE | cat
     makeTest and store data
-    Test stored in the /eos/user/r/rootinteractive/www/tests
+    Test stored in the server param 3 ${3} deiterctory prefix ${2}
     wdir = {pwd| sed s_.*/RootInteractive__
     Parameters:
       1 param   - $1 - testName
