@@ -4,7 +4,8 @@
 #  Issue descruption in https://github.com/miranov25/RootInteractive/issues/177
 
 export pathJQ='[paths | map(.|tostring) | join(".")| gsub("(.\\d+)"; "[]")]|unique'
-export tostingHQ='map(.|tostring) |join(":")'
+export tostringJQ='map(.|tostring) |join(":")'
+
 alias pathJQ='jq -r "$pathJQ" '
 
 init(){
@@ -16,8 +17,15 @@ init(){
 HELP_USAGE
 }
 
-pytestExample(){
-  time pytest --workers 6  --tests-per-worker 20 test_bokehDrawSA.py --json-report --json-report-file test_bokehDrawSA.json
+pytestExampleQueries(){
+
+  jq '.tests[]|select(.call.duration >10)|[.nodeid,.call.duration]|map(.|tostring) |join(":")' ./v0-01-03-rev1-26-gae95bc0/InteractiveDrawing/bokeh/testGS*.json
+  jq '.|select(.tests[].call.duration >10)|[.tests[].nodeid,.tests[].call.duration]|map(.|tostring) |join(":")' ./v0-01-03-rev1-26-gae95bc0/InteractiveDrawing/bokeh/testGS*.json
+  # select testNames, testnode iD and print results in table
+  jq '.|{tName:.environment.testName,t:.tests[]}|[.tName,.t.call.duration,.t.nodeid]|map(.|tostring) |join("  ")' ./v0-01-03-rev1-26-gae95bc0/InteractiveDrawing/bokeh/testGSI*.json
+  # the same with
+  jq '.|{tName:.environment.testName,t:.tests[]}|select(.t.call.duration >10)|[.tName,.t.call.duration,.t.nodeid]|map(.|tostring) |join("  ")' ./v0-01-03-rev1-26-gae95bc0/InteractiveDrawing/bokeh/testGSI*.json
+
 }
 
 pytestExampleJq(){
@@ -72,7 +80,7 @@ HELP_USAGE
   echo metadata $metadata
   echo pytest $metadata  --workers $testWorkers  --tests-per-worker 20 test_*.py --json-report --json-report-file $testName.json
   time pytest $metadata  --workers $testWorkers  --tests-per-worker 20 test_*.py --json-report --json-report-file $testName.json
-  uploadPyTest $testName ${testPrefixServer} ${testServer}
+  uploadPyTest $testName "${testPrefixServer}" "${testServer}"
 }
 
 uploadPyTest(){
