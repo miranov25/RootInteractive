@@ -1,7 +1,9 @@
 import jq
 import json
 import pandas as pd
+import regex as re
 
+jdata=0
 def example0():
     """
     this is example jq query
@@ -31,3 +33,18 @@ def queryStrings():
     ]
   | join(": ")
     """
+
+def jsonToPanda(arrayIn, varArray):
+    varArray=[".*ize.*"]
+    regExpArray=[]
+    for regExp in varArray:
+        regExpArray.append(re.compile(regExp))
+
+    pathJQ2=r'[paths | map(.|tostring) | join(".")| gsub("(.\\d+)"; "[]")]|unique'
+    arrayPath0=jq.compile(pathJQ2).input(jdata).all()
+    arrayPath=[]
+    #query=???
+    for path in arrayPath0[0]:
+        for regExp in regExpArray:
+            if re.match(regExp,path):
+                print(path)
