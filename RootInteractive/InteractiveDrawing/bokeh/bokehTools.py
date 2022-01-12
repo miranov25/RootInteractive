@@ -432,7 +432,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "show_histogram_error": False,
         "arrayCompression": None,
         "removeExtraColumns": True,
-        "cdsDict": {},
         "xAxisTitle": None,
         "yAxisTitle": None,
         "plotTitle": None,
@@ -533,8 +532,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     cdsFull = None
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
-        cdsCompress=CDSCompress()
-        cdsFull=cdsCompress
+        cdsFull=CDSCompress()
     else:
         cdsFull = ColumnDataSource()
 
@@ -547,7 +545,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         source = None
 
     histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
-    cdsDict = {None: dfQuery}
+    cdsDict = {None: {"data": dfQuery}}
 
     profileList = []
     for i in histogramDict:
@@ -837,8 +835,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
                     figureI.add_glyph(source, errorY)
-                #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
-                #    figureI.add_layout(errors)
             if figure_cds_name is None:
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:

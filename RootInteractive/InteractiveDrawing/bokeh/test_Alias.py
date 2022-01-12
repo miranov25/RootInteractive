@@ -172,7 +172,7 @@ def test_makeColumns():
     df = pd.DataFrame(np.random.random_sample(size=(200000, 2)), columns=list('XY'))
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
-    cdsDict = {"histoA": {"nbins": 10}, None: df}
+    cdsDict = {"histoA": {"nbins": 10}, None: {"data": df}}
     varList, ctx_updated, memoized_columns, used_names = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "saxpy(paramA, X, Y+1)", "paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
     assert len(varList) == 7
     assert len(used_names) == 5

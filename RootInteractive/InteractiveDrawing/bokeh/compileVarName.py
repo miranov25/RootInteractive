@@ -1,8 +1,10 @@
 import ast
 
-from bokeh.models.layouts import Panel
+javascript_globals = {
+    "sin": "Math.sin"
+}
 
-# This seems really stupid and overengineered, might as well use LLVM
+# This seems really stupid and overengineered
 class ColumnEvaluator:
     def __init__(self, context, cdsDict, paramDict, funcDict, code, fallback_eval=True):
         self.cdsDict = cdsDict
@@ -23,13 +25,7 @@ class ColumnEvaluator:
         elif isinstance(node, ast.Num):
             return self.visit_Num(node)
         else:
-            self.usedNames.add(self.code)
-            code = compile(ast.Expression(body=node), self.code, "eval")
-            return {
-                "name": self.code,
-                "value": eval(code, {}, self.cdsDict[self.context]),
-                "type": "server_derived_column"
-                }
+            return self.eval_fallback(node)
 
     def visit_Call(self, node: ast.Call):
         if not isinstance(node.func, ast.Name):
@@ -47,16 +43,10 @@ class ColumnEvaluator:
                 "name": self.code
             }
         else:
-            self.usedNames.add(self.code)
-            code = compile(ast.Expression(body=node), self.code, "eval")
-            return {
-                "name": self.code,
-                "value": eval(code, {}, self.cdsDict[self.context]),
-                "type": "server_derived_column"
-                }
+            return self.eval_fallback(node)
 
     def visit_Num(self, node: ast.Num):
-        # This is deprecated, kept for compatibility with old Python
+        # Kept for compatibility with old Python
         return {
             "name": self.code,
             "type": "constant",
@@ -92,11 +82,13 @@ class ColumnEvaluator:
         }
     
     def eval_fallback(self, node):
+        if "data" not in self.cdsDict[self.context]:
+            raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
         self.usedNames.add(self.code)
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
             "name": self.code,
-            "value": eval(code, {}, self.cdsDict[self.context]),
+            "value": eval(code, {}, self.cdsDict[self.context]["data"]),
             "type": "server_derived_column"
             }
         
