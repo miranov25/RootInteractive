@@ -869,18 +869,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         plotArray.append(figureI)
+    sent_data = {}
+    for key, value in memoized_columns[None].items():
+        if value["type"] == "server_derived_column":
+            sent_data[key] = value["value"]
+        elif value["type"] == "column":
+            sent_data[key] = dfQuery[key]
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
-        cdsCompress0, sizeMap= compressCDSPipe(dfQuery,options["arrayCompression"],1)
-        cdsCompress.update({"inputData":cdsCompress0, "sizeMap":sizeMap})
-        cdsFull=cdsCompress
+        cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+        cdsFull.inputData = cdsCompress0
+        cdsFull.sizeMap = sizeMap
     else:
-        sent_data = {}
-        for key, value in memoized_columns[None].items():
-            if value["type"] == "server_derived_column":
-                sent_data[key] = value["value"]
-            elif value["type"] == "column":
-                sent_data[key] = dfQuery[key]
         cdsFull.data = sent_data
     callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
                                           cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
