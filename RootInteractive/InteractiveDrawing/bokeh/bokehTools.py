@@ -523,6 +523,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     cdsHistoSummary = None
 
     memoized_columns = {}
+    sources = set()
 
     for i in dfQuery.keys():
         columnNameDict[i] = i
@@ -545,12 +546,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         source = None
 
     histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
-    cdsDict = {None: {"data": dfQuery}}
+    cdsDict = {None: {"data": dfQuery, "cds": source, "cdsFull": cdsFull, "type": "source"}}
 
     profileList = []
-    for i in histogramDict:
-        if i not in cdsDict:
-            cdsDict[i] = histogramDict[i]["cds"]
+    cdsDict.update(histogramDict)
 
     optionsChangeList = []
     for i, variables in enumerate(figureArray):
@@ -600,7 +599,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     varName = variables[1]
                 else:
                     optionWidget["callback"] = "selection"
-                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
                     varName = column[0]["name"]
                     fakeDf = {varName: dfQuery[varName]}
             if variables[0] == 'slider':
@@ -657,7 +656,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             if axis_index < nvars:
-                variablesLocal[axis_index] = variables[axis_index]
+                variablesLocal[axis_index] = variables[axis_index].copy()
             elif axis_name in optionLocal:
                 variablesLocal[axis_index] = optionLocal[axis_name]
             if variablesLocal[axis_index] is not None and not isinstance(variablesLocal[axis_index], list):
@@ -666,8 +665,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
         cds_names = None
+        for i, iY in enumerate(variablesLocal[1]):
+            if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
+                variablesLocal[1][i] += ".bin_count"
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+            sources.update(used_names_local)
 
         if variablesLocal[2] is not None:
             cds_name = cds_names[0]
@@ -680,8 +683,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
             cds_used = source
-            if cds_name is not None:
-                cds_used = cdsDict[cds_name]
+            cds_used = cdsDict[cds_name]["cds"]
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
@@ -729,7 +731,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
             cds_used = source
             if cmap_cds_name is not None:
-                cds_used = cdsDict[cmap_cds_name]
+                cds_used = cdsDict[cds_name]["cds"]
                 # This is really hacky, will probably be removed when ND histogram joins start working
                 if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
                     histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
@@ -777,9 +779,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            cds_used = source
-            if cds_name is not None:
-                cds_used = cdsDict[cds_name]
+            cds_used = cdsDict[cds_name]["cds"]
 
             if varY in histogramDict:
                 histoHandle = histogramDict[varY]
@@ -787,8 +787,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     colorHisto = colorAll[max(length, 4)][i]
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
                 elif histoHandle["type"] == "histo2d":
-                    addHisto2dGlyph(figureI, varNameX, varNameY, histoHandle, colorMapperDict, color, marker, dfQuery,
-                                    optionLocal)
+                    addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
                 drawnGlyph = None
                 colorMapperCallback = """
@@ -819,7 +818,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         hover_tool_renderers[""] = []
                     hover_tool_renderers[""].append(drawnGlyph)
                 elif cds_name in histogramDict:
-                    if histogramDict[cds_name]["type"] == "profile":
+                    if histogramDict[cds_name]["type"] == "projection":
                         if cds_name not in hover_tool_renderers:
                             hover_tool_renderers[cds_name] = []
                         hover_tool_renderers[cds_name].append(drawnGlyph)
@@ -845,7 +844,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         for iCds, iRenderers in hover_tool_renderers.items():
             if iCds == "":
                 tooltips = optionLocal["tooltips"]
-            elif iCds in histogramDict and histogramDict[iCds]["type"] == "profile":
+            elif iCds in histogramDict and histogramDict[iCds]["type"] == "projection":
                 profile_description = histogramDict[iCds]
                 tooltips = defaultNDProfileTooltips(profile_description["variables"], profile_description["axis"],
                                                     profile_description["quantiles"],  profile_description["sum_range"])
@@ -892,7 +891,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     return pAll, source, plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
-def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
+def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
@@ -916,10 +915,10 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
     elif visualization_type == "colZ":
         mapperC = {"field": "bin_count", "transform": LinearColorMapper(palette=options['palette'])}
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
-                             title=y)
+                             title=histoHandle["variables"][1])
         if options["legend_field"] is None:
             histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
-                            color=mapperC, marker=marker, legend_label="Histogram of " + x)
+                            color=mapperC, marker=marker, legend_label="Histogram of " + histoHandle["variables"][0])
         else:
             histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
@@ -1231,14 +1230,13 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             cdsUsed = optionLocal["source"]
         sampleVars = iHisto["variables"]
         if optionLocal["weights"] is not None:
-            _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
+            weights = optionLocal["weights"]
         if len(sampleVars) == 1:
-            _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict[""])
             source = cdsFull
             if "source" in iHisto:
                 source = iHisto["source"]
             cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
-                                    range=optionLocal["range"], sample=varNameX, weights=weights)
+                                    range=optionLocal["range"], sample=sampleVars[0], weights=weights)
             histoList.append(cdsHisto)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
@@ -1247,11 +1245,11 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     mapping.update({i:i})
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
+            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram", "source": cdsUsed})
         else:
             sampleVarNames = []
             for i in sampleVars:
-                _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict[""])
+                varName = i
                 sampleVarNames.append(varName)
             source = cdsFull
             if "source" in iHisto:
@@ -1270,10 +1268,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             if len(sampleVars) == 2:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
-                                        "variables": sampleVars}
+                                        "variables": sampleVars, "source": cdsUsed}
             else:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
-                                        "variables": sampleVars}
+                                        "variables": sampleVars, "source": cdsUsed}
             if "axis" in iHisto:
                 axisIndices = iHisto["axis"]
                 profilesDict = {}
@@ -1281,7 +1279,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
-                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
+                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "projection", "name": histoName+"_"+str(i), "variables": sampleVars,
                     "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
                 histoDict[histoName]["profiles"] = profilesDict
 
