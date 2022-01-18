@@ -1,4 +1,6 @@
+from argparse import ArgumentError
 import ast
+from msilib.schema import Error
 
 javascript_globals = {
     "sin": "Math.sin"
@@ -6,14 +8,15 @@ javascript_globals = {
 
 # This seems really stupid and overengineered
 class ColumnEvaluator:
-    def __init__(self, context, cdsDict, paramDict, funcDict, code, fallback_eval=True):
+    def __init__(self, context, cdsDict, paramDict, funcDict, code, useEval=True):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
         self.funcDict = funcDict
         self.context = context
-        self.usedNames = set()
+        self.dependencies = set()
         self.code = code
-        self.javascript = ""
+        self.useEval = useEval
+        self.isSource = True
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -63,7 +66,7 @@ class ColumnEvaluator:
         if node.value.id not in self.cdsDict:
             raise KeyError("Column not found")
         self.context = node.value.id
-        self.usedNames.add(node.attr)
+        self.dependencies.add(node.attr)
         return {
             "name": node.attr,
             "type": "column"
@@ -71,20 +74,24 @@ class ColumnEvaluator:
 
     def visit_Name(self, node: ast.Name):
         if node.id in self.paramDict:
+            self.isSource = False
+            if "options" in self.paramDict[node.id]:
+                for iOption in self.paramDict[node.id]["options"]:
+                    self.dependencies.add(iOption)
             return {
                 "name": node.id,
                 "type": "parameter"
             }
-        self.usedNames.add(node.id)
+        self.dependencies.add(node.id)
         return {
             "name": node.id,
             "type": "column"
         }
     
     def eval_fallback(self, node):
-        if "data" not in self.cdsDict[self.context]:
+        if "data" not in self.cdsDict[self.context] or not self.useEval:
             raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
-        self.usedNames.add(self.code)
+        self.dependencies.add(self.code)
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
             "name": self.code,
@@ -93,7 +100,8 @@ class ColumnEvaluator:
             }
         
 
-def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {}, memoizedColumns: dict = {}):
+def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {},
+                     memoizedColumns: dict = {}, forbiddenColumns: set = set()):
     if variableNames is None:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -112,12 +120,20 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
             variables.append(memoizedColumns[i_context][i_var])
             ctx_updated.append(i_context)
             continue
+        if (i_context, i_var) in forbiddenColumns:
+            # Unresolvable cyclic dependency in table - stack trace should tell exactly what went wrong
+            raise RuntimeError("Cyclic dependency detected")
         queryAST = ast.parse(i_var, mode="eval")
         evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var)
         column = evaluator.visit(queryAST.body)
         variables.append(column)
         i_context = evaluator.context
-        used_names.update({(i_context, i) for  i in evaluator.usedNames})
+        if evaluator.isSource:
+            used_names.update({(i_context, i) for  i in evaluator.dependencies})
+        else:
+            _, _, memoizedColumns, sources_local = getOrMakeColumns(list(evaluator.dependencies), i_context, cdsDict, paramDict, funcDict, 
+                                                                    memoizedColumns, forbiddenColumns | {(i_context, i_var)})
+            used_names.update(sources_local)
         ctx_updated.append(i_context)
         if i_context in memoizedColumns:
             memoizedColumns[i_context][i_var] = column
