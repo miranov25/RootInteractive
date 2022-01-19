@@ -137,17 +137,20 @@ export class HistogramCDS extends ColumnarDataSource {
     if(view_indices === null){
       const n_indices = this.source.length
       if(weights != null){
-        const weights_array = this.source.data[weights]
+        const weights_array = this.source.get_column(weights)
+        if (weights_array == null){
+          throw ReferenceError("Column not defined: "+ weights)
+        }
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[i])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += weights_array[i]
           }
         }
       } else {
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[i])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += 1
           }
         }
@@ -155,18 +158,21 @@ export class HistogramCDS extends ColumnarDataSource {
     } else {
       const n_indices = view_indices.length
       if(weights != null){
-        const weights_array = this.source.data[weights]
+        const weights_array = this.source.get_column(weights)
+        if (weights_array == null){
+          throw ReferenceError("Column not defined: "+ weights)
+        }
         for(let i=0; i<n_indices; i++){
           let j = view_indices[i]
           const bin = this.getbin(sample_array[j])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += weights_array[j]
           }
         }
       } else {
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[view_indices[i]])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += 1
           }
         }
@@ -185,4 +191,7 @@ export class HistogramCDS extends ColumnarDataSource {
       return (val*this._transform_scale+this._transform_origin)|0
   }
 
+  get_size(){
+    return this.nbins
+  }
 }
