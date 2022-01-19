@@ -93,7 +93,7 @@ class ColumnEvaluator:
                 "type": "parameter"
             }
         if "data" in self.cdsDict[self.context] and node.id not in self.cdsDict[self.context]["data"]:
-            raise IndexError("Column doesn't exist: " + node.id)
+            raise NameError("Column not defined: " + node.id)
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.id)
         self.dependencies.add((self.context, node.id))
@@ -119,7 +119,7 @@ class ColumnEvaluator:
     def eval_fallback(self, node):
         if "data" not in self.cdsDict[self.context] or not self.useEval:
             raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
-        self.dependencies.add((self.context, self.code))
+        self.dependencies.add((self.context, self.code[node.col_offset:node.end_col_offset]))
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
             "name": self.code,

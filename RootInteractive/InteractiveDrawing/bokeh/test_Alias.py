@@ -172,14 +172,14 @@ def test_makeColumns():
     df = pd.DataFrame(np.random.random_sample(size=(200000, 2)), columns=list('XY'))
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
-    cdsDict = {"histoA": {"nbins": 10}, None: {"data": df}}
-    varList, ctx_updated, memoized_columns, used_names = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "saxpy(paramA, X, Y+1)", "paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
+    cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "saxpy(paramA, X, Y+1)", "paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
     assert len(varList) == 7
-    assert len(used_names) == 5
+    assert len(sources) == 4
     assert ctx_updated[-1] == "histoA"
     print(ctx_updated)
     print(memoized_columns)
-    print(used_names)
+    print(sources)
 
 test_makeColumns()
 #test_customJsFunctionBokehDrawArray_v()
