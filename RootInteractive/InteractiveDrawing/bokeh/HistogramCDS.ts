@@ -101,7 +101,7 @@ export class HistogramCDS extends ColumnarDataSource {
       bin_right.length = 0
       if(this.view === null){
         if(this.range === null ){
-          const sample_arr = this.source.data[this.sample] as number[]
+          const sample_arr = this.source.get_array(this.sample) as number[]
           this._range_min = sample_arr.reduce((acc, cur) => Math.min(acc, cur), sample_arr[0])
           this._range_max = sample_arr.reduce((acc, cur) => Math.max(acc, cur), sample_arr[0])
         } else {
@@ -110,7 +110,7 @@ export class HistogramCDS extends ColumnarDataSource {
         }
       } else {
         if(this.range === null ){
-          const sample_arr = this.source.data[this.sample] as number[]
+          const sample_arr = this.source.get_array(this.sample) as number[]
           this._range_min = this.view.reduce((acc, cur) => Math.min(acc, sample_arr[cur]), sample_arr[this.view[0]])
           this._range_max = this.view.reduce((acc, cur) => Math.max(acc, sample_arr[cur]), sample_arr[this.view[0]])
         } else {
