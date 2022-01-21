@@ -334,6 +334,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
         formatter = ScientificFormatter(precision=3)
 
     for iHisto in histoDict:
+        # We are only interested in histograms so we filter the dict for histograms
         if histoDict[iHisto]["type"] == "histogram":
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
@@ -455,7 +456,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         options.update(figureArray[-1])
 
     if sourceArray is not None:
-        histogramArray = histogramArray + sourceArray
+        sourceArray = histogramArray + sourceArray
+    
+    else:
+        sourceArray = histogramArray
 
     sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None}] + sourceArray
 
@@ -549,7 +553,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         source = None
 
-    histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
+    # histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
 
     # Create the cdsDict - identify types from user input and make empty ColumnDataSources
     cdsDict = {}
@@ -591,10 +595,41 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 iSource["cdsOrig"] = CDSCompress()
             else:
                 iSource["cdsOrig"] = ColumnDataSource()
+        elif cdsType == "histogram":
+            nbins = 10
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            
+            #            cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
+            #                        range=optionLocal["range"], sample=sampleVars[0], weights=weights)
+            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
+        elif cdsType in ["histo2d", "histoNd"]:
+            nbins = [10]*len(iSource["variables"])
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            
+            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
+        else:
+            raise NotImplementedError("Unrecognized CDS type: " + cdsType)
 
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
-        #iSource["cdsFull"] = iSource["cdsOrig"]
 
         # Add downsampler
         iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
@@ -637,7 +672,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             TOptions = {'rowwise': False}
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict, rowwise=TOptions["rowwise"])
+            cdsHistoSummary, tableHisto = makeBokehHistoTable(cdsDict, rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
             continue
         if variables[0] in ALLOWED_WIDGET_TYPES:
@@ -654,6 +689,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
                     varName = column[0]["name"]
                     fakeDf = {varName: dfQuery[varName]}
+                    sources.update(used_names_local)
             if variables[0] == 'slider':
                 localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
             if variables[0] == 'range':
@@ -829,8 +865,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             varY = variables[1][i % lengthY]
             cds_used = cdsDict[cds_name]["cds"]
 
-            if varY in histogramDict:
-                histoHandle = histogramDict[varY]
+            if varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
+                histoHandle = cdsDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
@@ -916,20 +952,31 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         plotArray.append(figureI)
-    sent_data = {}
-    for key, value in memoized_columns[None].items():
-        if value["type"] == "server_derived_column":
-            sent_data[key] = value["value"]
-        elif value["type"] == "column":
-            sent_data[key] = dfQuery[key]
-    cdsFull = cdsDict[None]["cdsOrig"]
-    if options['arrayCompression'] is not None:
-        print("compressCDSPipe")
-        cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
-        cdsFull.inputData = cdsCompress0
-        cdsFull.sizeMap = sizeMap
-    else:
-        cdsFull.data = sent_data
+    histoList = []
+    for cdsKey, cdsValue in cdsDict.items():
+        # Populate the data sources - original columns
+        if cdsValue["type"] == "source":
+            sent_data = {}
+            for key, value in memoized_columns[cdsKey].items():
+                if (cdsKey, key) in sources:
+                    if value["type"] == "server_derived_column":
+                        sent_data[key] = value["value"]
+                    elif value["type"] == "column":
+                        sent_data[key] = dfQuery[key]
+            cdsOrig = cdsValue["cdsOrig"]
+            if cdsValue['arrayCompression'] is not None:
+                print("compressCDSPipe")
+                cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+                cdsOrig.inputData = cdsCompress0
+                cdsOrig.sizeMap = sizeMap
+            else:
+                cdsOrig.data = sent_data
+        elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
+            cdsValue["cdsOrig"].source = cdsDict[cdsValue["source"]]["cdsFull"]
+            if cdsValue["source"] is None:
+                histoList.append(cdsValue["cdsOrig"])
+        # Add aliases
+
     cdsFull = cdsDict[None]["cdsFull"]
     source = cdsDict[None]["cds"]
     callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
