@@ -39,7 +39,7 @@ export class CDSAlias extends ColumnarDataSource {
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.source.change, () => this.data={})
+    this.connect(this.source.change, () => {this.data={}; this.change.emit()})
     for( const key in this.mapping){
       const column = this.mapping[key]
       if(column.hasOwnProperty("transform")){
