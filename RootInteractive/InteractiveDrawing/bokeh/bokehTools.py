@@ -762,6 +762,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             sources.update(used_names_local)
 
+        # varZ
         if variablesLocal[2] is not None:
             cds_name = cds_names[0]
             varNameX = variablesLocal[0][0]["name"]
@@ -793,51 +794,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         color_bar = None
         mapperC = None
         cmap_cds_name = None
-        if 'colorZvar' in optionLocal:
-            #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
-            #So far, parametrized colZ is only supported for the main CDS
-            logging.info("%s", optionLocal["colorZvar"])
-            colorZVar = optionLocal['colorZvar']
-            if colorZVar in paramDict:
-                colorZVar = paramDict[colorZVar]['value']
-            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, colorZVar, None, aliasSet)
-            low = 0
-            high = 1
-            if cmap_cds_name is None:
-                low = min(dfQuery[varColor])
-                high=max(dfQuery[varColor])
-            if "cmapLow" in optionLocal:
-                low = optionLocal["cmapLow"]
-            if "cmapHigh" in optionLocal:
-                high = optionLocal["cmapHigh"]   
-            if optionLocal["rescaleColorMapper"] or optionLocal["colorZvar"] in paramDict:
-                if optionLocal["colorZvar"] in colorMapperDict:
-                    mapperC = colorMapperDict[optionLocal["colorZvar"]]
-                else:
-                    mapperC = {"field": varColor, "transform": LinearColorMapper(palette=optionLocal['palette'])}
-                    colorMapperDict[optionLocal["colorZvar"]] = mapperC
-            else:
-                mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
-            cds_used = cdsDict[cds_name]["cds"]
-            if cmap_cds_name is not None:
-                # HACK: This is really hacky, will probably be removed when ND histogram joins start working
-                if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
-                    histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
-                    const col = this.data[field]
-                    const isOK = this.data.isOK
-                    const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
-                    const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
-                    cmap.high = high;
-                    cmap.low = low;
-                    """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
-            axis_title = getHistogramAxisTitle(cdsDict, varColor, cmap_cds_name)
-            color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
-            if optionLocal['colorZvar'] in paramDict:
-                paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
 
         hover_tool_renderers = {}
 
         figure_cds_name = None
+        mapperC = None
 
         for i in range(0, length):
             variables_dict = {}
@@ -845,16 +806,49 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 variables_dict[axis_name] = variablesLocal[axis_index]
                 if isinstance(variables_dict[axis_name], list):
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
-            cds_name = cds_name = cds_names[i]
+            cds_name = cds_names[i]
             if variables[1][i % lengthY] not in histogramDict:
                 varNameX = makeBokehDataSpec(variables_dict["X"], paramDict)
                 varNameY = makeBokehDataSpec(variables_dict["Y"], paramDict)
-            if mapperC is not None and cds_name == cmap_cds_name:
-                color = mapperC
+            varColor = variables_dict["colorZvar"]
+            if varColor is not None:
+                if mapperC is not None:
+                    color = mapperC
+                else:
+                    rescaleColorMapper = optionLocal["rescaleColorMapper"] or varColor["type"] == "parameter" or cdsDict[cds_name]["type"] in ["histogram", "histo2d", "histoNd"]
+                    if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
+                        low = np.min(dfQuery[varColor])
+                        high= np.max(dfQuery[varColor])
+                        mapperC = linear_cmap(field_name=varColor["name"], palette=optionLocal['palette'], low=low, high=high)
+                    else:
+                        if varColor["name"] in colorMapperDict:
+                            mapperC = colorMapperDict[varColor["name"]]
+                        else:
+                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'])}
+                            colorMapperDict[varColor["name"]] = mapperC
+                    # HACK for projections - should probably just remove the rows as there's no issue with joins at all
+                    if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
+                        histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        const col = this.data[field]
+                        const isOK = this.data.isOK
+                        const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
+                        const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
+                        cmap.high = high;
+                        cmap.low = low;
+                        """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
+                    color = mapperC
+                    # Also add the color bar
+                    if varColor["type"] == "parameter":
+                        axis_title = paramDict[varColor["name"]]["value"]
+                    else:
+                        axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cmap_cds_name)
+                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
+                    if varColor["type"] == "parameter":
+                        paramDict[varColor["name"]]["subscribed_events"].append(["value", color_bar, "title"])
+            elif 'color' in optionLocal:
+                color=optionLocal['color']
             else:
                 color = colorAll[max(length, 4)][i]
-            if 'color' in optionLocal:
-                color=optionLocal['color']
             try:
                 marker = optionLocal['markers'][i]
             except:
@@ -985,7 +979,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cdsFull = cdsValue["cdsFull"]
                 if value["type"] == "alias":
                     cdsFull.mapping[key] = aliasDict[cdsKey][key]
-
+                elif value["type"] == "parameter":
+                    cdsFull.mapping[key] = paramDict[value["name"]]["value"]
+                    paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": key},
+                                                                                            code="""
+                                                                                                cdsAlias.mapping[key] = this.value;
+                                                                                                cdsAlias.compute_function(key);
+                                                                                                cdsAlias.change.emit();
+                                                                                            """)])
 
     cdsFull = cdsDict[None]["cdsFull"]
     source = cdsDict[None]["cds"]
