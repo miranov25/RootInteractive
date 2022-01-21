@@ -132,7 +132,10 @@ export class HistogramCDS extends ColumnarDataSource {
   histogram(weights: string | null): number[]{
     const bincount = Array<number>(this._nbins)
     bincount.fill(0)
-    const sample_array = this.source.data[this.sample]
+    const sample_array = this.source.get_column(this.sample)
+    if(sample_array == null){
+      throw ReferenceError("Column " + this.sample + " not found in source")
+    }
     const view_indices = this.view
     if(view_indices === null){
       const n_indices = this.source.length
