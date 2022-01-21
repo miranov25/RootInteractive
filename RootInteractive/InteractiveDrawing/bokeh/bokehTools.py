@@ -669,6 +669,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             plotArray.append(makeBokehDataTable(dfQuery, cdsDict["None"]["cdsOrig"], TOptions['include'], TOptions['exclude']))
             continue
         if variables[0] == 'tableHisto':
+            histoListLocal = []
+            for key, value in cdsDict.items():
+                if value["type"] in ["histogram", "histo2d", "histoNd"]:
+                    histoListLocal.append(key)
+            # We just want to add them to the dependency tree
+            _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", histoListLocal, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+            sources.update(used_names_local)
             TOptions = {'rowwise': False}
             if len(variables) > 1:
                 TOptions.update(variables[1])
@@ -954,6 +961,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         plotArray.append(figureI)
     histoList = []
     for cdsKey, cdsValue in cdsDict.items():
+        # Ignore unused data sources
+        if cdsKey not in memoized_columns:
+            continue
         # Populate the data sources - original columns
         if cdsValue["type"] == "source":
             sent_data = {}
@@ -972,10 +982,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 cdsOrig.data = sent_data
         elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
-            cdsValue["cdsOrig"].source = cdsDict[cdsValue["source"]]["cdsFull"]
+            cdsOrig = cdsValue["cdsOrig"]
+            cdsOrig.source = cdsDict[cdsValue["source"]]["cdsFull"]
             if cdsValue["source"] is None:
-                histoList.append(cdsValue["cdsOrig"])
+                histoList.append(cdsOrig)
+            if "histograms" in cdsValue:
+                for key, value in memoized_columns[cdsKey].items():
+                    if key in cdsValue["histograms"]:
+                        if value["type"] == "column":
+                            cdsOrig.histograms[key] = cdsValue["histograms"][key]              
+        # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
+        # In future an option can be added for creating them from array
+
         # Add aliases
+        for key, value in memoized_columns[cdsKey].items():
+            if (cdsKey, key) not in sources:
+                cdsFull = cdsValue["cdsFull"]
+                if value["type"] == "alias":
+                    cdsFull.mapping[key] = aliasDict[cdsKey][key]
+
 
     cdsFull = cdsDict[None]["cdsFull"]
     source = cdsDict[None]["cds"]
