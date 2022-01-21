@@ -461,7 +461,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         sourceArray = histogramArray
 
-    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None}] + sourceArray
+    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"]}] + sourceArray
 
     dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
@@ -553,8 +553,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         source = None
 
-    # histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
-
     # Create the cdsDict - identify types from user input and make empty ColumnDataSources
     cdsDict = {}
     for i, iSource in enumerate(sourceArray):
@@ -607,9 +605,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            
-            #            cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
-            #                        range=optionLocal["range"], sample=sampleVars[0], weights=weights)
             iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
             nbins = [10]*len(iSource["variables"])
@@ -623,7 +618,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            
             iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
@@ -634,8 +628,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         # Add downsampler
         iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
 
+        # TODO: Add tooltips for histograms
+        if "tooltips" not in iSource:
+            iSource["tooltips"] = []
+
     profileList = []
-    #cdsDict.update({None: {"data": dfQuery, "cds": source, "cdsFull": cdsFull, "type": "source"}})
 
     optionsChangeList = []
     for i, variables in enumerate(figureArray):
@@ -720,13 +717,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
-                yAxisTitle += getHistogramAxisTitle(histogramDict, varY, cds_name, False)
+                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
             if hasattr(dfQuery, "meta") and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
-                xAxisTitle += getHistogramAxisTitle(histogramDict, varX, cds_name, False)
+                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
@@ -833,7 +830,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     cmap.high = high;
                     cmap.low = low;
                     """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
-            axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
+            axis_title = getHistogramAxisTitle(cdsDict, varColor, cmap_cds_name)
             color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
             if optionLocal['colorZvar'] in paramDict:
                 paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
@@ -886,8 +883,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 glyph.line_color={...glyph.line_color, field:this.value}
                 """
                 if optionLocal["legend_field"] is None:
-                    x_label = getHistogramAxisTitle(histogramDict, varNameX, cds_name)
-                    y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
+                    x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                    y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                 else:
@@ -904,15 +901,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if optionLocal['size'] in paramDict:
                     paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                if cds_name is None:
-                    if "" not in hover_tool_renderers:
-                        hover_tool_renderers[""] = []
-                    hover_tool_renderers[""].append(drawnGlyph)
-                elif cds_name in histogramDict:
-                    if histogramDict[cds_name]["type"] == "projection":
-                        if cds_name not in hover_tool_renderers:
-                            hover_tool_renderers[cds_name] = []
-                        hover_tool_renderers[cds_name].append(drawnGlyph)
+                    if cds_name not in hover_tool_renderers:
+                        hover_tool_renderers[cds_name] = []
+                    hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
@@ -933,13 +924,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         for iCds, iRenderers in hover_tool_renderers.items():
-            if iCds == "":
-                tooltips = optionLocal["tooltips"]
-            elif iCds in histogramDict and histogramDict[iCds]["type"] == "projection":
-                profile_description = histogramDict[iCds]
-                tooltips = defaultNDProfileTooltips(profile_description["variables"], profile_description["axis"],
-                                                    profile_description["quantiles"],  profile_description["sum_range"])
-            figureI.add_tools(HoverTool(tooltips=tooltips, renderers=iRenderers))
+            figureI.add_tools(HoverTool(tooltips=cdsDict[iCds]["tooltips"], renderers=iRenderers))
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
@@ -1670,11 +1655,11 @@ def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
         return {"field": paramDict[varError["name"]]["value"], "transform": transform}
     return {"field": varError["name"], "transform": transform}
 
-def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
+def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return varName
-    if cdsName in histoDict:
-        if "variables" not in histoDict[cdsName]:
+    if cdsName in cdsDict:
+        if "variables" not in cdsDict[cdsName]:
             return varName
         if '_' in varName:
             if varName == "bin_count":
@@ -1682,30 +1667,30 @@ def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
             x = varName.split("_")
             if x[0] == "bin":
                 if len(x) == 2:
-                    return histoDict[cdsName]["variables"][0]
-                return histoDict[cdsName]["variables"][int(x[-1])]
+                    return cdsDict[cdsName]["variables"][0]
+                return cdsDict[cdsName]["variables"][int(x[-1])]
             if x[0] == "quantile":
-                quantile = histoDict[cdsName]["quantiles"][int(x[-1])]
+                quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if '_' in cdsName:
                     histoName, projectionIdx = cdsName.split("_")
-                    return "quantile " + str(quantile) + " " + histoDict[histoName]["variables"][int(projectionIdx)]
+                    return "quantile " + str(quantile) + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
                 return "quantile " + str(quantile)
             if x[0] == "sum":
-                range = histoDict[cdsName]["sum_range"][int(x[-1])]
+                range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                        return "sum " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
                 else:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                        return "p " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
         else:
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
-                return varName + " " + histoDict[histoName]["variables"][int(projectionIdx)]
+                return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
     if not removeCdsName:
         return cdsName+"."+varName
     return varName
