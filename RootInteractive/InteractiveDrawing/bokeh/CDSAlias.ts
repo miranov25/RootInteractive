@@ -25,7 +25,7 @@ export class CDSAlias extends ColumnarDataSource {
   static init_CDSAlias() {
     this.define<CDSAlias.Props>(({Ref, Boolean})=>({
       source:  [Ref(ColumnarDataSource)],
-      mapping:    [ p.Instance ],
+      mapping:    [ p.Instance, {} ],
       includeOrigColumns: [Boolean, true]
     }))
   }
@@ -33,13 +33,13 @@ export class CDSAlias extends ColumnarDataSource {
   initialize(){
     super.initialize()
     this.data = {}
-    this.compute_functions()
+   // this.compute_functions()
   }
 
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.source.change, () => this.compute_functions())
+    this.connect(this.source.change, () => this.data={})
     for( const key in this.mapping){
       const column = this.mapping[key]
       if(column.hasOwnProperty("transform")){
@@ -71,6 +71,18 @@ export class CDSAlias extends ColumnarDataSource {
   compute_function(columnName: string){
     const {source, mapping, data} = this
     const column = mapping[columnName]
+    if(column == null){
+      let new_column = source.get_column(columnName)
+      if(new_column == null){
+        throw ReferenceError("Column not defined: "+ columnName)
+      }
+      else if (!Array.isArray(new_column)){
+        data[columnName] = Array.from(new_column)
+      } else {
+        data[columnName] = new_column
+      }
+      return
+    }
     if(column.hasOwnProperty("field")){
         if(column.hasOwnProperty("transform")){
             const field = source.data[column.field] as any[]
@@ -98,12 +110,44 @@ export class CDSAlias extends ColumnarDataSource {
             data[columnName] = new_column
         }
     } else if(Object.prototype.toString.call(column) === '[object String]'){
-      data[columnName] = source.data[column] as any[]
+      let new_column = source.get_column(column)
+      if(new_column == null){
+        throw ReferenceError("Column not defined: "+ column)
+      }
+      else if (!Array.isArray(new_column)){
+        data[columnName] = Array.from(new_column)
+      } else {
+        data[columnName] = new_column
+      }
     }
+  }
+
+  get_array(key: string) {
+    let column = this.get_column(key)
+    if (column == null)
+        return []
+    else if (!Array.isArray(column))
+        return Array.from(column)
+    return column;
+  }
+
+  get_column(key: string){
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    this.compute_function(key)
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    return null
   }
 
   update_selection(){
     this.source.selected.indices = this.selected.indices
+  }
+
+  get_length(){
+    return this.source.get_length()
   }
 
 }

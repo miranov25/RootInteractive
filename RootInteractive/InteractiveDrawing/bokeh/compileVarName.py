@@ -8,15 +8,15 @@ JAVASCRIPT_GLOBALS = {
 
 # This seems really stupid and overengineered
 class ColumnEvaluator:
-    def __init__(self, context, cdsDict, paramDict, funcDict, code, useEval=True):
+    def __init__(self, context, cdsDict, paramDict, funcDict, code, aliasDict):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
         self.code = code
-        self.useEval = useEval
         self.isSource = True 
+        self.aliasDict = aliasDict
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -92,6 +92,22 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "parameter"
             }
+        if self.context in self.aliasDict and node.id in self.aliasDict[self.context]:
+            self.isSource = False
+            if isinstance(self.aliasDict[self.context][node.id], str):
+                if self.aliasDict[self.context][node.id] == node.id:
+                    self.isSource = True
+                self.dependencies.add((self.context, self.aliasDict[self.context][node.id]))
+                return {
+                    "name": node.id,
+                    "type": "alias"
+                }   
+            for i in self.aliasDict[self.context][node.id]["fields"]:
+                self.dependencies.add((self.context, i))
+            return {
+                "name": node.id,
+                "type": "alias"
+            }    
         if "data" in self.cdsDict[self.context] and node.id not in self.cdsDict[self.context]["data"]:
             raise NameError("Column not defined: " + node.id)
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
@@ -109,7 +125,7 @@ class ColumnEvaluator:
             self.dependencies.add((histogram["source"], i))
         if "weights" in histogram:
             self.dependencies.add((histogram["source"], histogram["weights"]))
-        if "histograms" in histogram and id in histogram["histograms"]:
+        if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
             self.dependencies.add((histogram["source"], histogram["histograms"][id]["weights"]))
         return {
             "name": id,
@@ -117,7 +133,7 @@ class ColumnEvaluator:
         }        
 
     def eval_fallback(self, node):
-        if "data" not in self.cdsDict[self.context] or not self.useEval:
+        if "data" not in self.cdsDict[self.context]:
             raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
         self.dependencies.add((self.context, self.code[node.col_offset:node.end_col_offset]))
         code = compile(ast.Expression(body=node), self.code, "eval")
@@ -129,7 +145,7 @@ class ColumnEvaluator:
         
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {},
-                     memoizedColumns: dict = {}, forbiddenColumns: set = set()):
+                     memoizedColumns: dict = {}, aliasDict: dict = {}, forbiddenColumns: set = set()):
     if variableNames is None:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -152,7 +168,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
             # Unresolvable cyclic dependency in table - stack trace should tell exactly what went wrong
             raise RuntimeError("Cyclic dependency detected")
         queryAST = ast.parse(i_var, mode="eval")
-        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var)
+        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
         column = evaluator.visit(queryAST.body)
         variables.append(column)
         i_context = evaluator.context
@@ -163,7 +179,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
             dependency_columns = [i[1] for i in direct_dependencies]
             dependency_tables = [i[0] for i in direct_dependencies]
             _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
-                                                                    memoizedColumns, forbiddenColumns | {(i_context, i_var)})
+                                                                    memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
             used_names.update(sources_local)
         ctx_updated.append(i_context)
         if i_context in memoizedColumns:

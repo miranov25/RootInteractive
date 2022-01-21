@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -160,8 +161,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
+        console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
         cdsSel.update()
+        console.log(cdsSel._downsampled_indices.length);
+        console.log(cdsSel.nPoints)
         const t3 = performance.now();
         console.log(`Updating cds took ${t3 - t2} milliseconds.`);
     }
@@ -453,6 +457,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     if sourceArray is not None:
         histogramArray = histogramArray + sourceArray
 
+    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None}] + sourceArray
+
     dfQuery, histogramDict, downsamplerColumns, \
     columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
                                                        parameterArray=parameterArray, aliasArray=aliasArray, options=options)
@@ -480,7 +486,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         mapper.update_args()
                 """)])
 
-    aliasDict = {"":{}}
+    aliasDict = {None:{}}
     aliasSet = set()
     for i in aliasArray:
         customJsArgList = {}
@@ -494,7 +500,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             aliasDict[i["context"]] = {}
                         aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
                     else:
-                        aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+                        aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
             else:
                 if "parameters" in i:
                     for j in i["parameters"]:
@@ -508,7 +514,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         aliasDict[i["context"]] = {}
                     aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
                 else:
-                    aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": transform}
+                    aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": transform}
                 if "parameters" in i:
                     for j in i["parameters"]:
                         paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
@@ -528,8 +534,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in dfQuery.keys():
         columnNameDict[i] = i
 
-    columnNameDict.update(aliasDict[""])
-
     cdsFull = None
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
@@ -537,8 +541,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         cdsFull = ColumnDataSource()
 
-    if aliasDict[""]:
-        cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
+    if aliasDict[None]:
+        cdsFull = CDSAlias(source=cdsFull)
 
     if downsamplerColumns:
         source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
@@ -546,10 +550,57 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         source = None
 
     histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
-    cdsDict = {None: {"data": dfQuery, "cds": source, "cdsFull": cdsFull, "type": "source"}}
+
+    # Create the cdsDict - identify types from user input and make empty ColumnDataSources
+    cdsDict = {}
+    for i, iSource in enumerate(sourceArray):
+        iSource = iSource.copy()
+        # Detect the name, error on collision
+        cds_name = "anonymous_"+str(i)
+        if "name" in iSource:
+            cds_name = iSource["name"]
+        else:
+            raise ValueError("Column data sources other than the main one must have a name")
+        if cds_name in cdsDict:
+            raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
+        cdsDict[cds_name] = iSource
+
+        # Detect the type
+        if "type" not in iSource:
+            if "data" in iSource:
+                cdsType = "source"
+            elif "variables" in iSource:
+                nvars = len(iSource["variables"])
+                if nvars == 1:
+                    cdsType = "histogram"
+                elif nvars == 2:
+                    cdsType = "histo2d"
+                else:
+                    cdsType = "histoNd"
+            elif "left" in iSource and "right" in iSource:
+                cdsType = "join"
+            else:
+                # Cannot determine type automatically
+                raise ValueError(iSource)
+            iSource["type"] = cdsType
+        cdsType = iSource["type"]
+
+        # Create cdsOrig
+        if cdsType == "source":
+            if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
+                iSource["cdsOrig"] = CDSCompress()
+            else:
+                iSource["cdsOrig"] = ColumnDataSource()
+
+        # Add middleware for aliases
+        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
+        #iSource["cdsFull"] = iSource["cdsOrig"]
+
+        # Add downsampler
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
 
     profileList = []
-    cdsDict.update(histogramDict)
+    #cdsDict.update({None: {"data": dfQuery, "cds": source, "cdsFull": cdsFull, "type": "source"}})
 
     optionsChangeList = []
     for i, variables in enumerate(figureArray):
@@ -579,7 +630,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             }
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            plotArray.append(makeBokehDataTable(dfQuery, source, TOptions['include'], TOptions['exclude']))
+            # TODO: This is broken if compression is used because CDSCompress isn't a ColumnDataSource
+            plotArray.append(makeBokehDataTable(dfQuery, cdsDict["None"]["cdsOrig"], TOptions['include'], TOptions['exclude']))
             continue
         if variables[0] == 'tableHisto':
             TOptions = {'rowwise': False}
@@ -625,15 +677,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
-                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, varY, None, aliasSet)
-                yAxisTitle += getHistogramAxisTitle(histogramDict, varNameY, cds_name, False)
+                yAxisTitle += getHistogramAxisTitle(histogramDict, varY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
             if hasattr(dfQuery, "meta") and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
-                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, varX, None, aliasSet)
-                xAxisTitle += getHistogramAxisTitle(histogramDict, varNameX, cds_name, False)
+                xAxisTitle += getHistogramAxisTitle(histogramDict, varX, cds_name, False)
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
@@ -669,7 +719,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
                 variablesLocal[1][i] += ".bin_count"
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
-            variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+            variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             sources.update(used_names_local)
 
         if variablesLocal[2] is not None:
@@ -682,7 +732,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
-            cds_used = source
             cds_used = cdsDict[cds_name]["cds"]
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
@@ -729,10 +778,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     colorMapperDict[optionLocal["colorZvar"]] = mapperC
             else:
                 mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
-            cds_used = source
+            cds_used = cdsDict[cds_name]["cds"]
             if cmap_cds_name is not None:
-                cds_used = cdsDict[cds_name]["cds"]
-                # This is really hacky, will probably be removed when ND histogram joins start working
+                # HACK: This is really hacky, will probably be removed when ND histogram joins start working
                 if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
                     histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
                     const col = this.data[field]
@@ -827,13 +875,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
-                    figureI.add_glyph(source, errorX)
+                    figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                     errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
-                    figureI.add_glyph(source, errorY)
+                    figureI.add_glyph(cds_used, errorY)
             if figure_cds_name is None:
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
@@ -874,6 +922,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             sent_data[key] = value["value"]
         elif value["type"] == "column":
             sent_data[key] = dfQuery[key]
+    cdsFull = cdsDict[None]["cdsOrig"]
     if options['arrayCompression'] is not None:
         print("compressCDSPipe")
         cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
@@ -881,14 +930,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsFull.sizeMap = sizeMap
     else:
         cdsFull.data = sent_data
+    cdsFull = cdsDict[None]["cdsFull"]
+    source = cdsDict[None]["cds"]
     callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
-                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
+                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
     if options['doDraw']:
         show(pAll)
-    return pAll, source, plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, cdsDict[None]["cds"], plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
