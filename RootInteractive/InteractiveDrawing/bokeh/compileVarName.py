@@ -1,11 +1,14 @@
 import ast
 
+# This is not used yet - will be used when aliases will be able to use generated javascript code
 JAVASCRIPT_GLOBALS = {
-    "sin": "Math.sin"
+    "sin": "Math.sin",
+    "cos": "Math.cos",
+    "log": "Math.log"
 }
 
-# This seems really stupid and overengineered
 class ColumnEvaluator:
+    # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, context, cdsDict, paramDict, funcDict, code, aliasDict):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
@@ -13,28 +16,41 @@ class ColumnEvaluator:
         self.context = context
         self.dependencies = set()
         self.code = code
+        self.tokenized_code = code.split('\n')
         self.isSource = True 
         self.aliasDict = aliasDict
 
-    def visit(self, node):
+    def visit(self, node, end_lineno=0, end_col_offset=0):
+        # 
         if isinstance(node, ast.Attribute):
             return self.visit_Attribute(node)
         elif isinstance(node, ast.Call):
-            return self.visit_Call(node)
+            return self.visit_Call(node, end_lineno=end_lineno, end_col_offset=end_col_offset)
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
         elif isinstance(node, ast.Num):
             return self.visit_Num(node)
         else:
-            return self.eval_fallback(node)
+            return self.eval_fallback(node, end_lineno=end_lineno, end_col_offset=end_col_offset)
 
-    def visit_Call(self, node: ast.Call):
+    def visit_Call(self, node: ast.Call, end_lineno, end_col_offset):
+        # This is never used in bokehDrawArray but there's still a unit test for it, and the dependency tree is generated correctly even in this case
         if not isinstance(node.func, ast.Name):
             raise ValueError("Functions in variables list can only be specified by names")
         if node.func.id in self.funcDict:
             args = []
-            for iArg in node.args:
-                args.append(self.visit(iArg))
+            line_ends = []
+            col_offset_ends = []
+            for i in range(len(node.args)-1):
+                line_ends.append(node.args[i+1].lineno)
+                col_offset_ends.append(node.args[i+1].col_offset)
+            line_ends.append(end_lineno)
+            if end_col_offset != 0:
+                col_offset_ends.append(self.tokenized_code[node.lineno-1][:end_col_offset].rfind(')'))
+            else:
+                col_offset_ends.append(self.tokenized_code[node.lineno-1].rfind(')'))
+            for i, iArg in enumerate(node.args):
+                args.append(self.visit(iArg,end_col_offset=col_offset_ends[i],end_lineno=line_ends[i]))
             return {
                 "value": {
                     "func": node.func.id,
@@ -146,10 +162,13 @@ class ColumnEvaluator:
             "type": "column"
         }        
 
-    def eval_fallback(self, node):
+    def eval_fallback(self, node, end_lineno, end_col_offset):
         if "data" not in self.cdsDict[self.context]:
             raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
-        self.dependencies.add((self.context, self.code[node.col_offset:node.end_col_offset]))
+        if end_col_offset == 0:
+            self.dependencies.add((self.context, self.tokenized_code[node.lineno-1][node.col_offset:]))
+        else:
+            self.dependencies.add((self.context, self.tokenized_code[node.lineno-1][node.col_offset:end_col_offset]))
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
             "name": self.code,
