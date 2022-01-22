@@ -220,10 +220,10 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
             outputMap[col] = arrayC
             break
     sizeMap = {k: sizeMap[k] for k in sorted(sizeMap, key=sizeMap.get, reverse=True)}
-    sizeMap["_all"] = [sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter, df.shape]
+    sizeMap["_all"] = [sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter]
 
     if verbosity > 0:
-        print("Compress", "_all", sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter, df.shape)
+        print("Compress", "_all", sizeOutAll, sizeInAll, sizeOutAll / sizeInAll, counter)
     return outputMap, sizeMap
 
 
