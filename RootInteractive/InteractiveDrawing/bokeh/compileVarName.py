@@ -76,6 +76,14 @@ class ColumnEvaluator:
         self.context = node.value.id
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
+        if self.cdsDict[self.context]["type"] == "projection":
+            self.isSource = False
+            projection = self.cdsDict[self.context]
+            self.dependencies.add((projection["source"], "bin_count"))
+            return {
+                "name": node.attr,
+                "type": "column"
+            }
         self.dependencies.add((self.context, node.attr))
         return {
             "name": node.attr,
