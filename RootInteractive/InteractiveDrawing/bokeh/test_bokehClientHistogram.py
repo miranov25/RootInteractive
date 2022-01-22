@@ -93,7 +93,7 @@ def testBokehClientHistogramProfileA():
     figureArray = [
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2'], {"size":"size"}],
         [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"size":"size"}],
-        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}, {"size":"size"}],
+        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2", "size":"size"}],
         [['histoAB_1.bin_center_0'], ['histoAB_1.std'], {"size":"size"}],
         ["tableHisto", {"rowwise": False}]
     ]
@@ -249,3 +249,5 @@ def testJoin():
     
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, sourceArray=sourceArray, aliasArray=aliasArray)
+
+testBokehClientHistogramProfileA()
