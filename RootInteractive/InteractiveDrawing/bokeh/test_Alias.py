@@ -43,7 +43,7 @@ aliasArray = [
         "transform": "saxpy" 
     },
     {
-        "name": "C_cut",
+        "name": "C_accepted",
         "variables": ["C"],
         "parameters": ["C_cut"],
         "func": "return C < C_cut"
@@ -75,7 +75,7 @@ histoArray = [
         "name": "histoA", "variables": ["A"], "nbins": 10, "histograms": {
             "entries": None,
             "entries_C_cut": {
-                "weights": "C_cut"
+                "weights": "C_accepted"
             }
         }
     },
@@ -84,7 +84,7 @@ histoArray = [
         "histograms": {
             "entries": None,
             "entries_C_cut": {
-                "weights": "C_cut"
+                "weights": "C_accepted"
             }
         }
     }
@@ -131,7 +131,6 @@ def test_customJsFunction():
     sliderWidget.js_on_change("value", CustomJS(args = {"jsMapper": jsMapper, "cdsAlias": cdsAlias}, code="""
         jsMapper.parameters = {x: this.value}
         jsMapper.update_args()
-        cdsAlias.compute_functions()
     """))
 
     output_file("test_Alias.html")
@@ -181,5 +180,5 @@ def test_makeColumns():
     print(memoized_columns)
     print(sources)
 
-test_makeColumns()
-#test_customJsFunctionBokehDrawArray_v()
+#test_makeColumns()
+test_customJsFunctionBokehDrawArray_v()
