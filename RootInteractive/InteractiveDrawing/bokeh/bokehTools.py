@@ -1,4 +1,3 @@
-from argparse import ArgumentError
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -626,6 +625,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
                     "quantiles": quantiles, "sum_range": sum_range, "axis": j, "tooltips": tooltips, "source": cds_name} 
                 iSource["profiles"] = projectionsLocal
+            elif cdsType == "join":
+                left = None
+                if "left" in iSource:
+                    left = iSource["left"]
+                right = None
+                if "left" in iSource:
+                    right = iSource["left"]
+                iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
@@ -636,7 +643,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         # Add downsampler
         iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
 
-        # TODO: Add tooltips for histograms
         if "tooltips" not in iSource:
             iSource["tooltips"] = []
 
@@ -671,7 +677,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 1:
                 TOptions.update(variables[1])
             # TODO: This is broken if compression is used because CDSCompress isn't a ColumnDataSource
-            plotArray.append(makeBokehDataTable(dfQuery, cdsDict["None"]["cdsOrig"], TOptions['include'], TOptions['exclude']))
+            plotArray.append(makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude']))
             continue
         if variables[0] == 'tableHisto':
             histoListLocal = []
@@ -763,6 +769,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
         cds_names = None
+        if "source" in optionLocal:
+            cds_names = optionLocal["source"]
         for i, iY in enumerate(variablesLocal[1]):
             if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
                 variablesLocal[1][i] += ".bin_count"
@@ -983,8 +991,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         for key, value in memoized_columns[cdsKey].items():
             if (cdsKey, key) not in sources:
                 cdsFull = cdsValue["cdsFull"]
+                # User defined aliases
                 if value["type"] == "alias":
                     cdsFull.mapping[key] = aliasDict[cdsKey][key]
+                # Columns directly controlled by parameter
                 elif value["type"] == "parameter":
                     cdsFull.mapping[key] = paramDict[value["name"]]["value"]
                     paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": key},
