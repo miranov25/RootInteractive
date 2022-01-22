@@ -463,11 +463,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"]}] + sourceArray
 
-    dfQuery, histogramDict, downsamplerColumns, \
-    columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
-                                                       parameterArray=parameterArray, aliasArray=aliasArray, options=options)
+    #dfQuery, histogramDict, downsamplerColumns, \
+    #columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
+    #                                                   parameterArray=parameterArray, aliasArray=aliasArray, options=options)
 
-    paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+    # paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+    paramDict = {}
+    for param in parameterArray:
+        paramDict[param["name"]] = param.copy()
+        paramDict[param["name"]]["subscribed_events"] = []
 
     widgetParams = []
     widgetArray = []
@@ -495,36 +499,35 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in aliasArray:
         customJsArgList = {}
         transform = None
-        if customJsColumns[i["name"]]:
-            aliasSet.add(i["name"])
-            if "transform" in i:
-                if i["transform"] in jsFunctionDict:
-                    if "context" in i:
-                        if i["context"] not in aliasDict:
-                            aliasDict[i["context"]] = {}
-                        aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
-                    else:
-                        aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
-            else:
-                if "parameters" in i:
-                    for j in i["parameters"]:
-                        customJsArgList[j] = paramDict[j]["value"]
-                if "v_func" in i:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
-                else:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+        aliasSet.add(i["name"])
+        if "transform" in i:
+            if i["transform"] in jsFunctionDict:
                 if "context" in i:
                     if i["context"] not in aliasDict:
                         aliasDict[i["context"]] = {}
-                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
                 else:
-                    aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": transform}
-                if "parameters" in i:
-                    for j in i["parameters"]:
-                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
-                mapper.parameters[param] = this.value
-                mapper.update_args()
-                        """)])
+                    aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+        else:
+            if "parameters" in i:
+                for j in i["parameters"]:
+                    customJsArgList[j] = paramDict[j]["value"]
+            if "v_func" in i:
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
+            else:
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+            if "context" in i:
+                if i["context"] not in aliasDict:
+                    aliasDict[i["context"]] = {}
+                aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+            else:
+                aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": transform}
+            if "parameters" in i:
+                for j in i["parameters"]:
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+            mapper.parameters[param] = this.value
+            mapper.update_args()
+                    """)])
 
 
     plotArray = []
@@ -534,24 +537,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     memoized_columns = {}
     sources = set()
-
-    for i in dfQuery.keys():
-        columnNameDict[i] = i
-
-    cdsFull = None
-    if options['arrayCompression'] is not None:
-        print("compressCDSPipe")
-        cdsFull=CDSCompress()
-    else:
-        cdsFull = ColumnDataSource()
-
-    if aliasDict[None]:
-        cdsFull = CDSAlias(source=cdsFull)
-
-    if downsamplerColumns:
-        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
-    else:
-        source = None
 
     # Create the cdsDict - identify types from user input and make empty ColumnDataSources
     cdsDict = {}
@@ -829,9 +814,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(variables_dict[axis_name], list):
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_names[i]
-            if variables[1][i % lengthY] not in histogramDict:
-                varNameX = makeBokehDataSpec(variables_dict["X"], paramDict)
-                varNameY = makeBokehDataSpec(variables_dict["Y"], paramDict)
+            varNameX = variables_dict["X"]["name"]
+            varNameY = variables_dict["Y"]["name"]
             varColor = variables_dict["colorZvar"]
             if varColor is not None:
                 if mapperC is not None:
@@ -850,7 +834,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        cdsDict[cds_name]['cdsOrig'].js_on_change('change', CustomJS(code="""
                         const col = this.data[field]
                         const isOK = this.data.isOK
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
@@ -952,7 +936,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 legend_options = optionLocal['legend_options'].copy()
                 legend_options_parameters = {}
                 for i, iOption in legend_options.items():
-                    if iOption in parameterDict:
+                    if iOption in paramDict:
                         legend_options_parameters[i] = paramDict[iOption]
                 for i, iOption in legend_options_parameters.items():
                     legend_options[i] = iOption['value']
