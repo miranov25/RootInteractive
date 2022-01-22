@@ -1,6 +1,4 @@
-from argparse import ArgumentError
 import ast
-from msilib.schema import Error
 
 JAVASCRIPT_GLOBALS = {
     "sin": "Math.sin"
