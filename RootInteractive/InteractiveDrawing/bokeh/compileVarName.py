@@ -112,6 +112,14 @@ class ColumnEvaluator:
             raise NameError("Column not defined: " + node.id)
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.id)
+        if self.cdsDict[self.context]["type"] == "projection":
+            self.isSource = False
+            projection = self.cdsDict[self.context]
+            self.dependencies.add((projection["source"], "bin_count"))
+            return {
+                "name": node.id,
+                "type": "column"
+            }
         self.dependencies.add((self.context, node.id))
         return {
             "name": node.id,
