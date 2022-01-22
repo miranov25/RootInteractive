@@ -171,7 +171,7 @@ class bokehDrawSA(object):
         if "arrayCompression" in options:
             self.isNotebook = False
         mergedFigureArray = figureArray + widgetsDescription
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
+        self.figure, self.cdsSel, self.plotArray, self.cmapList, self.cdsOrig, self.histoList,\
             self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)

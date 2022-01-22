@@ -1019,7 +1019,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
