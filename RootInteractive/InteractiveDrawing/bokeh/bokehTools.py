@@ -606,6 +606,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "source" not in iSource:
                 iSource["source"] = None
             iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHistoTooltips
         elif cdsType in ["histo2d", "histoNd"]:
             nbins = [10]*len(iSource["variables"])
             if "nbins" in iSource:
@@ -619,9 +621,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "source" not in iSource:
                 iSource["source"] = None
             iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHisto2DTooltips
+            #TODO: Add projections
+            if "axis" in iSource:
+                axisIndices = iSource["axis"]
+                projectionsLocal = {}
+                sum_range = []
+                if "sum_range" in iSource:
+                    sum_range = iSource["sum_range"]
+                quantiles = []
+                if "quantiles" in iSource:
+                    quantiles = iSource["quantiles"]
+                for j in axisIndices:
+                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles,
+                                                sum_range=sum_range, name=cds_name+"_"+str(j))
+                    projectionsLocal[i] = cdsProfile
+                    tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
+                    cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
+                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "tooltips": tooltips, "source": cds_name} 
+                iSource["profiles"] = projectionsLocal
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
-
+            
+    for iSource in cdsDict.values():
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
 
@@ -762,7 +785,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             sources.update(used_names_local)
 
-        # varZ
+        # varZ - if 3D use 3D
         if variablesLocal[2] is not None:
             cds_name = cds_names[0]
             varNameX = variablesLocal[0][0]["name"]
@@ -787,7 +810,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
 
-        # graphArray=drawGraphArray(df, variables)
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
@@ -1560,9 +1582,6 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
         for param in parameterArray:
             parameterDict[param["name"]] = param.copy()
             parameterDict[param["name"]]["subscribed_events"] = []
-    if histogramArray is not None:
-        for iHisto in histogramArray: 
-            pass
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
             if isinstance(variables, dict):
