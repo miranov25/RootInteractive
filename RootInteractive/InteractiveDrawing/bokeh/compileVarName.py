@@ -11,10 +11,21 @@ JAVASCRIPT_GLOBALS = {
 math_functions = {
     "sin": np.sin,
     "cos": np.cos,
+    "arcsin": np.arcsin,
+    "arccos": np.arccos,
+    "arctan": np.arctan,
     "exp": np.exp,
     "log": np.log,
+    "log2": np.log2,
+    "log10": np.log10,
     "sqrt": np.sqrt,
-    "abs": np.absolute
+    "abs": np.absolute,
+    "sinh": np.sinh,
+    "cosh": np.sinh,
+    "arctan2": np.arctan2,
+    "arccosh": np.arccosh,
+    "arcsinh": np.arcsinh,
+    "arctanh": np.arctanh
 }
 
 class ColumnEvaluator:
@@ -181,9 +192,10 @@ class ColumnEvaluator:
         else:
             raise NotImplementedError("Automatically generated JS functions from server derived columns are not supported")
         code = compile(ast.Expression(body=node), self.code, "eval")
+        locals = {**self.cdsDict[self.context]["data"], **math_functions}
         return {
             "name": column_id,
-            "value": eval(code, {}, self.cdsDict[self.context]["data"] | math_functions),
+            "value": eval(code, {}, locals),
             "type": "server_derived_column"
             }
         
