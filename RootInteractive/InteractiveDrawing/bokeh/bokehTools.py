@@ -706,7 +706,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     optionWidget["callback"] = "selection"
                     column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
                     varName = column[0]["name"]
-                    fakeDf = {varName: dfQuery[varName]}
+                    if column[0]["type"] == "column":
+                        fakeDf = {varName: dfQuery[varName]}
+                    elif column[0]["type"] == "server_derived_column":
+                        fakeDf = {varName: column[0]["value"]}
                     sources.update(used_names_local)
             if variables[0] == 'slider':
                 localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
