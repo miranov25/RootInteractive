@@ -172,9 +172,9 @@ def test_makeColumns():
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
-    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
-    assert len(varList) == 8
-    assert len(sources) == 5
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
+    assert len(varList) == 9
+    assert len(sources) == 6
     assert ctx_updated[-1] == "histoA"
     print(ctx_updated)
     print(memoized_columns)

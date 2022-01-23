@@ -1,10 +1,20 @@
 import ast
+import numpy as np
 
 # This is not used yet - will be used when aliases will be able to use generated javascript code
 JAVASCRIPT_GLOBALS = {
     "sin": "Math.sin",
     "cos": "Math.cos",
     "log": "Math.log"
+}
+
+math_functions = {
+    "sin": np.sin,
+    "cos": np.cos,
+    "exp": np.exp,
+    "log": np.log,
+    "sqrt": np.sqrt,
+    "abs": np.absolute
 }
 
 class ColumnEvaluator:
@@ -132,10 +142,14 @@ class ColumnEvaluator:
             }
         if self.cdsDict[self.context]["type"] == "join":
             self.isSource = False
-            # Add join key
-            
+            cds = self.cdsDict[self.context]
+            # Joins always depend on the join key
+            for i in cds["left_on"]:
+                self.dependencies.add(cds["left"], i)
+            for i in cds["right_on"]:
+                self.dependencies.add(cds["left"], i)
             # Try left
-            left = self.cdsDict[self.context]["left"]
+            #if "data" in self.cdsDict[cds["left"]] 
             return {
                 "name": node.id,
                 "type": "column"
@@ -169,7 +183,7 @@ class ColumnEvaluator:
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
             "name": column_id,
-            "value": eval(code, {}, self.cdsDict[self.context]["data"]),
+            "value": eval(code, {}, self.cdsDict[self.context]["data"] | math_functions),
             "type": "server_derived_column"
             }
         
