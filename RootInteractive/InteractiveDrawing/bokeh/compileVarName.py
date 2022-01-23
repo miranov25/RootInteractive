@@ -9,48 +9,37 @@ JAVASCRIPT_GLOBALS = {
 
 class ColumnEvaluator:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
-    def __init__(self, context, cdsDict, paramDict, funcDict, code, aliasDict):
+    def __init__(self, context, cdsDict, paramDict, funcDict, code, aliasDict, firstGeneratedID=0):
         self.cdsDict = cdsDict
         self.paramDict = paramDict
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
+        self.firstGeneratedID = firstGeneratedID
         self.code = code
-        self.tokenized_code = code.split('\n')
         self.isSource = True 
         self.aliasDict = aliasDict
 
-    def visit(self, node, end_lineno=0, end_col_offset=0):
-        # 
+    def visit(self, node):
         if isinstance(node, ast.Attribute):
             return self.visit_Attribute(node)
         elif isinstance(node, ast.Call):
-            return self.visit_Call(node, end_lineno=end_lineno, end_col_offset=end_col_offset)
+            return self.visit_Call(node)
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
         elif isinstance(node, ast.Num):
             return self.visit_Num(node)
         else:
-            return self.eval_fallback(node, end_lineno=end_lineno, end_col_offset=end_col_offset)
+            return self.eval_fallback(node)
 
-    def visit_Call(self, node: ast.Call, end_lineno, end_col_offset):
+    def visit_Call(self, node: ast.Call):
         # This is never used in bokehDrawArray but there's still a unit test for it, and the dependency tree is generated correctly even in this case
         if not isinstance(node.func, ast.Name):
             raise ValueError("Functions in variables list can only be specified by names")
         if node.func.id in self.funcDict:
             args = []
-            line_ends = []
-            col_offset_ends = []
-            for i in range(len(node.args)-1):
-                line_ends.append(node.args[i+1].lineno)
-                col_offset_ends.append(node.args[i+1].col_offset)
-            line_ends.append(end_lineno)
-            if end_col_offset != 0:
-                col_offset_ends.append(self.tokenized_code[node.lineno-1][:end_col_offset].rfind(')'))
-            else:
-                col_offset_ends.append(self.tokenized_code[node.lineno-1].rfind(')'))
-            for i, iArg in enumerate(node.args):
-                args.append(self.visit(iArg,end_col_offset=col_offset_ends[i],end_lineno=line_ends[i]))
+            for iArg in node.args:
+                args.append(self.visit(iArg))
             return {
                 "value": {
                     "func": node.func.id,
@@ -59,7 +48,7 @@ class ColumnEvaluator:
                 "type": "client_function",
                 "name": self.code
             }
-        if node.func.id in JAVASCRIPT_GLOBALS and not self.useEval:
+        if node.func.id in JAVASCRIPT_GLOBALS and "data" not in self.cdsDict[self.context]:
             #TODO: Add code generation
             args = []
             implementation = JAVASCRIPT_GLOBALS[node.func.id] + '('
@@ -73,7 +62,7 @@ class ColumnEvaluator:
         # Kept for compatibility with old Python
         self.isSource = False
         return {
-            "name": self.code,
+            "name": str(node.n),
             "type": "constant",
             "value": node.n
         }
@@ -98,7 +87,6 @@ class ColumnEvaluator:
                 "name": node.attr,
                 "type": "column"
             }
-        self.dependencies.add((self.context, node.attr))
         return {
             "name": node.attr,
             "type": "column"
@@ -130,7 +118,7 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "alias"
             }    
-        if "data" in self.cdsDict[self.context] and node.id not in self.cdsDict[self.context]["data"]:
+        if self.cdsDict[self.context]["type"] == "source" and node.id not in self.cdsDict[self.context]["data"]:
             raise NameError("Column not defined: " + node.id)
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.id)
@@ -142,7 +130,16 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "column"
             }
-        self.dependencies.add((self.context, node.id))
+        if self.cdsDict[self.context]["type"] == "join":
+            self.isSource = False
+            # Add join key
+            
+            # Try left
+            left = self.cdsDict[self.context]["left"]
+            return {
+                "name": node.id,
+                "type": "column"
+            }
         return {
             "name": node.id,
             "type": "column"
@@ -162,16 +159,16 @@ class ColumnEvaluator:
             "type": "column"
         }        
 
-    def eval_fallback(self, node, end_lineno, end_col_offset):
+    def eval_fallback(self, node):
         if "data" not in self.cdsDict[self.context]:
             raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
-        if end_col_offset == 0:
-            self.dependencies.add((self.context, self.tokenized_code[node.lineno-1][node.col_offset:]))
+        if self.isSource:
+            column_id = self.code
         else:
-            self.dependencies.add((self.context, self.tokenized_code[node.lineno-1][node.col_offset:end_col_offset]))
+            raise NotImplementedError("Automatically generated JS functions from server derived columns are not supported")
         code = compile(ast.Expression(body=node), self.code, "eval")
         return {
-            "name": self.code,
+            "name": column_id,
             "value": eval(code, {}, self.cdsDict[self.context]["data"]),
             "type": "server_derived_column"
             }
@@ -179,7 +176,7 @@ class ColumnEvaluator:
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {},
                      memoizedColumns: dict = {}, aliasDict: dict = {}, forbiddenColumns: set = set()):
-    if variableNames is None:
+    if variableNames is None or len(variableNames) == 0:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
         variableNames = [variableNames]
@@ -206,7 +203,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
         variables.append(column)
         i_context = evaluator.context
         if evaluator.isSource:
-            used_names.update(evaluator.dependencies)
+            used_names.update({(i_context, column["name"])})
         else:
             direct_dependencies = list(evaluator.dependencies)
             dependency_columns = [i[1] for i in direct_dependencies]
