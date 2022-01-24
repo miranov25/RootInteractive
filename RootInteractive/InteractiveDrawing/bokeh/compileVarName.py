@@ -200,6 +200,9 @@ class ColumnEvaluator:
             }
         
 
+def checkColumn(columnKey, tableKey, cdsDict):
+    return False
+
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {},
                      memoizedColumns: dict = {}, aliasDict: dict = {}, forbiddenColumns: set = set()):
     if variableNames is None or len(variableNames) == 0:
