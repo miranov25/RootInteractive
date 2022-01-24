@@ -9,6 +9,8 @@ export namespace CDSJoin {
     right: p.Property<ColumnarDataSource>
     on_left: p.Property<string[]>
     on_right: p.Property<string[]>
+    prefix_left: p.Property<string>
+    prefix_right: p.Property<string>
     how: p.Property<string>
     tolerance: p.Property<number>
   }
