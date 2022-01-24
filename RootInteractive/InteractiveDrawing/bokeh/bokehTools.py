@@ -625,14 +625,22 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
                     "quantiles": quantiles, "sum_range": sum_range, "axis": j, "tooltips": tooltips, "source": cds_name} 
                 iSource["profiles"] = projectionsLocal
-            elif cdsType == "join":
-                left = None
-                if "left" in iSource:
-                    left = iSource["left"]
-                right = None
-                if "left" in iSource:
-                    right = iSource["left"]
-                iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right)
+        elif cdsType == "join":
+            left = None
+            if "left" in iSource:
+                left = iSource["left"]
+            right = None
+            if "left" in iSource:
+                right = iSource["left"]
+            if "left_on" in iSource:
+                on_left = iSource["left_on"]
+            on_right = []
+            if "right_on" in iSource:
+                on_right = iSource["right_on"]
+            how  = "inner"
+            if "how" in iSource:
+                how = iSource["how"]
+            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
@@ -986,7 +994,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for key, value in memoized_columns[cdsKey].items():
                     if key in cdsValue["histograms"]:
                         if value["type"] == "column":
-                            cdsOrig.histograms[key] = cdsValue["histograms"][key]              
+                            cdsOrig.histograms[key] = cdsValue["histograms"][key]  
+        elif cdsValue["type"] == "join":
+            cdsOrig = cdsValue["cdsOrig"]
+            cdsOrig.left = cdsDict[cdsValue["left"]]["cdsFull"]
+            cdsOrig.right = cdsDict[cdsValue["left"]]["cdsFull"] 
         # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
         # In future an option can be added for creating them from array
 
@@ -1659,9 +1671,7 @@ def getTooltipColumns(tooltips):
 def makeBokehDataSpec(thing: dict, paramDict: dict):
     if thing["type"] == "constant":
         return {"value": thing["value"]}
-    if thing["type"] == "parameter":
-        return {"field": paramDict[thing["name"]]["value"]}
-    return thing["name"]
+    return {"field": thing["name"]}
 
 def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
     if varError["type"] == "constant":
