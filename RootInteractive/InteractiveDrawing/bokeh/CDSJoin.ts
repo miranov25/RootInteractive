@@ -188,9 +188,32 @@ export class CDSJoin extends ColumnarDataSource {
     change.emit()
   }
 
+  get_column(key: string){
+    const {left, right, data} = this
+    if (data[key] != null) return data[key]
+    let column = null
+    try {
+      column = left.get_column(key)
+    }
+    catch {
+      column = right.get_column(key)
+    }
+    if (column == null){
+      column = right.get_column(key)
+    }
+    if(column != null) {
+      if (!Array.isArray(column)){
+        data[key] = this.join_column(Array.from(column), this._indices_right)
+      } else {
+        data[key] = this.join_column(column, this._indices_right)
+      }
+    }
+    return data[key]
+  }
 
-  /*update_selection(){
-    this.source.selected.indices = this.selected.indices
-  }*/
+  get_length(){
+    if (this._indices_left == null) return 0
+    return this._indices_left.length
+  }
 
 }
