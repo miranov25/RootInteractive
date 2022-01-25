@@ -1001,7 +1001,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         elif cdsValue["type"] == "join":
             cdsOrig = cdsValue["cdsOrig"]
             cdsOrig.left = cdsDict[cdsValue["left"]]["cdsFull"]
-            cdsOrig.right = cdsDict[cdsValue["left"]]["cdsFull"] 
+            cdsOrig.right = cdsDict[cdsValue["right"]]["cdsFull"] 
         # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
         # In future an option can be added for creating them from array
 
