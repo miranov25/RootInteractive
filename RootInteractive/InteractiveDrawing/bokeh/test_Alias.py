@@ -168,11 +168,12 @@ def test_customJsFunctionBokehDrawArray_v():
                            aliasArray=aliasArray, histogramArray=histoArray)
     
 def test_makeColumns():
+    varList, ctx_updated, memoized_columns, sources = (None, None, None, None)
     df = pd.DataFrame(np.random.random_sample(size=(200000, 3)), columns=list('XYZ'))
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
-    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count"], {}, cdsDict, paramDict, functionDict)
     assert len(varList) == 9
     assert len(sources) == 6
     assert ctx_updated[-1] == "histoA"
@@ -180,5 +181,5 @@ def test_makeColumns():
     print(memoized_columns)
     print(sources)
 
-test_makeColumns()
+#test_makeColumns()
 #test_customJsFunctionBokehDrawArray_v()
