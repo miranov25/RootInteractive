@@ -91,6 +91,15 @@ class ColumnEvaluator:
     def visit_Attribute(self, node: ast.Attribute):
         if self.cdsDict[self.context]["type"] == "join":
             # In this case, we can have chained attributes
+            attrChain = []
+            if isinstance(node.value, ast.Attribute):
+                attrChain = self.visit_Attribute(self, node.value)["attrChain"]
+            if node.attr in self.cdsDict:
+                return {
+                    "name": node.attr,
+                    "type": "table",
+                    "attrChain": attrChain + [node.attr]
+                }
             self.isSource = False
             cds = self.cdsDict[self.context]
             # Joins always depend on the join key
@@ -106,12 +115,13 @@ class ColumnEvaluator:
             }
         if not isinstance(node.value, ast.Name):
             raise ValueError("Columns can only be selected from X")
-        if self.context is not None:
-            if node.value.id != self.context:
-                raise ValueError("Cannot jump out of already entered context within vairable parsing")
-        if node.value.id not in self.cdsDict:
-            raise KeyError("Column not found")
-        self.context = node.value.id
+        if node.value.id != "self":
+            if self.context is not None:
+                if node.value.id != self.context:
+                    raise ValueError("Cannot jump out of already entered context within vairable parsing")
+            if node.value.id not in self.cdsDict:
+                raise KeyError("Data source not found: " + node.value.id)
+            self.context = node.value.id
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
         if self.cdsDict[self.context]["type"] == "projection":
@@ -137,52 +147,19 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "parameter"
             }
-        if self.context in self.aliasDict and node.id in self.aliasDict[self.context]:
-            self.isSource = False
-            if isinstance(self.aliasDict[self.context][node.id], str):
-                if self.aliasDict[self.context][node.id] == node.id:
-                    self.isSource = True
-                self.dependencies.add((self.context, self.aliasDict[self.context][node.id]))
-                return {
-                    "name": node.id,
-                    "type": "alias"
-                }   
-            for i in self.aliasDict[self.context][node.id]["fields"]:
-                self.dependencies.add((self.context, i))
+        if node.id == self.context:
             return {
                 "name": node.id,
-                "type": "alias"
-            }    
-        if self.cdsDict[self.context]["type"] == "source" and node.id not in self.cdsDict[self.context]["data"]:
-            raise NameError("Column not defined: " + node.id)
-        if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
-            return self.visit_Name_histogram(node.id)
-        if self.cdsDict[self.context]["type"] == "projection":
-            self.isSource = False
-            projection = self.cdsDict[self.context]
-            self.dependencies.add((projection["source"], "bin_count"))
-            return {
-                "name": node.id,
-                "type": "column"
+                "type": "table"
             }
         if self.cdsDict[self.context]["type"] == "join":
-            self.isSource = False
-            cds = self.cdsDict[self.context]
-            # Joins always depend on the join key
-            for i in cds["left_on"]:
-                self.dependencies.add((cds["left"], i))
-            for i in cds["right_on"]:
-                self.dependencies.add((cds["left"], i))
-            # Try left
-            #if "data" in self.cdsDict[cds["left"]] 
-            return {
-                "name": node.id,
-                "type": "column"
-            }
-        return {
-            "name": node.id,
-            "type": "column"
-        }
+            if node.id in [self.aliasDict[self.context]["left"], self.aliasDict[self.context]["right"]]:
+                return {
+                    "name": node.id,
+                    "type": "table"
+                }
+        attrNode = ast.Attribute(value=ast.Name(id="self", ctx=ast.Load()), attr=node.id)
+        return self.visit(attrNode)
     
     def visit_Name_histogram(self, id: str):
         self.isSource = False
