@@ -555,6 +555,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if "type" not in iSource:
             if "data" in iSource:
                 cdsType = "source"
+                if "arrayCompression" not in iSource:
+                    iSource["arrayCompression"] = None
             elif "variables" in iSource:
                 nvars = len(iSource["variables"])
                 if nvars == 1:
@@ -563,7 +565,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     cdsType = "histo2d"
                 else:
                     cdsType = "histoNd"
-            elif "left" in iSource and "right" in iSource:
+            elif "left" in iSource or "right" in iSource:
                 cdsType = "join"
             else:
                 # Cannot determine type automatically
