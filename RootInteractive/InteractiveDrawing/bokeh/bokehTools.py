@@ -845,8 +845,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     rescaleColorMapper = optionLocal["rescaleColorMapper"] or varColor["type"] == "parameter" or cdsDict[cds_name]["type"] in ["histogram", "histo2d", "histoNd"]
                     if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
-                        low = np.min(dfQuery[varColor])
-                        high= np.max(dfQuery[varColor])
+                        low = np.min(cdsDict[cds_name]["data"][varColor["name"]])
+                        high= np.max(cdsDict[cds_name]["data"][varColor["name"]])
                         mapperC = linear_cmap(field_name=varColor["name"], palette=optionLocal['palette'], low=low, high=high)
                     else:
                         if varColor["name"] in colorMapperDict:
