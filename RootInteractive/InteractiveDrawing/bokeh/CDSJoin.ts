@@ -33,6 +33,8 @@ export class CDSJoin extends ColumnarDataSource {
       right: [Ref(ColumnarDataSource)],
       on_left: [ Array(String), [] ],
       on_right: [ Array(String), [] ],
+      prefix_left: [String],
+      prefix_right: [String],
       how: [ String ],
       tolerance: [Number, 1e-5]
     }))
@@ -174,11 +176,11 @@ export class CDSJoin extends ColumnarDataSource {
       this._indices_left = indices_left
       this._indices_right = indices_right
     }
-    for (const key in left.data) {
+    for (const key of left.columns()) {
       const col = left.get_array(key)
       if(col !== null) this.data[key] = this.join_column(col, this._indices_left)
     }
-    for (const key in right.data) {
+    for (const key of right.columns()) {
       const col = right.get_array(key)
       if(col !== null) this.data[key] = this.join_column(col, this._indices_right)
     }

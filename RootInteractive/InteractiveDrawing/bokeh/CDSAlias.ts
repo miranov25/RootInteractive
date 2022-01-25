@@ -150,4 +150,10 @@ export class CDSAlias extends ColumnarDataSource {
     return this.source.get_length()
   }
 
+  columns(){
+    const old_columns = this.source.columns().filter(x => this.mapping[x] == null)
+    const new_columns = Object.keys(this.mapping)
+    return old_columns.concat(new_columns)
+  }
+
 }
