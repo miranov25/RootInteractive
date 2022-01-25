@@ -89,7 +89,21 @@ class ColumnEvaluator:
         }
 
     def visit_Attribute(self, node: ast.Attribute):
-        # TODO: When adding joins on client, expand the functionality of this
+        if self.cdsDict[self.context]["type"] == "join":
+            # In this case, we can have chained attributes
+            self.isSource = False
+            cds = self.cdsDict[self.context]
+            # Joins always depend on the join key
+            for i in cds["left_on"]:
+                self.dependencies.add((cds["left"], i))
+            for i in cds["right_on"]:
+                self.dependencies.add((cds["right"], i))
+            # Try left
+            #if "data" in self.cdsDict[cds["left"]] 
+            return {
+                "name": node.attr,
+                "type": "column"
+            }
         if not isinstance(node.value, ast.Name):
             raise ValueError("Columns can only be selected from X")
         if self.context is not None:
@@ -156,9 +170,9 @@ class ColumnEvaluator:
             cds = self.cdsDict[self.context]
             # Joins always depend on the join key
             for i in cds["left_on"]:
-                self.dependencies.add(cds["left"], i)
+                self.dependencies.add((cds["left"], i))
             for i in cds["right_on"]:
-                self.dependencies.add(cds["left"], i)
+                self.dependencies.add((cds["left"], i))
             # Try left
             #if "data" in self.cdsDict[cds["left"]] 
             return {
