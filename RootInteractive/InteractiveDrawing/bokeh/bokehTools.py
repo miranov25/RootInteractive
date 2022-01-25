@@ -449,6 +449,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             logging.info(dfQuery.metaData)
     else:
         dfQuery = dataFrame.copy()
+        initMetadata(dfQuery)
     # Check/resp. load derived variables
 
     if isinstance(figureArray[-1], dict):
