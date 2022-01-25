@@ -213,8 +213,8 @@ class ColumnEvaluator:
 def checkColumn(columnKey, tableKey, cdsDict):
     return False
 
-def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, paramDict: dict = {}, funcDict: dict = {},
-                     memoizedColumns: dict = {}, aliasDict: dict = {}, forbiddenColumns: set = set()):
+def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDict: dict = {}, funcDict: dict = {},
+                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set()):
     if variableNames is None or len(variableNames) == 0:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -226,6 +226,10 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {None: {}}, 
     variables = []
     ctx_updated = []
     used_names = set()
+    if memoizedColumns is None:
+        memoizedColumns = {}
+    if aliasDict is None:
+        aliasDict = {}
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
