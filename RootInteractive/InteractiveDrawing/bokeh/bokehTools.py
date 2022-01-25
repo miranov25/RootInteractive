@@ -978,7 +978,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if value["type"] == "server_derived_column":
                         sent_data[key] = value["value"]
                     elif value["type"] == "column":
-                        sent_data[key] = dfQuery[key]
+                        sent_data[key] = cdsValue["data"][key]
             cdsOrig = cdsValue["cdsOrig"]
             if cdsValue['arrayCompression'] is not None:
                 print("compressCDSPipe")
