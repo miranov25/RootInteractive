@@ -92,8 +92,8 @@ class ColumnEvaluator:
         if self.cdsDict[self.context]["type"] == "join":
             # In this case, we can have chained attributes
             attrChain = []
-            if isinstance(node.value, ast.Attribute):
-                attrChain = self.visit_Attribute(self, node.value)["attrChain"]
+            if isinstance(node.value, ast.Attribute) or isinstance(node.value, ast.Name):
+                attrChain = self.visit(node.value)["attrChain"]
             if node.attr in self.cdsDict:
                 return {
                     "name": node.attr,
@@ -107,8 +107,12 @@ class ColumnEvaluator:
                 self.dependencies.add((cds["left"], i))
             for i in cds["right_on"]:
                 self.dependencies.add((cds["right"], i))
-            # Try left
-            #if "data" in self.cdsDict[cds["left"]] 
+            cds_used = 0
+            if attrChain[0] == self.context:
+                cds_used = 1
+            if(cds_used < len(attrChain)):
+                if attrChain[cds_used] in [cds["left"], cds["right"]]:
+                    self.dependencies.add((attrChain[cds_used], node.attr))
             return {
                 "name": node.attr,
                 "type": "column"
@@ -147,16 +151,18 @@ class ColumnEvaluator:
                 "name": node.id,
                 "type": "parameter"
             }
-        if node.id == self.context:
+        if node.id in [self.context, "self"]:
             return {
                 "name": node.id,
-                "type": "table"
+                "type": "table",
+                "attrChain": [node.id]
             }
         if self.cdsDict[self.context]["type"] == "join":
-            if node.id in [self.aliasDict[self.context]["left"], self.aliasDict[self.context]["right"]]:
+            if node.id in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
                 return {
                     "name": node.id,
-                    "type": "table"
+                    "type": "table",
+                    "attrChain": [node.id]
                 }
         attrNode = ast.Attribute(value=ast.Name(id="self", ctx=ast.Load()), attr=node.id)
         return self.visit(attrNode)
