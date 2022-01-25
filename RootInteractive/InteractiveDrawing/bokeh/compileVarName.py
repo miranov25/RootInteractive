@@ -89,6 +89,23 @@ class ColumnEvaluator:
         }
 
     def visit_Attribute(self, node: ast.Attribute):
+        if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
+            self.isSource = False
+            if isinstance(self.aliasDict[self.context][node.attr], str):
+                if self.aliasDict[self.context][node.attr] == node.attr:
+                    self.isSource = True
+                self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]))
+                return {
+                    "name": node.attr,
+                    "type": "alias"
+                }
+            if "fields" in self.aliasDict[self.context][node.attr]:
+                for i in self.aliasDict[self.context][node.attr]["fields"]:
+                    self.dependencies.add((self.context, i))
+            return {
+                "name": node.attr,
+                "type": "alias"
+            }
         if self.cdsDict[self.context]["type"] == "join":
             # In this case, we can have chained attributes
             attrChain = []
@@ -132,10 +149,6 @@ class ColumnEvaluator:
             self.isSource = False
             projection = self.cdsDict[self.context]
             self.dependencies.add((projection["source"], "bin_count"))
-            return {
-                "name": node.attr,
-                "type": "column"
-            }
         return {
             "name": node.attr,
             "type": "column"
