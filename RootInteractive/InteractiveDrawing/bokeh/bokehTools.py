@@ -1007,15 +1007,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         # Add aliases
         for key, value in memoized_columns[cdsKey].items():
-            if (cdsKey, key) not in sources:
+            columnKey = value["name"]
+            if (cdsKey, columnKey) not in sources:
                 cdsFull = cdsValue["cdsFull"]
                 # User defined aliases
                 if value["type"] == "alias":
-                    cdsFull.mapping[key] = aliasDict[cdsKey][key]
+                    cdsFull.mapping[columnKey] = aliasDict[cdsKey][columnKey]
                 # Columns directly controlled by parameter
                 elif value["type"] == "parameter":
-                    cdsFull.mapping[key] = paramDict[value["name"]]["value"]
-                    paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": key},
+                    cdsFull.mapping[columnKey] = paramDict[value["name"]]["value"]
+                    paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": columnKey},
                                                                                             code="""
                                                                                                 cdsAlias.mapping[key] = this.value;
                                                                                                 cdsAlias.compute_function(key);
