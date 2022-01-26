@@ -140,7 +140,7 @@ class ColumnEvaluator:
         if node.value.id != "self":
             if self.context is not None:
                 if node.value.id != self.context:
-                    raise ValueError("Incompatible data sources: " + node.value.id + ", " + self.context)
+                    raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             self.context = node.value.id
