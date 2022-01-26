@@ -9,6 +9,8 @@ export namespace CDSJoin {
     right: p.Property<ColumnarDataSource>
     on_left: p.Property<string[]>
     on_right: p.Property<string[]>
+    prefix_left: p.Property<string>
+    prefix_right: p.Property<string>
     how: p.Property<string>
     tolerance: p.Property<number>
   }
@@ -31,6 +33,8 @@ export class CDSJoin extends ColumnarDataSource {
       right: [Ref(ColumnarDataSource)],
       on_left: [ Array(String), [] ],
       on_right: [ Array(String), [] ],
+      prefix_left: [String],
+      prefix_right: [String],
       how: [ String ],
       tolerance: [Number, 1e-5]
     }))
@@ -172,11 +176,11 @@ export class CDSJoin extends ColumnarDataSource {
       this._indices_left = indices_left
       this._indices_right = indices_right
     }
-    for (const key in left.data) {
+    for (const key of left.columns()) {
       const col = left.get_array(key)
       if(col !== null) this.data[key] = this.join_column(col, this._indices_left)
     }
-    for (const key in right.data) {
+    for (const key of right.columns()) {
       const col = right.get_array(key)
       if(col !== null) this.data[key] = this.join_column(col, this._indices_right)
     }
@@ -184,9 +188,32 @@ export class CDSJoin extends ColumnarDataSource {
     change.emit()
   }
 
+  get_column(key: string){
+    const {left, right, data} = this
+    if (data[key] != null) return data[key]
+    let column = null
+    try {
+      column = left.get_column(key)
+    }
+    catch {
+      column = right.get_column(key)
+    }
+    if (column == null){
+      column = right.get_column(key)
+    }
+    if(column != null) {
+      if (!Array.isArray(column)){
+        data[key] = this.join_column(Array.from(column), this._indices_right)
+      } else {
+        data[key] = this.join_column(column, this._indices_right)
+      }
+    }
+    return data[key]
+  }
 
-  /*update_selection(){
-    this.source.selected.indices = this.selected.indices
-  }*/
+  get_length(){
+    if (this._indices_left == null) return 0
+    return this._indices_left.length
+  }
 
 }

@@ -4,15 +4,14 @@ from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.transform import *
-from jinja2.defaults import VARIABLE_END_STRING
+from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
 from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
-import pyparsing
 from IPython import get_ipython
-from bokeh.models.widgets import *
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -27,7 +26,6 @@ from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerC
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
-from bokeh.transform import transform as bokehTransform
 import re
 
 
@@ -47,7 +45,9 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
-BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field"]
+BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
+
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
 
 def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -76,7 +76,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
         const widget = widgetDict[key];
         const widgetType = widget.type;
         if(widgetType == "Slider"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             const widgetStep = widget.step;
             for(let i=0; i<size; i++){
@@ -85,7 +85,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "RangeSlider"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const low = widget.value[0];
             const high = widget.value[1];
             for(let i=0; i<size; i++){
@@ -94,7 +94,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "Select"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
@@ -105,7 +105,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "MultiSelect"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value.map((val)=>{
                 if(val === "True") return true;
                 if(val === "False") return false;
@@ -121,7 +121,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "CheckboxGroup"){
-            const col = dataOrig[key];
+            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             for(let i=0; i<size; i++){
                 isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
@@ -160,8 +160,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
     if(nPointRender > 0 && cdsSel != null){
+        console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
         cdsSel.update()
+        console.log(cdsSel._downsampled_indices.length);
+        console.log(cdsSel.nPoints)
         const t3 = performance.now();
         console.log(`Updating cds took ${t3 - t2} milliseconds.`);
     }
@@ -178,108 +181,13 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     return callback
 
 
-def __processBokehLayoutRow(layoutRow, figureList, layoutList, optionsMother, verbose=0):
-    """
-    :param layoutRow:
-    :param figureList:
-    :param layoutList:
-    :param optionsMother:
-    :param verbose:
-    :return:
-    """
-    if verbose > 0: logging.info("Raw", layoutRow)
-    array = []
-    layoutList.append(array)
-    option = __processBokehLayoutOption(layoutRow)
-    if verbose > 0: logging.info("Option", option)
-    for key in optionsMother:
-        if not (key in option):
-            option[key] = optionsMother[key]
-    for idx, y in enumerate(layoutRow):
-        if not y.isdigit(): continue
-        try:
-            fig = figureList[int(y)]
-        except:
-            logging.error("out of range index", y)
-        array.append(fig)
-        if type(fig).__name__ == 'DataTable':
-            continue
-        if 'commonY' in option:
-            if option["commonY"] >= 0:
-                try:
-                    fig.y_range = figureList[int(option["commonY"])].y_range
-                except ValueError:
-                    logging.info('Failed: to process option ' + option["commonY"])
-                    continue
-                except AttributeError:
-                    logging.info('Failed: to process option ' + option["commonY"])
-                    continue
-        if 'commonX' in option:
-            if option["commonX"] >= 0:
-                try:
-                    fig.x_range = figureList[int(option["commonX"])].x_range
-                except ValueError:
-                    if verbose > 0: logging.info('Failed: to process option ' + option["commonX"])
-                    continue
-                except AttributeError:
-                    logging.info('Failed: to process option ')
-                    continue
-
-        if (idx > 0) & ('y_visible' in option):
-            fig.yaxis.visible = bool(option["y_visible"]==1)
-        if (idx == 0) & ('y_visible' in option):
-            fig.yaxis.visible = bool(option["y_visible"]!=0)
-        if 'x_visible' in option:
-            fig.xaxis.visible = bool(option["x_visible"]==1)
-    nCols = len(array)
-    for fig in array:
-        if type(fig).__name__ == 'Figure':
-            if 'plot_width' in option:
-                fig.plot_width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.plot_height = int(option["plot_height"])
-        if type(fig).__name__ == 'DataTable':
-            if 'plot_width' in option:
-                fig.width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.height = int(option["plot_height"])
-        if type(fig).__name__ == 'BokehVisJSGraph3D':
-            if 'plot_width' in option:
-                fig.width = int(option["plot_width"] / nCols)
-            if 'plot_height' in option:
-                fig.height = int(option["plot_height"])
-
-
-def __processBokehLayoutOption(layoutOptions):
-    """
-    :param layoutOptions:
-    :return:
-    """
-    # https://stackoverflow.com/questions/9305387/string-of-kwargs-to-kwargs
-    options = {}
-    for x in layoutOptions:
-        if not (type(x) == str): continue
-        if "=" in str(x):  # one of the way to see if it's list
-            try:
-                k, v = x.split("=")
-            except ValueError:
-                continue
-            options[k] = v
-            if v.isdigit():
-                options[k] = int(v)
-            else:
-                try:
-                    options[k] = float(v)
-                except ValueError:
-                    options[k] = v
-    return options
-
-
-def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
-    :param widgetLayoutDesc: array desciption of layout
+    :param widgetLayoutDesc: array or dict desciption of layout
     :param widgetArray: input plain array of widgets/figures
+    :param isHorizontal: whether to create a row or column
+    :param options: options to use - can also be specified as the last element of widgetArray
     :return: combined figure
     Example:  in tutorial/bokehDraw/makePandaWidgets.ipynb
     widgetLayoutDesc=[
@@ -299,66 +207,68 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray):
         for i, iPanel in widgetLayoutDesc.items():
             tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
         return Tabs(tabs=tabs)
-    options = {
-        'commonX': -1, 'commonY': -1,
-        'x_visible': 1, 'y_visible': 1,
-        'plot_width': -1, 'plot_height': -1,
-        'sizing_mode': 'scale_width',
-        'legend_visible': True
-    }
+    if options is None:
+        options = {
+            'commonX': -1, 'commonY': -1,
+            'x_visible': 1, 'y_visible': 1,
+            'plot_width': -1, 'plot_height': -1,
+            'sizing_mode': 'scale_width',
+            'legend_visible': True
+        }
 
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
     if isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
-        options.update(widgetLayoutDesc[-1])
+        optionLocal = options.copy()
+        optionLocal.update(widgetLayoutDesc[-1])
         widgetLayoutDesc = widgetLayoutDesc[0:-1]
+    else:
+        optionLocal = options
 
-    for rowWidget in widgetLayoutDesc:
-        rowOptions = {}
-        rowOptions.update(options)
-        # patch local option
-        if isinstance(rowWidget[-1], dict):
-            rowOptions.update(rowWidget[-1])
-            rowWidget = rowWidget[0:-1]
-        rowWidgetArray0 = []
-        for i, iWidget in enumerate(rowWidget):
-            figure = widgetArray[iWidget]
-            rowWidgetArray0.append(figure)
-            if hasattr(figure, 'x_range'):
-                if rowOptions['commonX'] >= 0:
-                    figure.x_range = widgetArray[int(rowOptions["commonX"])].x_range
-                if rowOptions['commonY'] >= 0:
-                    figure.y_range = widgetArray[int(rowOptions["commonY"])].y_range
-                if rowOptions['x_visible'] == 0:
-                    figure.xaxis.visible = False
-                else:
-                     figure.xaxis.visible = True
-                #figure.xaxis.visible = bool(rowOptions["x_visible"])
-                if rowOptions['y_visible'] == 0:
-                    figure.yaxis.visible = False
-                if rowOptions['y_visible'] == 2:
-                    if i > 0: figure.yaxis.visible = False
-            if hasattr(figure, 'plot_width'):
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.plot_width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.plot_height = rowOptions["plot_height"]
-                if figure.legend:
-                    figure.legend.visible = rowOptions["legend_visible"]
-            if type(figure).__name__ == "DataTable":
-                figure.height = int(rowOptions["plot_height"])
-            if type(figure).__name__ == "BokehVisJSGraph3D":
-                if rowOptions["plot_width"] > 0:
-                    plot_width = int(rowOptions["plot_width"] / len(rowWidget))
-                    figure.width = plot_width
-                if rowOptions["plot_height"] > 0:
-                    figure.height = rowOptions["plot_height"]
+    for i, iWidget in enumerate(widgetLayoutDesc):
+        if isinstance(iWidget, dict):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=False, options=optionLocal))
+            continue
+        if isinstance(iWidget, list):
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=not isHorizontal, options=optionLocal))
+            continue
 
-        rowWidgetArray = row(rowWidgetArray0, sizing_mode=rowOptions['sizing_mode'])
-        widgetRows.append(rowWidgetArray)
+        figure = widgetArray[iWidget]
+        widgetRows.append(figure)
+        if hasattr(figure, 'x_range'):
+            if optionLocal['commonX'] >= 0:
+                figure.x_range = widgetArray[int(optionLocal["commonX"])].x_range
+            if optionLocal['commonY'] >= 0:
+                figure.y_range = widgetArray[int(optionLocal["commonY"])].y_range
+            if optionLocal['x_visible'] == 0:
+                figure.xaxis.visible = False
+            else:
+                figure.xaxis.visible = True
+            if optionLocal['y_visible'] == 0:
+                figure.yaxis.visible = False
+            if optionLocal['y_visible'] == 2:
+                if i > 0: figure.yaxis.visible = False
+        if hasattr(figure, 'plot_width'):
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.plot_width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.plot_height = optionLocal["plot_height"]
+            if figure.legend:
+                figure.legend.visible = optionLocal["legend_visible"]
+        if type(figure).__name__ == "DataTable":
+            figure.height = int(optionLocal["plot_height"])
+        if type(figure).__name__ == "BokehVisJSGraph3D":
+            if optionLocal["plot_width"] > 0:
+                plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.width = plot_width
+            if optionLocal["plot_height"] > 0:
+                figure.height = optionLocal["plot_height"]
+
+    if isHorizontal:
+        return row(widgetRows, sizing_mode=options['sizing_mode'])
     return column(widgetRows, sizing_mode=options['sizing_mode'])
 
 
@@ -423,6 +333,7 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
         formatter = ScientificFormatter(precision=3)
 
     for iHisto in histoDict:
+        # We are only interested in histograms so we filter the dict for histograms
         if histoDict[iHisto]["type"] == "histogram":
             histo_names.append(histoDict[iHisto]["name"])
             histo_columns.append("bin_count")
@@ -504,8 +415,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'x_axis_type': 'auto',
         'plot_width': 600,
         'plot_height': 400,
-        'errX': '',
-        'errY': '',
         'commonX': 0,
         'commonY': 0,
         'ncols': -1,
@@ -522,16 +431,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'nPointRender': 10000,
         "nbins": 10,
         "weights": None,
-        "histo2d": False,
         "range": None,
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
         "removeExtraColumns": True,
-        "cdsDict": {},
         "xAxisTitle": None,
         "yAxisTitle": None,
-        "plotTitle": None
+        "plotTitle": None,
+        "removeExtraColumns": False
     }
     options.update(kwargs)
     if query is not None:
@@ -541,19 +449,33 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             logging.info(dfQuery.metaData)
     else:
         dfQuery = dataFrame.copy()
+        initMetadata(dfQuery)
     # Check/resp. load derived variables
 
     if isinstance(figureArray[-1], dict):
         options.update(figureArray[-1])
 
     if sourceArray is not None:
-        histogramArray = histogramArray + sourceArray
+        sourceArray = histogramArray + sourceArray
+    
+    else:
+        sourceArray = histogramArray
 
-    dfQuery, histogramDict, downsamplerColumns, \
-    columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
-                                                       parameterArray=parameterArray, aliasArray=aliasArray, options=options)
+    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"]}] + sourceArray
 
-    paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+    #dfQuery, histogramDict, downsamplerColumns, \
+    #columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
+    #                                                   parameterArray=parameterArray, aliasArray=aliasArray, options=options)
+
+    # paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
+    paramDict = {}
+    for param in parameterArray:
+        paramDict[param["name"]] = param.copy()
+        paramDict[param["name"]]["subscribed_events"] = []
+
+    widgetParams = []
+    widgetArray = []
+    widgetDict = {}
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -572,41 +494,40 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         mapper.update_args()
                 """)])
 
-    aliasDict = {"":{}}
+    aliasDict = {None:{}}
     aliasSet = set()
     for i in aliasArray:
         customJsArgList = {}
         transform = None
-        if customJsColumns[i["name"]]:
-            aliasSet.add(i["name"])
-            if "transform" in i:
-                if i["transform"] in jsFunctionDict:
-                    if "context" in i:
-                        if i["context"] not in aliasDict:
-                            aliasDict[i["context"]] = {}
-                        aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
-                    else:
-                        aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
-            else:
-                if "parameters" in i:
-                    for j in i["parameters"]:
-                        customJsArgList[j] = paramDict[j]["value"]
-                if "v_func" in i:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
-                else:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+        aliasSet.add(i["name"])
+        if "transform" in i:
+            if i["transform"] in jsFunctionDict:
                 if "context" in i:
                     if i["context"] not in aliasDict:
                         aliasDict[i["context"]] = {}
-                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
                 else:
-                    aliasDict[""][i["name"]] = {"fields": i["variables"], "transform": transform}
-                if "parameters" in i:
-                    for j in i["parameters"]:
-                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
-                mapper.parameters[param] = this.value
-                mapper.update_args()
-                        """)])
+                    aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+        else:
+            if "parameters" in i:
+                for j in i["parameters"]:
+                    customJsArgList[j] = paramDict[j]["value"]
+            if "v_func" in i:
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
+            else:
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+            if "context" in i:
+                if i["context"] not in aliasDict:
+                    aliasDict[i["context"]] = {}
+                aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+            else:
+                aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": transform}
+            if "parameters" in i:
+                for j in i["parameters"]:
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+            mapper.parameters[param] = this.value
+            mapper.update_args()
+                    """)])
 
 
     plotArray = []
@@ -614,42 +535,150 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     colorMapperDict = {}
     cdsHistoSummary = None
 
-    for i in dfQuery.keys():
-        columnNameDict[i] = i
+    memoized_columns = {}
+    sources = set()
 
-    columnNameDict.update(aliasDict[""])
+    # Create the cdsDict - identify types from user input and make empty ColumnDataSources
+    cdsDict = {}
+    for i, iSource in enumerate(sourceArray):
+        iSource = iSource.copy()
+        # Detect the name, error on collision
+        cds_name = "anonymous_"+str(i)
+        if "name" in iSource:
+            cds_name = iSource["name"]
+        else:
+            raise ValueError("Column data sources other than the main one must have a name")
+        if cds_name in cdsDict:
+            raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
+        cdsDict[cds_name] = iSource
 
-    cdsFull = None
-    if options['arrayCompression'] is not None:
-        print("compressCDSPipe")
-        cdsCompress0, sizeMap= compressCDSPipe(dfQuery,options["arrayCompression"],1)
-        cdsCompress=CDSCompress(inputData=cdsCompress0, sizeMap=sizeMap)
-        cdsFull=cdsCompress
-    else:
-        try:
-            cdsFull = ColumnDataSource(dfQuery)
-        except:
-            logging.error("Invalid source:", cdsFull)
+        # Detect the type
+        if "type" not in iSource:
+            if "data" in iSource:
+                cdsType = "source"
+                if "arrayCompression" not in iSource:
+                    iSource["arrayCompression"] = None
+            elif "variables" in iSource:
+                nvars = len(iSource["variables"])
+                if nvars == 1:
+                    cdsType = "histogram"
+                elif nvars == 2:
+                    cdsType = "histo2d"
+                else:
+                    cdsType = "histoNd"
+            elif "left" in iSource or "right" in iSource:
+                cdsType = "join"
+            else:
+                # Cannot determine type automatically
+                raise ValueError(iSource)
+            iSource["type"] = cdsType
+        cdsType = iSource["type"]
 
-    if aliasDict[""]:
-        cdsFull = CDSAlias(source=cdsFull, mapping=columnNameDict)
+        # Create cdsOrig
+        if cdsType == "source":
+            if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
+                iSource["cdsOrig"] = CDSCompress()
+            else:
+                iSource["cdsOrig"] = ColumnDataSource()
+        elif cdsType == "histogram":
+            nbins = 10
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHistoTooltips
+        elif cdsType in ["histo2d", "histoNd"]:
+            nbins = [10]*len(iSource["variables"])
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHisto2DTooltips
+            #TODO: Add projections
+            if "axis" in iSource:
+                axisIndices = iSource["axis"]
+                projectionsLocal = {}
+                sum_range = []
+                if "sum_range" in iSource:
+                    sum_range = iSource["sum_range"]
+                quantiles = []
+                if "quantiles" in iSource:
+                    quantiles = iSource["quantiles"]
+                for j in axisIndices:
+                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles,
+                                                sum_range=sum_range, name=cds_name+"_"+str(j))
+                    projectionsLocal[i] = cdsProfile
+                    tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
+                    cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
+                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "tooltips": tooltips, "source": cds_name} 
+                iSource["profiles"] = projectionsLocal
+        elif cdsType == "join":
+            left = None
+            if "left" in iSource:
+                left = iSource["left"]
+            right = None
+            if "left" in iSource:
+                right = iSource["left"]
+            if "left_on" in iSource:
+                on_left = iSource["left_on"]
+            on_right = []
+            if "right_on" in iSource:
+                on_right = iSource["right_on"]
+            how  = "inner"
+            if "how" in iSource:
+                how = iSource["how"]
+            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how)
+        else:
+            raise NotImplementedError("Unrecognized CDS type: " + cdsType)
+            
+    for iSource in cdsDict.values():
+        # Add middleware for aliases
+        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
 
-    if downsamplerColumns:
-        source = DownsamplerCDS(source=cdsFull, nPoints=options['nPointRender'], selectedColumns=downsamplerColumns)
-    else:
-        source = None
+        # Add downsampler
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
 
-    histogramDict, histoList = bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray, histogramDict, aliasDict=aliasDict)
-    cdsDict = options["cdsDict"]
+        if "tooltips" not in iSource:
+            iSource["tooltips"] = []
 
     profileList = []
-    for i in histogramDict:
-        if i not in cdsDict:
-            cdsDict[i] = histogramDict[i]["cds"]
 
+    optionsChangeList = []
+    for i, variables in enumerate(figureArray):
+        if isinstance(variables, dict):
+            optionsChangeList.append(i)
+
+    optionsIndex = 0
+    if len(optionsChangeList) != 0:
+        optionGroup = options.copy()
+        optionGroup.update(figureArray[optionsChangeList[0]])
+    else:
+        optionGroup = options
     for i, variables in enumerate(figureArray):
         logging.info("%d\t%s", i, variables)
         if isinstance(variables, dict):
+            optionsIndex = optionsIndex + 1
+            if optionsIndex < len(optionsChangeList):
+                optionGroup = options.copy()
+                optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+            else:
+                optionGroup = options
             continue
         if variables[0] == 'table':
             TOptions = {
@@ -658,41 +687,81 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             }
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            plotArray.append(makeBokehDataTable(dfQuery, source, TOptions['include'], TOptions['exclude']))
+            # TODO: This is broken if compression is used because CDSCompress isn't a ColumnDataSource
+            plotArray.append(makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude']))
             continue
         if variables[0] == 'tableHisto':
+            histoListLocal = []
+            for key, value in cdsDict.items():
+                if value["type"] in ["histogram", "histo2d", "histoNd"]:
+                    histoListLocal.append(key)
+            # We just want to add them to the dependency tree
+            _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", histoListLocal, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+            sources.update(used_names_local)
             TOptions = {'rowwise': False}
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            cdsHistoSummary, tableHisto = makeBokehHistoTable(histogramDict, rowwise=TOptions["rowwise"])
+            cdsHistoSummary, tableHisto = makeBokehHistoTable(cdsDict, rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
+            continue
+        if variables[0] in ALLOWED_WIDGET_TYPES:
+            optionWidget = {}
+            if len(variables) == 3:
+                optionWidget = variables[2].copy()
+            fakeDf = None
+            if "callback" not in optionLocal:
+                if variables[1][0] in paramDict:
+                    optionWidget["callback"] = "parameter"
+                    varName = variables[1]
+                else:
+                    optionWidget["callback"] = "selection"
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+                    varName = column[0]["name"]
+                    if column[0]["type"] == "column":
+                        fakeDf = {varName: dfQuery[varName]}
+                    elif column[0]["type"] == "server_derived_column":
+                        fakeDf = {varName: column[0]["value"]}
+                    sources.update(used_names_local)
+            if variables[0] == 'slider':
+                localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'range':
+                localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'select':
+                localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'multiSelect':
+                localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+            plotArray.append(localWidget)
+            if localWidget:
+                widgetArray.append(localWidget)
+                widgetParams.append(variables)
+            if optionWidget["callback"] == "selection":
+                widgetDict[variables[1][0]] = localWidget
             continue
         xAxisTitle = ""
         yAxisTitle = ""
-        # zAxisTitle = ""
         plotTitle = ""
 
         for varY in variables[1]:
             if hasattr(dfQuery, "meta") and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
-                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, varY, None, aliasSet)
-                yAxisTitle += getHistogramAxisTitle(histogramDict, varNameY, cds_name, False)
+                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
             if hasattr(dfQuery, "meta") and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
-                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, varX, None, aliasSet)
-                xAxisTitle += getHistogramAxisTitle(histogramDict, varNameX, cds_name, False)
+                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
             xAxisTitle += ','
         xAxisTitle = xAxisTitle[:-1]
         yAxisTitle = yAxisTitle[:-1]
 
-        optionLocal = copy.copy(options)
-        if len(variables) > 2:
-            logging.info("Option %s", variables[2])
-            optionLocal.update(variables[2])
+        optionLocal = optionGroup.copy()
+        nvars = len(variables)
+        if isinstance(variables[-1], dict):
+            logging.info("Option %s", variables[-1])
+            optionLocal.update(variables[-1])
+            nvars -= 1
 
         if optionLocal["xAxisTitle"] is not None:
             xAxisTitle = optionLocal["xAxisTitle"]
@@ -702,15 +771,39 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if optionLocal["plotTitle"] is not None:
             plotTitle = optionLocal["plotTitle"]
 
-        if 'varZ' in optionLocal.keys():
-            dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][0], None, aliasSet)
-            _, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][0], cds_name, aliasSet)
-            _, varNameZ, cds_name = getOrMakeColumn(dfQuery, optionLocal['varZ'], cds_name, aliasSet)
-            _, varNameColor, cds_name = getOrMakeColumn(dfQuery, optionLocal['colorZvar'], cds_name, aliasSet)
+        variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
+        for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
+            if axis_index < nvars:
+                variablesLocal[axis_index] = variables[axis_index].copy()
+            elif axis_name in optionLocal:
+                variablesLocal[axis_index] = optionLocal[axis_name]
+            if variablesLocal[axis_index] is not None and not isinstance(variablesLocal[axis_index], list):
+                variablesLocal[axis_index] = [variablesLocal[axis_index]]
+        lengthX = len(variables[0])
+        lengthY = len(variables[1])
+        length = max(j is not None and len(j) for j in variablesLocal)
+        cds_names = None
+        if "source" in optionLocal:
+            cds_names = optionLocal["source"]
+        for i, iY in enumerate(variablesLocal[1]):
+            if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
+                variablesLocal[1][i] += ".bin_count"
+        for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
+            variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+            sources.update(used_names_local)
+
+        # varZ - if 3D use 3D
+        if variablesLocal[2] is not None:
+            cds_name = cds_names[0]
+            varNameX = variablesLocal[0][0]["name"]
+            varNameY = variablesLocal[1][0]["name"]
+            varNameZ = variablesLocal[2][0]["name"]
+            if variablesLocal[3] is not None:
+                varNameColor = variablesLocal[3][0]["name"]
+            else:
+                varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
-            cds_used = source
-            if cds_name is not None:
-                cds_used = cdsDict[cds_name]
+            cds_used = cdsDict[cds_name]["cds"]
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
@@ -724,78 +817,66 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
 
-        # graphArray=drawGraphArray(df, variables)
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
         mapperC = None
         cmap_cds_name = None
-        if 'colorZvar' in optionLocal:
-            #TODO: Support multiple color mappers, add more options, possibly use custom color mapper to improve performance
-            #So far, parametrized colZ is only supported for the main CDS
-            logging.info("%s", optionLocal["colorZvar"])
-            colorZVar = optionLocal['colorZvar']
-            if colorZVar in paramDict:
-                colorZVar = paramDict[colorZVar]['value']
-            _, varColor, cmap_cds_name = getOrMakeColumn(dfQuery, colorZVar, None, aliasSet)
-            low = 0
-            high = 1
-            if cmap_cds_name is None:
-                low = min(dfQuery[varColor])
-                high=max(dfQuery[varColor])
-            if "cmapLow" in optionLocal:
-                low = optionLocal["cmapLow"]
-            if "cmapHigh" in optionLocal:
-                high = optionLocal["cmapHigh"]   
-            if optionLocal["rescaleColorMapper"] or optionLocal["colorZvar"] in paramDict:
-                if optionLocal["colorZvar"] in colorMapperDict:
-                    mapperC = colorMapperDict[optionLocal["colorZvar"]]
-                else:
-                    mapperC = {"field": varColor, "transform": LinearColorMapper(palette=optionLocal['palette'])}
-                    colorMapperDict[optionLocal["colorZvar"]] = mapperC
-            else:
-                mapperC = linear_cmap(field_name=varColor, palette=optionLocal['palette'], low=low, high=high)
-            cds_used = source
-            if cmap_cds_name is not None:
-                cds_used = cdsDict[cmap_cds_name]
-                # This is really hacky, will probably be removed when ND histogram joins start working
-                if cmap_cds_name in histogramDict and histogramDict[cmap_cds_name]['type'] == 'profile' and varColor.split('_')[0] == 'bin':
-                    histogramDict[cmap_cds_name]['cds'].js_on_change('change', CustomJS(code="""
-                    const col = this.data[field]
-                    const isOK = this.data.isOK
-                    const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
-                    const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
-                    cmap.high = high;
-                    cmap.low = low;
-                    """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
-            axis_title = getHistogramAxisTitle(histogramDict, varColor, cmap_cds_name)
-            color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
-            if optionLocal['colorZvar'] in paramDict:
-                paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", color_bar, "title"])
 
         hover_tool_renderers = {}
 
         figure_cds_name = None
+        mapperC = None
 
         for i in range(0, length):
-            cds_name = None
-            if variables[1][i % lengthY] in histogramDict:
-                iHisto = histogramDict[variables[1][i % lengthY]]
-                if iHisto["type"] == "histogram":
-                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
-                elif iHisto["type"] == "histo2d":
-                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][0])
-                    dfQuery, varNameY = pandaGetOrMakeColumn(dfQuery, iHisto["variables"][1])
-            else:
-                dfQuery, varNameX, cds_name = getOrMakeColumn(dfQuery, variables[0][i % lengthX], cds_name, aliasSet)
-                dfQuery, varNameY, cds_name = getOrMakeColumn(dfQuery, variables[1][i % lengthY], cds_name, aliasSet)
-            if mapperC is not None and cds_name == cmap_cds_name:
-                color = mapperC
+            variables_dict = {}
+            for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
+                variables_dict[axis_name] = variablesLocal[axis_index]
+                if isinstance(variables_dict[axis_name], list):
+                    variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
+            cds_name = cds_names[i]
+            varNameX = variables_dict["X"]["name"]
+            varNameY = variables_dict["Y"]["name"]
+            varColor = variables_dict["colorZvar"]
+            if varColor is not None:
+                if mapperC is not None:
+                    color = mapperC
+                else:
+                    rescaleColorMapper = optionLocal["rescaleColorMapper"] or varColor["type"] == "parameter" or cdsDict[cds_name]["type"] in ["histogram", "histo2d", "histoNd"]
+                    if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
+                        low = np.min(cdsDict[cds_name]["data"][varColor["name"]])
+                        high= np.max(cdsDict[cds_name]["data"][varColor["name"]])
+                        mapperC = linear_cmap(field_name=varColor["name"], palette=optionLocal['palette'], low=low, high=high)
+                    else:
+                        if varColor["name"] in colorMapperDict:
+                            mapperC = colorMapperDict[varColor["name"]]
+                        else:
+                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'])}
+                            colorMapperDict[varColor["name"]] = mapperC
+                    # HACK for projections - should probably just remove the rows as there's no issue with joins at all
+                    if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
+                        cdsDict[cds_name]['cdsOrig'].js_on_change('change', CustomJS(code="""
+                        const col = this.data[field]
+                        const isOK = this.data.isOK
+                        const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
+                        const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
+                        cmap.high = high;
+                        cmap.low = low;
+                        """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
+                    color = mapperC
+                    # Also add the color bar
+                    if varColor["type"] == "parameter":
+                        axis_title = paramDict[varColor["name"]]["value"]
+                    else:
+                        axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cmap_cds_name)
+                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
+                    if varColor["type"] == "parameter":
+                        paramDict[varColor["name"]]["subscribed_events"].append(["value", color_bar, "title"])
+            elif 'color' in optionLocal:
+                color=optionLocal['color']
             else:
                 color = colorAll[max(length, 4)][i]
-            if 'color' in optionLocal:
-                color=optionLocal['color']
             try:
                 marker = optionLocal['markers'][i]
             except:
@@ -808,29 +889,24 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            cds_used = source
-            if cds_name is not None:
-                cds_used = cdsDict[cds_name]
+            cds_used = cdsDict[cds_name]["cds"]
 
-            if varY in histogramDict:
-                histoHandle = histogramDict[varY]
+            if varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
+                histoHandle = cdsDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
                 elif histoHandle["type"] == "histo2d":
-                    addHisto2dGlyph(figureI, varNameX, varNameY, histoHandle, colorMapperDict, color, marker, dfQuery,
-                                    optionLocal)
+                    addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
-                #                zAxisTitle +=varColor + ","
-                #            view = CDSView(source=source, filters=[GroupFilter(column_name=optionLocal['filter'], group=True)])
                 drawnGlyph = None
                 colorMapperCallback = """
                 glyph.fill_color={...glyph.fill_color, field:this.value}
                 glyph.line_color={...glyph.line_color, field:this.value}
                 """
                 if optionLocal["legend_field"] is None:
-                    x_label = getHistogramAxisTitle(histogramDict, varNameX, cds_name)
-                    y_label = getHistogramAxisTitle(histogramDict, varNameY, cds_name)
+                    x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                    y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                 else:
@@ -847,31 +923,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if optionLocal['size'] in paramDict:
                     paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                if cds_name is None:
-                    if "" not in hover_tool_renderers:
-                        hover_tool_renderers[""] = []
-                    hover_tool_renderers[""].append(drawnGlyph)
-                elif cds_name in histogramDict:
-                    if histogramDict[cds_name]["type"] == "profile":
-                        if cds_name not in hover_tool_renderers:
-                            hover_tool_renderers[cds_name] = []
-                        hover_tool_renderers[cds_name].append(drawnGlyph)
-                if ('errX' in optionLocal.keys()) and (optionLocal['errX'] != '') and (cds_name is None):
-                    dfQuery, varErrX = pandaGetOrMakeColumn(dfQuery, optionLocal['errX'])
-                    errWidthX = bokehTransform(varErrX, CustomJSTransform(v_func="return xs.map((x)=>2*x)"))
+                    if cds_name not in hover_tool_renderers:
+                        hover_tool_renderers[cds_name] = []
+                    hover_tool_renderers[cds_name].append(drawnGlyph)
+                if variables_dict['errX'] is not None:
+                    errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
-                    figureI.add_glyph(source, errorX)
-                if ('errY' in optionLocal.keys()) and (optionLocal['errY'] != '') and (cds_name is None):
-                    dfQuery, varErrY = pandaGetOrMakeColumn(dfQuery, optionLocal['errY'])
-                    errWidthY = bokehTransform(varErrY, CustomJSTransform(v_func="return xs.map((x)=>2*x)"))
+                    figureI.add_glyph(cds_used, errorX)
+                if variables_dict['errY'] is not None:
+                    errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                     errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                         paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
-                    figureI.add_glyph(source, errorY)
-                #    errors = Band(base=varNameX, lower=varNameY+"_lower", upper=varNameY+"_upper",source=source)
-                #    figureI.add_layout(errors)
+                    figureI.add_glyph(cds_used, errorY)
             if figure_cds_name is None:
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
@@ -880,13 +946,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
         for iCds, iRenderers in hover_tool_renderers.items():
-            if iCds == "":
-                tooltips = optionLocal["tooltips"]
-            elif iCds in histogramDict and histogramDict[iCds]["type"] == "profile":
-                profile_description = histogramDict[iCds]
-                tooltips = defaultNDProfileTooltips(profile_description["variables"], profile_description["axis"],
-                                                    profile_description["quantiles"],  profile_description["sum_range"])
-            figureI.add_tools(HoverTool(tooltips=tooltips, renderers=iRenderers))
+            figureI.add_tools(HoverTool(tooltips=cdsDict[iCds]["tooltips"], renderers=iRenderers))
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
@@ -898,27 +958,84 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 legend_options = optionLocal['legend_options'].copy()
                 legend_options_parameters = {}
                 for i, iOption in legend_options.items():
-                    if iOption in parameterDict:
+                    if iOption in paramDict:
                         legend_options_parameters[i] = paramDict[iOption]
                 for i, iOption in legend_options_parameters.items():
                     legend_options[i] = iOption['value']
                 figureI.legend.update(**legend_options)
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
-        #        zAxisTitle=zAxisTitle[:-1]
-        #        if(len(zAxisTitle)>0):
-        #            plotTitle += " Color:" + zAxisTitle
-        #        figureI.title = plotTitle
         plotArray.append(figureI)
+    histoList = []
+    for cdsKey, cdsValue in cdsDict.items():
+        # Ignore unused data sources
+        if cdsKey not in memoized_columns:
+            continue
+        # Populate the data sources - original columns
+        if cdsValue["type"] == "source":
+            sent_data = {}
+            for key, value in memoized_columns[cdsKey].items():
+                if (cdsKey, key) in sources:
+                    if value["type"] == "server_derived_column":
+                        sent_data[key] = value["value"]
+                    elif value["type"] == "column":
+                        sent_data[key] = cdsValue["data"][key]
+            cdsOrig = cdsValue["cdsOrig"]
+            if cdsValue['arrayCompression'] is not None:
+                print("compressCDSPipe")
+                cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+                cdsOrig.inputData = cdsCompress0
+                cdsOrig.sizeMap = sizeMap
+            else:
+                cdsOrig.data = sent_data
+        elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
+            cdsOrig = cdsValue["cdsOrig"]
+            cdsOrig.source = cdsDict[cdsValue["source"]]["cdsFull"]
+            if cdsValue["source"] is None:
+                histoList.append(cdsOrig)
+            if "histograms" in cdsValue:
+                for key, value in memoized_columns[cdsKey].items():
+                    if key in cdsValue["histograms"]:
+                        if value["type"] == "column":
+                            cdsOrig.histograms[key] = cdsValue["histograms"][key]  
+        elif cdsValue["type"] == "join":
+            cdsOrig = cdsValue["cdsOrig"]
+            cdsOrig.left = cdsDict[cdsValue["left"]]["cdsFull"]
+            cdsOrig.right = cdsDict[cdsValue["right"]]["cdsFull"] 
+        # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
+        # In future an option can be added for creating them from array
+
+        # Add aliases
+        for key, value in memoized_columns[cdsKey].items():
+            columnKey = value["name"]
+            if (cdsKey, columnKey) not in sources:
+                cdsFull = cdsValue["cdsFull"]
+                # User defined aliases
+                if value["type"] == "alias":
+                    cdsFull.mapping[columnKey] = aliasDict[cdsKey][columnKey]
+                # Columns directly controlled by parameter
+                elif value["type"] == "parameter":
+                    cdsFull.mapping[columnKey] = paramDict[value["name"]]["value"]
+                    paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": columnKey},
+                                                                                            code="""
+                                                                                                cdsAlias.mapping[key] = this.value;
+                                                                                                cdsAlias.compute_function(key);
+                                                                                                cdsAlias.change.emit();
+                                                                                            """)])
+
+    cdsFull = cdsDict[None]["cdsFull"]
+    source = cdsDict[None]["cds"]
+    callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
+                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
-        layoutList = [pAll]
     if options['doDraw']:
         show(pAll)
-    return pAll, source, layoutList, dfQuery, colorMapperDict, cdsFull, histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict
 
 
-def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQuery, options):
+def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
@@ -942,10 +1059,10 @@ def addHisto2dGlyph(fig, x, y, histoHandle, colorMapperDict, color, marker, dfQu
     elif visualization_type == "colZ":
         mapperC = {"field": "bin_count", "transform": LinearColorMapper(palette=options['palette'])}
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
-                             title=y)
+                             title=histoHandle["variables"][1])
         if options["legend_field"] is None:
             histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
-                            color=mapperC, marker=marker, legend_label="Histogram of " + x)
+                            color=mapperC, marker=marker, legend_label="Histogram of " + histoHandle["variables"][0])
         else:
             histoGlyphRenderer = fig.scatter(x="bin_center_0", y="bin_count", fill_alpha=1, source=cdsHisto, size=options['size'],
                             color=mapperC, marker=marker, legend_field=options["legend_field"])
@@ -1127,6 +1244,9 @@ def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **k
 
 
 def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
+    """
+    DEPRECATED - do not use this function - functionality already in bokehDrawArray
+    """
     widgetArray = []
     widgetDict = {}
     for widget in widgetParams:
@@ -1135,7 +1255,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
         optionLocal = {}
         localWidget = None
         if len(widget) == 3:
-            optionLocal = widget[2]
+            optionLocal = widget[2].copy()
         if "callback" not in optionLocal:
             if params[0] in paramDict:
                 optionLocal["callback"] = "parameter"
@@ -1158,10 +1278,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
     callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
                                        cmapDict=cmapDict, nPointRender=nPointRender,
                                        cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
-    #callback = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList, cmapDict=cmapDict, nPointRender=nPointRender)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
+    return widgetArray
+
+def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = {}
         params = iDesc[1]
+        callback = None
         if len(iDesc) == 3:
             optionLocal = iDesc[2]
         if "callback" not in optionLocal:
@@ -1170,7 +1294,7 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
             else:
                 optionLocal["callback"] = "selection"
         if optionLocal["callback"] == "selection":
-            callback = callbackSel
+            callback = defaultCallback
         elif optionLocal["callback"] == "parameter":
             paramControlled = paramDict[iDesc[1][0]]
             for iEvent in paramControlled["subscribed_events"]:
@@ -1179,15 +1303,14 @@ def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDi
                 else:
                     iWidget.js_link(*iEvent)
             continue
-        if isinstance(iWidget, CheckboxGroup):
-            iWidget.js_on_click(callback)
-        elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
-            iWidget.js_on_change("value", callback)
-        else:
-            iWidget.js_on_change("value", callback)
-        iWidget.js_on_event("value", callback)
-    return widgetArray
-
+        if callback is not None:
+            if isinstance(iWidget, CheckboxGroup):
+                iWidget.js_on_click(callback)
+            elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
+                iWidget.js_on_change("value", callback)
+            else:
+                iWidget.js_on_change("value", callback)
+            iWidget.js_on_event("value", callback)
 
 def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, parameterDict={}, aliasDict={}, **kwargs):
     options = {"range": None,
@@ -1251,14 +1374,13 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
             cdsUsed = optionLocal["source"]
         sampleVars = iHisto["variables"]
         if optionLocal["weights"] is not None:
-            _, weights, cdsUsed = getOrMakeColumn(dfQuery, optionLocal["weights"], cdsUsed, aliasDict[""])
+            weights = optionLocal["weights"]
         if len(sampleVars) == 1:
-            _, varNameX, cdsUsed = getOrMakeColumn(dfQuery, sampleVars[0], cdsUsed, aliasDict[""])
             source = cdsFull
             if "source" in iHisto:
                 source = iHisto["source"]
             cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
-                                    range=optionLocal["range"], sample=varNameX, weights=weights)
+                                    range=optionLocal["range"], sample=sampleVars[0], weights=weights)
             histoList.append(cdsHisto)
             if iHisto["name"] in aliasDict:
                 mapping = aliasDict[iHisto["name"]]
@@ -1267,11 +1389,11 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     mapping.update({i:i})
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram"})
+            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram", "source": cdsUsed})
         else:
             sampleVarNames = []
             for i in sampleVars:
-                _, varName, cdsUsed = getOrMakeColumn(dfQuery, i, cdsUsed, aliasDict[""])
+                varName = i
                 sampleVarNames.append(varName)
             source = cdsFull
             if "source" in iHisto:
@@ -1290,10 +1412,10 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                 cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
             if len(sampleVars) == 2:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
-                                        "variables": sampleVars}
+                                        "variables": sampleVars, "source": cdsUsed}
             else:
                 histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
-                                        "variables": sampleVars}
+                                        "variables": sampleVars, "source": cdsUsed}
             if "axis" in iHisto:
                 axisIndices = iHisto["axis"]
                 profilesDict = {}
@@ -1301,7 +1423,7 @@ def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=Non
                     cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
                                                 sum_range=optionLocal["sum_range"])
                     profilesDict[i] = cdsProfile
-                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "profile", "name": histoName+"_"+str(i), "variables": sampleVars,
+                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "projection", "name": histoName+"_"+str(i), "variables": sampleVars,
                     "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
                 histoDict[histoName]["profiles"] = profilesDict
 
@@ -1326,16 +1448,42 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
 
     if parameterArray is not None:
           for i, param in enumerate(parameterArray):
-            paramDict[param["name"]] = param
+            paramDict[param["name"]] = param.copy()
 
     if figureArray is not None:
+        optionsChangeList = []
         for i, variables in enumerate(figureArray):
             if isinstance(variables, dict):
+                optionsChangeList.append(i)
+
+        optionsIndex = 0
+        if len(optionsChangeList) != 0:
+            optionGroup = options.copy()
+            optionGroup.update(figureArray[optionsChangeList[0]])
+        else:
+            optionGroup = options
+        for i, variables in enumerate(figureArray):
+            if isinstance(variables, dict):
+                optionsIndex = optionsIndex + 1
+                if optionsIndex < len(optionsChangeList):
+                    optionGroup = options.copy()
+                    optionGroup.update(figureArray[optionsChangeList[optionsIndex]])
+                else:
+                    optionGroup = options
+                continue
+            if variables[0] in ALLOWED_WIDGET_TYPES:
+                if len(variables) < 3 or 'callback' not in variables[2]:
+                    if variables[1][0] not in paramDict:
+                        dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                        columnNameDict[varNameX] = True
+                elif variables[2]['callback'] == 'selection':
+                    dfQuery, varNameX = pandaGetOrMakeColumn(dfQuery, variables[1][0])
+                    columnNameDict[varNameX] = True
                 continue
             if variables[0] != "table" and variables[0] != "tableHisto":
                 nvars = len(variables)
                 if isinstance(variables[-1], dict):
-                    optionLocal = options.copy()
+                    optionLocal = optionGroup.copy()
                     optionLocal.update(variables[-1])
                     nvars = nvars - 1
                 else:
@@ -1420,6 +1568,7 @@ def makeDerivedColumns(dfQuery, figureArray=None, histogramArray=None, parameter
                                     dfQuery, varName = pandaGetOrMakeColumn(dfQuery, iColumn["weights"])
                                     columnNameDict[varName] = True
 
+    # Probably zombie code
     if widgetArray is not None:
         for iWidget in widgetArray:
             if len(iWidget) < 3 or 'callback' not in iWidget[2]:
@@ -1446,9 +1595,6 @@ def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableLis
         for param in parameterArray:
             parameterDict[param["name"]] = param.copy()
             parameterDict[param["name"]]["subscribed_events"] = []
-    if histogramArray is not None:
-        for iHisto in histogramArray: 
-            pass
     if figureArray is not None:
         for i, variables in enumerate(figureArray):
             if isinstance(variables, dict):
@@ -1526,43 +1672,56 @@ def getTooltipColumns(tooltips):
                 result[iField[1:]] = True
     return result
 
-def getHistogramAxisTitle(histoDict, varName, cdsName, removeCdsName=True):
+def makeBokehDataSpec(thing: dict, paramDict: dict):
+    if thing["type"] == "constant":
+        return {"value": thing["value"]}
+    return {"field": thing["name"]}
+
+def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
+    if varError["type"] == "constant":
+        return {"value": varError["value"]*2}
+    if transform is None:
+        transform = CustomJSTransform(v_func="return xs.map((x)=>2*x)")
+    if varError["type"] == "parameter":
+        return {"field": paramDict[varError["name"]]["value"], "transform": transform}
+    return {"field": varError["name"], "transform": transform}
+
+def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return varName
-    if cdsName in histoDict:
-        if "variables" not in histoDict[cdsName]:
+    if cdsName in cdsDict:
+        if "variables" not in cdsDict[cdsName]:
             return varName
         if '_' in varName:
             if varName == "bin_count":
-                # Maybe do something else
                 return "entries"
             x = varName.split("_")
             if x[0] == "bin":
                 if len(x) == 2:
-                    return histoDict[cdsName]["variables"][0]
-                return histoDict[cdsName]["variables"][int(x[-1])]
+                    return cdsDict[cdsName]["variables"][0]
+                return cdsDict[cdsName]["variables"][int(x[-1])]
             if x[0] == "quantile":
-                quantile = histoDict[cdsName]["quantiles"][int(x[-1])]
+                quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if '_' in cdsName:
                     histoName, projectionIdx = cdsName.split("_")
-                    return "quantile " + str(quantile) + " " + histoDict[histoName]["variables"][int(projectionIdx)]
+                    return "quantile " + str(quantile) + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
                 return "quantile " + str(quantile)
             if x[0] == "sum":
-                range = histoDict[cdsName]["sum_range"][int(x[-1])]
+                range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "sum " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                        return "sum " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
                 else:
                     if '_' in cdsName:
                         histoName, projectionIdx = cdsName.split("_")
-                        return "p " + histoDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                        return "p " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
         else:
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
-                return varName + " " + histoDict[histoName]["variables"][int(projectionIdx)]
+                return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
     if not removeCdsName:
         return cdsName+"."+varName
     return varName

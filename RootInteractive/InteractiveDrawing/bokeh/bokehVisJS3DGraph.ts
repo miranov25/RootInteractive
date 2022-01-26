@@ -93,12 +93,17 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
   get_data(): vis.DataSet {
     const data = new vis.DataSet()
     const source = this.model.data_source
+    const x = source.get_column(this.model.x)
+    const y = source.get_column(this.model.y)
+    const z = source.get_column(this.model.z)
+    const style = source.get_column(this.model.style)
+    if(x != null && y != null && z != null && style != null)
     for (let i = 0; i < source.get_length()!; i++) {
       data.add({
-        x: source.data[this.model.x][i],
-        y: source.data[this.model.y][i],
-        z: source.data[this.model.z][i],
-        style: source.data[this.model.style][i],
+        x: x[i],
+        y: y[i],
+        z: z[i],
+        style: style[i],
       })
     }
     return data

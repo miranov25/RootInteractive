@@ -101,7 +101,7 @@ export class HistogramCDS extends ColumnarDataSource {
       bin_right.length = 0
       if(this.view === null){
         if(this.range === null ){
-          const sample_arr = this.source.data[this.sample] as number[]
+          const sample_arr = this.source.get_array(this.sample) as number[]
           this._range_min = sample_arr.reduce((acc, cur) => Math.min(acc, cur), sample_arr[0])
           this._range_max = sample_arr.reduce((acc, cur) => Math.max(acc, cur), sample_arr[0])
         } else {
@@ -110,7 +110,7 @@ export class HistogramCDS extends ColumnarDataSource {
         }
       } else {
         if(this.range === null ){
-          const sample_arr = this.source.data[this.sample] as number[]
+          const sample_arr = this.source.get_array(this.sample) as number[]
           this._range_min = this.view.reduce((acc, cur) => Math.min(acc, sample_arr[cur]), sample_arr[this.view[0]])
           this._range_max = this.view.reduce((acc, cur) => Math.max(acc, sample_arr[cur]), sample_arr[this.view[0]])
         } else {
@@ -132,22 +132,28 @@ export class HistogramCDS extends ColumnarDataSource {
   histogram(weights: string | null): number[]{
     const bincount = Array<number>(this._nbins)
     bincount.fill(0)
-    const sample_array = this.source.data[this.sample]
+    const sample_array = this.source.get_column(this.sample)
+    if(sample_array == null){
+      throw ReferenceError("Column " + this.sample + " not found in source")
+    }
     const view_indices = this.view
     if(view_indices === null){
       const n_indices = this.source.length
       if(weights != null){
-        const weights_array = this.source.data[weights]
+        const weights_array = this.source.get_column(weights)
+        if (weights_array == null){
+          throw ReferenceError("Column not defined: "+ weights)
+        }
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[i])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += weights_array[i]
           }
         }
       } else {
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[i])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += 1
           }
         }
@@ -155,18 +161,21 @@ export class HistogramCDS extends ColumnarDataSource {
     } else {
       const n_indices = view_indices.length
       if(weights != null){
-        const weights_array = this.source.data[weights]
+        const weights_array = this.source.get_column(weights)
+        if (weights_array == null){
+          throw ReferenceError("Column not defined: "+ weights)
+        }
         for(let i=0; i<n_indices; i++){
           let j = view_indices[i]
           const bin = this.getbin(sample_array[j])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += weights_array[j]
           }
         }
       } else {
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(sample_array[view_indices[i]])
-          if(bin >= 0 && bin < this.nbins){
+          if(bin >= 0 && bin < this._nbins){
             bincount[bin] += 1
           }
         }
@@ -185,4 +194,7 @@ export class HistogramCDS extends ColumnarDataSource {
       return (val*this._transform_scale+this._transform_origin)|0
   }
 
+  get_size(){
+    return this.nbins
+  }
 }

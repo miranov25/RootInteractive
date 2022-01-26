@@ -7,10 +7,14 @@ from bokeh.plotting import output_file
 
 output_file("test_join.html")
 
+
+x = np.arange(10000)
+y = np.sqrt(x)
+c = np.square(np.arange(100))
 sourceArray = [
     {
         "name": "df2",
-        "data": pd.DataFrame({"A": [1,1,1,2,2,3,4]})
+        "data": pd.DataFrame({"A": x, "B": y})
     },
     {
         "name": "joinA",
@@ -22,15 +26,16 @@ sourceArray = [
     {
         "name": "histo0",
         "variables": ["B"],
-        "weights": "A"
+        "weights": "A",
+        "source": "joinA"
     }
 ]
 
-df = pd.DataFrame({"A": [1,2,2,2,4], "B": [1,2,3,4,5]})
+df = pd.DataFrame({"A": c})
 
 figureArray = [
-    [["A"], ["B"]],
-    [["joinA.A"], ["joinA.B"]],
+    [["A"], ["B"],{"source":"df2"}],
+    [["joinA.A"], ["joinA.df2.B"]],
     [["histo0.bin_center"], ["histo0.bin_count"]]
 ]
 

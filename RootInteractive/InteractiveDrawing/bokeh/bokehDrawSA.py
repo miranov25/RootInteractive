@@ -1,5 +1,5 @@
 from bokeh.models import *
-from .bokehTools import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
 import logging
 
 
@@ -144,10 +144,12 @@ class bokehDrawSA(object):
         kwargs=options
         tmp=""
         optionList=[]
+        nFigures = 0
         for fig in figureArray:
             if isinstance(fig,dict):
                 optionList.append(fig)
                 continue
+            nFigures = nFigures + 1
             if fig[0] == 'table':    continue
             for entry in fig:
                 if isinstance(entry, dict):
@@ -168,16 +170,14 @@ class bokehDrawSA(object):
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         if "arrayCompression" in options:
             self.isNotebook = False
-        dfQuery, _, _, _, _, _ = makeDerivedColumns(self.dataSource, figureArray=figureArray, histogramArray=options["histogramArray"] + options["sourceArray"],
-                                              widgetArray=widgetsDescription, parameterArray=options["parameterArray"], 
-                                              aliasArray=options["aliasArray"], options={"removeExtraColumns": True})
-        self.figure, self.cdsSel, self.plotArray, dataFrameOrig, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(dfQuery, None, figureArray, removeExtraColumns=False, **kwargs)
+        mergedFigureArray = figureArray + widgetsDescription
+        self.figure, self.cdsSel, self.plotArray, self.cmapList, self.cdsOrig, self.histoList,\
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
-        widgetList=self.initWidgets(widgetsDescription)
-        self.plotArray.append(widgetList)
-        self.pAll=gridplotRow(self.plotArray,sizing_mode=self.options['sizing_mode'])
+        if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
+            widgetList=processBokehLayoutArray(self.widgetLayout, self.plotArray[nFigures:])
+        self.pAll=gridplotRow([self.figure, widgetList], sizing_mode=self.options['sizing_mode'])
         self.widgetList=widgetList
         #self.pAll=column([self.figure,widgetList],sizing_mode=self.options['sizing_mode'])
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)

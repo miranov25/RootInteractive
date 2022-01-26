@@ -5,6 +5,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import Custom
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets import Slider
@@ -42,7 +43,7 @@ aliasArray = [
         "transform": "saxpy" 
     },
     {
-        "name": "C_cut",
+        "name": "C_accepted",
         "variables": ["C"],
         "parameters": ["C_cut"],
         "func": "return C < C_cut"
@@ -74,7 +75,7 @@ histoArray = [
         "name": "histoA", "variables": ["A"], "nbins": 10, "histograms": {
             "entries": None,
             "entries_C_cut": {
-                "weights": "C_cut"
+                "weights": "C_accepted"
             }
         }
     },
@@ -83,7 +84,7 @@ histoArray = [
         "histograms": {
             "entries": None,
             "entries_C_cut": {
-                "weights": "C_cut"
+                "weights": "C_accepted"
             }
         }
     }
@@ -130,7 +131,6 @@ def test_customJsFunction():
     sliderWidget.js_on_change("value", CustomJS(args = {"jsMapper": jsMapper, "cdsAlias": cdsAlias}, code="""
         jsMapper.parameters = {x: this.value}
         jsMapper.update_args()
-        cdsAlias.compute_functions()
     """))
 
     output_file("test_Alias.html")
@@ -166,5 +166,20 @@ def test_customJsFunctionBokehDrawArray_v():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
+    
+def test_makeColumns():
+    varList, ctx_updated, memoized_columns, sources = (None, None, None, None)
+    df = pd.DataFrame(np.random.random_sample(size=(200000, 3)), columns=list('XYZ'))
+    paramDict = {"paramA": {"value": "5"}}
+    functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
+    cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
+    assert len(varList) == 9
+    assert len(sources) == 6
+    assert ctx_updated[-1] == "histoA"
+    print(ctx_updated)
+    print(memoized_columns)
+    print(sources)
 
-test_customJsFunctionBokehDrawArray()
+test_makeColumns()
+#test_customJsFunctionBokehDrawArray_v()
