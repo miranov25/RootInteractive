@@ -90,6 +90,7 @@ class ColumnEvaluator:
 
     def visit_Attribute(self, node: ast.Attribute):
         if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
+            # We have an alias in aliasDict
             self.isSource = False
             if isinstance(self.aliasDict[self.context][node.attr], str):
                 if self.aliasDict[self.context][node.attr] == node.attr:
@@ -139,7 +140,7 @@ class ColumnEvaluator:
         if node.value.id != "self":
             if self.context is not None:
                 if node.value.id != self.context:
-                    raise ValueError("Cannot jump out of already entered context within vairable parsing")
+                    raise ValueError("Incompatible data sources: " + node.value.id + ", " + self.context)
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             self.context = node.value.id
@@ -155,6 +156,7 @@ class ColumnEvaluator:
         }
 
     def visit_Name(self, node: ast.Name):
+        # There are two cases, either we are selecting the namespace or the column from the current one
         if node.id in self.paramDict:
             self.isSource = False
             if "options" in self.paramDict[node.id]:
