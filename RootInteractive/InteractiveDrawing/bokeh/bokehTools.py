@@ -845,8 +845,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     rescaleColorMapper = optionLocal["rescaleColorMapper"] or varColor["type"] == "parameter" or cdsDict[cds_name]["type"] in ["histogram", "histo2d", "histoNd"]
                     if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
-                        low = np.min(cdsDict[cds_name]["data"][varColor["name"]])
-                        high= np.max(cdsDict[cds_name]["data"][varColor["name"]])
+                        low = np.nanmin(cdsDict[cds_name]["data"][varColor["name"]])
+                        high= np.nanmax(cdsDict[cds_name]["data"][varColor["name"]])
                         mapperC = linear_cmap(field_name=varColor["name"], palette=optionLocal['palette'], low=low, high=high)
                     else:
                         if varColor["name"] in colorMapperDict:
@@ -1126,6 +1126,14 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
     end = 0
     step = 0
     value=None
+    #df[name].loc[ abs(df[name])==np.inf]=0
+    try:
+        if df[name].dtype=="float":                    #if type is float and has inf print error message and replace
+            if (np.isinf(df[name])).sum()>0:
+                print(f"makeBokehSliderWidget() - Invalid column {name} with infinity")
+                raise
+    except:
+        pass
     if options['callback'] == 'parameter':
         if options['type'] == 'user':
             start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
@@ -1145,12 +1153,12 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
         if options['type'] == 'user':
             start = params[1], end = params[2], step = params[3], value = (params[4], params[5])
         elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
-            start = df[name].min()
-            end = df[name].max()
+            start = np.nanmin(df[name])
+            end = np.nanmax(df[name])
             step = (end - start) / options['bins']
         elif (options['type'] == 'unique'):
-            start = df[name].min()
-            end = df[name].max()
+            start = np.nanmin(df[name])
+            end = np.nanmax(df[name])
             nbins=df[name].unique().size-1
             step = (end - start) / float(nbins)
         elif options['type'] == 'sigma':
@@ -1193,7 +1201,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
         if options['callback'] == 'parameter':
             optionsPlot = paramDict[params[0]]["options"]
         else:
-            optionsPlot = np.sort(df[params[0]].unique()).tolist()
+            optionsPlot = np.sort(df[params[0]].dropna().unique()).tolist()
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
@@ -1221,7 +1229,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         try:
             optionsPlot = np.sort(df[params[0]].unique()).tolist()
         except:
-            optionsPlot = sorted(df[params[0]].unique().tolist())
+            optionsPlot = sorted(df[params[0]].dropna().unique().tolist())
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
