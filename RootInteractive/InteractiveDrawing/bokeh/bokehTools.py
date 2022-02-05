@@ -26,6 +26,8 @@ from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerC
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
+import numpy as np
+import pandas as pd
 import re
 
 
@@ -829,7 +831,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figure_cds_name = None
         mapperC = None
 
-        for i in range(0, length):
+        for i in range(length):
             variables_dict = {}
             for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
                 variables_dict[axis_name] = variablesLocal[axis_index]
@@ -929,15 +931,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
-                    if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorX}, code=colorMapperCallback)])
                     figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                     errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
-                    if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": errorY}, code=colorMapperCallback)])
                     figureI.add_glyph(cds_used, errorY)
+                if 'tooltips' in optionLocal and cds_names[i] is None:
+                    tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
+                else:
+                    tooltipColumns = getTooltipColumns(cdsDict[cds_name]["tooltips"])
+                _, cds_names, memoized_columns, used_names_local = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             if figure_cds_name is None:
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
@@ -1662,14 +1665,14 @@ def getOrMakeColumn(dfQuery, column, cdsName, ignoreDict={}):
 def getTooltipColumns(tooltips):
     if isinstance(tooltips, str):
         return {}
-    result = {}
+    result = set()
     tooltip_regex = re.compile(r'@(?:\w+|\{[^\}]*\})')
     for iTooltip in tooltips:
         for iField in tooltip_regex.findall(iTooltip[1]):
             if iField[1] == '{':
-                result[iField[2:-1]] = True
+                result.add(iField[2:-1])
             else:
-                result[iField[1:]] = True
+                result.add(iField[1:])
     return result
 
 def makeBokehDataSpec(thing: dict, paramDict: dict):
