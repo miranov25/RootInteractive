@@ -940,7 +940,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                 else:
                     tooltipColumns = getTooltipColumns(cdsDict[cds_name]["tooltips"])
-                _, cds_names, memoized_columns, used_names_local = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                _, _, memoized_columns, used_names_local = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             if figure_cds_name is None:
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
