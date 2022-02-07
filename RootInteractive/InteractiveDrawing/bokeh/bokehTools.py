@@ -464,11 +464,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"]}] + sourceArray
 
-    #dfQuery, histogramDict, downsamplerColumns, \
-    #columnNameDict, parameterDict, customJsColumns = makeDerivedColumns(dfQuery, figureArray, histogramArray=histogramArray,
-    #                                                   parameterArray=parameterArray, aliasArray=aliasArray, options=options)
-
-    # paramDict = bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList=list(columnNameDict))
     paramDict = {}
     for param in parameterArray:
         paramDict[param["name"]] = param.copy()
@@ -1277,50 +1272,6 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
                 iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
 
-
-def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
-    parameterDict = {}
-    if parameterArray is not None:
-        for param in parameterArray:
-            parameterDict[param["name"]] = param.copy()
-            parameterDict[param["name"]]["subscribed_events"] = []
-    if figureArray is not None:
-        for i, variables in enumerate(figureArray):
-            if isinstance(variables, dict):
-                continue
-            if len(variables) > 1 and variables[0] != "table" and variables[0] != "tableHisto":
-                if len(variables) > 2:
-                    optionLocal = options.copy()
-                    optionLocal.update(variables[-1])
-                else:
-                    optionLocal = options      
-                if 'colorZvar' in optionLocal:
-                    varColor = optionLocal['colorZvar']
-                    if varColor in parameterDict:
-                        paramColor = parameterDict[varColor]
-                        # Possibly also allow custom color mappers?
-                        if "type" not in paramColor:
-                            paramColor["type"] = "varName"
-                        if "options" not in paramColor:
-                            paramColor["options"] = variableList
-                            # XXX: Add autofill for cases of histograms and main CDS
-                if 'size' in optionLocal:
-                    varSize = optionLocal['size']
-                    if varSize in parameterDict:
-                        paramSize = parameterDict[varSize]
-                        if "type" not in paramSize:
-                            t = type(paramSize['value'])
-                            if t == str:
-                                paramSize["type"] = "varName"
-                            else:
-                                paramSize["type"] = "scalar"
-                        if paramSize["type"] == "varName":
-                            if "options" not in paramColor:
-                                paramSize["options"] = variableList
-                        elif paramSize["type"] == "scalar":
-                            if "range" not in paramSize:
-                                raise ValueError("Missing range for parameter: ", paramSize["name"])
-    return parameterDict
 
 def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
     tooltips = []
