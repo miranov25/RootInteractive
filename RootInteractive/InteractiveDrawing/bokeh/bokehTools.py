@@ -17,7 +17,6 @@ from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
-import copy
 from RootInteractive.Tools.compressArray import compressCDSPipe
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
@@ -1085,7 +1084,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     tooltips = None
     if "tooltips" in histoHandle:
         tooltips = histoHandle["tooltips"]
-    elif "tooltips" in options:
+    elif "histoTooltips" in options:
         tooltips = options["histoTooltips"]
     visualization_type = "points"
     histoGlyphRenderer = None
@@ -1247,44 +1246,6 @@ def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **k
     return CheckboxGroup(labels=optionsPlot, active=[])
 
 
-def makeBokehWidgets(df, widgetParams, cdsOrig, cdsSel, histogramList=[], cmapDict=None, cdsHistoSummary=None, profileList=None, paramDict={}, aliasDict=None, nPointRender=10000):
-    """
-    DEPRECATED - do not use this function - functionality already in bokehDrawArray
-    """
-    widgetArray = []
-    widgetDict = {}
-    for widget in widgetParams:
-        type = widget[0]
-        params = widget[1]
-        optionLocal = {}
-        localWidget = None
-        if len(widget) == 3:
-            optionLocal = widget[2].copy()
-        if "callback" not in optionLocal:
-            if params[0] in paramDict:
-                optionLocal["callback"] = "parameter"
-            else:
-                optionLocal["callback"] = "selection"
-        if type == 'range':
-            localWidget = makeBokehSliderWidget(df, True, params, paramDict, **optionLocal)
-        if type == 'slider':
-            localWidget = makeBokehSliderWidget(df, False, params, paramDict, **optionLocal)
-        if type == 'select':
-            localWidget = makeBokehSelectWidget(df, params, paramDict, **optionLocal)
-        if type == 'multiSelect':
-            localWidget = makeBokehMultiSelectWidget(df, params, paramDict, **optionLocal)
-        # if type=='checkbox':
-        #    localWidget=makeBokehCheckboxWidget(df,params,**options)
-        if localWidget:
-            widgetArray.append(localWidget)
-        if optionLocal["callback"] == "selection":
-            widgetDict[params[0]] = localWidget
-    callbackSel = makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, histogramList=histogramList,
-                                       cmapDict=cmapDict, nPointRender=nPointRender,
-                                       cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=aliasDict)
-    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
-    return widgetArray
-
 def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = {}
@@ -1315,124 +1276,6 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
             else:
                 iWidget.js_on_change("value", callback)
             iWidget.js_on_event("value", callback)
-
-def bokehMakeHistogramCDS(dfQuery, cdsFull, histogramArray=[], histogramDict=None, parameterDict={}, aliasDict={}, **kwargs):
-    options = {"range": None,
-               "nbins": 10,
-               "weights": None,
-               "quantiles": [],
-               "sum_range": [],
-               "histograms": {}
-               }
-    histoDict = {}
-    histoList = []
-    for iHisto in histogramArray:
-        histoName = iHisto["name"]
-        if histogramDict is not None and not histogramDict[histoName]:
-            continue
-        # XXX: This is not a histogram, this is a join
-        if "left" in iHisto:
-            if iHisto["left"] is not None:
-                left = histoDict[iHisto["left"]]["cds"]
-            else:
-                left = cdsFull
-            if iHisto["right"] is not None:
-                right = histoDict[iHisto["right"]]["cds"]
-            else:
-                right = cdsFull
-            on_left = []
-            if "left_on" in iHisto:
-                on_left = iHisto["left_on"]
-            on_right = []
-            if "right_on" in iHisto:
-                on_right = iHisto["right_on"]
-            how  = "inner"
-            cdsHisto = CDSJoin(left=left, right=right, on_left=on_left, on_right=on_right, how=how)
-            if iHisto["name"] in aliasDict:
-                mapping = aliasDict[iHisto["name"]]
-                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
-            histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": cdsHisto, "type": "join"})
-            continue
-        # XXX: Just rename this function already
-        if "data" in iHisto:
-            source = None
-            if 'arrayCompression' in iHisto:
-                print("compressCDSPipe")
-                cdsCompress0, sizeMap= compressCDSPipe(iHisto["data"].copy(), iHisto["arrayCompression"],1)
-                cdsCompress=CDSCompress(inputData=cdsCompress0, sizeMap=sizeMap)
-                source=cdsCompress
-            else:
-                source = ColumnDataSource(dfQuery)
-            if iHisto["name"] in aliasDict:
-                mapping = aliasDict[iHisto["name"]]
-                source = CDSAlias(source=source, mapping=mapping)  
-            histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": source, "type": "source"})
-            continue          
-        optionLocal = copy.copy(options)
-        optionLocal.update(iHisto)
-        weights = None
-        cdsUsed = None
-        if "source" in optionLocal:
-            cdsUsed = optionLocal["source"]
-        sampleVars = iHisto["variables"]
-        if optionLocal["weights"] is not None:
-            weights = optionLocal["weights"]
-        if len(sampleVars) == 1:
-            source = cdsFull
-            if "source" in iHisto:
-                source = iHisto["source"]
-            cdsHisto = HistogramCDS(source=source, nbins=optionLocal["nbins"], histograms=optionLocal["histograms"],
-                                    range=optionLocal["range"], sample=sampleVars[0], weights=weights)
-            histoList.append(cdsHisto)
-            if iHisto["name"] in aliasDict:
-                mapping = aliasDict[iHisto["name"]]
-                mapping.update({"bin_center": "bin_center", "bin_count": "bin_count", "bin_bottom": "bin_bottom", "bin_top": "bin_top"})
-                for i in optionLocal["histograms"].keys():
-                    mapping.update({i:i})
-                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
-            histoDict[histoName] = iHisto.copy()
-            histoDict[histoName].update({"cds": cdsHisto, "type": "histogram", "source": cdsUsed})
-        else:
-            sampleVarNames = []
-            for i in sampleVars:
-                varName = i
-                sampleVarNames.append(varName)
-            source = cdsFull
-            if "source" in iHisto:
-                source = iHisto["source"]
-            cdsHisto = HistoNdCDS(source=source, nbins=optionLocal["nbins"],
-                                    range=optionLocal["range"], sample_variables=sampleVarNames,
-                                    weights=weights, histograms=optionLocal["histograms"])
-            histoList.append(cdsHisto)
-            if iHisto["name"] in aliasDict:
-                mapping = aliasDict[iHisto["name"]]
-                mapping.update({"bin_count": "bin_count"})
-                for i in range(len(sampleVarNames)):
-                    mapping.update({f"bin_center_{i}": f"bin_center_{i}", f"bin_bottom_{i}": f"bin_bottom_{i}", f"bin_top_{i}": f"bin_top_{i}"})
-                for i in optionLocal["histograms"].keys():
-                    mapping.update({i:i})
-                cdsHisto = CDSAlias(source=cdsHisto, mapping=mapping)
-            if len(sampleVars) == 2:
-                histoDict[histoName] = {"cds": cdsHisto, "type": "histo2d", "name": histoName,
-                                        "variables": sampleVars, "source": cdsUsed}
-            else:
-                histoDict[histoName] = {"cds": cdsHisto, "type": "histoNd", "name": histoName,
-                                        "variables": sampleVars, "source": cdsUsed}
-            if "axis" in iHisto:
-                axisIndices = iHisto["axis"]
-                profilesDict = {}
-                for i in axisIndices:
-                    cdsProfile = HistoNdProfile(source=cdsHisto, axis_idx=i, quantiles=optionLocal["quantiles"],
-                                                sum_range=optionLocal["sum_range"])
-                    profilesDict[i] = cdsProfile
-                    histoDict[histoName+"_"+str(i)] = {"cds": cdsProfile, "type": "projection", "name": histoName+"_"+str(i), "variables": sampleVars,
-                    "quantiles": optionLocal["quantiles"], "sum_range": optionLocal["sum_range"], "axis": i} 
-                histoDict[histoName]["profiles"] = profilesDict
-
-    return histoDict, histoList
-
 
 
 def bokehMakeParameters(parameterArray, histogramArray, figureArray, variableList, options={}):
