@@ -442,10 +442,10 @@ def tree2Panda(tree, include, selection, **kwargs):
     if options["estimate"]>0 & options["estimate"] > tree.GetEstimate():
         tree.SetEstimate(options["estimate"])
     estimate0=tree.GetEstimate()
-    entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+    entries = tree.Draw(str(variables), selection, "goff", options["nEntries"], options["firstEntry"])  # query data
     if entries>estimate0:
         tree.SetEstimate(entries)
-        entries = tree.Draw(str(variables), selection, "goffpara", options["nEntries"], options["firstEntry"])  # query data
+        entries = tree.Draw(str(variables), selection, "goff", options["nEntries"], options["firstEntry"])  # query data
 
     columns = variables.split(":")
     for i, column in enumerate(columns):
@@ -456,6 +456,9 @@ def tree2Panda(tree, include, selection, **kwargs):
     for i, column in enumerate(columns):
         for mask in options["columnMask"]:
             columns[i] = columns[i].replace(mask[0], mask[1])
+    if options["verbose"]&0xF>0 :
+        for i, a in enumerate(columns):
+            print(f"{i}\t{a}\t{tree.GetVal(i)}\t{tree.GetVal(i)[0]}\t{tree.GetVal(i)[2]}")
 
     ex_dict = {}
     for i, a in enumerate(columns):
