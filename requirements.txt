@@ -28,3 +28,9 @@ keras
 # tests and tutorials
 pytest
 nbval
+pytest_tornasync
+pytest-json-report
+pytest-regressions
+pytest-datadir
+pytest-parallel
+jq

@@ -9,7 +9,7 @@ setup(
     author='Marian Ivanov ',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.01.03',
+    version='v0.01.04',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -51,6 +51,15 @@ setup(
         # ------------------      test and tutorials
         'pytest',
         'nbval',
-        'nb-clean'
+        'nb-clean',
+        #
+        # pytest packages
+        "pytest",
+        "pytest_tornasync",
+        "pytest-json-report",
+        "pytest-regressions",
+        "pytest-datadir",
+        "pytest-parallel",
+        "jq"
     ]
 )
