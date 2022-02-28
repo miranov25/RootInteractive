@@ -301,7 +301,7 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     for col in dataFrame.columns.values:
         isOK = True
         if hasattr(dataFrame, "meta"):
-            title = dataFrame.meta.metaData.get(col + ".OrigName", col);
+            title = dataFrame.meta.metaData.get(col + ".OrigName", col)
         else:
             title = col
         if include:
@@ -317,7 +317,7 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     return data_table
 
 
-def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
+def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=False, **kwargs):
     histo_names = []
     histo_columns = []
     bin_centers = []
@@ -335,27 +335,36 @@ def makeBokehHistoTable(histoDict, rowwise=False, **kwargs):
 
     for iHisto in histoDict:
         # We are only interested in histograms so we filter the dict for histograms
-        if histoDict[iHisto]["type"] == "histogram":
-            histo_names.append(histoDict[iHisto]["name"])
-            histo_columns.append("bin_count")
-            bin_centers.append("bin_center")
-            edges_left.append("bin_bottom")
-            edges_right.append("bin_top")
-            sources.append(histoDict[iHisto]["cds"])
-            compute_quantile.append(True)
-            if "quantiles" in histoDict[iHisto]:
-                quantiles += histoDict[iHisto]["quantiles"]
-            if "sum_range" in histoDict[iHisto]:
-                sum_range += histoDict[iHisto]["sum_range"]
-        elif histoDict[iHisto]["type"] in ["histo2d", "histoNd"]:
-            for i in range(len(histoDict[iHisto]["variables"])):
-                histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
+        isOK = True
+        if include:
+            isOK = False
+            if re.match(include, histoDict[iHisto]["name"]):
+                isOK = True
+        if exclude:
+            if re.match(exclude, histoDict[iHisto]["name"]):
+                isOK = False
+        if isOK:
+            if histoDict[iHisto]["type"] == "histogram":
+                histo_names.append(histoDict[iHisto]["name"])
                 histo_columns.append("bin_count")
-                bin_centers.append("bin_center_"+str(i))
-                edges_left.append("bin_bottom_"+str(i))
-                edges_right.append("bin_top_"+str(i))
+                bin_centers.append("bin_center")
+                edges_left.append("bin_bottom")
+                edges_right.append("bin_top")
                 sources.append(histoDict[iHisto]["cds"])
-                compute_quantile.append(False)
+                compute_quantile.append(True)
+                if "quantiles" in histoDict[iHisto]:
+                    quantiles += histoDict[iHisto]["quantiles"]
+                if "sum_range" in histoDict[iHisto]:
+                    sum_range += histoDict[iHisto]["sum_range"]
+            elif histoDict[iHisto]["type"] in ["histo2d", "histoNd"]:
+                for i in range(len(histoDict[iHisto]["variables"])):
+                    histo_names.append(histoDict[iHisto]["name"]+"_"+str(i))
+                    histo_columns.append("bin_count")
+                    bin_centers.append("bin_center_"+str(i))
+                    edges_left.append("bin_bottom_"+str(i))
+                    edges_right.append("bin_top_"+str(i))
+                    sources.append(histoDict[iHisto]["cds"])
+                    compute_quantile.append(False)
 
     quantiles = [*{*quantiles}]
     sum_range_uniq = []
@@ -688,16 +697,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             continue
         if variables[0] == 'tableHisto':
             histoListLocal = []
+            TOptions = {
+                'include': '',
+                'exclude': '',
+                'rowwise': False
+            }
             for key, value in cdsDict.items():
                 if value["type"] in ["histogram", "histo2d", "histoNd"]:
                     histoListLocal.append(key)
             # We just want to add them to the dependency tree
             _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", histoListLocal, cdsDict, paramDict, jsFunctionDict, memoized_columns)
             sources.update(used_names_local)
-            TOptions = {'rowwise': False}
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            cdsHistoSummary, tableHisto = makeBokehHistoTable(cdsDict, rowwise=TOptions["rowwise"])
+            histoDict = {i: cdsDict[i] for i in histoListLocal}
+            cdsHistoSummary, tableHisto = makeBokehHistoTable(histoDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
             continue
         if variables[0] in ALLOWED_WIDGET_TYPES:

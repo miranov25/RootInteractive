@@ -77,7 +77,7 @@ def testBokehClientHistogramOnlyHisto():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
-        ["tableHisto", {"rowwise": False}]
+        ["tableHisto", {"rowwise": False, "include": "histoA$|histoB$"}]
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -132,7 +132,7 @@ def testBokehClientHistogramRowwiseTable():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
-        ["tableHisto", {"rowwise": True}]
+        ["tableHisto", {"rowwise": True, "exclude": r".*_.*"}]
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -249,5 +249,3 @@ def testJoin():
     
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, sourceArray=sourceArray, aliasArray=aliasArray)
-
-testBokehClientHistogramProfileA()
