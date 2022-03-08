@@ -5,7 +5,67 @@ from sklearn.model_selection import train_test_split
 import time
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree import DecisionTreeClassifier
+import threading
+from sklearn.utils.fixes import _joblib_parallel_args
 
+def _accumulate_prediction(predict, X, out,col, lock):
+    """
+    This is a utility function for joblib's Parallel.
+    It can't go locally in ForestClassifier or ForestRegressor, because joblib
+    complains that it cannot pickle it when placed there.
+
+    """
+    prediction = predict(X, check_input=False)
+    with lock:
+        out[col] += prediction
+
+def predictRFStat(rf, X, statDictionary,n_jobs):
+    """
+    predict statistics from random forest
+    :param rf:                  - random forest object
+    :param X:                   -  input vector
+    :param statDictionary:      - dictionary of statistics to predict
+    :param n_jobs:              - number of parallel jobs for prediction
+    :return:
+    """
+    allRF = np.zeros((len(rf.estimators_), X.shape[0]))
+    lock = threading.Lock()
+    Parallel(
+        n_jobs=n_jobs,
+        verbose=rf.verbose,
+        **_joblib_parallel_args(require="sharedmem"),
+    )(
+            delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
+            for col,e in enumerate(rf.estimators_)
+    )
+    #
+    if "median" in statDictionary: statDictionary["median"]=np.median(allRF, 0)
+    if "mean"  in statDictionary: statDictionary["mean"]=np.mean(allRF, 0)
+    if "std"  in statDictionary: statDictionary["std"]=np.std(allRF, 0)
+    if "quantile" in   statDictionary:
+        statDictionary["quantiles"]={}
+        for quant in statDictionary["quantile"]:
+            statDictionary["quantiles"][quant]=np.quantile(allRF,quant,axis=0)
+    return statDictionary
+
+
+def predictRFStat0(rf, data, statDictionary):
+    """
+    predict local reducible array
+    :param rf               input random forest
+    :param statDictionary:  statistics to output
+    :param nPermutation:
+    :return:
+    """
+    # assert(treeType!=0 & treeType!=1)
+    allRF = np.zeros((len(rf.estimators_), data.shape[0]))
+    for i, tree in enumerate(rf.estimators_):
+        allRF[i] = tree.predict(data)
+    #
+    if "median" in statDictionary: statDictionary["median"]=np.median(allRF, 0)
+    if "mean"  in statDictionary: statDictionary["mean"]=np.mean(allRF, 0)
+    if "std"  in statDictionary: statDictionary["std"]=np.std(allRF, 0)
+    return statDictionary
 
 class MIForestErrPDF:
     """
