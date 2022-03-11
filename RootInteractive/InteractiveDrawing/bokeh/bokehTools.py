@@ -50,7 +50,7 @@ BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "le
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
 
-def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
+def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
         "nPointRender": 10000,
@@ -73,11 +73,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     let permutationFilter = [];
     let indicesAll = [];
-    for (const key in widgetDict){
-        const widget = widgetDict[key];
-        const widgetType = widget.type;
+    for (const iWidget of widgetList){
+        const widget = iWidget.widget;
+        const widgetType = iWidget.type;
+        const col = cdsOrig.get_column(iWidget.key);
         if(widgetType == "Slider"){
-            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             const widgetStep = widget.step;
             for(let i=0; i<size; i++){
@@ -86,7 +86,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "RangeSlider"){
-            const col = cdsOrig.get_column(key);
             const low = widget.value[0];
             const high = widget.value[1];
             for(let i=0; i<size; i++){
@@ -95,7 +94,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "Select"){
-            const col = cdsOrig.get_column(key);
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
@@ -106,7 +104,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "MultiSelect"){
-            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value.map((val)=>{
                 if(val === "True") return true;
                 if(val === "False") return false;
@@ -122,7 +119,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "CheckboxGroup"){
-            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             for(let i=0; i<size; i++){
                 isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
@@ -176,8 +172,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
-    # print(code)
-    callback = CustomJS(args={'widgetDict': widgetDict, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
+    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
                         code=code)
     return callback
 
