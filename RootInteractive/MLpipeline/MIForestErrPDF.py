@@ -5,8 +5,11 @@ from sklearn.model_selection import train_test_split
 import time
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree import DecisionTreeClassifier
+#
+from joblib import Parallel, delayed
 import threading
 from sklearn.utils.fixes import _joblib_parallel_args
+
 
 def _accumulate_prediction(predict, X, out,col, lock):
     """
@@ -45,23 +48,6 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     return statDictionary
 
 
-def predictRFStat0(rf, data, statDictionary):
-    """
-    predict local reducible array
-    :param rf               input random forest
-    :param statDictionary:  statistics to output
-    :param nPermutation:
-    :return:
-    """
-    # assert(treeType!=0 & treeType!=1)
-    allRF = np.zeros((len(rf.estimators_), data.shape[0]))
-    for i, tree in enumerate(rf.estimators_):
-        allRF[i] = tree.predict(data)
-    #
-    if "median" in statDictionary: statDictionary["median"]=np.median(allRF, 0)
-    if "mean"  in statDictionary: statDictionary["mean"]=np.mean(allRF, 0)
-    if "std"  in statDictionary: statDictionary["std"]=np.std(allRF, 0)
-    return statDictionary
 
 class MIForestErrPDF:
     """
