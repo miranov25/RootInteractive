@@ -30,11 +30,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     """
     allRF = np.zeros((len(rf.estimators_), X.shape[0]))
     lock = threading.Lock()
-    Parallel(
-        n_jobs=n_jobs,
-        verbose=rf.verbose,
-        **_joblib_parallel_args(require="sharedmem"),
-    )(
+    Parallel(n_jobs=n_jobs, verbose=rf.verbose,**_joblib_parallel_args(require="sharedmem"),)(
             delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
             for col,e in enumerate(rf.estimators_)
     )
