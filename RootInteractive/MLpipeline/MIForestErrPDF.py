@@ -20,8 +20,18 @@ def _accumulate_prediction(predict, X, out,col, lock):
 
     """
     prediction = predict(X, check_input=False)
-    #with lock:
-    #    out[col] += prediction
+    with lock:
+        out[col] += prediction
+
+def _accumulate_predictionNL(predict, X, out,col):
+    """
+    inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
+    This is a utility function for joblib's Parallel.
+    It can't go locally in ForestClassifier or ForestRegressor, because joblib
+    complains that it cannot pickle it when placed there.
+
+    """
+    prediction = predict(X, check_input=False)
     out[col] += prediction
 
 def predictRFStat(rf, X, statDictionary,n_jobs):
@@ -61,9 +71,9 @@ def predictForestStat(treeArray, X, statDictionary,n_jobs,verbose=False):
     :return:
     """
     allRF = np.zeros((len(treeArray), X.shape[0]))
-    lock = threading.Lock()
+    #lock = threading.Lock()
     Parallel(n_jobs=n_jobs,**_joblib_parallel_args(require="sharedmem"),)(
-            delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
+            delayed(_accumulate_predictionNL)(e.predict, X, allRF, col)
             for col,e in enumerate(treeArray)
     )
     #lock.release()
@@ -183,21 +193,26 @@ class MIForestErrPDF:
                 rmsPredMed = np.std(statDict0["median"] - statDict1["median"])
                 print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}")
                 #self.predictReducibleError(xIn[:nSampleTest], reducibleErrorEst, 64, fractions)
-#                for fraction in fractions:
-#                    reducibleErrorEst[fraction] = np.mean(reducibleErrorEst[fraction])
-#                print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}",reducibleErrorEst)
+                #for fraction in fractions:
+                #    reducibleErrorEst[fraction] = np.mean(reducibleErrorEst[fraction])
+                #print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}",reducibleErrorEst)
                 continue
             # estimate reducible error
-
-            yPred0 = self.predictStat(xIn, 0, statDict, treeSlice)
+            #yPred0 = self.predictStat(xIn, 0, statDict, treeSlice)
+            predictForestStat(self.trees[0][treeSlice],xIn.to_numpy(dtype=np.float32), statDict,n_jobs)
+            yPred0 =statDict["mean"]
             yPredMed0 = statDict["median"]
             yPredStd0 = statDict["std"]
-            yPred1 = self.predictStat(xIn, 1, statDict, treeSlice)
+            #yPred1 = self.predictStat(xIn, 1, statDict, treeSlice)
+            predictForestStat(self.trees[1][treeSlice],xIn.to_numpy(dtype=np.float32), statDict,n_jobs)
+            yPred1 =statDict["mean"]
             yPredMed1 = statDict["median"]
             yPredStd1 = statDict["std"]
             yPred = 0.5 * (yPred0 + yPred1)
+            yDelta=(yIn - yPred)
             # make delta regression trees
             self.deltaTrees.clear()
+
             for iTree in range(0, 2 * nTrees):
                 i0 = int(iTree * bucketSize)
                 i1 = int((iTree + 1) * bucketSize)
@@ -205,8 +220,14 @@ class MIForestErrPDF:
                     clf = DecisionTreeClassifier()
                 elif self.type == 'Regressor':
                     clf = DecisionTreeRegressor()
-                clf.fit(xIn[i0:i1], (yIn - yPred)[i0:i1])
+                #clf.fit(xIn[i0:i1], yDelta[i0:i1])
                 self.deltaTrees.append(clf)
+            Parallel(n_jobs=n_jobs,**_joblib_parallel_args(require="sharedmem"),)(
+                delayed(tree.fit)(xIn[int(iTree * bucketSize):int((iTree + 1) * bucketSize)],
+                                  yDelta[int(iTree * bucketSize):int((iTree + 1) * bucketSize)])
+                for iTree,tree in enumerate(self.deltaTrees)
+            )
+
             rmsPred = np.std(yPred0 - yPred1)
             rmsPredMed = np.std(yPredMed0 - yPredMed1)
             meanStd = np.mean(0.5 * (yPredStd0 + yPredStd1))
@@ -214,7 +235,8 @@ class MIForestErrPDF:
             rmsPoint = np.std(0.5 * (yPred0 + yPred1) - yIn)
             #
             treeSlice = slice(0, len(self.deltaTrees))
-            deltaPred = self.predictStat(xIn[:nSampleTest], -1, statDict, treeSlice)
+            #deltaPred = self.predictStat(xIn[:nSampleTest], -1, statDict, treeSlice)
+            predictForestStat(self.deltaTrees,xIn.to_numpy(dtype=np.float32)[:nSampleTest], statDict,n_jobs)
             meanStdDelta = np.mean(statDict["std"])
             irreducibleStdEst = np.sqrt(meanStdDelta ** 2 - (rmsPred ** 2) / 2.)
             self.predictReducibleError(xIn[:nSampleTest], reducibleErrorEst, 64, fractions)
@@ -225,38 +247,6 @@ class MIForestErrPDF:
             print(f"{tIter}\t{nTrees}\t{rmsPoint:.4f}\t{meanStdDelta:.4}\t{irreducibleStdEst:.4f}\t{meanStd:.4f}\t"
                   f"{meanDeltaRelStd:.4f}\t{rmsPred:.4f}\t{rmsPredMed:.4f}\t{meanlocalErrEst[2]:.4f}")
         return 0
-
-    def predictStatOrig(self, data, treeType, statDictionary, treeSlice):
-        """
-        predict value
-        :param data:           inout data
-        :param treeType:
-        :param statDictonary:  statistics to output
-        :param treeSlice:      slice to use for prediction  e.g. s=slice(0,a)
-        :return:
-        """
-        # assert(treeType!=0 & treeType!=1)
-        counter = 0
-        if (treeType == 0) | (treeType == 1):
-            for counter, tree in enumerate(self.trees[treeType][treeSlice]): pass
-            selTree = np.zeros((counter + 1, data.shape[0]))
-            for counter, tree in enumerate(self.trees[treeType][treeSlice]):
-                selTree[counter] = tree.predict(data)
-        else:
-            for counter, tree in enumerate(self.deltaTrees[treeSlice]): pass
-            selTree = np.zeros((counter + 1, data.shape[0]))
-            for counter, tree in enumerate(self.deltaTrees[treeSlice]):
-                selTree[counter] = tree.predict(data)
-
-        #
-        # stat={"Mean":np.mean(selTree[0:counter], 0), "Median":np.median(selTree[0:counter], 0), "RMS": np.std(selTree[counter], 0)}
-        for i, stat in enumerate(statDictionary):
-            # print(i,stat)
-            if stat == "mean": statDictionary["mean"] = np.mean(selTree[0:counter], 0)
-            if stat == "median": statDictionary["median"] = np.median(selTree[0:counter], 0)
-            if stat == "std": statDictionary["std"] = np.std(selTree[0:counter], 0)
-        return np.mean(selTree[0:counter], 0);
-
 
     def predictStat(self, data, treeType, statDictionary, treeSlice):
         """
@@ -301,16 +291,20 @@ class MIForestErrPDF:
         """
         # assert(treeType!=0 & treeType!=1)
         forestPredict = {}
+        n_jobs=self.optionsErrPDF["n_jobs"]
         for treeType in [0, 1]:
             counter = 0
             for counter, tree in enumerate(self.trees[treeType]): pass
             selTree = np.zeros((counter + 1, data.shape[0]))
             forestPredict[treeType] = selTree
-            for counter, tree in enumerate(self.trees[treeType]):
-                selTree[counter] = tree.predict(data)
+            #for counter, tree in enumerate(self.trees[treeType]):
+            #    selTree[counter] = tree.predict(data)
+            Parallel(n_jobs=n_jobs,**_joblib_parallel_args(require="sharedmem"),)(
+                delayed(_accumulate_predictionNL)(e.predict, data.to_numpy(dtype=np.float32), selTree, col)
+                for col,e in enumerate(self.trees[treeType])
+            )
         #
         nTreesAll = counter
-
         for fraction in fractionArray:
             deltas = np.zeros((nPermutation, data.shape[0]))
             for iPer in range(0, nPermutation):
