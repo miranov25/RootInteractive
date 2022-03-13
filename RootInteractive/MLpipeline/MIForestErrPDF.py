@@ -155,6 +155,7 @@ class MIForestErrPDF:
             y[1] = yIn[nRows // 2:nRows].iloc[permutation]
             #
             # fit trees
+            treeAllNew = []
             for iTree in range(0, nTrees):
                 iter = (2 * iTree // nTrees)
                 i0 = int(iTree * bucketSize)
@@ -163,9 +164,14 @@ class MIForestErrPDF:
                     clf = DecisionTreeClassifier()
                 elif self.type == 'Regressor':
                     clf = DecisionTreeRegressor()
-                clf.fit(x[iter][i0:i1], y[iter][i0:i1])
+                #clf.fit(x[iter][i0:i1], y[iter][i0:i1])
                 self.trees[iter].append(clf)
-
+                treeAllNew.append(clf)
+            Parallel(n_jobs=n_jobs,**_joblib_parallel_args(require="sharedmem"),)(
+                delayed(tree.fit)(x[(2 * iTree // nTrees)][int(iTree * bucketSize):int((iTree + 1) * bucketSize)],
+                                  y[(2 * iTree // nTrees)][int(iTree * bucketSize):int((iTree + 1) * bucketSize)])
+                for iTree,tree in enumerate(treeAllNew)
+            )
             treeSlice = slice(0, (nTrees // 2) * (tIter + 1) - 1)
             if (not self.optionsErrPDF["dump_progress"]) & (tIter < nIterMax - 1):
                 #yPred0 = self.predictStat(xIn[:nSampleTest], 0, statDict, treeSlice)
