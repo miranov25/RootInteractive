@@ -77,7 +77,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         const widget = iWidget.widget;
         const widgetType = iWidget.type;
         const col = cdsOrig.get_column(iWidget.key);
-        if(widgetType == "Slider"){
+        if(widgetType == "slider"){
             const widgetValue = widget.value;
             const widgetStep = widget.step;
             for(let i=0; i<size; i++){
@@ -85,7 +85,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
             }
         }
-        if(widgetType == "RangeSlider"){
+        if(widgetType == "range"){
             const low = widget.value[0];
             const high = widget.value[1];
             for(let i=0; i<size; i++){
@@ -93,7 +93,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] <= high);
             }
         }
-        if(widgetType == "Select"){
+        if(widgetType == "select"){
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
@@ -103,7 +103,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
             }
         }
-        if(widgetType == "MultiSelect"){
+        if(widgetType == "multiSelect"){
             const widgetValue = widget.value.map((val)=>{
                 if(val === "True") return true;
                 if(val === "False") return false;
@@ -736,11 +736,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if variables[0] == 'multiSelect':
                 localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             plotArray.append(localWidget)
-            if localWidget:
+            if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
             if optionWidget["callback"] == "selection":
-                widgetDict[variables[1][0]] = localWidget
+                cds_used = cds_names[0]
+                if cds_used not in widgetDict:
+                    widgetDict[cds_used] = []
+                widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": varName})
             continue
         xAxisTitle = ""
         yAxisTitle = ""
@@ -1030,11 +1033,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                                                                 cdsAlias.change.emit();
                                                                                             """)])
 
-    cdsFull = cdsDict[None]["cdsFull"]
-    source = cdsDict[None]["cds"]
-    callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
-                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
-    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
+    for iCds, widgetList in widgetDict.items():
+        cdsFull = cdsDict[iCds]["cdsFull"]
+        source = cdsDict[iCds]["cds"]
+        callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
+                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
+        for iWidget in widgetList:
+            iWidget["widget"].js_on_change("value", callback)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
     if options['doDraw']:
