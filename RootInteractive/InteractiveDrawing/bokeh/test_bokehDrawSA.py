@@ -86,9 +86,10 @@ widgetParams=[
     ['select',["X"]],
     ['slider',["size"]],
     ['select',["legendFontSize"]],
+    ['textQuery']
 ]
 widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8], {'sizing_mode': 'scale_width'}],
+    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 13], {'sizing_mode': 'scale_width'}],
     "Graphics": [[9, 10, 11, 12], {'sizing_mode': 'scale_width'}]
     }
 
