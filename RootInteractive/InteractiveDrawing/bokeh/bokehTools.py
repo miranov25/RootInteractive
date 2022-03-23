@@ -11,7 +11,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -71,12 +71,13 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     for(let i=0; i<size; ++i){
         isSelected[i] = true;
     }
+    console.log(cdsOrig.columns());
     let permutationFilter = [];
     let indicesAll = [];
     for (const iWidget of widgetList){
         const widget = iWidget.widget;
         const widgetType = iWidget.type;
-        const col = cdsOrig.get_column(iWidget.key);
+        const col = iWidget.key && cdsOrig.get_column(iWidget.key);
         if(widgetType == "slider"){
             const widgetValue = widget.value;
             const widgetStep = widget.step;
@@ -126,17 +127,20 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             }
         }
         // This is broken, to be fixed later.
-/*        if(widgetType == "TextInput"){
-            const widgetValue = widget.value;
-             if (queryText.length > 1)  {
-                let queryString='';
-                let varString='';
-                eval(varString+ 'var result = ('+ queryText+')');
-                for(let i=0; i<size; i++){
-                    isSelected[i] &= result[i];
-                }
-             }
-        }*/
+        if(widgetType == "textQuery"){
+            const queryText = widget.value;
+            if(queryText == ""){
+                continue;
+            }
+            const pattern = /^[a-zA-Z_$][0-9a-zA-Z_$]*$/;
+            const variablesLocal = cdsOrig.columns().filter((x) => pattern.test(x))
+            const dataOrigArray = variablesLocal.map((x) => cdsOrig.get_column(x))
+            const f = new Function(...variablesLocal, "\\"use strict\\"\\n" + queryText);
+            for(let i=0; i<size; i++){
+                const result = f(...dataOrigArray.map(x => x[i]));
+                isSelected[i] &= result;
+            }
+        }
     }
    
     const t1 = performance.now();
@@ -745,6 +749,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     widgetDict[cds_used] = []
                 widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": varName})
             continue
+        if variables[0] == "textQuery":
+            optionWidget = {}
+            if len(variables) >= 2:
+                optionWidget = variables[-1].copy()
+            localWidget = TextAreaInput(**optionWidget)
+            plotArray.append(localWidget)
+            widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
+            continue
+
         xAxisTitle = ""
         yAxisTitle = ""
         plotTitle = ""
