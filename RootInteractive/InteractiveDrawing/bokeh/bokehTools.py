@@ -11,7 +11,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -50,7 +50,7 @@ BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "le
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
 
-def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
+def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
         "nPointRender": 10000,
@@ -73,11 +73,11 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     }
     let permutationFilter = [];
     let indicesAll = [];
-    for (const key in widgetDict){
-        const widget = widgetDict[key];
-        const widgetType = widget.type;
-        if(widgetType == "Slider"){
-            const col = cdsOrig.get_column(key);
+    for (const iWidget of widgetList){
+        const widget = iWidget.widget;
+        const widgetType = iWidget.type;
+        const col = iWidget.key && cdsOrig.get_column(iWidget.key);
+        if(widgetType == "slider"){
             const widgetValue = widget.value;
             const widgetStep = widget.step;
             for(let i=0; i<size; i++){
@@ -85,8 +85,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
             }
         }
-        if(widgetType == "RangeSlider"){
-            const col = cdsOrig.get_column(key);
+        if(widgetType == "range"){
             const low = widget.value[0];
             const high = widget.value[1];
             for(let i=0; i<size; i++){
@@ -94,8 +93,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] <= high);
             }
         }
-        if(widgetType == "Select"){
-            const col = cdsOrig.get_column(key);
+        if(widgetType == "select"){
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
@@ -105,8 +103,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
             }
         }
-        if(widgetType == "MultiSelect"){
-            const col = cdsOrig.get_column(key);
+        if(widgetType == "multiSelect"){
             const widgetValue = widget.value.map((val)=>{
                 if(val === "True") return true;
                 if(val === "False") return false;
@@ -122,7 +119,6 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         if(widgetType == "CheckboxGroup"){
-            const col = cdsOrig.get_column(key);
             const widgetValue = widget.value;
             for(let i=0; i<size; i++){
                 isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
@@ -130,17 +126,20 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
             }
         }
         // This is broken, to be fixed later.
-/*        if(widgetType == "TextInput"){
-            const widgetValue = widget.value;
-             if (queryText.length > 1)  {
-                let queryString='';
-                let varString='';
-                eval(varString+ 'var result = ('+ queryText+')');
-                for(let i=0; i<size; i++){
-                    isSelected[i] &= result[i];
-                }
-             }
-        }*/
+        if(widgetType == "textQuery"){
+            const queryText = widget.value;
+            if(queryText == ""){
+                continue;
+            }
+            const pattern = /^[a-zA-Z_$][0-9a-zA-Z_$]*$/;
+            const variablesLocal = cdsOrig.columns().filter((x) => pattern.test(x))
+            const dataOrigArray = variablesLocal.map((x) => cdsOrig.get_column(x))
+            const f = new Function(...variablesLocal, "\\"use strict\\"\\n" + queryText);
+            for(let i=0; i<size; i++){
+                const result = f(...dataOrigArray.map(x => x[i]));
+                isSelected[i] &= result;
+            }
+        }
     }
    
     const t1 = performance.now();
@@ -176,8 +175,7 @@ def makeJScallbackOptimized(widgetDict, cdsOrig, cdsSel, **kwargs):
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
-    # print(code)
-    callback = CustomJS(args={'widgetDict': widgetDict, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
+    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
                         code=code)
     return callback
 
@@ -741,12 +739,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if variables[0] == 'multiSelect':
                 localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             plotArray.append(localWidget)
-            if localWidget:
+            if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
             if optionWidget["callback"] == "selection":
-                widgetDict[variables[1][0]] = localWidget
+                cds_used = cds_names[0]
+                if cds_used not in widgetDict:
+                    widgetDict[cds_used] = []
+                widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": varName})
             continue
+        if variables[0] == "textQuery":
+            optionWidget = {}
+            if len(variables) >= 2:
+                optionWidget = variables[-1].copy()
+            cds_used = None
+            localWidget = TextAreaInput(**optionWidget)
+            plotArray.append(localWidget)
+            widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
+            continue
+
         xAxisTitle = ""
         yAxisTitle = ""
         plotTitle = ""
@@ -1035,11 +1046,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                                                                 cdsAlias.change.emit();
                                                                                             """)])
 
-    cdsFull = cdsDict[None]["cdsFull"]
-    source = cdsDict[None]["cds"]
-    callbackSel = makeJScallbackOptimized(widgetDict, cdsFull, source, histogramList=histoList,
-                                          cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
-    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, callbackSel)
+    for iCds, widgetList in widgetDict.items():
+        cdsFull = cdsDict[iCds]["cdsFull"]
+        source = cdsDict[iCds]["cds"]
+        callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
+                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
+        for iWidget in widgetList:
+            iWidget["widget"].js_on_change("value", callback)
+    connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
     if options['doDraw']:

@@ -164,9 +164,6 @@ class bokehDrawSA(object):
                 varList += word + ":"
         if type(widgetsDescription)==str:
             varList += widgetsDescription
-        elif type(widgetsDescription)==list:
-            for w in widgetsDescription:
-                varList+=w[1][0]+":"
         kwargs["optionList"]=optionList
         self = cls(dataFrame, query, "", "", "", "", None, variables=varList, **kwargs)
         if "arrayCompression" in options:
