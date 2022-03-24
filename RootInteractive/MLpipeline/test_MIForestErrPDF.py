@@ -48,12 +48,22 @@ def generateInput(nPoints, outFraction=0.0):
 
 
 def test_MIForestErrPDF(nPoints=100000,outFraction=0.1,n_jobs=2):
-    df=generateInput(nPoints,0.1)
+    df=generateInput(nPoints,outFraction)
     varFit = 'value'
     variableX = ['A', "expB", "csin", 'D']
     miErrPDF=MIForestErrPDF("Regressor",{"mean_depth":mean_depth, "n_jobs":n_jobs,"niter_max":niter_max })
     miErrPDF.fit(df[variableX][0:nPoints//2],df[varFit][0:nPoints//2])
+    return miErrPDF,df, df[variableX]
+
+def drawReducible():
+    outputErr={}
+    x=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    miErrPDF.predictReducibleError(dfVar,  outputErr, 32, x)
+    f=pd.DataFrame([x,x]).transpose()
+    for i in range(9) : f[1][i]=outputErr[f[0][i]].mean()
+
+
 
 #%%time
-nPoints=500000; outFraction=0.1; mean_depth=16; niter_max=16; n_jobs=16;
-test_MIForestErrPDF(nPoints,0.1,n_jobs)
+nPoints=100000; outFraction=0.30; mean_depth=16; niter_max=16; n_jobs=16;
+miErrPDF,df,dfVar=test_MIForestErrPDF(nPoints,outFraction,n_jobs)
