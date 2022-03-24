@@ -71,7 +71,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     for(let i=0; i<size; ++i){
         isSelected[i] = true;
     }
-    console.log(cdsOrig.columns());
     let permutationFilter = [];
     let indicesAll = [];
     for (const iWidget of widgetList){
@@ -753,6 +752,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionWidget = {}
             if len(variables) >= 2:
                 optionWidget = variables[-1].copy()
+            cds_used = None
             localWidget = TextAreaInput(**optionWidget)
             plotArray.append(localWidget)
             widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
