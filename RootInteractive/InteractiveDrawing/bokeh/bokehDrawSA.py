@@ -103,10 +103,11 @@ class bokehDrawSA(object):
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
         """
         * Constructor of  interactive standalone figure array
-        * Example usage in
-            * test_bokehDrawArray.py
+        * Example usage in test_bokehDrawArray.py
             * for list opf options see tutorials
-               * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/test_bokehClinetHistogram.ipynb
+               *  https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/standAlone.ipynb
+               *  https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/test_bokehClientHistogram.ipynb
+               *  https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/customJsColumns.ipynb
 
         :param widgetsDescription:
         :param dataFrame:      input data frame currently it is panda plan intefrace others (vaex)
@@ -114,7 +115,7 @@ class bokehDrawSA(object):
         :param figureArray:    list of figure - [[varX ] [ varY], {figure options}]
         :param kwargs:         widgetArray, layout=figureLayout, tooltips=tooltips,widgetLayout=widgetLayout,sizing_mode
 
-            example
+        example:
                 >>> figureArray = [
                 >>>    [['A'], ['histoA']],
                 >>>    [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
