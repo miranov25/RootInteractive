@@ -20,6 +20,7 @@ runtime
 requests
 # ---------------------    machine learning dependencies
 sklearn
+xgboost
 #scikit-garden
 scikit-hep
 forestci
