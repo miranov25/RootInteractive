@@ -11,7 +11,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput, Toggle
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -48,7 +48,7 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
 
-ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect"]
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle"]
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -518,7 +518,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "v_func" in i:
                 transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
             else:
-                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+                if i["func"] in paramDict:
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=paramDict[i["func"]]["value"])
+                    paramDict[i["func"]].append(["value", CustomJS(args={"mapper":transform}, code="""
+            mapper.func = this.value
+            mapper.update_args()
+                    """)])
+                else:
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
             if "context" in i:
                 if i["context"] not in aliasDict:
                     aliasDict[i["context"]] = {}
@@ -738,6 +745,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'multiSelect':
                 localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+            if variables[0] == 'toggle':
+                label = variables[1][0]
+                if "label" in optionWidget:
+                    label = optionWidget["label"]
+                active = False
+                if optionWidget["callback"] == "parameter":
+                    active = paramDict[variables[1][0]]["value"]
+                localWidget = Toggle(label=label, active=active)
             plotArray.append(localWidget)
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
@@ -1240,9 +1255,9 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             raise IndexError("Default value out of range for select widget.")
     elif default is None:
         if options['callback'] == 'parameter':
-            default_value = optionsPlot.index(paramDict[params[0]]["value"])
+            default_value = optionsPlot.index(str(paramDict[params[0]]["value"]))
     else:
-        default_value = optionsPlot.index(paramDict[params[0]]["value"])
+        default_value = optionsPlot.index(str(default))
     return Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
 
 
@@ -1297,6 +1312,8 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
                 if len(iEvent) == 2:
                     iWidget.js_on_change(*iEvent)
                 else:
+                    if isinstance(iWidget, Toggle):
+                        iEvent[0] = "active"
                     iWidget.js_link(*iEvent)
             continue
         if callback is not None:

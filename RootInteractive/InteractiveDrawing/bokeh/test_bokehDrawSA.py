@@ -53,6 +53,7 @@ parameterArray = [
     {"name": "X", "value":"A", "options":["A", "B", "D"]},
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
+    {"name": "legendVisible", "value":True},
 ]
 
 figureArray = [
@@ -64,7 +65,7 @@ figureArray = [
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
-    {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}
+    {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize", "visible": "legendVisible"}}
 ]
 
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
@@ -86,11 +87,12 @@ widgetParams=[
     ['select',["X"]],
     ['slider',["size"]],
     ['select',["legendFontSize"]],
-    ['textQuery', {"title": "selection"}]
+    ['textQuery', {"title": "selection"}],
+    ['toggle', ['legendVisible']]
 ]
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 13], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[9, 10, 11, 12], {'sizing_mode': 'scale_width'}]
+    "Graphics": [[9, 10, 11, 12, 14], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
