@@ -660,7 +660,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
 
         # Add downsampler
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=options["nPointRender"])
+        nPoints = options["nPointRender"]
+        if options["nPointRender"] in paramDict:
+            nPoints = paramDict[options["nPointRender"]]["value"]
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints)
+        if options["nPointRender"] in paramDict:
+            paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
+                            downsampler.nPoints = this.value | 0
+                        """)])
 
         if "tooltips" not in iSource:
             iSource["tooltips"] = []
