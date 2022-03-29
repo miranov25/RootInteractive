@@ -54,6 +54,7 @@ parameterArray = [
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "legendVisible", "value":True},
+    {"name": "nPoints", "range":[0, 1200], "value": 1000}
 ]
 
 figureArray = [
@@ -82,17 +83,18 @@ widgetParams=[
     ['multiSelect', ["DDC"]],
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
+    ['textQuery', {"title": "selection"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
     ['select',["colorZ"]],
     ['select',["X"]],
     ['slider',["size"]],
     ['select',["legendFontSize"]],
-    ['textQuery', {"title": "selection"}],
-    ['toggle', ['legendVisible']]
+    ['toggle', ['legendVisible']],
+    ['slider', ['nPoints']]
 ]
 widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 13], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[9, 10, 11, 12, 14], {'sizing_mode': 'scale_width'}]
+    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 9], {'sizing_mode': 'scale_width'}],
+    "Graphics": [[10, 11, 12], [13, 14, 15], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
@@ -125,7 +127,7 @@ def testBokehDrawArrayWidgetNoScale(record_property: ty.Callable[[str, ty.Any], 
 
 def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], None], data_regression):
     output_file("test_BokehDrawArrayDownsample.html")
-    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, nPointRender="nPoints")
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     # number of cdsSel columns is no longer relevant
@@ -136,7 +138,7 @@ def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], Non
 def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayQuery.html")
     df0 = df.copy()
-    fig=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender=200, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender="nPoints", parameterArray=parameterArray)
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     record_property("cdsSel_size",len(fig.cdsSel.selectedColumns))
