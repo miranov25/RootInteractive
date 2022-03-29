@@ -53,7 +53,6 @@ ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle"]
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
-        "nPointRender": 10000,
         "cmapDict": None,
         "histogramList": []
     }
@@ -63,7 +62,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         """
     const t0 = performance.now();
     const dataOrig = cdsOrig.data;
-    const nPointRender = options.nPointRender;
     let nSelected=0;
     const precision = 0.000001;
     const size = cdsOrig.length;
@@ -159,7 +157,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     }
     const t2 = performance.now();
     console.log(`Histogramming took ${t2 - t1} milliseconds.`);
-    if(nPointRender > 0 && cdsSel != null){
+    if(cdsSel != null){
         console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
         cdsSel.update()
