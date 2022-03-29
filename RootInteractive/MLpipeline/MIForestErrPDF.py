@@ -195,7 +195,7 @@ class MIForestErrPDF:
                 for iTree,tree in enumerate(treeAllNew)
             )
             treeSlice = slice(0, (nTrees // 2) * (tIter + 1) - 1)
-            if (not self.optionsErrPDF["dump_progress"]) & (tIter < nIterMax - 1):
+            if (not self.optionsErrPDF["dump_progress"]) & (tIter < nIterMax):
                 #yPred0 = self.predictStat(xIn[:nSampleTest], 0, statDict, treeSlice)
                 #yPred1 = self.predictStat(xIn[:nSampleTest], 1, statDict, treeSlice)
                 #rmsPred = np.std(yPred0 - yPred1)
@@ -205,12 +205,13 @@ class MIForestErrPDF:
                 rmsPredMed = np.std(statDictOut0["median"] - statDictOut1["median"])
                 keyName=statDict0["trim_mean"][0]
                 rmsPredTM = np.std(statDictOut0["trim_mean"][keyName] - statDictOut1["trim_mean"][keyName])
-                print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}\t{rmsPredTM:.4f}")
+                print(f"{tIter}\t{nTrees}\t{rmsPred:.4}\t{rmsPredMed:.4}\t{rmsPredTM:.4}")
                 #self.predictReducibleError(xIn[:nSampleTest], reducibleErrorEst, 64, fractions)
                 #for fraction in fractions:
                 #    reducibleErrorEst[fraction] = np.mean(reducibleErrorEst[fraction])
                 #print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}",reducibleErrorEst)
                 continue
+            return  0
             # estimate reducible error
             #yPred0 = self.predictStat(xIn, 0, statDict, treeSlice)
             predictForestStat(self.trees[0][treeSlice],xIn.to_numpy(dtype=np.float32), statDict,n_jobs)
