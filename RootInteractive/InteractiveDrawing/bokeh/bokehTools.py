@@ -667,6 +667,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if options["nPointRender"] in paramDict:
             paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
                             downsampler.nPoints = this.value | 0
+                            downsampler.update()
                         """)])
 
         if "tooltips" not in iSource:
