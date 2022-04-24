@@ -209,6 +209,7 @@ class MIxgboostErrPDF:
                 break
             else:
                 stdCurrent =stdPointMean[3]
+                self.earlyStop=ir[1]
 
     def fitReducible(self, learning_rate=0.02, subsample=0.05, n_estimators=100) :
         from sklearn.base import clone
