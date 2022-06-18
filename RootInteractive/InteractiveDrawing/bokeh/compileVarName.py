@@ -136,7 +136,7 @@ class ColumnEvaluator:
                 "type": "column"
             }
         if not isinstance(node.value, ast.Name):
-            raise ValueError("Columns can only be selected from X")
+            raise ValueError("Column data source name cannot be a function call")
         if node.value.id != "self":
             if self.context is not None:
                 if node.value.id != self.context:
@@ -150,6 +150,12 @@ class ColumnEvaluator:
             self.isSource = False
             projection = self.cdsDict[self.context]
             self.dependencies.add((projection["source"], "bin_count"))
+        if "data" in self.cdsDict[self.context] and node.attr not in self.cdsDict[self.context]["data"]:
+            raise KeyError("Column " + node.attr + " not found in data source " + str(self.cdsDict[self.context]["name"]))
+            #return {
+            #    "error": KeyError,
+            #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
+            #}           
         return {
             "name": node.attr,
             "type": "column"
@@ -191,6 +197,25 @@ class ColumnEvaluator:
             self.dependencies.add((histogram["source"], histogram["weights"]))
         if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
             self.dependencies.add((histogram["source"], histogram["histograms"][id]["weights"]))
+        isOK = (id == "bin_count")
+        if self.cdsDict[self.context]["type"] == "histogram":
+            if id in ["bin_left", "bin_center", "bin_right"]:
+                isOK = True
+        else:
+            if id in ["bin_bottom_{}".format(i) for i in range(len(histogram["variables"]))]:
+                isOK = True
+            if id in ["bin_center_{}".format(i) for i in range(len(histogram["variables"]))]:
+                isOK = True
+            if id in ["bin_top_{}".format(i) for i in range(len(histogram["variables"]))]:
+                isOK = True            
+        if "histograms" in histogram and id in histogram["histograms"]:
+            isOK = True
+        if not isOK:
+            raise KeyError("Column " + id + " not found in histogram " + histogram["name"])
+            #return {
+            #    "error": KeyError,
+            #    "msg": "Column " + id + " not found in histogram " + histogram["name"]
+            #}
         return {
             "name": id,
             "type": "column"
