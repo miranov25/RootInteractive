@@ -36,7 +36,7 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circ
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
-    ("range", "[@{bin_left}, @{bin_right}]"),
+    ("range", "[@{bin_bottom}, @{bin_top}]"),
     ("count", "@bin_count")
 ]
 
@@ -1136,9 +1136,9 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
         visualization_type = options["visualization_type"]
     if visualization_type == "bars":
         if options['flip_histogram_axes']:
-            histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
+            histoGlyph = Quad(left=0, right="bin_count", bottom="bin_bottom", top="bin_top", fill_color=colorHisto)
         else:
-            histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+            histoGlyph = Quad(left="bin_bottom", right="bin_top", bottom=0, top="bin_count", fill_color=colorHisto)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
     elif visualization_type == "points":
         if options['flip_histogram_axes']:
