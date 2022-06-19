@@ -199,7 +199,7 @@ class ColumnEvaluator:
             self.dependencies.add((histogram["source"], histogram["histograms"][id]["weights"]))
         isOK = (id == "bin_count")
         if self.cdsDict[self.context]["type"] == "histogram":
-            if id in ["bin_left", "bin_center", "bin_right"]:
+            if id in ["bin_bottom", "bin_center", "bin_top"]:
                 isOK = True
         else:
             if id in ["bin_bottom_{}".format(i) for i in range(len(histogram["variables"]))]:
@@ -207,7 +207,7 @@ class ColumnEvaluator:
             if id in ["bin_center_{}".format(i) for i in range(len(histogram["variables"]))]:
                 isOK = True
             if id in ["bin_top_{}".format(i) for i in range(len(histogram["variables"]))]:
-                isOK = True            
+                isOK = True         
         if "histograms" in histogram and id in histogram["histograms"]:
             isOK = True
         if not isOK:
