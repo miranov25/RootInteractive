@@ -260,6 +260,10 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
+        if i_context == "$IGNORE":
+            variables.append(None)
+            ctx_updated.append(i_context)
+            continue
         if i_context in memoizedColumns and i_var in memoizedColumns[i_context]:
             variables.append(memoizedColumns[i_context][i_var])
             ctx_updated.append(i_context)

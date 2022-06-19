@@ -824,12 +824,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
-        cds_names = None
+        cds_names = [None]*length
         if "source" in optionLocal:
             cds_names = optionLocal["source"]
         for i, iY in enumerate(variablesLocal[1]):
             if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
-                variablesLocal[1][i] += ".bin_count"
+                cds_names[i] = "$IGNORE"
+                _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", variablesLocal[1][i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                sources.update(used_names_local)
+                
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             sources.update(used_names_local)
@@ -878,8 +881,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(variables_dict[axis_name], list):
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_names[i]
-            varNameX = variables_dict["X"]["name"]
-            varNameY = variables_dict["Y"]["name"]
             varColor = variables_dict["colorZvar"]
             if varColor is not None:
                 if mapperC is not None:
@@ -931,7 +932,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            cds_used = cdsDict[cds_name]["cds"]
+            cds_used = None
+            if cds_name != "$IGNORE":
+                cds_used = cdsDict[cds_name]["cds"]
 
             if varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
@@ -941,6 +944,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 elif histoHandle["type"] == "histo2d":
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
+                varNameX = variables_dict["X"]["name"]
+                varNameY = variables_dict["Y"]["name"]
                 drawnGlyph = None
                 colorMapperCallback = """
                 glyph.fill_color={...glyph.fill_color, field:this.value}
