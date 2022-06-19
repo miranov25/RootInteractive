@@ -36,7 +36,7 @@ bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circ
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
-    ("range", "[@{bin_left}, @{bin_right}]"),
+    ("range", "[@{bin_bottom}, @{bin_top}]"),
     ("count", "@bin_count")
 ]
 
@@ -779,39 +779,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
             continue
 
-        xAxisTitle = ""
-        yAxisTitle = ""
-        plotTitle = ""
-
-        for varY in variables[1]:
-            if hasattr(dfQuery, "meta") and '.' not in varY:
-                yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
-            else:
-                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
-            yAxisTitle += ','
-        for varX in variables[0]:
-            if hasattr(dfQuery, "meta") and '.' not in varX:
-                xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
-            else:
-                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
-            xAxisTitle += ','
-        xAxisTitle = xAxisTitle[:-1]
-        yAxisTitle = yAxisTitle[:-1]
-
         optionLocal = optionGroup.copy()
         nvars = len(variables)
         if isinstance(variables[-1], dict):
             logging.info("Option %s", variables[-1])
             optionLocal.update(variables[-1])
             nvars -= 1
-
-        if optionLocal["xAxisTitle"] is not None:
-            xAxisTitle = optionLocal["xAxisTitle"]
-        if optionLocal["yAxisTitle"] is not None:
-            yAxisTitle = optionLocal["yAxisTitle"]
-        plotTitle += yAxisTitle + " vs " + xAxisTitle
-        if optionLocal["plotTitle"] is not None:
-            plotTitle = optionLocal["plotTitle"]
 
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
@@ -824,12 +797,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
-        cds_names = None
+        cds_names = [None]*length
         if "source" in optionLocal:
             cds_names = optionLocal["source"]
         for i, iY in enumerate(variablesLocal[1]):
             if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
-                variablesLocal[1][i] += ".bin_count"
+                cds_names[i] = "$IGNORE"
+                _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", variablesLocal[1][i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                sources.update(used_names_local)
+
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
             sources.update(used_names_local)
@@ -852,12 +828,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             plotArray.append(plotI)
             continue
         else:
-            figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], title=plotTitle,
+            figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
                              tools=options['tools'], x_axis_type=options['x_axis_type'],
                              y_axis_type=options['y_axis_type'])
-
-        figureI.xaxis.axis_label = xAxisTitle
-        figureI.yaxis.axis_label = yAxisTitle
 
         lengthX = len(variables[0])
         lengthY = len(variables[1])
@@ -878,8 +851,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(variables_dict[axis_name], list):
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_names[i]
-            varNameX = variables_dict["X"]["name"]
-            varNameY = variables_dict["Y"]["name"]
             varColor = variables_dict["colorZvar"]
             if varColor is not None:
                 if mapperC is not None:
@@ -931,7 +902,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionLocal.update(variables[2])
             varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
-            cds_used = cdsDict[cds_name]["cds"]
+            cds_used = None
+            if cds_name != "$IGNORE":
+                cds_used = cdsDict[cds_name]["cds"]
 
             if varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
@@ -941,6 +914,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 elif histoHandle["type"] == "histo2d":
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
+                varNameX = variables_dict["X"]["name"]
+                varNameY = variables_dict["Y"]["name"]
                 drawnGlyph = None
                 colorMapperCallback = """
                 glyph.fill_color={...glyph.fill_color, field:this.value}
@@ -982,10 +957,43 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     tooltipColumns = getTooltipColumns(cdsDict[cds_name]["tooltips"])
                 _, _, memoized_columns, tooltip_sources = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
                 sources.update(tooltip_sources)
-            if figure_cds_name is None:
+            if cds_name == "$IGNORE":
+                cds_name = varY
+            if figure_cds_name is None and cds_name != "$IGNORE":
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
                 figure_cds_name = ""
+
+        xAxisTitle = ""
+        yAxisTitle = ""
+        plotTitle = ""
+
+        for varY in variables[1]:
+            if hasattr(dfQuery, "meta") and '.' not in varY:
+                yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
+            else:
+                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
+            yAxisTitle += ','
+        for varX in variables[0]:
+            if hasattr(dfQuery, "meta") and '.' not in varX:
+                xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
+            else:
+                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
+            xAxisTitle += ','
+        xAxisTitle = xAxisTitle[:-1]
+        yAxisTitle = yAxisTitle[:-1]
+
+        if optionLocal["xAxisTitle"] is not None:
+            xAxisTitle = optionLocal["xAxisTitle"]
+        if optionLocal["yAxisTitle"] is not None:
+            yAxisTitle = optionLocal["yAxisTitle"]
+        plotTitle += yAxisTitle + " vs " + xAxisTitle
+        if optionLocal["plotTitle"] is not None:
+            plotTitle = optionLocal["plotTitle"]
+
+        figureI.title.text = plotTitle
+        figureI.xaxis.axis_label = xAxisTitle
+        figureI.yaxis.axis_label = yAxisTitle
 
         if color_bar != None:
             figureI.add_layout(color_bar, 'right')
@@ -1136,9 +1144,9 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
         visualization_type = options["visualization_type"]
     if visualization_type == "bars":
         if options['flip_histogram_axes']:
-            histoGlyph = Quad(left=0, right="bin_count", bottom="bin_left", top="bin_right", fill_color=colorHisto)
+            histoGlyph = Quad(left=0, right="bin_count", bottom="bin_bottom", top="bin_top", fill_color=colorHisto)
         else:
-            histoGlyph = Quad(left="bin_left", right="bin_right", bottom=0, top="bin_count", fill_color=colorHisto)
+            histoGlyph = Quad(left="bin_bottom", right="bin_top", bottom=0, top="bin_count", fill_color=colorHisto)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
     elif visualization_type == "points":
         if options['flip_histogram_axes']:
@@ -1389,8 +1397,13 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return varName
     if cdsName in cdsDict:
+        prefix = ""
+        if not removeCdsName:
+            prefix =  cdsName+"."
         if "variables" not in cdsDict[cdsName]:
             return varName
+        if varName.startswith(cdsName+"."):
+            varName = varName[len(cdsName)+1:]
         if '_' in varName:
             if varName == "bin_count":
                 return "entries"
@@ -1421,6 +1434,4 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
             if '_' in cdsName:
                 histoName, projectionIdx = cdsName.split("_")
                 return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
-    if not removeCdsName:
-        return cdsName+"."+varName
-    return varName
+    return prefix+varName
