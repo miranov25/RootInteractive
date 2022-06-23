@@ -74,6 +74,9 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     let indicesAll = [];
     for (const iWidget of widgetList){
         if(iWidget.filter != null){
+            if (this == iWidget.widget){
+                iWidget.filter.dirty_widget = true
+            }
             const widgetFilter = iWidget.filter.v_compute();
             for(let i=0; i<size; i++){
                 isSelected[i] &= widgetFilter[i];
