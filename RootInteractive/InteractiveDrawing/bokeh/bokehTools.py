@@ -760,8 +760,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'multiSelect':
                 localWidget, widgetFilter, newColumn = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
-                memoized_columns[None][newColumn["name"]] = newColumn
-                sources.add((None, newColumn["name"]))
+                if newColumn is not None:
+                    memoized_columns[None][newColumn["name"]] = newColumn
+                    sources.add((None, newColumn["name"]))
             if variables[0] == 'multiSelectBitmask':
                 localWidget, widgetFilter = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'toggle':
@@ -1305,14 +1306,17 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
-    mapping = {}
-    for i, val in enumerate(optionsPlot):
-        mapping[val] = i
-    # print(optionsPlot)
-    how="any"
     widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
-    filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how=how, mapping=mapping)
-    newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes}
+    filterLocal = None
+    newColumn = None
+    if len(optionsPlot) < 31:
+        mapping = {}
+        for i, val in enumerate(optionsPlot):
+            mapping[val] = 2**i
+        # print(optionsPlot)
+        how="any"
+        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how=how, mapping=mapping)
+        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": 2**codes}
     return widget_local, filterLocal, newColumn
 
 
