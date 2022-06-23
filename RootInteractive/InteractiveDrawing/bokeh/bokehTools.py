@@ -25,6 +25,7 @@ from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerC
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
+from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
 import numpy as np
 import pandas as pd
 import re
@@ -72,6 +73,13 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     let permutationFilter = [];
     let indicesAll = [];
     for (const iWidget of widgetList){
+        if(iWidget.filter != null){
+            const widgetFilter = iWidget.filter.v_compute();
+            for(let i=0; i<size; i++){
+                isSelected[i] &= widgetFilter[i];
+            }
+            continue;
+        }
         const widget = iWidget.widget;
         const widgetType = iWidget.type;
         const col = iWidget.key && cdsOrig.get_column(iWidget.key);
@@ -730,6 +738,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) == 3:
                 optionWidget = variables[2].copy()
             fakeDf = None
+            widgetFilter = None
             if "callback" not in optionLocal:
                 if variables[1][0] in paramDict:
                     optionWidget["callback"] = "parameter"
@@ -750,7 +759,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if variables[0] == 'select':
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'multiSelect':
-                localWidget = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                localWidget, widgetFilter, newColumn = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                memoized_columns[None][newColumn["name"]] = newColumn
+                sources.add((None, newColumn["name"]))
+            if variables[0] == 'multiSelectBitmask':
+                localWidget, widgetFilter = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'toggle':
                 label = variables[1][0]
                 if "label" in optionWidget:
@@ -767,7 +780,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
                     widgetDict[cds_used] = []
-                widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": varName})
+                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
+                if widgetFilter is not None:
+                    widgetDictLocal["filter"] = widgetFilter
+                widgetDict[cds_used].append(widgetDictLocal)
             continue
         if variables[0] == "textQuery":
             optionWidget = {}
@@ -1082,6 +1098,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
         for iWidget in widgetList:
             iWidget["widget"].js_on_change("value", callback)
+            if "filter" in iWidget:
+                iWidget["filter"].source = cdsFull
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
@@ -1281,16 +1299,21 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
     options.update(kwargs)
     # optionsPlot = []
     if len(params) == 1:
-        try:
-            optionsPlot = np.sort(df[params[0]].unique()).tolist()
-        except:
-            optionsPlot = sorted(df[params[0]].dropna().unique().tolist())
+        codes, optionsPlot = pd.factorize(df[params[0]], sort=True)
+        optionsPlot = optionsPlot.to_list()
     else:
         optionsPlot = params[1:]
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
+    mapping = {}
+    for i, val in enumerate(optionsPlot):
+        mapping[val] = i
     # print(optionsPlot)
-    return MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
+    how="any"
+    widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
+    filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how=how, mapping=mapping)
+    newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes}
+    return widget_local, filterLocal, newColumn
 
 
 def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
