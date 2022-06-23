@@ -48,14 +48,30 @@ export class MultiSelectFilter extends Model {
     this.dirty_widget = true
   }
 
+  connect_signals(): void {
+    super.connect_signals()
+
+    this.connect(this.widget.properties.value.change, this.mark_dirty_widget)
+    this.connect(this.source.change, this.mark_dirty_source)
+  }
+
+  mark_dirty_widget(){
+    this.dirty_widget = true
+  }
+
+  mark_dirty_source(){
+    this.dirty_source = true
+  }
+
   public v_compute(): boolean[]{
     const {dirty_source, dirty_widget, cached_vector, widget, source, mapping, mask, field, how} = this
     if (!dirty_source && !dirty_widget){
         return cached_vector
     }
     let col = source.get_array(field)
-    const mask_new = widget.value.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, mask)
-    let new_vector: boolean[] = []
+    const mask_new = widget.value.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
+    let new_vector: boolean[]
+     = []
     if (how == "any"){
         new_vector = col.map((x: number) => (x & mask_new) != 0)
     } else if(how == "all"){
