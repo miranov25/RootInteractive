@@ -97,9 +97,15 @@ export class MultiSelectFilter extends Model {
     }
     const mask_new = widget.value.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
     if (how == "any"){
-        new_vector = col.map((x: number) => (x & mask_new) != 0)
+        for(let i=0; i<col.length; i++){
+          const x = col[i] as number
+          new_vector[i] = (x & mask_new) != 0
+        }
     } else if(how == "all"){
-        new_vector = col.map((x:number) => (x & mask_new) == mask_new)
+      for(let i=0; i<col.length; i++){
+        const x = col[i] as number
+        new_vector[i] = (x & mask_new) == mask_new
+      }
     }
     this.dirty_source = false
     this.dirty_widget = false
