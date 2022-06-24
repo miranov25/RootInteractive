@@ -80,7 +80,7 @@ widgetParams=[
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
-    ['multiSelect', ["DDC"]],
+    ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection"}],
