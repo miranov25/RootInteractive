@@ -1317,9 +1317,15 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         for i, val in enumerate(optionsPlot):
             mapping[val] = 2**i
         # print(optionsPlot)
-        how="any"
-        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how=how, mapping=mapping)
+        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="any", mapping=mapping)
         newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": 2**codes}
+    else:
+        mapping = {}
+        for i, val in enumerate(optionsPlot):
+            mapping[val] = i
+        print(len(optionsPlot))
+        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes}
     return widget_local, filterLocal, newColumn
 
 
