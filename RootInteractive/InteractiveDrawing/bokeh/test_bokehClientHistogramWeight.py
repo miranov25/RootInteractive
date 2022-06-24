@@ -34,7 +34,7 @@ widgetParams = [
     ['range', ['A', -1., 1., 0.1, -1., 1.]],
     ['range', ['B']],
     ['range', ['C']],
-    ['range', ['D']],
+    ['multiSelect', ['D']],
 ]
 widgetLayoutDesc = [[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
 
@@ -58,3 +58,5 @@ def test_clientHistogramWeightCompressed():
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
                                 arrayCompression=arrayCompressionRelative16)
+
+test_clientHistogramWeightCompressed()
