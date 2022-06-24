@@ -1307,6 +1307,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         optionsPlot = optionsPlot.to_list()
     else:
         optionsPlot = params[1:]
+        codes = np.searchsorted(optionsPlot, df[params[0]])
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
     widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
