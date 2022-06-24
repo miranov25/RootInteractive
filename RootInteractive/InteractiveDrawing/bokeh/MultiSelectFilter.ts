@@ -69,9 +69,26 @@ export class MultiSelectFilter extends Model {
         return cached_vector
     }
     let col = source.get_array(field)
+    let new_vector: boolean[] = this.cached_vector
+    if (new_vector == null){
+        new_vector = Array(col.length)
+    } else {
+        new_vector.length = col.length
+    }
+    if (how == "whitelist"){
+        const accepted_codes = widget.value.map((a: string) => mapping[a])
+        let count=0
+        for(let i=0; i<col.length; i++){
+            let isOK = accepted_codes.reduce((acc: boolean, cur: number)=>acc||cur == col[i],false)
+            new_vector[i] = isOK
+        }        
+        console.log(count)
+        this.dirty_source = false
+        this.dirty_widget = false
+        this.cached_vector = new_vector
+        return new_vector
+    }
     const mask_new = widget.value.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
-    let new_vector: boolean[]
-     = []
     if (how == "any"){
         new_vector = col.map((x: number) => (x & mask_new) != 0)
     } else if(how == "all"){
