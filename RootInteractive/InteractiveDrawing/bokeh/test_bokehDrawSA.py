@@ -149,5 +149,5 @@ def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
         pytest.skip("no ROOT module")
     output_file("test_bokehDrawSAArray_fromTTree.html")
-    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
+    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayoutDesc)
 
