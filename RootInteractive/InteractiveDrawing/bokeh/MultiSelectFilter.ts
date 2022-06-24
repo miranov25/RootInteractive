@@ -79,7 +79,8 @@ export class MultiSelectFilter extends Model {
         const accepted_codes = widget.value.map((a: string) => mapping[a])
         let count=0
         for(let i=0; i<col.length; i++){
-            let isOK = accepted_codes.reduce((acc: boolean, cur: number)=>acc||cur == col[i],false)
+            const x = col[i]
+            let isOK = accepted_codes.reduce((acc: boolean, cur: number)=>acc||(cur == x),false)
             new_vector[i] = isOK
         }        
         console.log(count)
