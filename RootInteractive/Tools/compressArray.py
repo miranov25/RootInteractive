@@ -3,7 +3,7 @@ import pickle
 import zlib
 from bokeh.util.serialization import *
 import numpy as np
-import pandas as pdMap
+import pandas as pd
 import sys
 import re
 import collections
@@ -140,8 +140,10 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if action == "delta":
                 currentArray = roundAbsolute(currentArray, actionParam)
             if action == "zip":
-                arrayInfo["dtype"] = currentArray.to_numpy().dtype.name
-                currentArray = zlib.compress(currentArray.to_numpy())
+                if isinstance(currentArray, pd.Series):
+                    currentArray = currentArray.to_numpy()
+                arrayInfo["dtype"] = currentArray.dtype.name
+                currentArray = zlib.compress(currentArray)
             if action == "unzip":
                 currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
             if action == "base64":
@@ -170,7 +172,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
                     currentArray = currentArray.map(dictValues).astype("int32")
             if action == "decode":
                 if not arrayInfo["skipCode"]:
-                    arrayAsPanda=pdMap.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
+                    arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
                     currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
             counter+=1
        # except:

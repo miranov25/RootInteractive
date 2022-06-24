@@ -34,7 +34,7 @@ widgetParams = [
     ['range', ['A', -1., 1., 0.1, -1., 1.]],
     ['range', ['B']],
     ['range', ['C']],
-    ['range', ['D']],
+    ['multiSelect', ['D']],
 ]
 widgetLayoutDesc = [[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
 

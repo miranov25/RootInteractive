@@ -80,7 +80,7 @@ widgetParams=[
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
-    ['multiSelect', ["DDC"]],
+    ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection"}],
@@ -149,5 +149,5 @@ def testBokehDrawArraySA_tree():
     if "ROOT" not in sys.modules:
         pytest.skip("no ROOT module")
     output_file("test_bokehDrawSAArray_fromTTree.html")
-    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayout)
+    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayoutDesc)
 
