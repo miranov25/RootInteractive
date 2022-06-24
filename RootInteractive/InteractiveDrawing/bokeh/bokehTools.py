@@ -1,3 +1,4 @@
+from bisect import bisect
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -1302,12 +1303,12 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
     options = {'default': 0, 'size': 4}
     options.update(kwargs)
     # optionsPlot = []
-    if len(params) == 1:
-        codes, optionsPlot = pd.factorize(df[params[0]], sort=True)
-        optionsPlot = optionsPlot.to_list()
+    if len(params) > 1:
+        dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
     else:
-        optionsPlot = params[1:]
-        codes = np.searchsorted(optionsPlot, df[params[0]])
+        dfCategorical = df[params[0]]
+    codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+    optionsPlot = optionsPlot.to_list()
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
     widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
