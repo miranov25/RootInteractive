@@ -80,7 +80,13 @@ export class MultiSelectFilter extends Model {
         let count=0
         for(let i=0; i<col.length; i++){
             const x = col[i]
-            let isOK = accepted_codes.reduce((acc: boolean, cur: number)=>acc||(cur == x),false)
+            let isOK = false
+            for(let j=0; j<accepted_codes.length; j++){
+              if(accepted_codes[j] == x){
+                isOK = true
+                break
+              }
+            }
             new_vector[i] = isOK
         }        
         console.log(count)
