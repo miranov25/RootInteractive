@@ -58,5 +58,3 @@ def test_clientHistogramWeightCompressed():
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
                                 arrayCompression=arrayCompressionRelative16)
-
-test_clientHistogramWeightCompressed()
