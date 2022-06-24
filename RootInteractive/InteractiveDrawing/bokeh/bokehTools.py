@@ -1325,7 +1325,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
             mapping[val] = i
         print(len(optionsPlot))
         filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="whitelist", mapping=mapping)
-        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes}
+        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
 
 
