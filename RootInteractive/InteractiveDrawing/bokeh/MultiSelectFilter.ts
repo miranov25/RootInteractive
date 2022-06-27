@@ -57,10 +57,12 @@ export class MultiSelectFilter extends Model {
 
   mark_dirty_widget(){
     this.dirty_widget = true
+    this.change.emit()
   }
 
   mark_dirty_source(){
     this.dirty_source = true
+    this.change.emit()
   }
 
   public v_compute(): boolean[]{
@@ -105,6 +107,16 @@ export class MultiSelectFilter extends Model {
       for(let i=0; i<col.length; i++){
         const x = col[i] as number
         new_vector[i] = (x & mask_new) == mask_new
+      }
+    } else if(how == "neither"){
+      for(let i=0; i<col.length; i++){
+        const x = col[i] as number
+        new_vector[i] = (x & mask_new) == 0
+      }
+    } else if(how == "eq"){
+      for(let i=0; i<col.length; i++){
+        const x = col[i] as number
+        new_vector[i] = x == mask_new
       }
     }
     this.dirty_source = false

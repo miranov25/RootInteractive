@@ -50,7 +50,7 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
 
-ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle"]
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask"]
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -768,7 +768,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     memoized_columns[None][newColumn["name"]] = newColumn
                     sources.add((None, newColumn["name"]))
             if variables[0] == 'multiSelectBitmask':
-                localWidget, widgetFilter = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                localWidget, widgetFilter = makeBokehMultiSelectBitmaskWidget(column[0], **optionWidget)
             if variables[0] == 'toggle':
                 label = variables[1][0]
                 if "label" in optionWidget:
@@ -1102,9 +1102,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
         for iWidget in widgetList:
-            iWidget["widget"].js_on_change("value", callback)
             if "filter" in iWidget:
                 iWidget["filter"].source = cdsFull
+                iWidget["filter"].js_on_change("change", callback)
+            else:
+                iWidget["widget"].js_on_change("value", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray)
@@ -1329,6 +1331,19 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="whitelist", mapping=mapping)
         newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
+
+
+def makeBokehMultiSelectBitmaskWidget(column: dict, title: str, mapping: dict, **kwargs):
+    options = {'size': 4, "how": "all"}
+    options.update(kwargs)
+    keys = list(mapping.keys())
+    if options["how"] in ["any", "whitelist"]:
+        multiselect_value = keys
+    else:
+        multiselect_value = []
+    widgetLocal = MultiSelect(title=title, value=multiselect_value, options=keys, size=options["size"])
+    filterLocal = MultiSelectFilter(widget=widgetLocal, field=column["name"], how=options["how"], mapping=mapping)
+    return widgetLocal, filterLocal
 
 
 def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):

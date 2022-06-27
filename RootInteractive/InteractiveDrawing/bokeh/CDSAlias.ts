@@ -85,7 +85,7 @@ export class CDSAlias extends ColumnarDataSource {
     }
     if(column.hasOwnProperty("field")){
         if(column.hasOwnProperty("transform")){
-            const field = source.data[column.field] as any[]
+            let field = this.get_array(column.field)
             const new_column = column.transform.v_compute(field)
             if(new_column){
                 data[columnName] = new_column
@@ -93,10 +93,10 @@ export class CDSAlias extends ColumnarDataSource {
                 data[columnName] = field.map(column.transform.compute)
             }
         } else {
-            data[columnName] = source.data[column.field] as any[]
+            data[columnName] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
-        const fields = column.fields.map((x: number) => source.data[x])
+        const fields = column.fields.map((x: string) => this.get_array(x))
         let new_column = column.transform.v_compute(fields)
         if(new_column){
             data[columnName] = new_column
@@ -110,7 +110,7 @@ export class CDSAlias extends ColumnarDataSource {
             data[columnName] = new_column
         }
     } else if(Object.prototype.toString.call(column) === '[object String]'){
-      let new_column = source.get_column(column)
+      let new_column = this.get_column(column)
       if(new_column == null){
         throw ReferenceError("Column not defined: "+ column)
       }

@@ -97,8 +97,9 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     const y = source.get_column(this.model.y)
     const z = source.get_column(this.model.z)
     const style = source.get_column(this.model.style)
-    if(x != null && y != null && z != null && style != null)
-    for (let i = 0; i < source.get_length()!; i++) {
+    const n = source.get_length()
+    if(x != null && y != null && z != null && style != null && n != null)
+    for (let i = 0; i < n; i++) {
       data.add({
         x: x[i],
         y: y[i],
