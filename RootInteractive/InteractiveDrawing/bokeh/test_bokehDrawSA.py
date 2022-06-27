@@ -45,11 +45,12 @@ df["DD"]=((df.D*4).round(0)).astype(int)
 df["DDC"]=((df.D*4).round(0)).astype(int).map(mapDDC)
 df["EE"]=(df.E*4).round(0)
 df['errY']=df.A*0.02+0.02
+df['maskAC']=2*(df['A']>.5)|1*(df['C']>.5)
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
 
 parameterArray = [
-    {"name": "colorZ", "value":"EE", "options":["A", "B", "EE"]},
+    {"name": "colorZ", "value":"A", "options":["A", "B", "EE"]},
     {"name": "X", "value":"A", "options":["A", "B", "D"]},
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
@@ -73,6 +74,13 @@ widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)"), ("ErrY", "@errY")]
 
 widgetParams=[
+    ['select',["colorZ"]],
+    ['select',["X"]],
+    ['slider',["size"]],
+    ['select',["legendFontSize"]],
+    ['toggle', ['legendVisible']],
+    ['slider', ['nPoints']],
+
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1]],
 
@@ -81,20 +89,16 @@ widgetParams=[
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10}],
     ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
+    ['multiSelectBitmask', ["maskAC"], {"mapping": {"A": 2, "C": 1}, "how":"all", "title": "maskAC(all)"}],
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-    ['select',["colorZ"]],
-    ['select',["X"]],
-    ['slider',["size"]],
-    ['select',["legendFontSize"]],
-    ['toggle', ['legendVisible']],
-    ['slider', ['nPoints']]
+
 ]
 widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 9], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[10, 11, 12], [13, 14, 15], {'sizing_mode': 'scale_width'}]
+    "Selection": [[6, 7, 8], [9, 10, 11], [12, 13],[14, 15, 16], {'sizing_mode': 'scale_width'}],
+    "Graphics": [[0, 1, 2], [3, 4, 5], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
