@@ -57,10 +57,12 @@ export class MultiSelectFilter extends Model {
 
   mark_dirty_widget(){
     this.dirty_widget = true
+    this.change.emit()
   }
 
   mark_dirty_source(){
     this.dirty_source = true
+    this.change.emit()
   }
 
   public v_compute(): boolean[]{
