@@ -108,6 +108,16 @@ export class MultiSelectFilter extends Model {
         const x = col[i] as number
         new_vector[i] = (x & mask_new) == mask_new
       }
+    } else if(how == "neither"){
+      for(let i=0; i<col.length; i++){
+        const x = col[i] as number
+        new_vector[i] = (x & mask_new) == 0
+      }
+    } else if(how == "eq"){
+      for(let i=0; i<col.length; i++){
+        const x = col[i] as number
+        new_vector[i] = x == mask_new
+      }
     }
     this.dirty_source = false
     this.dirty_widget = false
