@@ -96,9 +96,10 @@ widgetParams=[
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
 
 ]
+
 widgetLayoutDesc={
-    "Selection": [[6, 7, 8], [9, 10, 11], [12, 13],[14, 15, 16], {'sizing_mode': 'scale_width'}],
-    "Graphics": [[0, 1, 2], [3, 4, 5], {'sizing_mode': 'scale_width'}]
+    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 9], {'sizing_mode': 'scale_width'}],
+    "Graphics": [["colorZ", 11, 12], [13, 14, 15], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
@@ -155,3 +156,5 @@ def testBokehDrawArraySA_tree():
     output_file("test_bokehDrawSAArray_fromTTree.html")
     fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayoutDesc)
 
+output_file("test_BokehDrawArrayWidget.html")
+bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
