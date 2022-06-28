@@ -74,13 +74,6 @@ widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1
 tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)"), ("ErrY", "@errY")]
 
 widgetParams=[
-    ['select',["colorZ"]],
-    ['select',["X"]],
-    ['slider',["size"]],
-    ['select',["legendFontSize"]],
-    ['toggle', ['legendVisible']],
-    ['slider', ['nPoints']],
-
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1]],
 
@@ -94,12 +87,17 @@ widgetParams=[
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
-
+    ['select',["colorZ"], {"name": "colorZ"}],
+    ['select',["X"], {"name": "X"}],
+    ['slider',["size"], {"name": "markerSize"}],
+    ['select',["legendFontSize"], {"name": "legendFontSize"}],
+    ['toggle', ['legendVisible'], {"name": "legendVisible"}],
+    ['slider', ['nPoints'], {"name": "nPointsRender"}]
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 9], {'sizing_mode': 'scale_width'}],
-    "Graphics": [["colorZ", 11, 12], [13, 14, 15], {'sizing_mode': 'scale_width'}]
+    "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
