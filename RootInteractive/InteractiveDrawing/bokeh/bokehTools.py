@@ -788,8 +788,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     active = paramDict[variables[1][0]]["value"]
                 localWidget = Toggle(label=label, active=active)
             plotArray.append(localWidget)
-            if "name" in optionLocal:
-                plotDict[optionLocal["name"]] = localWidget
+            if "name" in optionWidget:
+                plotDict[optionWidget["name"]] = localWidget
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
@@ -1130,7 +1130,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
