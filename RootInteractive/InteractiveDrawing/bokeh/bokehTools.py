@@ -190,7 +190,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     return callback
 
 
-def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
     :param widgetLayoutDesc: array or dict desciption of layout
@@ -214,7 +214,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: b
     if isinstance(widgetLayoutDesc, dict):
         tabs = []
         for i, iPanel in widgetLayoutDesc.items():
-            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
+            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray, widgetDict), title=i))
         return Tabs(tabs=tabs)
     if options is None:
         options = {
@@ -238,13 +238,16 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: b
 
     for i, iWidget in enumerate(widgetLayoutDesc):
         if isinstance(iWidget, dict):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=False, options=optionLocal))
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal))
             continue
         if isinstance(iWidget, list):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=not isHorizontal, options=optionLocal))
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal))
             continue
 
-        figure = widgetArray[iWidget]
+        if isinstance(iWidget, int) and iWidget < len(widgetArray):
+            figure = widgetArray[iWidget]
+        else:
+            figure = widgetDict[iWidget]
         widgetRows.append(figure)
         if hasattr(figure, 'x_range'):
             if optionLocal['commonX'] >= 0:
@@ -692,6 +695,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if isinstance(variables, dict):
             optionsChangeList.append(i)
 
+    plotDict = {}
+
     optionsIndex = 0
     if len(optionsChangeList) != 0:
         optionGroup = options.copy()
@@ -716,7 +721,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 1:
                 TOptions.update(variables[1])
             # TODO: This is broken if compression is used because CDSCompress isn't a ColumnDataSource
-            plotArray.append(makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude']))
+            dataTable = makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude'])
+            plotArray.append(dataTable)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = dataTable
             continue
         if variables[0] == 'tableHisto':
             histoListLocal = []
@@ -736,6 +744,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             histoDict = {i: cdsDict[i] for i in histoListLocal}
             cdsHistoSummary, tableHisto = makeBokehHistoTable(histoDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = tableHisto
             continue
         if variables[0] in ALLOWED_WIDGET_TYPES:
             optionWidget = {}
@@ -778,6 +788,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     active = paramDict[variables[1][0]]["value"]
                 localWidget = Toggle(label=label, active=active)
             plotArray.append(localWidget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = localWidget
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
@@ -797,6 +809,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cds_used = None
             localWidget = TextAreaInput(**optionWidget)
             plotArray.append(localWidget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = localWidget
             widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
             continue
 
@@ -847,6 +861,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
             plotArray.append(plotI)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = plotI
             continue
         else:
             figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
@@ -1039,6 +1055,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         plotArray.append(figureI)
+        if "name" in optionLocal:
+            plotDict[optionLocal["name"]] = figureI
     histoList = []
     for cdsKey, cdsValue in cdsDict.items():
         # Ignore unused data sources
@@ -1109,7 +1127,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 iWidget["widget"].js_on_change("value", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
-        pAll = processBokehLayoutArray(options['layout'], plotArray)
+        pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
     return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict
