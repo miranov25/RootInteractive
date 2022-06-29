@@ -1164,7 +1164,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title="Count")
         histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
-                          fill_color=mapperC)
+                          fill_color=mapperC, line_width=0)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":
