@@ -117,14 +117,14 @@ def test_record(record_property: ty.Callable[[str, ty.Any], None]):
 
 def testBokehDrawArrayWidget(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayWidget.html")
-    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
 
 
 def testBokehDrawArrayWidgetNoScale(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayWidgetNoScale.html")
-    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray)
+    fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray, nPointRender="nPoints")
     record_property("html_size",os.stat("test_BokehDrawArrayWidgetNoScale.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
 
