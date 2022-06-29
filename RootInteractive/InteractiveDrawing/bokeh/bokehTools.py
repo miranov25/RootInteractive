@@ -190,7 +190,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     return callback
 
 
-def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: bool=False, options: dict=None):
+def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
     :param widgetLayoutDesc: array or dict desciption of layout
@@ -214,7 +214,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: b
     if isinstance(widgetLayoutDesc, dict):
         tabs = []
         for i, iPanel in widgetLayoutDesc.items():
-            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray), title=i))
+            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray, widgetDict), title=i))
         return Tabs(tabs=tabs)
     if options is None:
         options = {
@@ -238,13 +238,16 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, isHorizontal: b
 
     for i, iWidget in enumerate(widgetLayoutDesc):
         if isinstance(iWidget, dict):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=False, options=optionLocal))
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal))
             continue
         if isinstance(iWidget, list):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, isHorizontal=not isHorizontal, options=optionLocal))
+            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal))
             continue
 
-        figure = widgetArray[iWidget]
+        if isinstance(iWidget, int) and iWidget < len(widgetArray):
+            figure = widgetArray[iWidget]
+        else:
+            figure = widgetDict[iWidget]
         widgetRows.append(figure)
         if hasattr(figure, 'x_range'):
             if optionLocal['commonX'] >= 0:
@@ -594,12 +597,17 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             iSource["type"] = cdsType
         cdsType = iSource["type"]
 
+        # Create the name for cdsOrig
+        name_orig = "cdsOrig"
+        if cds_name is not None:
+            name_orig = cds_name+"_orig"
+
         # Create cdsOrig
         if cdsType == "source":
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
-                iSource["cdsOrig"] = CDSCompress()
+                iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
-                iSource["cdsOrig"] = ColumnDataSource()
+                iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
             nbins = 10
             if "nbins" in iSource:
@@ -612,7 +620,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
+            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHistoTooltips
         elif cdsType in ["histo2d", "histoNd"]:
@@ -627,7 +635,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
+            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHisto2DTooltips
             #TODO: Add projections
@@ -642,7 +650,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     quantiles = iSource["quantiles"]
                 for j in axisIndices:
                     cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j))
+                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
                     projectionsLocal[i] = cdsProfile
                     tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
@@ -663,19 +671,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             how  = "inner"
             if "how" in iSource:
                 how = iSource["how"]
-            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how)
+            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
-    for iSource in cdsDict.values():
+    for cds_name, iSource in cdsDict.items():
+
+        name_full = "cdsFull"
+        if cds_name is not None:
+            name_orig = cds_name+"_orig"
         # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
+        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={}, name=name_full)
 
         # Add downsampler
+        name_normal = "default source"
+        if cds_name is not None:
+            name_normal = cds_name
         nPoints = options["nPointRender"]
         if options["nPointRender"] in paramDict:
             nPoints = paramDict[options["nPointRender"]]["value"]
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints)
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
         if options["nPointRender"] in paramDict:
             paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
                             downsampler.nPoints = this.value | 0
@@ -691,6 +706,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i, variables in enumerate(figureArray):
         if isinstance(variables, dict):
             optionsChangeList.append(i)
+
+    plotDict = {}
 
     optionsIndex = 0
     if len(optionsChangeList) != 0:
@@ -716,7 +733,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 1:
                 TOptions.update(variables[1])
             # TODO: This is broken if compression is used because CDSCompress isn't a ColumnDataSource
-            plotArray.append(makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude']))
+            dataTable = makeBokehDataTable(dfQuery, cdsDict[None]["cdsOrig"], TOptions['include'], TOptions['exclude'])
+            plotArray.append(dataTable)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = dataTable
             continue
         if variables[0] == 'tableHisto':
             histoListLocal = []
@@ -736,6 +756,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             histoDict = {i: cdsDict[i] for i in histoListLocal}
             cdsHistoSummary, tableHisto = makeBokehHistoTable(histoDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"])
             plotArray.append(tableHisto)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = tableHisto
             continue
         if variables[0] in ALLOWED_WIDGET_TYPES:
             optionWidget = {}
@@ -778,6 +800,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     active = paramDict[variables[1][0]]["value"]
                 localWidget = Toggle(label=label, active=active)
             plotArray.append(localWidget)
+            if "name" in optionWidget:
+                localWidget.name = optionWidget["name"]
+                plotDict[optionWidget["name"]] = localWidget
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
@@ -797,6 +822,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cds_used = None
             localWidget = TextAreaInput(**optionWidget)
             plotArray.append(localWidget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = localWidget
             widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
             continue
 
@@ -847,6 +874,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
             plotArray.append(plotI)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = plotI
             continue
         else:
             figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
@@ -1039,6 +1068,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 for i, iOption in legend_options_parameters.items():
                     iOption["subscribed_events"].append(["value", figureI.legend[0], i])        
         plotArray.append(figureI)
+        if "name" in optionLocal:
+            plotDict[optionLocal["name"]] = figureI
     histoList = []
     for cdsKey, cdsValue in cdsDict.items():
         # Ignore unused data sources
@@ -1109,10 +1140,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 iWidget["widget"].js_on_change("value", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
-        pAll = processBokehLayoutArray(options['layout'], plotArray)
+        pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
@@ -1133,7 +1164,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title="Count")
         histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
-                          fill_color=mapperC)
+                          fill_color=mapperC, line_width=0)
         histoGlyphRenderer = fig.add_glyph(cdsHisto, histoGlyph)
         fig.add_layout(color_bar, 'right')
     elif visualization_type == "colZ":

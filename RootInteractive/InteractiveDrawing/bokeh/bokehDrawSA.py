@@ -98,6 +98,7 @@ class bokehDrawSA(object):
         self.profileList = None
         self.paramDict = None
         self.aliasDict = None
+        self.plotDict = None
 
     @classmethod
     def fromArray(cls, dataFrame, query, figureArray, widgetsDescription, **kwargs):
@@ -170,11 +171,11 @@ class bokehDrawSA(object):
             self.isNotebook = False
         mergedFigureArray = figureArray + widgetsDescription
         self.figure, self.cdsSel, self.plotArray, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **kwargs)
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, self.plotDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
-            widgetList=processBokehLayoutArray(self.widgetLayout, self.plotArray[nFigures:])
+            widgetList=processBokehLayoutArray(self.widgetLayout, self.plotArray[nFigures:], self.plotDict)
         self.pAll=gridplotRow([self.figure, widgetList], sizing_mode=self.options['sizing_mode'])
         self.widgetList=widgetList
         #self.pAll=column([self.figure,widgetList],sizing_mode=self.options['sizing_mode'])
