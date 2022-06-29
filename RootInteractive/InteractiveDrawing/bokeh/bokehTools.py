@@ -597,12 +597,17 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             iSource["type"] = cdsType
         cdsType = iSource["type"]
 
+        # Create the name for cdsOrig
+        name_orig = "cdsOrig"
+        if cds_name is not None:
+            name_orig = cds_name+"_orig"
+
         # Create cdsOrig
         if cdsType == "source":
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
-                iSource["cdsOrig"] = CDSCompress()
+                iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
-                iSource["cdsOrig"] = ColumnDataSource()
+                iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
             nbins = 10
             if "nbins" in iSource:
@@ -615,7 +620,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange)
+            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHistoTooltips
         elif cdsType in ["histo2d", "histoNd"]:
@@ -630,7 +635,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange)
+            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHisto2DTooltips
             #TODO: Add projections
@@ -645,7 +650,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     quantiles = iSource["quantiles"]
                 for j in axisIndices:
                     cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j))
+                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
                     projectionsLocal[i] = cdsProfile
                     tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
@@ -666,19 +671,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             how  = "inner"
             if "how" in iSource:
                 how = iSource["how"]
-            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how)
+            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
-    for iSource in cdsDict.values():
+    for cds_name, iSource in cdsDict.items():
+
+        name_full = "cdsFull"
+        if cds_name is not None:
+            name_orig = cds_name+"_orig"
         # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={})
+        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={}, name=name_full)
 
         # Add downsampler
+        name_normal = "default source"
+        if cds_name is not None:
+            name_normal = cds_name
         nPoints = options["nPointRender"]
         if options["nPointRender"] in paramDict:
             nPoints = paramDict[options["nPointRender"]]["value"]
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints)
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
         if options["nPointRender"] in paramDict:
             paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
                             downsampler.nPoints = this.value | 0
@@ -789,6 +801,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 localWidget = Toggle(label=label, active=active)
             plotArray.append(localWidget)
             if "name" in optionWidget:
+                localWidget.name = optionWidget["name"]
                 plotDict[optionWidget["name"]] = localWidget
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
