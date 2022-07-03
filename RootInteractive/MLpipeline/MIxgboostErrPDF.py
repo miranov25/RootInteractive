@@ -8,7 +8,7 @@ from sklearn.tree import DecisionTreeClassifier
 #
 from joblib import Parallel, delayed
 import threading
-from sklearn.utils.fixes import _joblib_parallel_args
+#from sklearn.utils.fixes import _joblib_parallel_args
 from scipy import stats
 import xgboost as xgb
 
@@ -211,7 +211,7 @@ class MIxgboostErrPDF:
                 stdCurrent =stdPointMean[3]
                 self.earlyStop=ir[1]
 
-    def fitReducible(self, learning_rate=0.02, subsample=0.05, n_estimators=100) :
+    def fitReducible(self, learning_rate=0.01, subsample=0.05, n_estimators=100) :
         from sklearn.base import clone
         import copy
         for iSample in [0,1,2]:
@@ -225,7 +225,7 @@ class MIxgboostErrPDF:
 
 
 
-    def predictStat(self, Xin, statDictionary, iSample, predType, iteration_range, YRef=0):
+    def predictStatSlow(self, Xin, statDictionary, iSample, predType, iteration_range, YRef=0):
         """
         predict value
         :param data:           inout data
@@ -262,16 +262,88 @@ class MIxgboostErrPDF:
             statOut["stdIter"] = np.std(xgbPredD, 0)
         return statOut
 
-    def predictReducibleError(self, data, statDictionary, nPermutation, fractionArray):
+    def predictStatIter(self, Xin, statDictionary, iSample, predType, iteration_range, YRef=0):
         """
-        predict local reducible array
-        :param data:           input data
-        :param statDictionary:  statistics to output
-        :param nPermutation:
-        :param fractionArray:
+        predict value
+        :param data:           inout data
+        :param statDictonary:  statistics to output
+        :param treeType:
         :return:
         """
-        # assert(treeType!=0 & treeType!=1)
+        nIteration = iteration_range[1] - iteration_range[0]
+        xgbPred  = np.zeros((Xin.shape[0], nIteration))
+        xgbPredN  = np.zeros((Xin.shape[0], nIteration))
+        xgbPredD = np.zeros((Xin.shape[0], nIteration))
+        pred0=0
+        for i in range(iteration_range[0], iteration_range[1]-1):
+            regressor=self.regXGBFac[iSample]
+            if predType==1:
+                regressor=self.regXGBFacRed[iSample]
+            if type(pred0)=='int':
+                pred0=regressor.predict(Xin, iteration_range=(0, i))
+            deltaPred=   regressor.predict(Xin, iteration_range=(i, i+1))-0.5
+            #predI=regressor.predict(Xin, iteration_range=(0, i))
+            #predI1=regressor.predict(Xin, iteration_range=(0, i+1))
+            # print(delta.shape,xgbPred[:,i].shape)
+            xgbPred[:, i-iteration_range[0]]  = deltaPred
+            xgbPredN[:, i-iteration_range[0]] = deltaPred/deltaPred.std()
+            if YRef : xgbPredD[:, i-iteration_range[0]] = YRef-pred0
+            pred0+=deltaPred
+        statOut={}
+        #if YRef
+        statOut["mean"]     = np.mean(xgbPred, 1)
+        statOut["median"]   = np.median(xgbPred, 1)
+        statOut["std"]      = np.std(xgbPred, 1)
+        statOut["stdN"]     = np.std(xgbPredN, 1)
+        statOut["meanIter"]  = np.mean(xgbPred, 0)
+        statOut["stdIter"]  = np.std(xgbPred, 0)
+        if YRef:
+            statOut["stdRef"]     = np.std(xgbPredD, 1)
+            statOut["stdNRef"]     = np.std(xgbPredN, 1)
+            statOut["stdIterRef"] = np.std(xgbPredD, 0)
+
+        return statOut
+
+    def predictReducibleError(self,X):
+        """
+        predict reducible error using 3 fold
+        xgbErrPDF.fitReducible() has to be called before
+        :param X:
+        :return: error estimator
+        """
+        outStat={}
+        stdDiff0={}
+        ir=(0,0)
+        redStop=self.regXGBFacRed[0]._get_iteration_range(ir)[1]
+
+        for iSample in [0,1,2]:
+            print(iSample)
+            y=self.predictStatIter(X,{},iSample,1,(self.earlyStop,redStop),0)
+            outStat[f"stdNR{iSample}"]=y["stdN"]
+            #yP=xgbErrPDF.regXGBFacRed[iSample].predict(df[variableX].to_numpy())
+
+        for i in [0,1,2]:
+            stdDiff0[i]=(self.regXGBFacRed[iSample].predict(X)-self.regXGBFacRed[(iSample+1)%3].predict(X)).std()/np.sqrt(2.)
+            outStat[f"redErr{i}"]=outStat[f"stdNR{i}"]*stdDiff0[i]
+        outStat[f"redErr"]=((outStat[f"redErr0"]+  outStat[f"redErr1"]+  outStat[f"redErr2"])/3.)/np.sqrt(3.)
+        outStat[f"stdNR"]=((outStat[f"stdNR0"]+  outStat[f"stdNR1"]+  outStat[f"stdNR2"])/3.)/np.sqrt(3.)
+        return outStat
+
+    def predictStat(self,X):
+        outStat={}
+        for iSample in [0,1,2]:
+            print(iSample)
+            xP=self.regXGBFac[iSample].predict(X)
+            yP=self.regXGBFacRed[iSample].predict(X)
+            outStat[f"mean_{iSample}"]=xP
+            outStat[f"meanRed_{iSample}"]=yP
+            if iSample==0:
+                outStat[f"mean"]=outStat[f"mean_{iSample}"]/3.
+                outStat[f"meanRed"]=outStat[f"meanRed_{iSample}"]/3.
+            else:
+                outStat[f"mean"]+=outStat[f"mean_{iSample}"]/3.
+                outStat[f"meanRed"]+=outStat[f"meanRed_{iSample}"]/3
+        return outStat
 
     def predict(self, data, **options):
         """
