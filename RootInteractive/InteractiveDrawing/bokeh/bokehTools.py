@@ -622,10 +622,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if cdsType == "source":
             # HACK: Add "index" column for user convenience
             if "index" not in iSource["data"]:
-                try:
-                    iSource["data"]["index"] = iSource["data"].index
-                except:
-                    iSource["data"]["index"] = np.arange(len(list(iSource["data"].values())))
+                iSource["data"]["index"] = np.arange(len(list(iSource["data"].values)), dtype=np.int32)
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
