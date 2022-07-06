@@ -52,6 +52,8 @@ export class HistogramCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => this.update_data())
+    this.connect(this.properties.nbins.change, () => this.update_data())
+    this.connect(this.properties.range.change, () => this.update_data())
   }
 
   update_data(indices: number[] | null = null): void {
@@ -101,18 +103,40 @@ export class HistogramCDS extends ColumnarDataSource {
       bin_right.length = 0
       if(this.view === null){
         if(this.range === null ){
-          const sample_arr = this.source.get_array(this.sample) as number[]
-          this._range_min = sample_arr.reduce((acc, cur) => Math.min(acc, cur), sample_arr[0])
-          this._range_max = sample_arr.reduce((acc, cur) => Math.max(acc, cur), sample_arr[0])
+          const sample_arr = this.source.get_column(this.sample)
+          if(sample_arr == null){
+            throw ReferenceError("Column " + this.sample + " not found in source " + this.source.name)
+          }
+          let range_min = Infinity
+          let range_max = -Infinity
+          const l = sample_arr.length
+          for(let x=0; x<l; x++){
+            range_min = Math.min(range_min, sample_arr[x])
+            range_max = Math.max(range_max, sample_arr[x])
+          }
+          this._range_min = range_min
+          this._range_max = range_max
         } else {
           this._range_min = this.range[0]
           this._range_max = this.range[1]
         }
       } else {
         if(this.range === null ){
-          const sample_arr = this.source.get_array(this.sample) as number[]
-          this._range_min = this.view.reduce((acc, cur) => Math.min(acc, sample_arr[cur]), sample_arr[this.view[0]])
-          this._range_max = this.view.reduce((acc, cur) => Math.max(acc, sample_arr[cur]), sample_arr[this.view[0]])
+          const sample_arr = this.source.get_column(this.sample)
+          if(sample_arr == null){
+            throw ReferenceError("Column " + this.sample + " not found in source " + this.source.name)
+          }
+          let range_min = Infinity
+          let range_max = -Infinity
+          const view = this.view
+          const l = this.view.length
+          for(let x=0; x<l; x++){
+            const y = view[x]
+            range_min = Math.min(range_min, sample_arr[y])
+            range_max = Math.max(range_max, sample_arr[y])
+          }
+          this._range_min = range_min
+          this._range_max = range_max
         } else {
           this._range_min = this.range[0]
           this._range_max = this.range[1]

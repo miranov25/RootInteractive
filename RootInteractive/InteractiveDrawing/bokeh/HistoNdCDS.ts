@@ -103,10 +103,13 @@ export class HistoNdCDS extends ColumnarDataSource {
   update_range(): void {
     this._nbins = this.nbins;
 
-    let sample_array: number[][] = []
+    let sample_array: ArrayLike<number>[] = []
     if(this.range === null || this.range.reduce((acc, cur) => acc || (cur === null), false))
     for (const column_name of this.sample_variables) {
-      const column = this.source.get_array(column_name) as number[]
+      const column = this.source.get_column(column_name)
+      if (column == null){
+        throw new Error("Column " + column_name + " not found in source " + this.source.name);
+      }
       sample_array.push(column)
     }
       // This code seems stupid
@@ -114,16 +117,34 @@ export class HistoNdCDS extends ColumnarDataSource {
       if(this.view === null){
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
-            this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
+            let range_min = Infinity
+            let range_max = -Infinity
+            const column = sample_array[i]
+            const l = column.length
+            for(let x=0; x<l; x++){
+              range_min = Math.min(range_min, column[x])
+              range_max = Math.max(range_max, column[x])
+            }
+            this._range_min[i] = range_min
+            this._range_max[i] = range_max
           }
           invalidate_bins = true
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
             if(r === null) {
-              this._range_min[i] = sample_array[i].reduce((acc, cur) => Math.min(acc, cur), Infinity)
-              this._range_max[i] = sample_array[i].reduce((acc, cur) => Math.max(acc, cur), -Infinity)
+              for (let i = 0; i < this._nbins.length; i++) {
+                let range_min = Infinity
+                let range_max = -Infinity
+                const column = sample_array[i]
+                const l = column.length
+                for(let x=0; x<l; x++){
+                  range_min = Math.min(range_min, column[x])
+                  range_max = Math.max(range_max, column[x])
+                }
+                this._range_min[i] = range_min
+                this._range_max[i] = range_max
+              }
               invalidate_bins = true
             } else {
               this._range_min[i] = r[0]
@@ -134,18 +155,36 @@ export class HistoNdCDS extends ColumnarDataSource {
       } else {
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            const col = sample_array[i]
-            this._range_min[i] = this.view.reduce((acc, cur) => Math.min(acc, col[cur]), Infinity)
-            this._range_max[i] = this.view.reduce((acc, cur) => Math.max(acc, col[cur]), -Infinity)
+            let range_min = Infinity
+            let range_max = -Infinity
+            const column = sample_array[i]
+            const view = this.view
+            const l = this.view.length
+            for(let x=0; x<l; x++){
+              const y = view[x]
+              range_min = Math.min(range_min, column[y])
+              range_max = Math.max(range_max, column[y])
+            }
+            this._range_min[i] = range_min
+            this._range_max[i] = range_max
           }
           invalidate_bins = true
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
             if(r === null) {
-              const col = sample_array[i]
-              this._range_min[i] = this.view.reduce((acc, cur) => Math.min(acc, col[cur]), Infinity)
-              this._range_max[i] = this.view.reduce((acc, cur) => Math.max(acc, col[cur]), -Infinity)
+              const column = sample_array[i]
+              let range_min = Infinity
+              let range_max = -Infinity
+              const view = this.view
+              const l = this.view.length
+              for(let x=0; x<l; x++){
+                const y = view[x]
+                range_min = Math.min(range_min, column[y])
+                range_max = Math.max(range_max, column[y])
+              }
+              this._range_min[i] = range_min
+              this._range_max[i] = range_max
               invalidate_bins = true
             } else {
               this._range_min[i] = r[0]
@@ -194,9 +233,9 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   histogram(weights: string | null): number[]{
     const length = this._strides[this._strides.length-1]
-    let sample_array: number[][] = []
+    let sample_array: ArrayLike<number>[] = []
     for (const column_name of this.sample_variables) {
-      sample_array.push(this.source.get_array(column_name))
+      sample_array.push(this.source.get_column(column_name)!)
     }
     let bincount: number[] = Array(length)
     bincount.fill(0)
@@ -248,7 +287,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     return bincount
   }
 
-  getbin(idx: number, sample: number[][]): number{
+  getbin(idx: number, sample: ArrayLike<number>[]): number{
       // This can be optimized using loop fission, but in our use case the data doeswn't change often, which means
       // that the cached bin indices are invalidated infrequently.
       // Another approach would be to cache index in the sorted array, this would require sorting the array, 
@@ -278,6 +317,11 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public get_stride(idx: number): number{
     return this._strides[idx]
+  }
+
+  get_size(){
+    const dim = this._strides.length-1
+    return this._strides[dim]
   }
 
 }
