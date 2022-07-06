@@ -80,7 +80,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         const widget = index.widget;
         const widgetType = index.type;
         const col = index.key && cdsOrig.get_column(index.key);
-        // TODO: Possibly use bisect, if this becomes bottleneck. Also add more widgets for index
+        // TODO: Add more widgets for index, not only range slider
         if(widgetType == "range"){
             const low = widget.value[0];
             const high = widget.value[1];
@@ -620,6 +620,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         # Create cdsOrig
         if cdsType == "source":
+            # HACK: Add "index" column for user convenience
+            if "index" not in iSource["data"]:
+                try:
+                    iSource["data"]["index"] = iSource["data"].index
+                except:
+                    iSource["data"]["index"] = np.arange(len(list(iSource["data"].values())))
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
