@@ -191,8 +191,8 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         cdsSel.update()
         console.log(cdsSel._downsampled_indices.length);
         console.log(cdsSel.nPoints)
-        const t3 = performance.now();
-        console.log(`Updating cds took ${t3 - t2} milliseconds.`);
+        const t4 = performance.now();
+        console.log(`Updating cds took ${t4 - t3} milliseconds.`);
     }
     if(options.cdsHistoSummary !== null){
         options.cdsHistoSummary.update();
