@@ -52,8 +52,6 @@ export class HistogramCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => this.update_data())
-    this.connect(this.props.nbins.change, () => this.update_data())
-    this.connect(this.props.range.change, () => this.update_data())
   }
 
   update_data(indices: number[] | null = null): void {
