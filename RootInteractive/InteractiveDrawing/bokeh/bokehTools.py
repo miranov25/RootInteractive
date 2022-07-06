@@ -63,23 +63,54 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     code = \
         """
     const t0 = performance.now();
-    const dataOrig = cdsOrig.data;
     let nSelected=0;
     const precision = 0.000001;
     const size = cdsOrig.length;
+
+    let first = 0;
+    let last = size;
+
     let isSelected = new Array(size);
     for(let i=0; i<size; ++i){
-        isSelected[i] = true;
+        isSelected[i] = false;
     }
     let permutationFilter = [];
     let indicesAll = [];
+    if(index != null){
+        const widget = index.widget;
+        const widgetType = index.type;
+        const col = index.key && cdsOrig.get_column(index.key);
+        // TODO: Possibly use bisect, if this becomes bottleneck. Also add more widgets for index
+        if(widgetType == "range"){
+            const low = widget.value[0];
+            const high = widget.value[1];
+            for(let i=0; i<size; i++){
+                if(col[i] >= low){
+                    first = i;
+                    break;
+                }
+            }
+            for(let i=first; i<size; i++){
+                if(col[i] >= high){
+                    last = i;
+                    break;
+                }
+            }
+        }
+    }
+    for(let i=first; i<last; ++i){
+        isSelected[i] = true;
+    }
+
+    const t1 = performance.now();
+    console.log(`Using index took ${t1 - t0} milliseconds.`);
     for (const iWidget of widgetList){
         if(iWidget.filter != null){
             if (this == iWidget.widget){
                 iWidget.filter.dirty_widget = true
             }
             const widgetFilter = iWidget.filter.v_compute();
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 isSelected[i] &= widgetFilter[i];
             }
             continue;
@@ -90,7 +121,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         if(widgetType == "slider"){
             const widgetValue = widget.value;
             const widgetStep = widget.step;
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 isSelected[i] &= (col[i] >= widgetValue-0.5*widgetStep);
                 isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
             }
@@ -98,7 +129,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         if(widgetType == "range"){
             const low = widget.value[0];
             const high = widget.value[1];
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 isSelected[i] &= (col[i] >= low);
                 isSelected[i] &= (col[i] <= high);
             }
@@ -107,30 +138,15 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
             widgetValue = widgetValue === "False" ? false : widgetValue;
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
                 isOK|=(col[i] == widgetValue)
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
             }
         }
-        if(widgetType == "multiSelect"){
-            const widgetValue = widget.value.map((val)=>{
-                if(val === "True") return true;
-                if(val === "False") return false;
-                if(!isNaN(val)) return Number(val);
-                return val;
-            });
-            for(let i=0; i<size; i++){
-                let isOK = widgetValue.reduce((acc,cur)=>acc|Math.abs(cur-col[i])<precision,0);
-                if (!isOK){
-                    isOK = widgetValue.reduce((acc,cur)=>acc|cur===col[i],0);
-                }
-                isSelected[i] &= isOK;
-            }
-        }
         if(widgetType == "CheckboxGroup"){
             const widgetValue = widget.value;
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
                 isSelected &= (col[i] == widgetValue) | isOK;
             }
@@ -145,15 +161,15 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             const variablesLocal = cdsOrig.columns().filter((x) => pattern.test(x))
             const dataOrigArray = variablesLocal.map((x) => cdsOrig.get_column(x))
             const f = new Function(...variablesLocal, "\\"use strict\\"\\n" + queryText);
-            for(let i=0; i<size; i++){
+            for(let i=first; i<last; i++){
                 const result = f(...dataOrigArray.map(x => x[i]));
                 isSelected[i] &= result;
             }
         }
     }
    
-    const t1 = performance.now();
-    console.log(`Filtering took ${t1 - t0} milliseconds.`);
+    const t2 = performance.now();
+    console.log(`Filtering took ${t2 - t1} milliseconds.`);
     const view = options.view;
     const histogramList = options.histogramList
     if(histogramList != []){
@@ -167,8 +183,8 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             histo.update_range();
         }
     }
-    const t2 = performance.now();
-    console.log(`Histogramming took ${t2 - t1} milliseconds.`);
+    const t3 = performance.now();
+    console.log(`Histogramming took ${t3 - t2} milliseconds.`);
     if(cdsSel != null){
         console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
@@ -185,7 +201,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
-    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options},
+    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options, 'index':options["index"]},
                         code=code)
     return callback
 
@@ -809,11 +825,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if optionWidget["callback"] == "selection":
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
-                    widgetDict[cds_used] = []
+                    widgetDict[cds_used] = {"widgetList":[]}
                 widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
                 if widgetFilter is not None:
                     widgetDictLocal["filter"] = widgetFilter
-                widgetDict[cds_used].append(widgetDictLocal)
+                if "index" in optionWidget and optionWidget["index"]:
+                    widgetDict[cds_used]["index"] = widgetDictLocal
+                else:
+                    widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
             continue
         if variables[0] == "textQuery":
             optionWidget = {}
@@ -824,7 +843,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             plotArray.append(localWidget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = localWidget
-            widgetDict[cds_used].append({"widget": localWidget, "type": variables[0], "key": None})
+            if cds_used not in widgetDict:
+                widgetDict[cds_used] = {"widgetList":[]}
+            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
             continue
 
         optionLocal = optionGroup.copy()
@@ -1127,17 +1148,23 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                                                                 cdsAlias.change.emit();
                                                                                             """)])
 
-    for iCds, widgetList in widgetDict.items():
+    for iCds, widgets in widgetDict.items():
+        widgetList = widgets["widgetList"]
+        index = None
+        if "index" in widgets:
+            index = widgets["index"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         source = cdsDict[iCds]["cds"]
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
-                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()))
+                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
         for iWidget in widgetList:
             if "filter" in iWidget:
                 iWidget["filter"].source = cdsFull
                 iWidget["filter"].js_on_change("change", callback)
             else:
                 iWidget["widget"].js_on_change("value", callback)
+        if index is not None:
+            index["widget"].js_on_change("value", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
