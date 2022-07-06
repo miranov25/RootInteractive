@@ -75,7 +75,7 @@ tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)
 
 widgetParams=[
     ['range', ['A']],
-    ['range', ['B', 0, 1, 0.1, 0, 1]],
+    ['range', ['B', 0, 1, 0.1, 0, 1], {"index": True}],
 
     ['range', ['C'], {'type': 'minmax'}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
