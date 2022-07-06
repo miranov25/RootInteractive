@@ -75,9 +75,6 @@ export class CDSAlias extends ColumnarDataSource {
       let new_column = source.get_column(columnName)
       if(new_column == null){
         throw ReferenceError("Column not defined: "+ columnName + " in data source " + source.name)
-      }
-      else if (!Array.isArray(new_column)){
-        data[columnName] = Array.from(new_column)
       } else {
         data[columnName] = new_column
       }
@@ -114,9 +111,7 @@ export class CDSAlias extends ColumnarDataSource {
       if(new_column == null){
         throw ReferenceError("Column not defined: "+ column)
       }
-      else if (!Array.isArray(new_column)){
-        data[columnName] = Array.from(new_column)
-      } else {
+      else {
         data[columnName] = new_column
       }
     }
