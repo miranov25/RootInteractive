@@ -51,6 +51,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this.data = {"bin_count":[]}
     this.view = null
     this._bin_indices = []
+    this._do_cache_bins = true
     this.update_range()
   }
 
@@ -58,8 +59,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => {
-      this._bin_indices.length = this.source.length
-      this._bin_indices.fill(-2, 0, this.source.length)
+      this.invalidate_cached_bins()
       this.update_data()
     })
   }
@@ -100,6 +100,8 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _transform_scale: number[]
   private _strides: number[]
 
+  private _do_cache_bins: boolean
+
   update_range(): void {
     this._nbins = this.nbins;
 
@@ -113,7 +115,6 @@ export class HistoNdCDS extends ColumnarDataSource {
       sample_array.push(column)
     }
       // This code seems stupid
-      let invalidate_bins = false
       if(this.view === null){
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
@@ -128,7 +129,7 @@ export class HistoNdCDS extends ColumnarDataSource {
             this._range_min[i] = range_min
             this._range_max[i] = range_max
           }
-          invalidate_bins = true
+          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
@@ -145,7 +146,7 @@ export class HistoNdCDS extends ColumnarDataSource {
                 this._range_min[i] = range_min
                 this._range_max[i] = range_max
               }
-              invalidate_bins = true
+              this._do_cache_bins = false
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
@@ -168,7 +169,7 @@ export class HistoNdCDS extends ColumnarDataSource {
             this._range_min[i] = range_min
             this._range_max[i] = range_max
           }
-          invalidate_bins = true
+          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
@@ -185,17 +186,13 @@ export class HistoNdCDS extends ColumnarDataSource {
               }
               this._range_min[i] = range_min
               this._range_max[i] = range_max
-              invalidate_bins = true
+              this._do_cache_bins = false
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
             }
           }
         }        
-      }
-      if (invalidate_bins || this._bin_indices.length === 0){
-        this._bin_indices.length = this.source.length
-        this._bin_indices.fill(-2, 0, this.source.length)
       }
       const dim = this.nbins.length
       this._nbins.length = dim
@@ -292,8 +289,11 @@ export class HistoNdCDS extends ColumnarDataSource {
       // that the cached bin indices are invalidated infrequently.
       // Another approach would be to cache index in the sorted array, this would require sorting the array, 
       // but would make subsequent hisogramming even quicker.
-      const cached_value = this._bin_indices[idx]
-      if(cached_value != -2) return cached_value
+      if(this._do_cache_bins){
+        const cached_value = this._bin_indices[idx]
+        if(cached_value != -2) return cached_value
+      }
+
       let bin = 0
 
       for (let i = 0; i < this._nbins.length; i++) {
@@ -311,7 +311,9 @@ export class HistoNdCDS extends ColumnarDataSource {
           bin += ((val * this._transform_scale[i] - this._transform_origin[i]) | 0) * this._strides[i]
         }
       }
-      this._bin_indices[idx] = bin
+      if(this._do_cache_bins){
+        this._bin_indices[idx] = bin
+      }
       return bin
   }
 
@@ -322,6 +324,14 @@ export class HistoNdCDS extends ColumnarDataSource {
   get_size(){
     const dim = this._strides.length-1
     return this._strides[dim]
+  }
+
+  invalidate_cached_bins(){
+    if(this._do_cache_bins){
+      this._bin_indices.length = this.source.length
+      this._bin_indices.fill(-2, 0, this.source.length)
+    }
+
   }
 
 }
