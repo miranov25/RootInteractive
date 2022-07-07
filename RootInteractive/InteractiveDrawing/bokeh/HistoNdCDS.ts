@@ -71,15 +71,6 @@ export class HistoNdCDS extends ColumnarDataSource {
         //TODO: Make this actually do something
       } else {
         bincount = this.histogram(this.weights)
-        if(this.histograms !== null){
-          for (const key in this.histograms){
-            if(this.histograms[key] === null){
-              this.data[key] = this.histogram(null)
-            } else {
-              this.data[key] = this.histogram(this.histograms[key].weights)
-            }
-          }
-        }
       }
       this.data["bin_count"] = bincount
       this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
@@ -194,6 +185,7 @@ export class HistoNdCDS extends ColumnarDataSource {
           }
         }        
       }
+      this.invalidate_cached_bins()
       const dim = this.nbins.length
       this._nbins.length = dim
       this._transform_scale.length = dim
@@ -242,7 +234,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       if(weights != null){
         const weights_array = this.source.get_column(weights)
         if (weights_array == null){
-          throw ReferenceError("Column not defined: "+ weights)
+          throw ReferenceError("Column "+ weights + " not found in " + this.source.name)
         }
         for(let i=0; i<n_indices; i++){
           const bin = this.getbin(i, sample_array)
@@ -263,7 +255,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       if(weights != null){
         const weights_array = this.source.get_column(weights)
         if (weights_array == null){
-          throw ReferenceError("Column not defined: "+ weights)
+          throw ReferenceError("Column "+ weights + " not found in " + this.source.name)
         }
         for(let i=0; i<n_indices; i++){
           let j = view_indices[i]
@@ -331,7 +323,32 @@ export class HistoNdCDS extends ColumnarDataSource {
       this._bin_indices.length = this.source.length
       this._bin_indices.fill(-2, 0, this.source.length)
     }
-
   }
+
+  get_column(key: string){
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    this.compute_function(key)
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    return null
+  }
+
+  compute_function(key: string){
+    const {histograms, data} = this 
+    if(histograms !== null){
+      if(histograms[key] === null){
+        data[key] = this.histogram(null)
+      } else {
+        data[key] = this.histogram(histograms[key].weights)
+      }
+    }
+  }
+
+  //public change_selection(indices: number[]){
+//
+//  }
 
 }
