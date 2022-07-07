@@ -35,8 +35,9 @@ widgetParams = [
     ['range', ['B']],
     ['range', ['C']],
     ['multiSelect', ['D']],
+    ['range', ['index'], {"index": True}],
 ]
-widgetLayoutDesc = [[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc = [[0, 1], [2, 3, 4], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc = [
     [0, 1, {'y_visible': 1, 'x_visible': 1, 'plot_height': 150}],
