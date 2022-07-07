@@ -52,6 +52,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this.view = null
     this._bin_indices = []
     this._do_cache_bins = true
+    this.invalidate_cached_bins()
     this.update_range()
   }
 
@@ -185,7 +186,6 @@ export class HistoNdCDS extends ColumnarDataSource {
           }
         }        
       }
-      this.invalidate_cached_bins()
       const dim = this.nbins.length
       this._nbins.length = dim
       this._transform_scale.length = dim
