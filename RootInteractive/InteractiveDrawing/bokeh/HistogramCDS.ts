@@ -56,34 +56,6 @@ export class HistogramCDS extends ColumnarDataSource {
     this.connect(this.properties.range.change, () => {this._stale_range = true})
   }
 
-  update_data(indices: number[] | null = null): void {
-      let bincount = null
-      if (this.data["bin_count"] != null){
-        bincount = this.data["bin_count"] as number[]
-        bincount.length = this._nbins
-      } else {
-        bincount = new Array<number>(this._nbins, 0)
-      }
-      if(indices != null){
-        //TODO: Make this actually do something
-      } else {
-        bincount = this.histogram(this.weights)
-        if(this.histograms !== null){
-          for (const key in this.histograms){
-            if(this.histograms[key] === null){
-              this.data[key] = this.histogram(null)
-            } else {
-              this.data[key] = this.histogram(this.histograms[key].weights)
-            }
-          }
-        }
-      }
-      this.data["bin_count"] = bincount
-      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
-      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
-      this.change.emit()
-  }
-
   private _transform_origin: number
   private _transform_scale: number
 
@@ -247,7 +219,7 @@ export class HistogramCDS extends ColumnarDataSource {
   compute_function(key: string){
     const {histograms, data} = this 
     if(key == "bin_count"){
-      data[key] = this.histogram(null)
+      data[key] = this.histogram(this.weights)
     } else if(key == "errorbar_high"){
       const bincount = this.get_column("bin_count")!
       const errorbar_edge = Array<number>(this._nbins)

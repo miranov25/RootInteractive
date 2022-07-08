@@ -65,20 +65,6 @@ export class HistoNdCDS extends ColumnarDataSource {
     })
   }
 
-  update_data(indices: number[] | null = null): void {
-      let bincount = this.data["bin_count"] as number[]
-      bincount.length = length
-      if(indices != null){
-        //TODO: Make this actually do something
-      } else {
-        bincount = this.histogram(this.weights)
-      }
-      this.data["bin_count"] = bincount
-      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
-      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
-      this.change.emit()
-  }
-
   public view: number[] | null
 
   public dim: number
@@ -303,7 +289,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   compute_function(key: string){
     const {histograms, data} = this 
     if(key == "bin_count"){
-      data[key] = this.histogram(null)
+      data[key] = this.histogram(this.weights)
     } else if(key == "errorbar_high"){
       const bincount = this.get_column("bin_count")!
       const l = this.get_length()
