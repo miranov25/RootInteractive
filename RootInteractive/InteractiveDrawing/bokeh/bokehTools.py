@@ -180,7 +180,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         }
         for (const histo of histogramList){
             histo.view = indicesAll;
-            histo.update_range();
+            histo.change_selection();
         }
     }
     const t3 = performance.now();
