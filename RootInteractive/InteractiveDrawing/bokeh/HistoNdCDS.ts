@@ -48,7 +48,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[]}
+    this.data = {}
     this.view = null
     this._bin_indices = []
     this._do_cache_bins = true
@@ -61,7 +61,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
     this.connect(this.source.change, () => {
       this.invalidate_cached_bins()
-      this.update_data()
+      this._stale_range = true
     })
   }
 
@@ -93,6 +93,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _strides: number[]
 
   private _do_cache_bins: boolean
+  private _stale_range: boolean
 
   update_range(): void {
     this._nbins = this.nbins;
@@ -177,7 +178,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
 
       this.dim = dim
-      this.update_data()
+      this._stale_range = false
   }
 
   histogram(weights: string | null): number[]{
@@ -273,7 +274,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     return this._strides[idx]
   }
 
-  get_size(){
+  get_length(){
     const dim = this._strides.length-1
     return this._strides[dim]
   }
@@ -286,6 +287,9 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   get_column(key: string){
+    if(this._stale_range){
+      this.update_range()
+    }
     if(this.data[key] != null){
       return this.data[key]
     }
@@ -298,13 +302,32 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   compute_function(key: string){
     const {histograms, data} = this 
+    if(key == "bin_count"){
+      data[key] = this.histogram(null)
+    } else if(key == "errorbar_high"){
+      const bincount = this.get_column("bin_count")!
+      const l = this.get_length()
+      const errorbar_edge = Array<number>(l)
+      for(let i=0; i<l; i++){
+        errorbar_edge[i] = bincount[i] + Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    } else if(key == "errorbar_low"){
+      const bincount = this.get_column("bin_count")!
+      const l = this.get_length()
+      const errorbar_edge = Array<number>(l)
+      for(let i=0; i<l; i++){
+        errorbar_edge[i] = bincount[i] - Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    }
     if(histograms !== null){
       if(histograms[key] === null){
         data[key] = this.histogram(null)
       } else {
         data[key] = this.histogram(histograms[key].weights)
       }
-    }
+    } 
   }
 
   auto_range(column: ArrayLike<number>, axis_idx: number){
@@ -333,8 +356,10 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._range_max[axis_idx] = range_max    
   }
 
-  //public change_selection(indices: number[]){
-//
-//  }
+  public change_selection(){
+    this._stale_range = true
+    this.data = {}
+    this.change.emit()
+  }
 
 }
