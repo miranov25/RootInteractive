@@ -110,35 +110,16 @@ export class HistoNdCDS extends ColumnarDataSource {
       if(this.view === null){
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            let range_min = Infinity
-            let range_max = -Infinity
             const column = sample_array[i]
-            const l = column.length
-            for(let x=0; x<l; x++){
-              range_min = Math.min(range_min, column[x])
-              range_max = Math.max(range_max, column[x])
-            }
-            this._range_min[i] = range_min
-            this._range_max[i] = range_max
+            this.auto_range(column, i)
           }
           this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
             if(r === null) {
-              for (let i = 0; i < this._nbins.length; i++) {
-                let range_min = Infinity
-                let range_max = -Infinity
-                const column = sample_array[i]
-                const l = column.length
-                for(let x=0; x<l; x++){
-                  range_min = Math.min(range_min, column[x])
-                  range_max = Math.max(range_max, column[x])
-                }
-                this._range_min[i] = range_min
-                this._range_max[i] = range_max
-              }
-              this._do_cache_bins = false
+              const column = sample_array[i]
+              this.auto_range(column, i)
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
@@ -148,18 +129,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       } else {
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            let range_min = Infinity
-            let range_max = -Infinity
             const column = sample_array[i]
-            const view = this.view
-            const l = this.view.length
-            for(let x=0; x<l; x++){
-              const y = view[x]
-              range_min = Math.min(range_min, column[y])
-              range_max = Math.max(range_max, column[y])
-            }
-            this._range_min[i] = range_min
-            this._range_max[i] = range_max
+            this.auto_range_indices(column, i)
           }
           this._do_cache_bins = false
         } else {
@@ -167,18 +138,7 @@ export class HistoNdCDS extends ColumnarDataSource {
             const r = this.range[i]
             if(r === null) {
               const column = sample_array[i]
-              let range_min = Infinity
-              let range_max = -Infinity
-              const view = this.view
-              const l = this.view.length
-              for(let x=0; x<l; x++){
-                const y = view[x]
-                range_min = Math.min(range_min, column[y])
-                range_max = Math.max(range_max, column[y])
-              }
-              this._range_min[i] = range_min
-              this._range_max[i] = range_max
-              this._do_cache_bins = false
+              this.auto_range_indices(column, i)
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
@@ -345,6 +305,32 @@ export class HistoNdCDS extends ColumnarDataSource {
         data[key] = this.histogram(histograms[key].weights)
       }
     }
+  }
+
+  auto_range(column: ArrayLike<number>, axis_idx: number){
+    let range_min = Infinity
+    let range_max = -Infinity
+    const l = column.length
+    for(let x=0; x<l; x++){
+      range_min = Math.min(range_min, column[x])
+      range_max = Math.max(range_max, column[x])
+    }
+    this._range_min[axis_idx] = range_min
+    this._range_max[axis_idx] = range_max    
+  }
+
+  auto_range_indices(column: ArrayLike<number>, axis_idx: number){
+    let range_min = Infinity
+    let range_max = -Infinity
+    const view = this.view!
+    const l = this.view!.length
+    for(let x=0; x<l; x++){
+      const y = view[x]
+      range_min = Math.min(range_min, column[y])
+      range_max = Math.max(range_max, column[y])
+    }
+    this._range_min[axis_idx] = range_min
+    this._range_max[axis_idx] = range_max    
   }
 
   //public change_selection(indices: number[]){
