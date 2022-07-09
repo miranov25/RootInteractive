@@ -168,6 +168,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   histogram(weights: string | null): number[]{
+    console.log("Histogram " + this.name + " " + weights)
     const length = this._strides[this._strides.length-1]
     let sample_array: ArrayLike<number>[] = []
     for (const column_name of this.sample_variables) {
