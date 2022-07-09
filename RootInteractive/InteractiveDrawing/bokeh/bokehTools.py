@@ -27,6 +27,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
+from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 import numpy as np
 import pandas as pd
 import re
@@ -231,7 +232,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
         tabs = []
         for i, iPanel in widgetLayoutDesc.items():
             tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray, widgetDict), title=i))
-        return Tabs(tabs=tabs)
+        return LazyTabs(tabs=tabs)
     if options is None:
         options = {
             'commonX': -1, 'commonY': -1,
