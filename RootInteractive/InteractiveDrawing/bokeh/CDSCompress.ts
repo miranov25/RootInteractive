@@ -144,7 +144,7 @@ export class CDSCompress extends ColumnDataSource {
         }
         if (dtype == "float32"){
           arrayOut = new Float32Array(arrayOut.buffer)
-          arrayOut = Array.from(arrayOut)
+           arrayOut = new Float64Array(arrayOut)
         }
         if (dtype == "float64"){
           arrayOut = new Float64Array(arrayOut.buffer)
