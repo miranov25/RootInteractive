@@ -4,6 +4,7 @@ Code for interactive visualization of multidimensional data in ROOT or native Py
 Support for ROOT data structures:
 * TTree and TTreeFormula, Aliases .. 
 * TFormula, resp. any static Root/AliRoot functions
+* RDataFrame <-> awkward - work i progress
 
 #### No python packages dependencies on AliRoot
 * ROOT + libStat 
@@ -13,9 +14,15 @@ Support for ROOT data structures:
 ## RootInteractive content:
 
 * **Visualization part wrappers**
+  * Interective easily configurable visualization of un-binned and binned data
+  * Interactive histogramming
   * client/server application Jupyter, Bokeh
   * client application - (Bokeh standalone)
+  
 
+
+* **Interactive   histogramming and data aggregation**  in many dimensions on client
+* 
 * **Machine learning part ** work in progrees (mostly ErrPar branch)
   * Wrappers for decision trees and Neural Net
   * Provides interface for the reducible, irreducible errors, proability density function
