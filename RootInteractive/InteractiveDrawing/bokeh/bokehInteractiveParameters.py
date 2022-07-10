@@ -14,6 +14,9 @@ figureParameters["histogram"]={}
 figureParameters["markers"]["parameterArray"]=[
     {"name": "markerSize", "value":7, "range":[0, 20]}, ## somethig else ????
 ]
+figureParameters["markers"]["widgets"]=[
+    ['slider',["markerSize"], {"name": "markerSize"}],
+]
 # legend parameters - as used in bokehDrawSA
 figureParameters["legend"]["parameterArray"]=[
     {"name": "legendFontSize", "value":"5px", "options":['3px','4px','5px','7px',"9px", "11px", "13px", "15px", "17px", "19px"]},
