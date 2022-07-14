@@ -61,7 +61,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
     this.connect(this.source.change, () => {
       this.invalidate_cached_bins()
-      this._stale_range = true
+      this.change_selection()
     })
   }
 
