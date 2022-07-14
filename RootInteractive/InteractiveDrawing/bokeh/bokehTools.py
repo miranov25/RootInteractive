@@ -28,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import Custom
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
+from RootInteractive.InteractiveDrawing.bokeh.LazyGlyphRenderer import LazyGlyphRenderer
 import numpy as np
 import pandas as pd
 import re
@@ -1021,11 +1022,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
-                    figureI.add_glyph(cds_used, errorX)
+                    add_lazy_glyph(figureI, cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                     errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
-                    figureI.add_glyph(cds_used, errorY)
+                    add_lazy_glyph(figureI, cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                 else:
@@ -1550,3 +1551,9 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 histoName, projectionIdx = cdsName.split("_")
                 return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
     return prefix+varName
+
+# Same as bokeh, but uses a LazyGlyphRenderer instead
+def add_lazy_glyph(figure, source, glyph, **kwargs):
+    g = LazyGlyphRenderer(data_source=source, glyph=glyph, **kwargs)
+    figure.renderers.append(g)
+    return g
