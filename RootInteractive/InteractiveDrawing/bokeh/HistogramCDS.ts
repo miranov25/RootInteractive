@@ -220,14 +220,14 @@ export class HistogramCDS extends ColumnarDataSource {
     const {histograms, data} = this 
     if(key == "bin_count"){
       data[key] = this.histogram(this.weights)
-    } else if(key == "errorbar_high"){
+    } else if(key === "errorbar_high"){
       const bincount = this.get_column("bin_count")!
       const errorbar_edge = Array<number>(this._nbins)
       for(let i=0; i<this._nbins; i++){
         errorbar_edge[i] = bincount[i] + Math.sqrt(bincount[i])
       }
       data[key] = errorbar_edge
-    } else if(key == "errorbar_low"){
+    } else if(key === "errorbar_low"){
       const bincount = this.get_column("bin_count")!
       const errorbar_edge = Array<number>(this._nbins)
       for(let i=0; i<this._nbins; i++){
@@ -235,8 +235,8 @@ export class HistogramCDS extends ColumnarDataSource {
       }
       data[key] = errorbar_edge
     }
-    if(histograms !== null){
-      if(histograms[key] === null){
+    if(histograms != null){
+      if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
         data[key] = this.histogram(histograms[key].weights)

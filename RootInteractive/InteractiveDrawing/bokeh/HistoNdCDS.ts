@@ -308,8 +308,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
       data[key] = errorbar_edge
     }
-    if(histograms !== null){
-      if(histograms[key] === null){
+    if(histograms != null){
+      if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
         data[key] = this.histogram(histograms[key].weights)
