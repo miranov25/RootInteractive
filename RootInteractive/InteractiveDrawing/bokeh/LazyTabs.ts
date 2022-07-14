@@ -69,7 +69,7 @@ export namespace LazyTabs {
     }
 
     on_visible_change(){
-      const {tabs, _last_index, visible} = this
+      const {_last_index, visible} = this
       const active_renderers = this.renderers[_last_index]
       for(let i=0; i<active_renderers.length; i++){
         active_renderers[i].visible = visible

@@ -4,6 +4,8 @@ from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
+from bokeh.models.plots import Plot
+from bokeh.models.renderers import GlyphRenderer
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
@@ -229,11 +231,20 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
         {'width':10,'plot_height':200, 'sizing_mode':'scale_width'}
     ]
     """
+    return processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray, widgetDict, isHorizontal, options)[0]
+
+def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     if isinstance(widgetLayoutDesc, dict):
+        tabsModel = LazyTabs()
         tabs = []
+        renderers = []
         for i, iPanel in widgetLayoutDesc.items():
-            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray, widgetDict), title=i))
-        return LazyTabs(tabs=tabs)
+            child, childRenderers = processBokehLayoutArrayRenderers(iPanel, widgetArray, widgetDict)
+            tabs.append(Panel(child=child, title=i))
+            renderers.append(childRenderers)
+        tabsModel.tabs = tabs
+        tabsModel.renderers = renderers
+        return tabsModel, [tabsModel]
     if options is None:
         options = {
             'commonX': -1, 'commonY': -1,
@@ -254,12 +265,18 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
     else:
         optionLocal = options
 
+    renderers = []
+
     for i, iWidget in enumerate(widgetLayoutDesc):
         if isinstance(iWidget, dict):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal))
+            child, childRenderers = processBokehLayoutArrayRenderers(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal)
+            widgetRows.append(child)
+            renderers += childRenderers
             continue
         if isinstance(iWidget, list):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal))
+            child, childRenderers = processBokehLayoutArrayRenderers(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal)
+            widgetRows.append(child)
+            renderers += childRenderers
             continue
 
         if isinstance(iWidget, int) and iWidget < len(widgetArray):
@@ -296,10 +313,12 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
                 figure.width = plot_width
             if optionLocal["plot_height"] > 0:
                 figure.height = optionLocal["plot_height"]
+        if isinstance(figure, Plot):
+            renderers += figure.renderers
 
     if isHorizontal:
-        return row(widgetRows, sizing_mode=options['sizing_mode'])
-    return column(widgetRows, sizing_mode=options['sizing_mode'])
+        return row(widgetRows, sizing_mode=options['sizing_mode']), renderers
+    return column(widgetRows, sizing_mode=options['sizing_mode']), renderers  
 
 
 def gridplotRow(figList0, **options):
@@ -1005,6 +1024,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                drawnGlyph.js_on_change('visible', CustomJS(args={"source": cds_used, "dummy": ColumnDataSource()}, code="""
+                            this.data_source = this.visible ? source : dummy
+                """))
                 if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
