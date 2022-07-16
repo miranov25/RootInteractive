@@ -45,6 +45,13 @@ export namespace LazyTabs {
         if(this.renderers == null){
           this.renderers = this.tabs.map(_=>[])
         }
+        for(let i=0; i<this.renderers.length; i++){
+          if(i != this.active){
+            for(let j=0; j<this.renderers[i].length; j++){
+              this.renderers[i][j].watched = false
+            }
+          }
+        }
       }
 
     connect_signals(): void {
