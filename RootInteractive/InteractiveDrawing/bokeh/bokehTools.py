@@ -5,7 +5,6 @@ from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.plots import Plot
-from bokeh.models.renderers import GlyphRenderer
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
@@ -30,7 +29,6 @@ from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import Custom
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
-from RootInteractive.InteractiveDrawing.bokeh.LazyGlyphRenderer import LazyGlyphRenderer
 import numpy as np
 import pandas as pd
 import re
@@ -192,7 +190,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     if(cdsSel != null){
         console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
-        cdsSel.update()
+        cdsSel.invalidate()
         console.log(cdsSel._downsampled_indices.length);
         console.log(cdsSel.nPoints)
         const t4 = performance.now();
@@ -314,7 +312,7 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
             if optionLocal["plot_height"] > 0:
                 figure.height = optionLocal["plot_height"]
         if isinstance(figure, Plot):
-            renderers += figure.renderers
+            renderers += [i.data_source for i in figure.renderers if isinstance(i.data_source, DownsamplerCDS)]
 
     if isHorizontal:
         return row(widgetRows, sizing_mode=options['sizing_mode']), renderers
@@ -1044,11 +1042,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
-                    add_lazy_glyph(figureI, cds_used, errorX)
+                    figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                     errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
-                    add_lazy_glyph(figureI, cds_used, errorY)
+                    figureI.add_glyph(cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                 else:
@@ -1573,9 +1571,3 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 histoName, projectionIdx = cdsName.split("_")
                 return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
     return prefix+varName
-
-# Same as bokeh, but uses a LazyGlyphRenderer instead
-def add_lazy_glyph(figure, source, glyph, **kwargs):
-    g = LazyGlyphRenderer(data_source=source, glyph=glyph, **kwargs)
-    figure.renderers.append(g)
-    return g

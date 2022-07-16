@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, Int, List
+from bokeh.core.properties import Instance, String, Int, Bool
 from bokeh.models import ColumnarDataSource
 
 
@@ -16,5 +16,5 @@ class DownsamplerCDS(ColumnarDataSource):
 
     source = Instance(ColumnarDataSource)
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
-    selectedColumns = List(String, default=[], help="Redundant, do not use this.")
+    watched = Bool()
     print("Import ", __implementation__)

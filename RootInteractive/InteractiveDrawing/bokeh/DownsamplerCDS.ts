@@ -7,7 +7,7 @@ export namespace DownsamplerCDS {
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnarDataSource>
     nPoints: p.Property<number>
-    selectedColumns: p.Property<string[]>
+    watched: p.Property<boolean>
   }
 }
 
@@ -23,10 +23,11 @@ export class DownsamplerCDS extends ColumnarDataSource {
   static __name__ = "DownsamplerCDS"
 
   static init_DownsamplerCDS() {
-    this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String, Boolean})=>({
       source:  [Ref(ColumnarDataSource)],
       nPoints:    [ Int, 300 ],
-      selectedColumns:    [ Array(String), [] ]
+      selectedColumns:    [ Array(String), [] ],
+      watched: [Boolean, true]
     }))
   }
 
@@ -35,6 +36,8 @@ export class DownsamplerCDS extends ColumnarDataSource {
   private _indices: number[]
 
   private _downsampled_indices: number[]
+
+  private _needs_update: boolean
 
   initialize(){
     super.initialize()
@@ -62,17 +65,17 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
     this.connect(this.selected.change, () => this.update_selection())
     // TODO: Add the use case when source grows in size
-    this.connect(this.source.change, () => this.update())
+    this.connect(this.source.change, () => {this.invalidate()})
   }
 
   update(){
-    const {source, nPoints, change, booleans, _indices} = this
+    const {source, nPoints, selected, booleans, _indices} = this
     const l = source.length
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
     this._downsampled_indices = []
     for(let i=0; i<l && this._downsampled_indices.length < nPoints; i++){
-      if (booleans === null || booleans[_indices[i]]){
+      if (_indices[i]<l && (booleans == null || booleans[_indices[i]])){
         this._downsampled_indices.push(_indices[i])
       }
     }
@@ -93,8 +96,9 @@ export class DownsamplerCDS extends ColumnarDataSource {
         j++
       }
     }
-    change.emit()
-    this.selected.indices = selected_indices
+//    change.emit()
+    selected.indices = selected_indices
+    this._needs_update = false
   }
 
 
@@ -139,6 +143,9 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   get_column(columnName: string){
     const {data, source, _downsampled_indices} = this
+    if(this.watched && this._needs_update){
+      this.update()
+    }
     if (data[columnName] != undefined){
       return data[columnName]
     }
@@ -152,5 +159,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   get_length(){
     return this._downsampled_indices.length
+  }
+
+  invalidate(){
+    this._needs_update = true
+    this.change.emit()
   }
 }
