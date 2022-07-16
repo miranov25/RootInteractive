@@ -126,7 +126,7 @@ def test_customJsFunction():
 
     cdsOrig = ColumnDataSource(df)
     cdsAlias = CDSAlias(source=cdsOrig, mapping={"a":"A", "b":"B", "a*x+b": {"fields":["A", "B"], "transform": jsMapper}})
-    cdsDownsampled = DownsamplerCDS(source = cdsAlias, selectedColumns=["a", "b", "a*x+b"])
+    cdsDownsampled = DownsamplerCDS(source = cdsAlias)
 
     sliderWidget.js_on_change("value", CustomJS(args = {"jsMapper": jsMapper, "cdsAlias": cdsAlias}, code="""
         jsMapper.parameters = {x: this.value}
