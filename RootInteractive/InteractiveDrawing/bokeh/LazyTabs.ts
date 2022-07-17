@@ -41,17 +41,19 @@ export namespace LazyTabs {
     initialize(): void {
         super.initialize()
     
-        this._last_index = this.active
+        const {active, watched, tabs} = this
+        this._last_index = active
         if(this.renderers == null){
-          this.renderers = this.tabs.map(_=>[])
+          this.renderers = tabs.map(_=>[])
         }
         for(let i=0; i<this.renderers.length; i++){
-          if(i != this.active){
-            for(let j=0; j<this.renderers[i].length; j++){
-              this.renderers[i][j].watched = false
-            }
+          for(let j=0; j<this.renderers[i].length; j++){
+            this.renderers[i][j].watched = false
           }
         }
+        for(let j=0; j<this.renderers[active].length; j++){
+          this.renderers[active][j].watched = watched
+        } 
       }
 
     connect_signals(): void {
@@ -62,7 +64,7 @@ export namespace LazyTabs {
     }
 
     on_active_change() {
-        const {active, tabs, _last_index} = this
+        const {active, _last_index} = this
         const old_renderers = this.renderers[_last_index]
         for(let i=0; i<old_renderers.length; i++){
           old_renderers[i].watched = false
@@ -72,7 +74,7 @@ export namespace LazyTabs {
         for(let i=0; i<active_renderers.length; i++){
           active_renderers[i].watched = true
         }
-        tabs[active].child.visible = true
+  //      tabs[active].child.visible = true
   //      this._last_index = active
     }
 
