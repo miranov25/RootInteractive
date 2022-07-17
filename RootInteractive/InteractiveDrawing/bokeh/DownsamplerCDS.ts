@@ -173,4 +173,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
       this.change.emit()
     }
   }
+
+  //Needed because of typescript, is supposed to be a nop
+  on_visible_change(){}
 }

@@ -40,7 +40,6 @@ export namespace LazyTabs {
 
     initialize(): void {
         super.initialize()
-    
         const {active, watched, tabs} = this
         this._last_index = active
         if(this.renderers == null){
@@ -53,6 +52,7 @@ export namespace LazyTabs {
         }
         for(let j=0; j<this.renderers[active].length; j++){
           this.renderers[active][j].watched = watched
+          this.renderers[active][j].on_visible_change()
         } 
       }
 
