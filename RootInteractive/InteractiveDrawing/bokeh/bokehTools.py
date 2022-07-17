@@ -396,7 +396,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                 bin_centers.append("bin_center")
                 edges_left.append("bin_bottom")
                 edges_right.append("bin_top")
-                sources.append(histoDict[iHisto]["cds"])
+                sources.append(histoDict[iHisto]["cdsOrig"])
                 compute_quantile.append(True)
                 if "quantiles" in histoDict[iHisto]:
                     quantiles += histoDict[iHisto]["quantiles"]
