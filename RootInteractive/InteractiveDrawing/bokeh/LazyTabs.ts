@@ -69,13 +69,11 @@ export namespace LazyTabs {
         for(let i=0; i<old_renderers.length; i++){
           old_renderers[i].watched = false
         }
-  //      tabs[_last_index].child.visible = false
         const active_renderers = this.renderers[active]
         for(let i=0; i<active_renderers.length; i++){
           active_renderers[i].watched = true
         }
-  //      tabs[active].child.visible = true
-  //      this._last_index = active
+        this._last_index = active
     }
 
     on_visible_change(){
