@@ -142,10 +142,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
   }
 
   get_column(columnName: string){
-    const {data, source, _downsampled_indices} = this
     if(this.watched && this._needs_update){
       this.update()
     }
+    const {data, source, _downsampled_indices} = this
     if (data[columnName] != undefined){
       return data[columnName]
     }
