@@ -23,10 +23,9 @@ export class DownsamplerCDS extends ColumnarDataSource {
   static __name__ = "DownsamplerCDS"
 
   static init_DownsamplerCDS() {
-    this.define<DownsamplerCDS.Props>(({Ref, Int, Array, String, Boolean})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean})=>({
       source:  [Ref(ColumnarDataSource)],
       nPoints:    [ Int, 300 ],
-      selectedColumns:    [ Array(String), [] ],
       watched: [Boolean, true]
     }))
   }
@@ -66,6 +65,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this.connect(this.selected.change, () => this.update_selection())
     // TODO: Add the use case when source grows in size
     this.connect(this.source.change, () => {this.invalidate()})
+    this.connect(this.properties.watched.change, () => {this.toggle_watched()})
   }
 
   update(){
@@ -163,6 +163,14 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   invalidate(){
     this._needs_update = true
-    this.change.emit()
+    if(this.watched){
+      this.change.emit()
+    }
+  }
+
+  toggle_watched(){
+    if(this.watched && this._needs_update){
+      this.change.emit()
+    }
   }
 }
