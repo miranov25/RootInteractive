@@ -100,7 +100,6 @@ export class HistoNdCDS extends ColumnarDataSource {
             const column = sample_array[i]
             this.auto_range(column, i)
           }
-          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
@@ -119,7 +118,6 @@ export class HistoNdCDS extends ColumnarDataSource {
             const column = sample_array[i]
             this.auto_range_indices(column, i)
           }
-          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
@@ -336,6 +334,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
+    this._do_cache_bins = false
   }
 
   auto_range_indices(column: ArrayLike<number>, axis_idx: number){
@@ -350,6 +349,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
+    this._do_cache_bins = false
   }
 
   public change_selection(){
