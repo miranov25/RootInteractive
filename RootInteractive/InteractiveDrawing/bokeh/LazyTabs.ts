@@ -48,7 +48,7 @@ export namespace LazyTabs {
         for(let i=0; i<this.renderers.length; i++){
           for(let j=0; j<this.renderers[i].length; j++){
             this.renderers[i][j].watched = false
-            this.renderers[active][j].on_visible_change()
+            this.renderers[i][j].on_visible_change()
           }
         }
         for(let j=0; j<this.renderers[active].length; j++){
