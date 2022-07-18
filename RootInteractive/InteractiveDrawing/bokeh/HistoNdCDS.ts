@@ -174,6 +174,15 @@ export class HistoNdCDS extends ColumnarDataSource {
     for (const column_name of this.sample_variables) {
       sample_array.push(this.source.get_column(column_name)!)
     }
+    for(let i=0; i<this._nbins.length; i++){
+      if(Math.abs(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])>1e-6){
+        console.log(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])
+        throw Error("Assertion error: Range minimum in histogram" + this.name + "is broken")
+      }
+      if(Math.abs(this._range_max[i]*this._transform_scale[i]-this._transform_origin[i] - this._nbins[i])>1e-6){
+        throw Error("Assertion error: Range maximum in histogram" + this.name + "is broken")
+      }
+    }
     let bincount: number[] = Array(length)
     bincount.fill(0)
     const view_indices = this.view
