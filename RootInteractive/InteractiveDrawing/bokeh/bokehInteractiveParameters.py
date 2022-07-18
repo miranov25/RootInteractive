@@ -10,6 +10,7 @@ figureParameters={}
 figureParameters["markers"]={}
 figureParameters["legend"]={}
 figureParameters["histogram"]={}
+figureParameters["StatParam"]={}
 # marker parameters
 figureParameters["markers"]["parameterArray"]=[
     {"name": "markerSize", "value":7, "range":[0, 20]}, ## somethig else ????
@@ -36,4 +37,17 @@ figureParameters["legend"]["figureOptions"]={"legend_options": {"label_text_font
 figureParameters["histogram"]["parameterArray"]=[
      {"name": "his_Count", "value":"top_right", "options":["linear_count","log_count","sqrt_count"]}, ###  ??? - supporting aliases for histogram to be created automatically
      #{"name": "his_CountErr", "value":"top_right", "options":["sqrt","sumw2"]},                       ###  ??? - supporting aliases for histogram to be created automatically
+]
+#
+# statistic parameterization
+figureParameters["StatParam"]["parameterArray"]=[
+        {"name": "nPointsRender", "range":[10, 1000], "value": 50},
+]
+
+figureParameters["StatParam"]["widgets"]=[
+    ['slider', ['nPointsRender'], {"name": "nPointsRender"}]
+    ['range', ['index'], {"index": True}],
+]
+figureParameters["StatParam"]["widgetLayout"]=[
+    ["nPointsRender","index"]
 ]
