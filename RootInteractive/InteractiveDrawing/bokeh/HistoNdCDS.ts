@@ -48,7 +48,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[]}
+    this.data = {}
     this.view = null
     this._bin_indices = []
     this._do_cache_bins = true
@@ -61,22 +61,8 @@ export class HistoNdCDS extends ColumnarDataSource {
 
     this.connect(this.source.change, () => {
       this.invalidate_cached_bins()
-      this.update_data()
+      this.change_selection()
     })
-  }
-
-  update_data(indices: number[] | null = null): void {
-      let bincount = this.data["bin_count"] as number[]
-      bincount.length = length
-      if(indices != null){
-        //TODO: Make this actually do something
-      } else {
-        bincount = this.histogram(this.weights)
-      }
-      this.data["bin_count"] = bincount
-      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
-      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
-      this.change.emit()
   }
 
   public view: number[] | null
@@ -93,6 +79,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _strides: number[]
 
   private _do_cache_bins: boolean
+  private _stale_range: boolean
 
   update_range(): void {
     this._nbins = this.nbins;
@@ -110,35 +97,15 @@ export class HistoNdCDS extends ColumnarDataSource {
       if(this.view === null){
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            let range_min = Infinity
-            let range_max = -Infinity
             const column = sample_array[i]
-            const l = column.length
-            for(let x=0; x<l; x++){
-              range_min = Math.min(range_min, column[x])
-              range_max = Math.max(range_max, column[x])
-            }
-            this._range_min[i] = range_min
-            this._range_max[i] = range_max
+            this.auto_range(column, i)
           }
-          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
             if(r === null) {
-              for (let i = 0; i < this._nbins.length; i++) {
-                let range_min = Infinity
-                let range_max = -Infinity
-                const column = sample_array[i]
-                const l = column.length
-                for(let x=0; x<l; x++){
-                  range_min = Math.min(range_min, column[x])
-                  range_max = Math.max(range_max, column[x])
-                }
-                this._range_min[i] = range_min
-                this._range_max[i] = range_max
-              }
-              this._do_cache_bins = false
+              const column = sample_array[i]
+              this.auto_range(column, i)
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
@@ -148,37 +115,15 @@ export class HistoNdCDS extends ColumnarDataSource {
       } else {
         if(this.range === null){
           for (let i = 0; i < this._nbins.length; i++) {
-            let range_min = Infinity
-            let range_max = -Infinity
             const column = sample_array[i]
-            const view = this.view
-            const l = this.view.length
-            for(let x=0; x<l; x++){
-              const y = view[x]
-              range_min = Math.min(range_min, column[y])
-              range_max = Math.max(range_max, column[y])
-            }
-            this._range_min[i] = range_min
-            this._range_max[i] = range_max
+            this.auto_range_indices(column, i)
           }
-          this._do_cache_bins = false
         } else {
           for (let i = 0; i < this.range.length; i++) {
             const r = this.range[i]
             if(r === null) {
               const column = sample_array[i]
-              let range_min = Infinity
-              let range_max = -Infinity
-              const view = this.view
-              const l = this.view.length
-              for(let x=0; x<l; x++){
-                const y = view[x]
-                range_min = Math.min(range_min, column[y])
-                range_max = Math.max(range_max, column[y])
-              }
-              this._range_min[i] = range_min
-              this._range_max[i] = range_max
-              this._do_cache_bins = false
+              this.auto_range_indices(column, i)
             } else {
               this._range_min[i] = r[0]
               this._range_max[i] = r[1]
@@ -217,14 +162,24 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
 
       this.dim = dim
-      this.update_data()
+      this._stale_range = false
   }
 
   histogram(weights: string | null): number[]{
+    console.log("Histogram " + this.name + " " + weights)
     const length = this._strides[this._strides.length-1]
     let sample_array: ArrayLike<number>[] = []
     for (const column_name of this.sample_variables) {
       sample_array.push(this.source.get_column(column_name)!)
+    }
+    for(let i=0; i<this._nbins.length; i++){
+      if(Math.abs(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])>1e-6){
+        console.log(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])
+        throw Error("Assertion error: Range minimum in histogram" + this.name + "is broken")
+      }
+      if(Math.abs(this._range_max[i]*this._transform_scale[i]-this._transform_origin[i] - this._nbins[i])>1e-6){
+        throw Error("Assertion error: Range maximum in histogram" + this.name + "is broken")
+      }
     }
     let bincount: number[] = Array(length)
     bincount.fill(0)
@@ -313,7 +268,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     return this._strides[idx]
   }
 
-  get_size(){
+  get_length(){
     const dim = this._strides.length-1
     return this._strides[dim]
   }
@@ -326,6 +281,9 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   get_column(key: string){
+    if(this._stale_range){
+      this.update_range()
+    }
     if(this.data[key] != null){
       return this.data[key]
     }
@@ -338,17 +296,66 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   compute_function(key: string){
     const {histograms, data} = this 
-    if(histograms !== null){
-      if(histograms[key] === null){
+    if(key == "bin_count"){
+      data[key] = this.histogram(this.weights)
+    } else if(key == "errorbar_high"){
+      const bincount = this.get_column("bin_count")!
+      const l = this.get_length()
+      const errorbar_edge = Array<number>(l)
+      for(let i=0; i<l; i++){
+        errorbar_edge[i] = bincount[i] + Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    } else if(key == "errorbar_low"){
+      const bincount = this.get_column("bin_count")!
+      const l = this.get_length()
+      const errorbar_edge = Array<number>(l)
+      for(let i=0; i<l; i++){
+        errorbar_edge[i] = bincount[i] - Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    }
+    if(histograms != null){
+      if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
         data[key] = this.histogram(histograms[key].weights)
       }
-    }
+    } 
   }
 
-  //public change_selection(indices: number[]){
-//
-//  }
+  auto_range(column: ArrayLike<number>, axis_idx: number){
+    let range_min = Infinity
+    let range_max = -Infinity
+    const l = column.length
+    for(let x=0; x<l; x++){
+      range_min = Math.min(range_min, column[x])
+      range_max = Math.max(range_max, column[x])
+    }
+    this._range_min[axis_idx] = range_min
+    this._range_max[axis_idx] = range_max    
+    this._do_cache_bins = false
+  }
+
+  auto_range_indices(column: ArrayLike<number>, axis_idx: number){
+    let range_min = Infinity
+    let range_max = -Infinity
+    const view = this.view!
+    const l = this.view!.length
+    for(let x=0; x<l; x++){
+      const y = view[x]
+      range_min = Math.min(range_min, column[y])
+      range_max = Math.max(range_max, column[y])
+    }
+    this._range_min[axis_idx] = range_min
+    this._range_max[axis_idx] = range_max    
+    this._do_cache_bins = false
+  }
+
+  public change_selection(){
+    this._stale_range = true
+    this.data = {}
+    this.change.emit()
+  }
 
 }

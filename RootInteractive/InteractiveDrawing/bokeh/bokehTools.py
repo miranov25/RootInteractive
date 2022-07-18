@@ -4,6 +4,7 @@ from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
+from bokeh.models.plots import Plot
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
@@ -27,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
+from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 import numpy as np
 import pandas as pd
 import re
@@ -180,7 +182,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         }
         for (const histo of histogramList){
             histo.view = indicesAll;
-            histo.update_range();
+            histo.change_selection();
         }
     }
     const t3 = performance.now();
@@ -188,7 +190,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     if(cdsSel != null){
         console.log(isSelected.reduce((a,b)=>a+b, 0));
         cdsSel.booleans = isSelected
-        cdsSel.update()
+        cdsSel.invalidate()
         console.log(cdsSel._downsampled_indices.length);
         console.log(cdsSel.nPoints)
         const t4 = performance.now();
@@ -227,11 +229,20 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
         {'width':10,'plot_height':200, 'sizing_mode':'scale_width'}
     ]
     """
+    return processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray, widgetDict, isHorizontal, options)[0]
+
+def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     if isinstance(widgetLayoutDesc, dict):
+        tabsModel = LazyTabs()
         tabs = []
+        renderers = []
         for i, iPanel in widgetLayoutDesc.items():
-            tabs.append(Panel(child=processBokehLayoutArray(iPanel, widgetArray, widgetDict), title=i))
-        return Tabs(tabs=tabs)
+            child, childRenderers = processBokehLayoutArrayRenderers(iPanel, widgetArray, widgetDict)
+            tabs.append(Panel(child=child, title=i))
+            renderers.append(childRenderers)
+        tabsModel.tabs = tabs
+        tabsModel.renderers = renderers
+        return tabsModel, [tabsModel]
     if options is None:
         options = {
             'commonX': -1, 'commonY': -1,
@@ -252,12 +263,18 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
     else:
         optionLocal = options
 
+    renderers = []
+
     for i, iWidget in enumerate(widgetLayoutDesc):
         if isinstance(iWidget, dict):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal))
+            child, childRenderers = processBokehLayoutArrayRenderers(iWidget, widgetArray, widgetDict, isHorizontal=False, options=optionLocal)
+            widgetRows.append(child)
+            renderers += childRenderers
             continue
         if isinstance(iWidget, list):
-            widgetRows.append(processBokehLayoutArray(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal))
+            child, childRenderers = processBokehLayoutArrayRenderers(iWidget, widgetArray, widgetDict, isHorizontal=not isHorizontal, options=optionLocal)
+            widgetRows.append(child)
+            renderers += childRenderers
             continue
 
         if isinstance(iWidget, int) and iWidget < len(widgetArray):
@@ -294,10 +311,12 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
                 figure.width = plot_width
             if optionLocal["plot_height"] > 0:
                 figure.height = optionLocal["plot_height"]
+        if isinstance(figure, Plot):
+            renderers += [i.data_source for i in figure.renderers if isinstance(i.data_source, DownsamplerCDS)]
 
     if isHorizontal:
-        return row(widgetRows, sizing_mode=options['sizing_mode'])
-    return column(widgetRows, sizing_mode=options['sizing_mode'])
+        return row(widgetRows, sizing_mode=options['sizing_mode']), renderers
+    return column(widgetRows, sizing_mode=options['sizing_mode']), renderers  
 
 
 def gridplotRow(figList0, **options):
@@ -377,7 +396,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                 bin_centers.append("bin_center")
                 edges_left.append("bin_bottom")
                 edges_right.append("bin_top")
-                sources.append(histoDict[iHisto]["cds"])
+                sources.append(histoDict[iHisto]["cdsOrig"])
                 compute_quantile.append(True)
                 if "quantiles" in histoDict[iHisto]:
                     quantiles += histoDict[iHisto]["quantiles"]
@@ -1003,6 +1022,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                drawnGlyph.js_on_change('visible', CustomJS(args={"source": cds_used, "dummy": ColumnDataSource()}, code="""
+                            this.data_source = this.visible ? source : dummy
+                """))
                 if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]

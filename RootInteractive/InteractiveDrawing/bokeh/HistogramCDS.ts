@@ -43,45 +43,17 @@ export class HistogramCDS extends ColumnarDataSource {
   initialize(): void {
     super.initialize()
 
-    this.data = {"bin_count":[], "bin_bottom":[], "bin_center":[], "bin_top":[], "errorbar_low":[], "errorbar_high":[]}
+    this.data = {}
     this.view = null
-    this.update_range()
+    this._stale_range = true
   }
 
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.source.change, () => this.update_data())
-    this.connect(this.properties.nbins.change, () => this.update_data())
-    this.connect(this.properties.range.change, () => this.update_data())
-  }
-
-  update_data(indices: number[] | null = null): void {
-      let bincount = null
-      if (this.data["bin_count"] != null){
-        bincount = this.data["bin_count"] as number[]
-        bincount.length = this.nbins
-      } else {
-        bincount = new Array<number>(this.nbins, 0)
-      }
-      if(indices != null){
-        //TODO: Make this actually do something
-      } else {
-        bincount = this.histogram(this.weights)
-        if(this.histograms !== null){
-          for (const key in this.histograms){
-            if(this.histograms[key] === null){
-              this.data[key] = this.histogram(null)
-            } else {
-              this.data[key] = this.histogram(this.histograms[key].weights)
-            }
-          }
-        }
-      }
-      this.data["bin_count"] = bincount
-      this.data["errorbar_low"] = bincount.map(x=>x+Math.sqrt(x))
-      this.data["errorbar_high"] = bincount.map(x=>x-Math.sqrt(x))
-      this.change.emit()
+    this.connect(this.source.change, () => {this.change_selection()})
+    this.connect(this.properties.nbins.change, () => {this.change_selection()})
+    this.connect(this.properties.range.change, () => {this.change_selection()})
   }
 
   private _transform_origin: number
@@ -93,14 +65,13 @@ export class HistogramCDS extends ColumnarDataSource {
 
   public view: number[] | null
 
+  _stale_range: boolean
+
   update_range(): void {
       // TODO: This is a hack and can be done in a much more efficient way that doesn't save bin edges as an array
-      const bin_left = (this.data["bin_bottom"] as number[])
-      const bin_center = (this.data["bin_center"] as number[])
-      const bin_right = (this.data["bin_top"] as number[])
-      bin_left.length = 0
-      bin_center.length = 0
-      bin_right.length = 0
+      const bin_left: number[] = []
+      const bin_center: number[] = []
+      const bin_right: number[] = []
       if(this.view === null){
         if(this.range === null ){
           const sample_arr = this.source.get_column(this.sample)
@@ -150,7 +121,10 @@ export class HistogramCDS extends ColumnarDataSource {
         bin_center.push(this._range_min+(index+.5)*(this._range_max-this._range_min)/this._nbins)
         bin_right.push(this._range_min+(index+1)*(this._range_max-this._range_min)/this._nbins)
       }
-      this.update_data()
+      this.data["bin_bottom"] = bin_left
+      this.data["bin_top"] = bin_right
+      this.data["bin_center"] = bin_center
+      this._stale_range = false
   }
 
   histogram(weights: string | null): number[]{
@@ -218,7 +192,56 @@ export class HistogramCDS extends ColumnarDataSource {
       return (val*this._transform_scale+this._transform_origin)|0
   }
 
-  get_size(){
+  get_length(){
     return this.nbins
   }
+
+  public change_selection(){
+    this._stale_range = true
+    this.data = {}
+    this.change.emit()
+  }
+
+  get_column(key: string){
+    if(this._stale_range){
+      this.update_range()
+    }
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    this.compute_function(key)
+    if(this.data[key] != null){
+      return this.data[key]
+    }
+    return null
+  }
+
+  compute_function(key: string){
+    const {histograms, data} = this 
+    if(key == "bin_count"){
+      data[key] = this.histogram(this.weights)
+    } else if(key === "errorbar_high"){
+      const bincount = this.get_column("bin_count")!
+      const errorbar_edge = Array<number>(this._nbins)
+      for(let i=0; i<this._nbins; i++){
+        errorbar_edge[i] = bincount[i] + Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    } else if(key === "errorbar_low"){
+      const bincount = this.get_column("bin_count")!
+      const errorbar_edge = Array<number>(this._nbins)
+      for(let i=0; i<this._nbins; i++){
+        errorbar_edge[i] = bincount[i] - Math.sqrt(bincount[i])
+      }
+      data[key] = errorbar_edge
+    }
+    if(histograms != null){
+      if(histograms[key] == null){
+        data[key] = this.histogram(null)
+      } else {
+        data[key] = this.histogram(histograms[key].weights)
+      }
+    } 
+  }
+
 }

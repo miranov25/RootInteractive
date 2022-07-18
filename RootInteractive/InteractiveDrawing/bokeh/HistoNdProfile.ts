@@ -18,6 +18,8 @@ export interface HistoNdProfile extends HistoNdProfile.Attrs {}
 export class HistoNdProfile extends ColumnarDataSource {
   properties: HistoNdProfile.Props
 
+  _stale: boolean
+
   constructor(attrs?: Partial<HistoNdProfile.Attrs>) {
     super(attrs)
   }
@@ -38,13 +40,16 @@ export class HistoNdProfile extends ColumnarDataSource {
     super.initialize()
 
     this.data = {}
-    this.update()
+    this._stale = true
   }
 
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.source.change, () => this.update())
+    this.connect(this.source.change, () => {
+      this._stale = true
+      this.change.emit()
+    })
   }
 
   update(): void {
@@ -83,18 +88,18 @@ export class HistoNdProfile extends ColumnarDataSource {
         let bin_top_filtered:Array<Array<number>> = []
         let bin_bottom_filtered:Array<Array<number>> = []
         for (let i = 0; i < this.source.dim; i++) {
-          bin_centers_all.push(this.source.get_array("bin_center_"+i) as number[])
+          bin_centers_all.push(this.source.get_column("bin_center_"+i) as number[])
           bin_centers_filtered.push([])
-          bin_top_all.push(this.source.get_array("bin_top_"+i) as number[])
+          bin_top_all.push(this.source.get_column("bin_top_"+i) as number[])
           bin_top_filtered.push([])
-          bin_bottom_all.push(this.source.get_array("bin_bottom_"+i) as number[])
+          bin_bottom_all.push(this.source.get_column("bin_bottom_"+i) as number[])
           bin_bottom_filtered.push([])
         }
 
-        const bin_count = this.source.get_array("bin_count") as number[]
-        const bin_centers = this.source.get_array("bin_center_"+this.axis_idx) as number[]
-        const edges_left = this.source.get_array("bin_bottom_"+this.axis_idx) as number[]
-        const edges_right = this.source.get_array("bin_top_"+this.axis_idx) as number[]
+        const bin_count = this.source.get_column("bin_count") as number[]
+        const bin_centers = this.source.get_column("bin_center_"+this.axis_idx) as number[]
+        const edges_left = this.source.get_column("bin_bottom_"+this.axis_idx) as number[]
+        const edges_right = this.source.get_column("bin_top_"+this.axis_idx) as number[]
 
         for(let x = 0; x < this.source.length; x += stride_high){
           for(let z = 0; z < stride_low; z ++){
@@ -224,8 +229,21 @@ export class HistoNdProfile extends ColumnarDataSource {
               this.data["bin_top_"+i] = bin_top_filtered[i]
           }
         }
+        this._stale = false
+  }
 
-        this.change.emit()
+  get_column(key: string){
+    if(this._stale){
+      this.update()
+    }
+    return this.data[key]
+  }
+
+  get_length(){
+    if(this._stale){
+      this.update()
+    }
+    return this.data["entries"].length
   }
 
 }

@@ -133,9 +133,6 @@ def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], Non
     fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, nPointRender="nPoints")
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
-    # number of cdsSel columns is no longer relevant
-    # record_property("cdsSel_size",len(fig.cdsSel.selectedColumns))
-    # data_regression.check(list(fig.cdsSel.selectedColumns),"test_bokehDrawSA.testBokehDrawArrayDownsample")
 
 
 def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
@@ -144,8 +141,6 @@ def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     fig=bokehDrawSA.fromArray(df0, "BoolC == True", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, nPointRender="nPoints", parameterArray=parameterArray)
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
-    record_property("cdsSel_size",len(fig.cdsSel.selectedColumns))
-
     assert (df0.keys() == df.keys()).all()
 
 def testBokehDrawArraySA_tree():
