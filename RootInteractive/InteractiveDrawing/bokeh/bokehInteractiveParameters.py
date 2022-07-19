@@ -45,7 +45,7 @@ figureParameters["StatParam"]["parameterArray"]=[
 ]
 
 figureParameters["StatParam"]["widgets"]=[
-    ['slider', ['nPointsRender'], {"name": "nPointsRender"}]
+    ['slider', ['nPointsRender'], {"name": "nPointsRender"}],
     ['range', ['index'], {"index": True}],
 ]
 figureParameters["StatParam"]["widgetLayout"]=[
