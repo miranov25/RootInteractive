@@ -1178,6 +1178,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         index = None
         if "index" in widgets:
             index = widgets["index"]
+        cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         source = cdsDict[iCds]["cds"]
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
