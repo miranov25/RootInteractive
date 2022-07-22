@@ -73,6 +73,8 @@ export class CDSAlias extends ColumnarDataSource {
   compute_function(key: string){
     const {source, mapping, data, cached_columns} = this
     const column = mapping[key]
+    const len = this.get_length()
+    if(len == null) return
     if(column == null){
       let new_column = source.get_column(key)
       if(new_column == null){
@@ -108,7 +110,7 @@ export class CDSAlias extends ColumnarDataSource {
             new_column.length = source.get_length()
             const nvars = fields.length
             let row = new Array(nvars)
-            for (let i = 0; i < fields[0].length; i++) {
+            for (let i = 0; i < len; i++) {
               for(let j=0; j<nvars; j++){
                 row[j] = fields[j][i]
               }
