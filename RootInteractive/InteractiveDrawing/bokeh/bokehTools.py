@@ -1178,13 +1178,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         index = None
         if "index" in widgets:
             index = widgets["index"]
+        cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         source = cdsDict[iCds]["cds"]
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
         for iWidget in widgetList:
             if "filter" in iWidget:
-                iWidget["filter"].source = cdsFull
+                field = iWidget["filter"].field
+                if memoized_columns[iCds][field]["type"] == "alias":
+                    iWidget["filter"].source = cdsFull
+                else:
+                    iWidget["filter"].source = cdsOrig
                 iWidget["filter"].js_on_change("change", callback)
             else:
                 iWidget["widget"].js_on_change("value", callback)
