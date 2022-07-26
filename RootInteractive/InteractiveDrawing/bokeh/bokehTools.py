@@ -568,9 +568,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 if i["func"] in paramDict:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=paramDict[i["func"]]["value"])
-                    paramDict[i["func"]].append(["value", CustomJS(args={"mapper":transform}, code="""
+                    paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
             mapper.func = this.value
-            mapper.update_args()
+            mapper.update_func()
+            mapper.change.emit()
                     """)])
                 else:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
@@ -868,6 +869,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
             widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
+            continue
+        if variables[0] == "text":
+            optionWidget = {"title": variables[1][0]}
+            if len(variables) > 2:
+                optionWidget.update(variables[-1])
+            value = paramDict[variables[1][0]]["value"]
+            localWidget = TextAreaInput(value=value, **optionWidget)
+            plotArray.append(localWidget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = localWidget
+            widgetArray.append(localWidget)
+            widgetParams.append(variables)
             continue
 
         optionLocal = optionGroup.copy()
