@@ -23,7 +23,7 @@ parameterArray = [
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "paramX", "value":10, "range": [-20, 20]},
     {"name": "C_cut", "value": 1, "range": [0, 1]},
-    {"name": "CustomFunc", "value":"return 0;"}
+    {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"}
 ]
 
 # This interface with two arrays is only for the case when functions are reused with different columns as target
