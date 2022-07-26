@@ -2,7 +2,7 @@ from bisect import bisect
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
-from bokeh.models.mappers import LinearColorMapper, LogColorMapper
+from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.plots import Plot
 from bokeh.transform import *
@@ -1232,7 +1232,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
 
     if visualization_type == "heatmap":
         # Flipping histogram axes probably doesn't make sense in this case.
-        mapperC = {"field": "bin_count", "transform": LogColorMapper(palette=options['palette'],low=1,low_color=(255,255,255,0.0))}
+        mapperC = {"field": "bin_count", "transform": LinearColorMapper(palette=options['palette'])}
         color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0),
                              title="Count")
         histoGlyph = Quad(left="bin_bottom_0", right="bin_top_0", bottom="bin_bottom_1", top="bin_top_1",
