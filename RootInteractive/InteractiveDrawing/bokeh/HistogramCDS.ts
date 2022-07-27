@@ -85,6 +85,10 @@ export class HistogramCDS extends ColumnarDataSource {
             range_min = Math.min(range_min, sample_arr[x])
             range_max = Math.max(range_max, sample_arr[x])
           }
+          if(range_min == range_max){
+            range_min -= 1
+            range_max += 1
+          }
           this._range_min = range_min
           this._range_max = range_max
         } else {
@@ -105,6 +109,10 @@ export class HistogramCDS extends ColumnarDataSource {
             const y = view[x]
             range_min = Math.min(range_min, sample_arr[y])
             range_max = Math.max(range_max, sample_arr[y])
+          }
+          if(range_min == range_max){
+            range_min -= 1
+            range_max += 1
           }
           this._range_min = range_min
           this._range_max = range_max
