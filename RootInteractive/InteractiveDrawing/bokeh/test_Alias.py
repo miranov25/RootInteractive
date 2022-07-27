@@ -108,13 +108,13 @@ widgetParams=[
     ['select',["legendFontSize"]],
     ['slider',["C_cut"]],
     ['slider',["paramX"]],
-    ['text', ["CustomFunc"]]
+    ['text', ["CustomFunc"], {"name": "CustomFunc"}]
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}],
     "Graphics": [[5, 6], {'sizing_mode': 'scale_width'}],
-    "CustomJS functions": [[7, 8],[9]]
+    "CustomJS functions": [[7, 8],["CustomFunc"]]
     }
 
 figureLayoutDesc=[
@@ -187,3 +187,5 @@ def test_makeColumns():
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
+
+test_customJsFunctionBokehDrawArray_v()
