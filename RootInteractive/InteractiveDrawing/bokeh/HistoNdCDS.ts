@@ -253,7 +253,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
         // Make the max value inclusive
         if(val === this._range_max[i]){
-          bin += this._nbins[i] * this._strides[i] - 1
+          bin += (this._nbins[i] - 1) * this._strides[i]
         } else {
           bin += ((val * this._transform_scale[i] - this._transform_origin[i]) | 0) * this._strides[i]
         }
