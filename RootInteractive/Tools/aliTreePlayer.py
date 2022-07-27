@@ -467,6 +467,7 @@ def tree2Panda(tree, include, selection, **kwargs):
         #ex_dict[a] = np.frombuffer(np.ascontiguousarray(val), dtype=float, count=entries)  # not orking for python mismatch  as suggested at https://github.com/almarklein/pyelastix/issues/14
         # TODO - conversion not needed  - proper type to be used here
     df = pd.DataFrame(ex_dict, columns=columns)
+    df = df.loc[:, ~df.columns.duplicated()]
     for i, a in enumerate(columns):
         if (tree.GetLeaf(a)):
             try:
