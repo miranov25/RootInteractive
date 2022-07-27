@@ -860,12 +860,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if variables[0] == "textQuery":
             optionWidget = {}
             if len(variables) >= 2:
-                optionWidget = variables[-1].copy()
+                optionWidget.update(variables[-1])
             cds_used = None
             localWidget = TextAreaInput(**optionWidget)
             plotArray.append(localWidget)
-            if "name" in optionLocal:
-                plotDict[optionLocal["name"]] = localWidget
+            if "name" in optionWidget:
+                plotDict[optionWidget["name"]] = localWidget
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
             widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
@@ -877,8 +877,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             value = paramDict[variables[1][0]]["value"]
             localWidget = TextAreaInput(value=value, **optionWidget)
             plotArray.append(localWidget)
-            if "name" in optionLocal:
-                plotDict[optionLocal["name"]] = localWidget
+            if "name" in optionWidget:
+                plotDict[optionWidget["name"]] = localWidget
             widgetArray.append(localWidget)
             widgetParams.append(variables)
             continue
