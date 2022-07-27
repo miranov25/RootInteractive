@@ -971,7 +971,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         if varColor["name"] in colorMapperDict:
                             mapperC = colorMapperDict[varColor["name"]]
                         else:
-                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'])}
+                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'],low=1,low_color=(255,255,255,0))}
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
@@ -1027,15 +1027,31 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 glyph.fill_color={...glyph.fill_color, field:this.value}
                 glyph.line_color={...glyph.line_color, field:this.value}
                 """
-                if optionLocal["legend_field"] is None:
+                if "visualization_type" in optionLocal and optionLocal["visualization_type"] == "heatmap":
                     x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                     y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
-                                color=color, marker=marker, legend_label=y_label + " vs " + x_label)
+                    if "top" in optionLocal and "bottom" in optionLocal and "left" in optionLocal and "right" in optionLocal:
+                        top = optionLocal["top"]
+                        bottom = optionLocal["bottom"]
+                        left = optionLocal["left"]
+                        right = optionLocal["right"]
+                    else :
+                        top = "bin_top_1"
+                        bottom = "bin_bottom_1"
+                        left = "bin_bottom_0"
+                        right = "bin_top_0"
+                    drawnGlyph = figureI.quad(top=top, bottom=bottom, left=left, right=right,
+                    fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
                 else:
-                    drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
-                                color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                drawnGlyph.js_on_change('visible', CustomJS(args={"source": cds_used, "dummy": ColumnDataSource()}, code="""
+                    if optionLocal["legend_field"] is None:
+                        x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
+                                color=color, marker=marker, legend_label=y_label + " vs " + x_label)
+                    else:
+                        drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                    drawnGlyph.js_on_change('visible', CustomJS(args={"source": cds_used, "dummy": ColumnDataSource()}, code="""
                             this.data_source = this.visible ? source : dummy
                 """))
                 if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
