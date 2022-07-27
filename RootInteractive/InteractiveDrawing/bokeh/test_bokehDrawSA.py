@@ -61,7 +61,7 @@ parameterArray = [
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
-    [['X'], ['C+A', 'C-A', 'A/A']],
+    [['X'], ['C+A', 'C-A', 'A/A'], {"name": "fig1"}],
     [['B'], ['C+B', 'C-B'], { "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True}],
     [['D'], ['(A+B+C)*DD'], {"colorZvar": "colorZ", "size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
@@ -85,7 +85,7 @@ widgetParams=[
     ['multiSelectBitmask', ["maskAC"], {"mapping": {"A": 2, "C": 1}, "how":"all", "title": "maskAC(all)"}],
     ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
-    ['textQuery', {"title": "selection"}],
+    ['textQuery', {"title": "selection", "name":"selectionText"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
     ['select',["colorZ"], {"name": "colorZ"}],
     ['select',["X"], {"name": "X"}],
@@ -96,13 +96,13 @@ widgetParams=[
 ]
 
 widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, 9], {'sizing_mode': 'scale_width'}],
+    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
     "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
     "A": [
-        [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [0, "fig1", 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
         ],
     "B": [

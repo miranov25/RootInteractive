@@ -22,7 +22,8 @@ parameterArray = [
     {"name": "size", "value":7, "range":[0, 30]},
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "paramX", "value":10, "range": [-20, 20]},
-    {"name": "C_cut", "value": 1, "range": [0, 1]}
+    {"name": "C_cut", "value": 1, "range": [0, 1]},
+    {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"}
 ]
 
 # This interface with two arrays is only for the case when functions are reused with different columns as target
@@ -59,11 +60,16 @@ aliasArray = [
         "variables": ["entries", "entries_C_cut"],
         "func": "return entries_C_cut / entries",
         "context": "histoAC"
+    },
+    {
+        "name": "custom_column",
+        "variables": ["A", "B", "C", "A_mul_paramX_plus_B"],
+        "func": "CustomFunc"
     }
 ]
 
 figureArray = [
-    [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B'], {"size":"size"}],
+    [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B', "custom_column"], {"size":"size"}],
     [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
     [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}],
     [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}],
@@ -102,12 +108,13 @@ widgetParams=[
     ['select',["legendFontSize"]],
     ['slider',["C_cut"]],
     ['slider',["paramX"]],
+    ['text', ["CustomFunc"], {"name": "CustomFunc"}]
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}],
     "Graphics": [[5, 6], {'sizing_mode': 'scale_width'}],
-    "CustomJS functions": [[7, 8]]
+    "CustomJS functions": [[7, 8],["CustomFunc"]]
     }
 
 figureLayoutDesc=[
@@ -180,6 +187,3 @@ def test_makeColumns():
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
-
-test_makeColumns()
-#test_customJsFunctionBokehDrawArray_v()
