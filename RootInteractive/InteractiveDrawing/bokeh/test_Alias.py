@@ -187,5 +187,3 @@ def test_makeColumns():
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
-
-test_customJsFunctionBokehDrawArray_v()
