@@ -253,7 +253,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
         // Make the max value inclusive
         if(val === this._range_max[i]){
-          bin += this._nbins[i] * this._strides[i]
+          bin += (this._nbins[i] - 1) * this._strides[i]
         } else {
           bin += ((val * this._transform_scale[i] - this._transform_origin[i]) | 0) * this._strides[i]
         }
@@ -332,6 +332,10 @@ export class HistoNdCDS extends ColumnarDataSource {
       range_min = Math.min(range_min, column[x])
       range_max = Math.max(range_max, column[x])
     }
+    if(range_min == range_max){
+      range_min -= .5
+      range_max += .5
+    }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
     this._do_cache_bins = false
@@ -346,6 +350,10 @@ export class HistoNdCDS extends ColumnarDataSource {
       const y = view[x]
       range_min = Math.min(range_min, column[y])
       range_max = Math.max(range_max, column[y])
+    }
+    if(range_min == range_max){
+      range_min -= .5
+      range_max += .5
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
