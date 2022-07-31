@@ -648,9 +648,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
-            nbins = 10
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
             weights = None
             if "weights" in iSource:
                 weights = iSource["weights"]
@@ -659,9 +656,22 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange, name=name_orig)
+            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHistoTooltips
+            nbins = 10
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            if nbins in paramDict:
+                paramDict[nbins]["subscribed_events"].append(["value", iSource["cdsOrig"], "nbins"])
+                nbins = paramDict[nbins]["value"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if isinstance(histoRange, str) and histoRange in paramDict:
+                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
+                histoRange = paramDict[histoRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
             nbins = [10]*len(iSource["variables"])
             if "nbins" in iSource:
