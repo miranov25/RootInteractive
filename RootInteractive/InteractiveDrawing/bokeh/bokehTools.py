@@ -687,9 +687,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             nbins = [10]*len(iSource["variables"])
             if "nbins" in iSource:
                 nbins = iSource["nbins"]
-    #        if nbins in paramDict:
-    #            paramDict[nbins]["subscribed_events"].append(["value", iSource["cdsOrig"], "nbins"])
-    #            nbins = paramDict[nbins]["value"]
+            for binsIdx, iBins in enumerate(nbins):
+                if isinstance(iBins, str) and iBins in paramDict:
+                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
+                        histogram.nbins[i] = this.value | 0;
+                        histogram.update_nbins();
+                        histogram.invalidate_cached_bins();
+                        histogram.change_selection();
+                    """)])
+                    nbins[binsIdx] = paramDict[iBins]["value"]
             histoRange = None
             if "range" in iSource:
                 histoRange = iSource["range"]
