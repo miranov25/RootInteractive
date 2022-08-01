@@ -71,10 +71,13 @@ export class DownsamplerCDS extends ColumnarDataSource {
   update(){
     const {source, nPoints, selected, booleans, _indices} = this
     const l = source.length
+    if(this._indices.length < l){
+      this.shuffle_indices()
+    }
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
     this._downsampled_indices = []
-    for(let i=0; i<l && this._downsampled_indices.length < nPoints; i++){
+    for(let i=0; i < this._indices.length && this._downsampled_indices.length < nPoints; i++){
       if (_indices[i]<l && (booleans == null || booleans[_indices[i]])){
         this._downsampled_indices.push(_indices[i])
       }
