@@ -663,7 +663,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "nbins" in iSource:
                 nbins = iSource["nbins"]
             if nbins in paramDict:
-                paramDict[nbins]["subscribed_events"].append(["value", iSource["cdsOrig"], "nbins"])
+                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
+                            histogram.nbins = this.value | 0;
+                            histogram.change_selection();
+                        """)])
                 nbins = paramDict[nbins]["value"]
             histoRange = None
             if "range" in iSource:
@@ -839,7 +842,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         fakeDf = {varName: dfQuery[varName]}
                     elif column[0]["type"] == "server_derived_column":
                         fakeDf = {varName: column[0]["value"]}
-                    sources.update(used_names_local)
+                    if variables[0] != 'multiSelect':
+                        sources.update(used_names_local)
             if variables[0] == 'slider':
                 localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
             if variables[0] == 'range':
