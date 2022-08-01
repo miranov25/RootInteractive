@@ -56,7 +56,7 @@ histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "range": "histoRangeA", "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":20, "range": [0, 1]},
     {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
-    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
+    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, 20], "range": ["histoRangeA", None], "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
 ]
 
 def testBokehClientHistogram():

@@ -673,20 +673,33 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoRange = paramDict[histoRange]["value"]
             iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
-            nbins = [10]*len(iSource["variables"])
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
             weights = None
             if "weights" in iSource:
                 weights = iSource["weights"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHisto2DTooltips
+            nbins = [10]*len(iSource["variables"])
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+    #        if nbins in paramDict:
+    #            paramDict[nbins]["subscribed_events"].append(["value", iSource["cdsOrig"], "nbins"])
+    #            nbins = paramDict[nbins]["value"]
             histoRange = None
             if "range" in iSource:
                 histoRange = iSource["range"]
-            if "source" not in iSource:
-                iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange, name=name_orig)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHisto2DTooltips
+            if histoRange is not None:
+                for rangeIdx, iRange in enumerate(histoRange):
+                    if isinstance(iRange, str) and iRange in paramDict:
+                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": rangeIdx}, code="""
+                            histogram.range[i] = this.value;
+                            histogram.invalidate_cached_bins();
+                            histogram.change_selection();
+                        """)])
+                        histoRange[rangeIdx] = paramDict[iRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
             #TODO: Add projections
             if "axis" in iSource:
                 axisIndices = iSource["axis"]
