@@ -686,7 +686,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 iSource["tooltips"] = defaultHisto2DTooltips
             nbins = [10]*len(iSource["variables"])
             if "nbins" in iSource:
-                nbins = iSource["nbins"]
+                nbins = iSource["nbins"].copy()
             for binsIdx, iBins in enumerate(nbins):
                 if isinstance(iBins, str) and iBins in paramDict:
                     paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
@@ -698,7 +698,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     nbins[binsIdx] = paramDict[iBins]["value"]
             histoRange = None
             if "range" in iSource:
-                histoRange = iSource["range"]
+                histoRange = iSource["range"].copy()
             if histoRange is not None:
                 for rangeIdx, iRange in enumerate(histoRange):
                     if isinstance(iRange, str) and iRange in paramDict:
