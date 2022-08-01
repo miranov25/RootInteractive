@@ -750,7 +750,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         name_full = "cdsFull"
         if cds_name is not None:
-            name_orig = cds_name+"_orig"
+            name_full = cds_name+"_full"
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={}, name=name_full)
 
@@ -1187,8 +1187,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
             cdsOrig = cdsValue["cdsOrig"]
             cdsOrig.source = cdsDict[cdsValue["source"]]["cdsFull"]
-            if cdsValue["source"] is None:
-                histoList.append(cdsOrig)
             if "histograms" in cdsValue:
                 for key, value in memoized_columns[cdsKey].items():
                     if key in cdsValue["histograms"]:
@@ -1227,6 +1225,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         source = cdsDict[iCds]["cds"]
+        histoList = []
+        for cdsKey, cdsValue in cdsDict.items():
+            if cdsKey not in memoized_columns:
+                continue
+            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
+                histoList.append(cdsValue["cdsOrig"])
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
         for iWidget in widgetList:
