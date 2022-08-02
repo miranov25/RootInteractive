@@ -148,7 +148,7 @@ def testBokehClientHistogramRowwiseTable():
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
 def testBokehClientHistogram3d():
-    output_file("test_BokehClientHistogram.html")
+    output_file("test_BokehClientHistogram3d.html")
     histoArray = [
         {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]]},
     ]
