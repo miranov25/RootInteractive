@@ -229,7 +229,7 @@ def testJoin():
         }
     ]
     histoArray = [
-        {"name": "histoAB", "variables": ["A", "B"], "nbins": [10, "nBinsB"], "range": ["rangeA", None], "axis": [0]},
+        {"name": "histoAB", "variables": ["A", "B"], "nbins": [10, "nBinsB"], "range": ["histoRangeA", None], "axis": [0]},
         {"name": "histoB", "variables": ["B"], "nbins": "nBinsB",
             "histograms": {
                 "sum_A": {"weights": "A"}
