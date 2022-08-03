@@ -28,6 +28,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._transform_origin = []
     this._transform_scale = []
     this._strides = []
+    this._nbins = []
   }
 
   static __name__ = "HistoNdCDS"
@@ -53,7 +54,8 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._bin_indices = []
     this._do_cache_bins = true
     this.invalidate_cached_bins()
-    this.update_range()
+    this.update_nbins()
+    this._stale_range = true
   }
 
   connect_signals(): void {
@@ -374,7 +376,8 @@ export class HistoNdCDS extends ColumnarDataSource {
     for(let i=0; i<dim; i++){
       this._nbins[i] = this.nbins[i]
       this._strides[i+1] = this._strides[i]*this._nbins[i]
-    }    
+    }
+    this.dim = dim
   }
 
 }
