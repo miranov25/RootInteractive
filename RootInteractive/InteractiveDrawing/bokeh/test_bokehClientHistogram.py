@@ -159,8 +159,8 @@ def testBokehClientHistogram3d():
         [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
     ]
     figureLayoutDesc=[
-        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
     ]
     widgetLayoutDesc = [[0, 1, 2], [3, 4], [5], [7], {'sizing_mode': 'scale_width'}]
@@ -181,8 +181,8 @@ def testBokehClientHistogram3d_colormap():
         {"size": "size", "rescaleColorMapper": True}
     ]
     figureLayoutDesc=[
-        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
     ]
     widgetLayoutDesc = [[0, 1, 2], [3, 4], [5], [7], {'sizing_mode': 'scale_width'}]
@@ -204,8 +204,8 @@ def testBokehClientHistogram3d_colormap_noscale():
         {"size": "size"}
     ]
     figureLayoutDesc=[
-        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
-        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
+        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
     ]
     widgetLayoutDesc = [[0, 1, 2], [3, 4], [5], [7], {'sizing_mode': 'scale_width'}]
