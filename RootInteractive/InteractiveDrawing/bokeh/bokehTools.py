@@ -651,12 +651,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             weights = None
             if "weights" in iSource:
                 weights = iSource["weights"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"]
+            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHistoTooltips
             nbins = 10
@@ -747,12 +744,17 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
     for cds_name, iSource in cdsDict.items():
-
+        cdsOrig = iSource["cdsOrig"]
+        if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
+            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
+        elif iSource["type"] == "join":
+            cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
+            cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
         name_full = "cdsFull"
         if cds_name is not None:
             name_full = cds_name+"_full"
         # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={}, name=name_full)
+        iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
 
         # Add downsampler
         name_normal = "default source"
@@ -1186,16 +1188,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cdsOrig.data = sent_data
         elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
             cdsOrig = cdsValue["cdsOrig"]
-            cdsOrig.source = cdsDict[cdsValue["source"]]["cdsFull"]
             if "histograms" in cdsValue:
                 for key, value in memoized_columns[cdsKey].items():
                     if key in cdsValue["histograms"]:
                         if value["type"] == "column":
-                            cdsOrig.histograms[key] = cdsValue["histograms"][key]  
-        elif cdsValue["type"] == "join":
-            cdsOrig = cdsValue["cdsOrig"]
-            cdsOrig.left = cdsDict[cdsValue["left"]]["cdsFull"]
-            cdsOrig.right = cdsDict[cdsValue["right"]]["cdsFull"] 
+                            cdsOrig.histograms[key] = cdsValue["histograms"][key]
         # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
         # In future an option can be added for creating them from array
 
