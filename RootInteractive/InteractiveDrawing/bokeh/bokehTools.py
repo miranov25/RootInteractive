@@ -933,8 +933,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 variablesLocal[axis_index] = optionLocal[axis_name]
             if variablesLocal[axis_index] is not None and not isinstance(variablesLocal[axis_index], list):
                 variablesLocal[axis_index] = [variablesLocal[axis_index]]
-        lengthX = len(variables[0])
-        lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
         cds_names = [None]*length
         if "source" in optionLocal:
@@ -977,7 +975,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
-        mapperC = None
         cmap_cds_name = None
 
         hover_tool_renderers = {}
@@ -1500,7 +1497,7 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
         params = iDesc[1]
         callback = None
         if len(iDesc) == 3:
-            optionLocal = iDesc[2]
+            optionLocal = iDesc[2].copy()
         if "callback" not in optionLocal:
             if params[0] in paramDict:
                 optionLocal["callback"] = "parameter"
