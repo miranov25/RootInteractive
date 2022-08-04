@@ -28,6 +28,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._transform_origin = []
     this._transform_scale = []
     this._strides = []
+    this._nbins = []
   }
 
   static __name__ = "HistoNdCDS"
@@ -53,7 +54,8 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._bin_indices = []
     this._do_cache_bins = true
     this.invalidate_cached_bins()
-    this.update_range()
+    this.update_nbins()
+    this._stale_range = true
   }
 
   connect_signals(): void {
@@ -333,8 +335,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       range_max = Math.max(range_max, column[x])
     }
     if(range_min == range_max){
-      range_min -= .5
-      range_max += .5
+      range_min -= 1
+      range_max += 1
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
@@ -352,8 +354,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       range_max = Math.max(range_max, column[y])
     }
     if(range_min == range_max){
-      range_min -= .5
-      range_max += .5
+      range_min -= 1
+      range_max += 1
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
@@ -364,6 +366,18 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._stale_range = true
     this.data = {}
     this.change.emit()
+  }
+
+  update_nbins(){
+    const dim = this.nbins.length
+    this._nbins.length = dim
+    this._strides.length = dim+1
+    this._strides[0] = 1
+    for(let i=0; i<dim; i++){
+      this._nbins[i] = this.nbins[i]
+      this._strides[i+1] = this._strides[i]*this._nbins[i]
+    }
+    this.dim = dim
   }
 
 }

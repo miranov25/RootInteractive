@@ -648,35 +648,64 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
+            if "source" not in iSource:
+                iSource["source"] = None
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHistoTooltips
             nbins = 10
             if "nbins" in iSource:
                 nbins = iSource["nbins"]
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
+            if nbins in paramDict:
+                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
+                            histogram.nbins = this.value | 0;
+                            histogram.change_selection();
+                        """)])
+                nbins = paramDict[nbins]["value"]
             histoRange = None
             if "range" in iSource:
                 histoRange = iSource["range"]
-            if "source" not in iSource:
-                iSource["source"] = None
-            iSource["cdsOrig"] = HistogramCDS(nbins=nbins, sample=iSource["variables"][0], weights=weights, range=histoRange, name=name_orig)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHistoTooltips
+            if isinstance(histoRange, str) and histoRange in paramDict:
+                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
+                histoRange = paramDict[histoRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
-            nbins = [10]*len(iSource["variables"])
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
             weights = None
             if "weights" in iSource:
                 weights = iSource["weights"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"]
             if "source" not in iSource:
                 iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(nbins=nbins, sample_variables=iSource["variables"], weights=weights, range=histoRange, name=name_orig)
+            iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHisto2DTooltips
+            nbins = [10]*len(iSource["variables"])
+            if "nbins" in iSource:
+                nbins = iSource["nbins"].copy()
+            for binsIdx, iBins in enumerate(nbins):
+                if isinstance(iBins, str) and iBins in paramDict:
+                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
+                        histogram.nbins[i] = this.value | 0;
+                        histogram.update_nbins();
+                        histogram.invalidate_cached_bins();
+                        histogram.change_selection();
+                    """)])
+                    nbins[binsIdx] = paramDict[iBins]["value"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"].copy()
+            if histoRange is not None:
+                for rangeIdx, iRange in enumerate(histoRange):
+                    if isinstance(iRange, str) and iRange in paramDict:
+                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": rangeIdx}, code="""
+                            histogram.range[i] = this.value;
+                            histogram.invalidate_cached_bins();
+                            histogram.change_selection();
+                        """)])
+                        histoRange[rangeIdx] = paramDict[iRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
             #TODO: Add projections
             if "axis" in iSource:
                 axisIndices = iSource["axis"]
@@ -715,12 +744,17 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
     for cds_name, iSource in cdsDict.items():
-
+        cdsOrig = iSource["cdsOrig"]
+        if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
+            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
+        elif iSource["type"] == "join":
+            cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
+            cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
         name_full = "cdsFull"
         if cds_name is not None:
-            name_orig = cds_name+"_orig"
+            name_full = cds_name+"_full"
         # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=iSource["cdsOrig"], mapping={}, name=name_full)
+        iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
 
         # Add downsampler
         name_normal = "default source"
@@ -816,7 +850,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         fakeDf = {varName: dfQuery[varName]}
                     elif column[0]["type"] == "server_derived_column":
                         fakeDf = {varName: column[0]["value"]}
-                    sources.update(used_names_local)
+                    if variables[0] != 'multiSelect':
+                        sources.update(used_names_local)
             if variables[0] == 'slider':
                 localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
             if variables[0] == 'range':
@@ -898,8 +933,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 variablesLocal[axis_index] = optionLocal[axis_name]
             if variablesLocal[axis_index] is not None and not isinstance(variablesLocal[axis_index], list):
                 variablesLocal[axis_index] = [variablesLocal[axis_index]]
-        lengthX = len(variables[0])
-        lengthY = len(variables[1])
         length = max(j is not None and len(j) for j in variablesLocal)
         cds_names = [None]*length
         if "source" in optionLocal:
@@ -942,7 +975,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
-        mapperC = None
         cmap_cds_name = None
 
         hover_tool_renderers = {}
@@ -975,9 +1007,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        cdsDict[cds_name]['cdsOrig'].js_on_change('change', CustomJS(code="""
-                        const col = this.data[field]
-                        const isOK = this.data.isOK
+                        cdsDict[cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        const col = this.get_column(field)
+                        const isOK = this.get_column("isOK")
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
                         const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
                         cmap.high = high;
@@ -1169,18 +1201,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cdsOrig.data = sent_data
         elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
             cdsOrig = cdsValue["cdsOrig"]
-            cdsOrig.source = cdsDict[cdsValue["source"]]["cdsFull"]
-            if cdsValue["source"] is None:
-                histoList.append(cdsOrig)
             if "histograms" in cdsValue:
                 for key, value in memoized_columns[cdsKey].items():
                     if key in cdsValue["histograms"]:
                         if value["type"] == "column":
-                            cdsOrig.histograms[key] = cdsValue["histograms"][key]  
-        elif cdsValue["type"] == "join":
-            cdsOrig = cdsValue["cdsOrig"]
-            cdsOrig.left = cdsDict[cdsValue["left"]]["cdsFull"]
-            cdsOrig.right = cdsDict[cdsValue["right"]]["cdsFull"] 
+                            cdsOrig.histograms[key] = cdsValue["histograms"][key]
         # Nothing needed for projections, they already come populated on initialization because of a quirk in the interface
         # In future an option can be added for creating them from array
 
@@ -1210,6 +1235,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         source = cdsDict[iCds]["cds"]
+        histoList = []
+        for cdsKey, cdsValue in cdsDict.items():
+            if cdsKey not in memoized_columns:
+                continue
+            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
+                histoList.append(cdsValue["cdsOrig"])
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
         for iWidget in widgetList:
@@ -1482,7 +1513,7 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
         params = iDesc[1]
         callback = None
         if len(iDesc) == 3:
-            optionLocal = iDesc[2]
+            optionLocal = iDesc[2].copy()
         if "callback" not in optionLocal:
             if params[0] in paramDict:
                 optionLocal["callback"] = "parameter"
