@@ -1010,8 +1010,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        cdsDict[cds_name]['cdsOrig'].js_on_change('change', CustomJS(code="""
-                        const col = this.data[field]
+                        cdsDict[cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        const col = this.get_column(field)
                         const isOK = this.data.isOK
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
                         const high = col.map((x,i) => isOK[i] ? col[i] : -Infinity).reduce((acc, cur)=>Math.max(acc,cur), -Infinity);
