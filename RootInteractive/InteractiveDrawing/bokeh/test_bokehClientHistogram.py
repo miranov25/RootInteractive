@@ -57,7 +57,7 @@ figureLayoutDesc=[
 histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "range": "histoRangeA", "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":"nBinsB", "range": [0, 1]},
-    {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, 5, 10], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
+    {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, "nBinsB", 10], "range": ["histoRangeA", None, None], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, "nBinsB"], "range": ["histoRangeA", None], "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
 ]
 
@@ -254,3 +254,4 @@ def testJoin():
     
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, sourceArray=sourceArray, aliasArray=aliasArray)
+
