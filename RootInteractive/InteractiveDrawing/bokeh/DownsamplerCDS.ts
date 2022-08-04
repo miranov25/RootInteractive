@@ -161,6 +161,9 @@ export class DownsamplerCDS extends ColumnarDataSource {
   }
 
   get_length(){
+    if(this.watched && this._needs_update){
+      this.update()
+    }
     return this._downsampled_indices.length
   }
 
