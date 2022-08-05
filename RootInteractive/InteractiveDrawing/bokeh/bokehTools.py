@@ -107,6 +107,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     const t1 = performance.now();
     console.log(`Using index took ${t1 - t0} milliseconds.`);
     for (const iWidget of widgetList){
+        if(!iWidget.active) continue;
         if(iWidget.filter != null){
             if (this == iWidget.widget){
                 iWidget.filter.dirty_widget = true
@@ -884,7 +885,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
                     widgetDict[cds_used] = {"widgetList":[]}
-                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
+                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName, "active": True}
                 if widgetFilter is not None:
                     widgetDictLocal["filter"] = widgetFilter
                 if "index" in optionWidget and optionWidget["index"]:
@@ -903,7 +904,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 plotDict[optionWidget["name"]] = localWidget
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
-            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
+            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None, "active": True})
             continue
         if variables[0] == "text":
             optionWidget = {"title": variables[1][0]}
