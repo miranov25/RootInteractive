@@ -1003,7 +1003,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         if varColor["name"] in colorMapperDict:
                             mapperC = colorMapperDict[varColor["name"]]
                         else:
-                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'],low=1,low_color=(255,255,255,0))}
+                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'])}
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
