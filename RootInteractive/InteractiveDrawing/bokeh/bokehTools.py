@@ -107,7 +107,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     const t1 = performance.now();
     console.log(`Using index took ${t1 - t0} milliseconds.`);
     for (const iWidget of widgetList){
-        if(!iWidget.active) continue;
+        if(iWidget.widget.disabled) continue;
         if(iWidget.filter != null){
             if (this == iWidget.widget){
                 iWidget.filter.dirty_widget = true
@@ -874,10 +874,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     active = paramDict[variables[1][0]]["value"]
                 localWidget = Toggle(label=label, active=active)
-            plotArray.append(localWidget)
+            if "toggleable" in optionWidget:
+                widgetToggle = Toggle(label="disable", active=False)
+                widgetToggle.js_link("active", localWidget, "disabled")
+                widgetFull = row([localWidget, widgetToggle])
+            else:
+                widgetFull = localWidget
+            plotArray.append(widgetFull)
             if "name" in optionWidget:
                 localWidget.name = optionWidget["name"]
-                plotDict[optionWidget["name"]] = localWidget
+                plotDict[optionWidget["name"]] = widgetFull
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
@@ -885,7 +891,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
                     widgetDict[cds_used] = {"widgetList":[]}
-                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName, "active": True}
+                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
                 if widgetFilter is not None:
                     widgetDictLocal["filter"] = widgetFilter
                 if "index" in optionWidget and optionWidget["index"]:
@@ -904,7 +910,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 plotDict[optionWidget["name"]] = localWidget
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
-            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None, "active": True})
+            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
             continue
         if variables[0] == "text":
             optionWidget = {"title": variables[1][0]}
