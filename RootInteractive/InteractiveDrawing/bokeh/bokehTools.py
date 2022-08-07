@@ -876,7 +876,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 localWidget = Toggle(label=label, active=active)
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=False)
-                widgetToggle.js_link("active", localWidget, "disabled")
+                widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
+                widget.disabled = this.active
+                widget.properties.value.change.emit()
+                """))
                 widgetFull = row([localWidget, widgetToggle])
             else:
                 widgetFull = localWidget
