@@ -2,7 +2,12 @@
 
 
 
-The alias array is used as an optional argument in the bokehDrawSA to define derived variables on the client side.
+The alias array declaration is used as an optional argument in the bokehDrawSA to define derived variables on the client side.
+
+The declarative programming used in bokehDrawSA is a type of coding where developers express the computational 
+logic without having to programme the control flow of each process. This can help simplify coding, as developers 
+only need to describe what they want the programme to achieve, rather than explicitly prescribing the steps or 
+commands required to achieve the desired result.
 
 `
 bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
