@@ -13,7 +13,7 @@ from bokeh.palettes import *
 from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput, Toggle
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -29,6 +29,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import Custom
 from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
+from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 import numpy as np
 import pandas as pd
 import re
@@ -52,7 +53,9 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
 
-ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask"]
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner"]
+
+RANGE_SELECTION_WIDGETS = ["slider", "range", "spinner"]
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -121,22 +124,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         const widget = iWidget.widget;
         const widgetType = iWidget.type;
         const col = iWidget.key && cdsOrig.get_column(iWidget.key);
-        if(widgetType == "slider"){
-            const widgetValue = widget.value;
-            const widgetStep = widget.step;
-            for(let i=first; i<last; i++){
-                isSelected[i] &= (col[i] >= widgetValue-0.5*widgetStep);
-                isSelected[i] &= (col[i] <= widgetValue+0.5*widgetStep);
-            }
-        }
-        if(widgetType == "range"){
-            const low = widget.value[0];
-            const high = widget.value[1];
-            for(let i=first; i<last; i++){
-                isSelected[i] &= (col[i] >= low);
-                isSelected[i] &= (col[i] <= high);
-            }
-        }
         if(widgetType == "select"){
             let widgetValue = widget.value;
             widgetValue = widgetValue === "True" ? true : widgetValue;
@@ -492,7 +479,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
-        "removeExtraColumns": True,
         "xAxisTitle": None,
         "yAxisTitle": None,
         "plotTitle": None,
@@ -855,8 +841,17 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         sources.update(used_names_local)
             if variables[0] == 'slider':
                 localWidget = makeBokehSliderWidget(fakeDf, False, variables[1], paramDict, **optionWidget)
+                if optionWidget["callback"] == "selection":
+                    widgetFilter = RangeFilter(range=(localWidget.value-.5*localWidget.step, localWidget.value+.5*localWidget.step), field=variables[1][0], name=variables[1][0])
+                    localWidget.js_on_change("value", CustomJS(args={"target":widgetFilter}, code="""
+                        target.range = [this.value-.5*this.step, this.value+.5*this.step]
+                    """
+                    ))
             if variables[0] == 'range':
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
+                if optionWidget["callback"] == "selection" and "index" not in optionWidget:
+                    widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
+                    localWidget.js_link("value", widgetFilter, "range")
             if variables[0] == 'select':
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
             if variables[0] == 'multiSelect':
@@ -1162,7 +1157,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
 
-        if color_bar != None:
+        if color_bar is not None:
             figureI.add_layout(color_bar, 'right')
         for iCds, iRenderers in hover_tool_renderers.items():
             figureI.add_tools(HoverTool(tooltips=cdsDict[iCds]["tooltips"], renderers=iRenderers))
@@ -1515,6 +1510,10 @@ def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **k
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str(val)
     return CheckboxGroup(labels=optionsPlot, active=[])
+
+
+def makeBokehSpinnerWidget():
+    return Spinner()
 
 
 def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
