@@ -60,7 +60,6 @@ RANGE_SELECTION_WIDGETS = ["slider", "range", "spinner"]
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
-        "cmapDict": None,
         "histogramList": []
     }
     options.update(kwargs)
@@ -79,7 +78,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     for(let i=0; i<size; ++i){
         isSelected[i] = false;
     }
-    let permutationFilter = [];
     let indicesAll = [];
     if(index != null){
         const widget = index.widget;
@@ -141,7 +139,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
                 isSelected &= (col[i] == widgetValue) | isOK;
             }
         }
-        // This is broken, to be fixed later.
         if(widgetType == "textQuery"){
             const queryText = widget.value;
             if(queryText == ""){
@@ -201,6 +198,7 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
     apply layout on plain array of bokeh figures, resp. interactive widgets
     :param widgetLayoutDesc: array or dict desciption of layout
     :param widgetArray: input plain array of widgets/figures
+    :param widgetDict: input dict of widgets/figures, used for accessing them by name
     :param isHorizontal: whether to create a row or column
     :param options: options to use - can also be specified as the last element of widgetArray
     :return: combined figure
@@ -875,6 +873,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widget.disabled = this.active
                 widget.properties.value.change.emit()
                 """))
+                if widgetFilter is not None:
+                    widgetToggle.js_on_change("active", CustomJS(args={"filter": widgetFilter}, code="""
+                    filter.change.emit()
+                    """))
                 widgetFull = row([localWidget, widgetToggle])
             else:
                 widgetFull = localWidget
