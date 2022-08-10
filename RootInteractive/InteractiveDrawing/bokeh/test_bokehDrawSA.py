@@ -92,7 +92,7 @@ widgetParams=[
     ['slider',["size"], {"name": "markerSize"}],
     ['select',["legendFontSize"], {"name": "legendFontSize"}],
     ['toggle', ['legendVisible'], {"name": "legendVisible"}],
-    ['slider', ['nPoints'], {"name": "nPointsRender"}]
+    ['spinner', ['nPoints'], {"name": "nPointsRender"}]
 ]
 
 widgetLayoutDesc={
