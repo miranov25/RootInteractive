@@ -875,8 +875,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     value = paramDict[variables[1][0]]["value"]
                 localWidget = Spinner(title=label, value=value)
+            if variables[0] == 'spinnerRange':
+                # TODO: Make a spinner pair custom widget, or something similar
+                label = variables[1][0]
+                localWidgetMin = Spinner(title=label, value=value)
             if "toggleable" in optionWidget:
-                widgetToggle = Toggle(label="disable", active=False)
+                widgetToggle = Toggle(label="disable", active=False, width=70)
                 widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
                 widget.disabled = this.active
                 widget.properties.value.change.emit()
