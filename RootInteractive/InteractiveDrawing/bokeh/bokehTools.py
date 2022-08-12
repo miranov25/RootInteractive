@@ -845,20 +845,29 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         target.range = [this.value-.5*this.step, this.value+.5*this.step]
                     """
                     ))
+                widgetFull = localWidget
             if variables[0] == 'range':
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
                 if optionWidget["callback"] == "selection" and "index" not in optionWidget:
                     widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
                     localWidget.js_link("value", widgetFilter, "range")
+                widgetFull = localWidget
+                if "resizeable" in optionWidget and optionWidget["resizeable"]:
+                    spinnerLow = Spinner(value=localWidget.start)
+                    spinnerHigh = Spinner(value=localWidget.end)
+                    widgetFull = row([spinnerLow, widgetFull, spinnerHigh])
             if variables[0] == 'select':
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                widgetFull = localWidget
             if variables[0] == 'multiSelect':
                 localWidget, widgetFilter, newColumn = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
                 if newColumn is not None:
                     memoized_columns[None][newColumn["name"]] = newColumn
                     sources.add((None, newColumn["name"]))
+                widgetFull = localWidget
             if variables[0] == 'multiSelectBitmask':
                 localWidget, widgetFilter = makeBokehMultiSelectBitmaskWidget(column[0], **optionWidget)
+                widgetFull = localWidget
             if variables[0] == 'toggle':
                 label = variables[1][0]
                 if "label" in optionWidget:
@@ -867,6 +876,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     active = paramDict[variables[1][0]]["value"]
                 localWidget = Toggle(label=label, active=active)
+                widgetFull = localWidget
             if variables[0] == 'spinner':
                 label = variables[1][0]
                 if "label" in optionWidget:
@@ -875,6 +885,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     value = paramDict[variables[1][0]]["value"]
                 localWidget = Spinner(title=label, value=value)
+                widgetFull = localWidget
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
                 label = variables[1][0]
@@ -889,9 +900,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     widgetToggle.js_on_change("active", CustomJS(args={"filter": widgetFilter}, code="""
                     filter.change.emit()
                     """))
-                widgetFull = row([localWidget, widgetToggle])
-            else:
-                widgetFull = localWidget
+                widgetFull = row([widgetFull, widgetToggle])
             plotArray.append(widgetFull)
             if "name" in optionWidget:
                 localWidget.name = optionWidget["name"]
