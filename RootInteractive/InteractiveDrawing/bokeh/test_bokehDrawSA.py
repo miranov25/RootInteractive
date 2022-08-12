@@ -77,7 +77,7 @@ widgetParams=[
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1], {"index": True}],
 
-    ['range', ['C'], {'type': 'minmax'}],
+    ['range', ['C'], {'type': 'minmax', "resizeable": True, "toggleable":True}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10, "toggleable":True}],
