@@ -853,9 +853,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     localWidget.js_link("value", widgetFilter, "range")
                 widgetFull = localWidget
                 if "resizeable" in optionWidget and optionWidget["resizeable"]:
-                    spinnerLow = Spinner(value=localWidget.start)
-                    spinnerHigh = Spinner(value=localWidget.end)
-                    widgetFull = row([spinnerLow, widgetFull, spinnerHigh])
+                    spinnerLow = Spinner(value=localWidget.start, title="start")
+                    spinnerLow.js_link("value", localWidget, "start")
+                    spinnerHigh = Spinner(value=localWidget.end, title="end")
+                    spinnerHigh.js_link("value", localWidget, "end")
+                    spinnerBins = Spinner(value=10, title="bins")
+                    widgetFull = layout([[spinnerLow, spinnerBins, spinnerHigh], widgetFull])
             if variables[0] == 'select':
                 localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
                 widgetFull = localWidget
