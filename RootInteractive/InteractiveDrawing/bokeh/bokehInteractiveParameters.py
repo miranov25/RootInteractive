@@ -20,7 +20,7 @@ figureParameters["markers"]["widgets"]=[
 ]
 # legend parameters - as used in bokehDrawSA
 figureParameters["legend"]["parameterArray"]=[
-    {"name": "legendFontSize", "value":"5px", "options":['3px','4px','5px','7px',"9px", "11px", "13px", "15px", "17px", "19px"]},
+    {"name": "legendFontSize", "value":"11px", "options":['3px','4px','5px','7px',"9px", "11px", "13px", "15px", "17px", "19px"]},
     {"name": "legendLocation", "value":"top_right", "options":["top_right","top_left", "bottom_right","bottom_left"]},
     {"name": "legendVisible", "value":True},
 ]
