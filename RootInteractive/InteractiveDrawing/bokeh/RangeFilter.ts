@@ -79,7 +79,7 @@ export class RangeFilter extends Model {
     const index_high = this.index_high === -1 ? col.length : this.index_high
     const [low, high] = this.range
     for(let i=index_low; i<index_high; i++){
-        new_vector[i] = (col[i] > low) && (col[i] < high)
+        new_vector[i] = (col[i] >= low) && (col[i] <= high)
     }
     this.dirty_source = false
     this.dirty_widget = false
