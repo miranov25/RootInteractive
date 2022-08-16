@@ -1395,7 +1395,7 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
         pass
     if options['callback'] == 'parameter':
         if options['type'] == 'user':
-            start = params[1], end = params[2], step = params[3]
+            start, end, step = params[1], params[2], params[3]
         else:
             param = paramDict[params[0]]
             start = param['range'][0]
@@ -1410,7 +1410,7 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
             value = paramDict[params[0]]["value"]
     else:
         if options['type'] == 'user':
-            start = params[1], end = params[2], step = params[3]
+            start, end, step = params[1], params[2], params[3]
         elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
             start = np.nanmin(df[name])
             end = np.nanmax(df[name])
