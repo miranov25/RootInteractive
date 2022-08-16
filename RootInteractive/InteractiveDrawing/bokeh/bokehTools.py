@@ -894,7 +894,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 label = variables[1][0]
                 localWidgetMin = Spinner(title=label, value=value)
             if "toggleable" in optionWidget:
-                widgetToggle = Toggle(label="disable", active=False, width=70)
+                localWidget.disabled=True
+                widgetToggle = Toggle(label="disable", active=True, width=70)
                 widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
                 widget.disabled = this.active
                 widget.properties.value.change.emit()
