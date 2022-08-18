@@ -853,6 +853,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     localWidget.js_link("value", widgetFilter, "range")
                 widgetFull = localWidget
                 if "resizeable" in optionWidget and optionWidget["resizeable"]:
+                    raise NotImplementedError("Resizeable sliders are not implemented yet.")
                     spinnerLow = Spinner(value=localWidget.start, title="start")
                     spinnerLow.js_link("value", localWidget, "start")
                     spinnerHigh = Spinner(value=localWidget.end, title="end")
@@ -891,6 +892,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = localWidget
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
+                raise NotImplementedError("Spinner range is not implemented")
                 label = variables[1][0]
                 localWidgetMin = Spinner(title=label, value=value)
             if "toggleable" in optionWidget:
