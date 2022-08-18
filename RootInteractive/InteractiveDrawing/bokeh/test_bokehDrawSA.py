@@ -75,15 +75,15 @@ tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)
 
 widgetParams=[
     ['range', ['A']],
-    ['range', ['B', 0, 1, 0.1, 0, 1], {"index": True}],
+    ['range', ['B', 0, 1, 0.1, 0, 1], {"type":"user", "index": True}],
 
-    ['range', ['C'], {'type': 'minmax'}],
+    ['range', ['C'], {'type': 'minmax', "toggleable":True}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10, "toggleable":True}],
     ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
     ['multiSelectBitmask', ["maskAC"], {"mapping": {"A": 2, "C": 1}, "how":"all", "title": "maskAC(all)"}],
-    ['select',["CC", 0, 1, 2, 3], {"default": 1}],
+    ['select',["CC", 0, 1, 2, 3], {"default": 1, "toggleable":True}],
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection", "name":"selectionText"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
