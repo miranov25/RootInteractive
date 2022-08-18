@@ -1,4 +1,3 @@
-from bisect import bisect
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
@@ -10,10 +9,9 @@ from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeCol
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
 from bokeh.palettes import *
-from bokeh.io import push_notebook, curdoc
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, Tabs, TableColumn, TextAreaInput, Toggle, Spinner
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
