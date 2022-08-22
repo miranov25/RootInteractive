@@ -11,7 +11,7 @@ from bokeh.layouts import *
 from bokeh.palettes import *
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, TableColumn, TextAreaInput, Toggle, Spinner
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, TableColumn, TextAreaInput, Toggle, Spinner, RadioButtonGroup
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -51,9 +51,7 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
 
-ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner"]
-
-RANGE_SELECTION_WIDGETS = ["slider", "range", "spinner"]
+ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -890,16 +888,35 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = localWidget
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
-                raise NotImplementedError("Spinner range is not implemented")
                 label = variables[1][0]
-                localWidgetMin = Spinner(title=label, value=value)
+                valueMin=0
+                valueMax=1
+                localWidgetMin = Spinner(title=f"min({label})", value=valueMin)
+                localWidgetMax = Spinner(title=f"max({label})", value=valueMax)
+                widgetFilter = RangeFilter(range=[valueMin, valueMax], field=variables[1][0], name=variables[1][0])
+                localWidgetMin.js_on_change("value", CustomJS(args={"widget":localWidgetMin, "filter": widgetFilter}, code="""
+                    filter.range[0] = this.value
+                    filter.properties.range.change.emit()
+                    """))
+                localWidgetMax.js_on_change("value", CustomJS(args={"widget":localWidgetMax, "filter": widgetFilter}, code="""
+                    filter.range[1] = this.value
+                    filter.properties.range.change.emit()
+                    """))
+                widgetFull=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
                 localWidget.disabled=True
                 widgetToggle = Toggle(label="disable", active=True, width=70)
-                widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
-                widget.disabled = this.active
-                widget.properties.value.change.emit()
-                """))
+                if variables[0] == 'spinnerRange':
+                    widgetToggle.js_on_change("active", CustomJS(args={"widgetMin":localWidgetMin, "widgetMax": localWidgetMax, "filter": widgetFilter}, code="""
+                    widgetMin.disabled = this.active
+                    widgetMax.disabled = this.active
+                    filter.change.emit()
+                    """))
+                else:
+                    widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
+                    widget.disabled = this.active
+                    widget.properties.value.change.emit()
+                    """))
                 if widgetFilter is not None:
                     widgetToggle.js_on_change("active", CustomJS(args={"filter": widgetFilter}, code="""
                     filter.change.emit()

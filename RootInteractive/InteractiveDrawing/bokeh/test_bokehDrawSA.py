@@ -77,7 +77,7 @@ widgetParams=[
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1], {"type":"user", "index": True}],
 
-    ['range', ['C'], {'type': 'minmax', "toggleable":True}],
+    ['spinnerRange', ['C'], {}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
     ['slider', ['AA'], {'bins': 10, "toggleable":True}],
