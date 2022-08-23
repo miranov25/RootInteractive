@@ -11,7 +11,7 @@ from bokeh.layouts import *
 from bokeh.palettes import *
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, CheckboxGroup, Panel, TableColumn, TextAreaInput, Toggle, Spinner, RadioButtonGroup
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, Panel, TableColumn, TextAreaInput, Toggle, Spinner, RadioButtonGroup
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
@@ -126,13 +126,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
                 let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
                 isOK|=(col[i] == widgetValue)
                 isSelected[i] &= (col[i] == widgetValue) | isOK;
-            }
-        }
-        if(widgetType == "CheckboxGroup"){
-            const widgetValue = widget.value;
-            for(let i=first; i<last; i++){
-                isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
-                isSelected &= (col[i] == widgetValue) | isOK;
             }
         }
         if(widgetType == "textQuery"){
@@ -1546,23 +1539,6 @@ def makeBokehMultiSelectBitmaskWidget(column: dict, title: str, mapping: dict, *
     return widget_local, filter_local
 
 
-def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
-    options = {'default': 0, 'size': 10}
-    options.update(kwargs)
-    # optionsPlot = []
-    if len(params) == 1:
-        optionsPlot = np.sort(df[params[0]].unique()).tolist()
-    else:
-        optionsPlot = params[1:]
-    for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str(val)
-    return CheckboxGroup(labels=optionsPlot, active=[])
-
-
-def makeBokehSpinnerWidget():
-    return Spinner()
-
-
 def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dict, defaultCallback: CustomJS):
     for iDesc, iWidget in zip(widgetParams, widgetArray):
         optionLocal = {}
@@ -1588,9 +1564,7 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
                     iWidget.js_link(*iEvent)
             continue
         if callback is not None:
-            if isinstance(iWidget, CheckboxGroup):
-                iWidget.js_on_click(callback)
-            elif isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
+            if isinstance(iWidget, Slider) or isinstance(iWidget, RangeSlider):
                 iWidget.js_on_change("value", callback)
             else:
                 iWidget.js_on_change("value", callback)
