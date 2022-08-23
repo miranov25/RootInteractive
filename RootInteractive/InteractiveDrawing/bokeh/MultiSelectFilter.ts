@@ -1,5 +1,4 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import { MultiSelect } from "models/widgets/multiselect"
 import {Model} from "model"
 import * as p from "core/properties"
 
@@ -8,7 +7,7 @@ export namespace MultiSelectFilter {
 
   export type Props = Model.Props & {
     source: p.Property<ColumnarDataSource>
-    widget: p.Property<MultiSelect>
+    selected: p.Property<string[]>
     mapping: p.Property<Record<string, number>>
     mask: p.Property<number>
     field:p.Property<string>
@@ -28,9 +27,9 @@ export class MultiSelectFilter extends Model {
   static __name__ = "MultiSelectFilter"
 
   static init_MultiSelectFilter() {
-    this.define<MultiSelectFilter.Props>(({Ref, Int, String})=>({
+    this.define<MultiSelectFilter.Props>(({Ref, Int, Array, String})=>({
       source:  [Ref(ColumnarDataSource)],
-      widget:    [ Ref(MultiSelect) ],
+      selected:    [ Array(String), [] ],
       mapping:    [p.Instance],
       mask: [Int, -1],
       field: [String],
@@ -51,7 +50,7 @@ export class MultiSelectFilter extends Model {
   connect_signals(): void {
     super.connect_signals()
 
-    this.connect(this.widget.properties.value.change, this.mark_dirty_widget)
+    this.connect(this.properties.selected.change, this.mark_dirty_widget)
     this.connect(this.source.change, this.mark_dirty_source)
   }
 
@@ -66,7 +65,7 @@ export class MultiSelectFilter extends Model {
   }
 
   public v_compute(): boolean[]{
-    const {dirty_source, dirty_widget, cached_vector, widget, source, mapping, mask, field, how} = this
+    const {dirty_source, dirty_widget, cached_vector, selected, source, mapping, mask, field, how} = this
     if (!dirty_source && !dirty_widget){
         return cached_vector
     }
@@ -78,7 +77,7 @@ export class MultiSelectFilter extends Model {
         new_vector.length = col.length
     }
     if (how == "whitelist"){
-        const accepted_codes = widget.value.map((a: string) => mapping[a])
+        const accepted_codes = selected.map((a: string) => mapping[a])
         let count=0
         for(let i=0; i<col.length; i++){
             const x = col[i]
@@ -97,7 +96,7 @@ export class MultiSelectFilter extends Model {
         this.cached_vector = new_vector
         return new_vector
     }
-    const mask_new = widget.value.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
+    const mask_new = selected.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
     if (how == "any"){
         for(let i=0; i<col.length; i++){
           const x = col[i] as number

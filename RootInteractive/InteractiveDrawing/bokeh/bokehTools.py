@@ -1518,14 +1518,16 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         for i, val in enumerate(optionsPlot):
             mapping[val] = 2**i
         # print(optionsPlot)
-        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="any", mapping=mapping)
+        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="any", mapping=mapping)
+        widget_local.js_link("value", filterLocal, "selected")
         newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": (2**codes).astype(np.int32)}
     else:
         mapping = {}
         for i, val in enumerate(optionsPlot):
             mapping[val] = i
         print(len(optionsPlot))
-        filterLocal = MultiSelectFilter(widget=widget_local, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+        widget_local.js_link("value", filterLocal, "selected")
         newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
 
@@ -1538,9 +1540,10 @@ def makeBokehMultiSelectBitmaskWidget(column: dict, title: str, mapping: dict, *
         multiselect_value = keys
     else:
         multiselect_value = []
-    widgetLocal = MultiSelect(title=title, value=multiselect_value, options=keys, size=options["size"])
-    filterLocal = MultiSelectFilter(widget=widgetLocal, field=column["name"], how=options["how"], mapping=mapping)
-    return widgetLocal, filterLocal
+    widget_local = MultiSelect(title=title, value=multiselect_value, options=keys, size=options["size"])
+    filter_local = MultiSelectFilter(selected=multiselect_value, field=column["name"], how=options["how"], mapping=mapping)
+    widget_local.js_link("value", filter_local, "selected")
+    return widget_local, filter_local
 
 
 def makeBokehCheckboxWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
