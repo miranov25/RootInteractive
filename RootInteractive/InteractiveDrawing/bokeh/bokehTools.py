@@ -106,9 +106,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     for (const iWidget of widgetList){
         if(iWidget.widget.disabled) continue;
         if(iWidget.filter != null){
-//            if (this == iWidget.widget){
-//                iWidget.filter.dirty_widget = true
-//            }
             const widgetFilter = iWidget.filter.v_compute();
             for(let i=first; i<last; i++){
                 isSelected[i] &= widgetFilter[i];
@@ -867,17 +864,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
                 label = variables[1][0]
-                valueMin=0
-                valueMax=1
-                localWidgetMin = Spinner(title=f"min({label})", value=valueMin)
-                localWidgetMax = Spinner(title=f"max({label})", value=valueMax)
-                widgetFilter = RangeFilter(range=[valueMin, valueMax], field=variables[1][0], name=variables[1][0])
-                localWidgetMin.js_on_change("value", CustomJS(args={"widget":localWidgetMin, "filter": widgetFilter}, code="""
+                start, end, step = makeSliderParameters(fakeDf, variables[1], **optionWidget)
+                localWidgetMin = Spinner(title=f"min({label})", low=start, value=start, high=end, step=step)
+                localWidgetMax = Spinner(title=f"max({label})", low=start, value=end, high=end, step=step)
+                widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
+                localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter}, code="""
                     filter.range[0] = this.value
+                    other.step = this.step = (other.value - this.value) * .05
                     filter.properties.range.change.emit()
                     """))
-                localWidgetMax.js_on_change("value", CustomJS(args={"widget":localWidgetMax, "filter": widgetFilter}, code="""
+                localWidgetMax.js_on_change("value", CustomJS(args={"other":localWidgetMin, "filter": widgetFilter}, code="""
                     filter.range[1] = this.value
+                    other.step = this.step = (this.value - other.value) * .05
                     filter.properties.range.change.emit()
                     """))
                 widgetFull=row([localWidgetMin, localWidgetMax])
@@ -1381,14 +1379,6 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
     end = 0
     step = 0
     value=None
-    #df[name].loc[ abs(df[name])==np.inf]=0
-    try:
-        if df[name].dtype=="float":                    #if type is float and has inf print error message and replace
-            if (np.isinf(df[name])).sum()>0:
-                print(f"makeBokehSliderWidget() - Invalid column {name} with infinity")
-                raise
-    except:
-        pass
     if options['callback'] == 'parameter':
         if options['type'] == 'user':
             start, end, step = params[1], params[2], params[3]
@@ -1405,47 +1395,72 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
                 step = (end - start) / bins
             value = paramDict[params[0]]["value"]
     else:
-        if options['type'] == 'user':
-            start, end, step = params[1], params[2], params[3]
-        elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
-            start = np.nanmin(df[name])
-            end = np.nanmax(df[name])
-            step = (end - start) / options['bins']
-        elif (options['type'] == 'unique'):
-            start = np.nanmin(df[name])
-            end = np.nanmax(df[name])
-            nbins=df[name].unique().size-1
-            step = (end - start) / float(nbins)
-        elif options['type'] == 'sigma':
-            mean = df[name].mean()
-            sigma = df[name].std()
-            start = mean - options['sigma'] * sigma
-            end = mean + options['sigma'] * sigma
-            step = (end - start) / options['bins']
-        elif options['type'] == 'sigmaMed':
-            mean = df[name].median()
-            sigma = df[name].std()
-            start = mean - options['sigma'] * sigma
-            end = mean + options['sigma'] * sigma
-            step = (end - start) / options['bins']
-        elif options['type'] == 'sigmaTM':
-            mean = df[name].trimmed_mean(options['limits'])
-            sigma = df[name].trimmed_std(options['limits'])
-            start = mean - options['sigma'] * sigma
-            end = mean + options['sigma'] * sigma
-            step = (end - start) / options['bins']
+        start, end, step = makeSliderParameters(df, params, **kwargs)
     if isRange:
         if (start==end):
             start-=1
             end+=1
         if value is None:
             value = (start, end)
-        slider = RangeSlider(title=title, start=start, end=end, step=step, value=value)
+        slider = RangeSlider(title=title, start=start, end=end, step=step, value=value, name=name)
     else:
         if value is None:
             value = (start + end) * 0.5
-        slider = Slider(title=title, start=start, end=end, step=step, value=value)
+        slider = Slider(title=title, start=start, end=end, step=step, value=value, name=name)
     return slider
+
+
+def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
+    options = {
+        'type': 'auto',
+        'bins': 30,
+        'sigma': 4,
+        'limits': (0.05, 0.05),
+        'title': '',
+    }
+    options.update(kwargs)
+    name = params[0]
+    start = 0
+    end = 0
+    step = 0
+    #df[name].loc[ abs(df[name])==np.inf]=0
+    try:
+        if df[name].dtype=="float":                    #if type is float and has inf print error message and replace
+            if (np.isinf(df[name])).sum()>0:
+                print(f"makeBokehSliderWidget() - Invalid column {name} with infinity")
+                raise
+    except:
+        pass
+    if options['type'] == 'user':
+        start, end, step = params[1], params[2], params[3]
+    elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
+        start = np.nanmin(df[name])
+        end = np.nanmax(df[name])
+        step = (end - start) / options['bins']
+    elif (options['type'] == 'unique'):
+        start = np.nanmin(df[name])
+        end = np.nanmax(df[name])
+        nbins=df[name].unique().size-1
+        step = (end - start) / float(nbins)
+    elif options['type'] == 'sigma':
+        mean = df[name].mean()
+        sigma = df[name].std()
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    elif options['type'] == 'sigmaMed':
+        mean = df[name].median()
+        sigma = df[name].std()
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    elif options['type'] == 'sigmaTM':
+        mean = df[name].trimmed_mean(options['limits'])
+        sigma = df[name].trimmed_std(options['limits'])
+        start = mean - options['sigma'] * sigma
+        end = mean + options['sigma'] * sigma
+        step = (end - start) / options['bins']
+    return start, end, step    
 
 
 def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, default=None, **kwargs):
