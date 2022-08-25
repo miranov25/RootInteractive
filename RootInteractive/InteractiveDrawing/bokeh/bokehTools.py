@@ -106,9 +106,9 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     for (const iWidget of widgetList){
         if(iWidget.widget.disabled) continue;
         if(iWidget.filter != null){
-            if (this == iWidget.widget){
-                iWidget.filter.dirty_widget = true
-            }
+//            if (this == iWidget.widget){
+//                iWidget.filter.dirty_widget = true
+//            }
             const widgetFilter = iWidget.filter.v_compute();
             for(let i=first; i<last; i++){
                 isSelected[i] &= widgetFilter[i];
@@ -118,16 +118,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
         const widget = iWidget.widget;
         const widgetType = iWidget.type;
         const col = iWidget.key && cdsOrig.get_column(iWidget.key);
-        if(widgetType == "select"){
-            let widgetValue = widget.value;
-            widgetValue = widgetValue === "True" ? true : widgetValue;
-            widgetValue = widgetValue === "False" ? false : widgetValue;
-            for(let i=first; i<last; i++){
-                let isOK = Math.abs(col[i] - widgetValue) <= widgetValue * precision;
-                isOK|=(col[i] == widgetValue)
-                isSelected[i] &= (col[i] == widgetValue) | isOK;
-            }
-        }
         if(widgetType == "textQuery"){
             const queryText = widget.value;
             if(queryText == ""){
@@ -841,16 +831,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
                     localWidget.js_link("value", widgetFilter, "range")
                 widgetFull = localWidget
-                if "resizeable" in optionWidget and optionWidget["resizeable"]:
-                    raise NotImplementedError("Resizeable sliders are not implemented yet.")
-                    spinnerLow = Spinner(value=localWidget.start, title="start")
-                    spinnerLow.js_link("value", localWidget, "start")
-                    spinnerHigh = Spinner(value=localWidget.end, title="end")
-                    spinnerHigh.js_link("value", localWidget, "end")
-                    spinnerBins = Spinner(value=10, title="bins")
-                    widgetFull = layout([[spinnerLow, spinnerBins, spinnerHigh], widgetFull])
             if variables[0] == 'select':
-                localWidget = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                localWidget, widgetFilter, newColumn = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
+                if newColumn is not None:
+                    memoized_columns[None][newColumn["name"]] = newColumn
+                    sources.add((None, newColumn["name"]))
                 widgetFull = localWidget
             if variables[0] == 'multiSelect':
                 localWidget, widgetFilter, newColumn = makeBokehMultiSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
@@ -1467,13 +1452,15 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     options = {'size': 10}
     options.update(kwargs)
     # optionsPlot = []
-    if len(params) == 1:
-        if options['callback'] == 'parameter':
-            optionsPlot = paramDict[params[0]]["options"]
-        else:
-            optionsPlot = np.sort(df[params[0]].dropna().unique()).tolist()
+    if options['callback'] == 'parameter':
+        optionsPlot = paramDict[params[0]]["options"]
     else:
-        optionsPlot = params[1:]
+        if len(params) > 1:
+            dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
+        else:
+            dfCategorical = df[params[0]]
+        codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+        optionsPlot = optionsPlot.dropna().to_list()
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str((val))
     default_value = 0
@@ -1482,17 +1469,42 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             default_value = default
         else:
             raise IndexError("Default value out of range for select widget.")
+    elif default is None and options['callback'] == 'parameter':
+        default_value = optionsPlot.index(str(paramDict[params[0]]["value"]))
     elif default is None:
-        if options['callback'] == 'parameter':
-            default_value = optionsPlot.index(str(paramDict[params[0]]["value"]))
+        default_value = 0
     else:
         default_value = optionsPlot.index(str(default))
-    return Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
+    widget_local = Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
+    filterLocal = None
+    newColumn = None
+    js_callback_code="""
+        target.selected = [this.value]
+    """
+    if options['callback'] == 'parameter':
+        return widget_local, filterLocal, newColumn
+    if len(optionsPlot) < 31:
+        mapping = {}
+        for i, val in enumerate(optionsPlot):
+            mapping[val] = 2**i
+        # print(optionsPlot)
+        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="any", mapping=mapping)
+        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
+        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": (2**codes).astype(np.int32)}
+    else:
+        mapping = {}
+        for i, val in enumerate(optionsPlot):
+            mapping[val] = i
+        print(len(optionsPlot))
+        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
+        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
+    return widget_local, filterLocal, newColumn
 
 
 def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, **kwargs):
     # print("makeBokehMultiSelectWidget",params,kwargs)
-    options = {'default': 0, 'size': 4}
+    options = {'size': 4}
     options.update(kwargs)
     # optionsPlot = []
     if len(params) > 1:
@@ -1502,7 +1514,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
     codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
     optionsPlot = optionsPlot.to_list()
     for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str((val))
+        optionsPlot[i] = str(val)
     widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
     filterLocal = None
     newColumn = None
