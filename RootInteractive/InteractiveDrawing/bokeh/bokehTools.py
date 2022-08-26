@@ -900,7 +900,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = row([widgetFull, widgetToggle])
             plotArray.append(widgetFull)
             if "name" in optionWidget:
-                localWidget.name = optionWidget["name"]
                 plotDict[optionWidget["name"]] = widgetFull
             if localWidget and optionWidget["callback"] != "selection":
                 widgetArray.append(localWidget)
