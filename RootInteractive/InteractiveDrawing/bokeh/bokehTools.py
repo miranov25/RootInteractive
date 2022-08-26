@@ -1497,22 +1497,14 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     """
     if options['callback'] == 'parameter':
         return widget_local, filterLocal, newColumn
-    if len(optionsPlot) < 31:
-        mapping = {}
-        for i, val in enumerate(optionsPlot):
-            mapping[val] = 2**i
-        # print(optionsPlot)
-        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="any", mapping=mapping)
-        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
-        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": (2**codes).astype(np.int32)}
-    else:
-        mapping = {}
-        for i, val in enumerate(optionsPlot):
-            mapping[val] = i
-        print(len(optionsPlot))
-        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
-        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
-        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
+
+    mapping = {}
+    for i, val in enumerate(optionsPlot):
+        mapping[val] = i
+    print(len(optionsPlot))
+    filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+    widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
+    newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
 
 
