@@ -902,7 +902,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = widgetFull
             if localWidget and optionWidget["callback"] != "selection":
-                widgetArray.append(localWidget)
+                widgetArray.append(widgetFull)
                 widgetParams.append(variables)
             if optionWidget["callback"] == "selection":
                 cds_used = cds_names[0]
