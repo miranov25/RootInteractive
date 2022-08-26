@@ -878,7 +878,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     other.step = this.step = (this.value - other.value) * .05
                     filter.properties.range.change.emit()
                     """))
-                widgetFull=row([localWidgetMin, localWidgetMax])
+                widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=True, width=70)
                 if variables[0] == 'spinnerRange':
