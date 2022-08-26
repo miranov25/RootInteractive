@@ -880,7 +880,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """))
                 widgetFull=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
-                localWidget.disabled=True
                 widgetToggle = Toggle(label="disable", active=True, width=70)
                 if variables[0] == 'spinnerRange':
                     widgetToggle.js_on_change("active", CustomJS(args={"widgetMin":localWidgetMin, "widgetMax": localWidgetMax, "filter": widgetFilter}, code="""
@@ -889,6 +888,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     filter.change.emit()
                     """))
                 else:
+                    localWidget.disabled=True
                     widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
                     widget.disabled = this.active
                     widget.properties.value.change.emit()
@@ -901,8 +901,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             plotArray.append(widgetFull)
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = widgetFull
-            if localWidget and optionWidget["callback"] != "selection":
-                widgetArray.append(widgetFull)
+            if optionWidget["callback"] != "selection" and localWidget:
+                widgetArray.append(localWidget)
                 widgetParams.append(variables)
             if optionWidget["callback"] == "selection":
                 cds_used = cds_names[0]
