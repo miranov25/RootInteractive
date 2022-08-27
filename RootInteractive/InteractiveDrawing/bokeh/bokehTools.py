@@ -878,9 +878,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     other.step = this.step = (this.value - other.value) * .05
                     filter.properties.range.change.emit()
                     """))
-                widgetFull=row([localWidgetMin, localWidgetMax])
+                widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
-                localWidget.disabled=True
                 widgetToggle = Toggle(label="disable", active=True, width=70)
                 if variables[0] == 'spinnerRange':
                     widgetToggle.js_on_change("active", CustomJS(args={"widgetMin":localWidgetMin, "widgetMax": localWidgetMax, "filter": widgetFilter}, code="""
@@ -889,6 +888,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     filter.change.emit()
                     """))
                 else:
+                    localWidget.disabled=True
                     widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget}, code="""
                     widget.disabled = this.active
                     widget.properties.value.change.emit()
@@ -900,9 +900,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = row([widgetFull, widgetToggle])
             plotArray.append(widgetFull)
             if "name" in optionWidget:
-                localWidget.name = optionWidget["name"]
                 plotDict[optionWidget["name"]] = widgetFull
-            if localWidget and optionWidget["callback"] != "selection":
+            if optionWidget["callback"] != "selection" and localWidget:
                 widgetArray.append(localWidget)
                 widgetParams.append(variables)
             if optionWidget["callback"] == "selection":
@@ -1498,22 +1497,14 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     """
     if options['callback'] == 'parameter':
         return widget_local, filterLocal, newColumn
-    if len(optionsPlot) < 31:
-        mapping = {}
-        for i, val in enumerate(optionsPlot):
-            mapping[val] = 2**i
-        # print(optionsPlot)
-        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="any", mapping=mapping)
-        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
-        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": (2**codes).astype(np.int32)}
-    else:
-        mapping = {}
-        for i, val in enumerate(optionsPlot):
-            mapping[val] = i
-        print(len(optionsPlot))
-        filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
-        widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
-        newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
+
+    mapping = {}
+    for i, val in enumerate(optionsPlot):
+        mapping[val] = i
+    print(len(optionsPlot))
+    filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+    widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
+    newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
 
 

@@ -77,10 +77,10 @@ widgetParams=[
     ['range', ['A']],
     ['range', ['B', 0, 1, 0.1, 0, 1], {"type":"user", "index": True}],
 
-    ['spinnerRange', ['C'], {}],
+    ['spinnerRange', ['C'], {"name": "widgetC"}],
     ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
     ['range', ['E'], {'type': 'sigmaMed', 'bins': 10, 'sigma': 3}],
-    ['slider', ['AA'], {'bins': 10, "toggleable":True}],
+    ['slider', ['AA'], {'bins': 10, "toggleable":True, "name": "widgetAA"}],
     ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
     ['multiSelectBitmask', ["maskAC"], {"mapping": {"A": 2, "C": 1}, "how":"all", "title": "maskAC(all)"}],
     ['select',["CC", 0, 1, 2, 3], {"default": 1, "toggleable":True}],
@@ -96,7 +96,7 @@ widgetParams=[
 ]
 
 widgetLayoutDesc={
-    "Selection": [[0, 1, 2], [3, 4], [5, 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
+    "Selection": [[0, 1, "widgetC"], [3, 4], ["widgetAA", 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
     "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], {'sizing_mode': 'scale_width'}]
     }
 
