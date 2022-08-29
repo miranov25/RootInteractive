@@ -18,7 +18,7 @@ class HistoStatsCDS(ColumnarDataSource):
     names = List(String)
     bin_centers = List(String)
     bincount_columns = List(String)
-    rowwise = Bool
+    rowwise = Bool()
     quantiles = List(Float)
     compute_quantile = List(Bool)
     edges_left = List(String)
