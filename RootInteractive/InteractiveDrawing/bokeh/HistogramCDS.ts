@@ -29,14 +29,14 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable, String})=>({
+    this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable, String, Dict, Any})=>({
       source:  [Ref(ColumnDataSource)],
 //      view:         [Nullable(Array(Int)), null],
       nbins:        [Number],
       range:    [Nullable(Array(Number))],
       sample:      [String],
       weights:      [Nullable(String), null],
-      histograms:  [p.Instance]
+      histograms:  [Dict(Any), {}]
     }))
   }
 
