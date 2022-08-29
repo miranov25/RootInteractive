@@ -30,7 +30,7 @@ export class HistoNdProfile extends ColumnarDataSource {
 
     this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int})=>({
       source:  [Ref(HistoNdCDS)],
-      axis_idx: [Int],
+      axis_idx: [Int, 0],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       sum_range: [Array(Array(Number)), []]
     }))

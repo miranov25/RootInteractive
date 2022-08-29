@@ -16,6 +16,6 @@ class HistoNdProfile(ColumnarDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
     source = Instance(HistoNdCDS)
-    axis_idx = Int
+    axis_idx = Int(default=0)
     quantiles = List(Float)
     sum_range = List(List(Float))
