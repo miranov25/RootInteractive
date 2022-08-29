@@ -26,14 +26,14 @@ class HistoNdCDS(ColumnarDataSource):
     if nullable_available:
         range = Nullable(List(Nullable((List(Float)))), help="Ranges in the same order as sample_variables")
         weights = Nullable(String(), default=None)
-        histograms = Nullable(Dict(String, Nullable(Dict(String, Any))), default={"entries": {}}, help="""
+        histograms = Nullable(Dict(String, Nullable(Dict(String, Any))), help="""
         Dictionary of the values to histogram.
         Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
             """)
     else:
         range = List(List(Float), help="Ranges in the same order as sample_variables")
         weights = String(default=None)
-        histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
+        histograms = Dict(String, Dict(String, Any), help="""
         Dictionary of the values to histogram.
         Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
             """)
