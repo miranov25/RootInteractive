@@ -25,12 +25,17 @@ class HistogramCDS(ColumnarDataSource):
     if nullable_available:
         weights = Nullable(String(), default=None)
         range = Nullable(List(Float))
+        histograms = Dict(String, Nullable(Dict(String, Any)), help="""
+            Dictionary of the values to histogram.
+            Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
+        """)
     else:
         weights = String(default=None)
         range = List(Float)
+        histograms = Dict(String, Dict(String, Any), help="""
+            Dictionary of the values to histogram.
+            Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
+        """)
     nbins = Int()
-    histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
-    Dictionary of the values to histogram.
-    Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
-    """)
+
     print("x", __implementation__)
