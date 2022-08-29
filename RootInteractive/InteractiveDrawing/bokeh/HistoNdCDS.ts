@@ -41,7 +41,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
-      weights:      [String, null],
+      weights:      [Nullable(String), null],
       histograms:  [p.Instance]
     }))
   }
@@ -87,7 +87,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._nbins = this.nbins;
 
     let sample_array: ArrayLike<number>[] = []
-    if(this.range === null || this.range.reduce((acc, cur) => acc || (cur === null), false))
+    if(this.range === null || this.range.reduce((acc: boolean, cur) => acc || (cur === null), false))
     for (const column_name of this.sample_variables) {
       const column = this.source.get_column(column_name)
       if (column == null){

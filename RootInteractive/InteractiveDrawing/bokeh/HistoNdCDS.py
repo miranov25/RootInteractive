@@ -1,6 +1,11 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
 from bokeh.models import ColumnarDataSource
 
+try:
+    from bokeh.core.properties import Nullable
+    nullable_available = True
+except ImportError:
+    nullable_available = False
 
 class HistoNdCDS(ColumnarDataSource):
 
@@ -16,13 +21,19 @@ class HistoNdCDS(ColumnarDataSource):
 
     source = Instance(ColumnarDataSource, help="Source from which to take the data to histogram")
     sample_variables = List(String, help="Names of the columns used for binning")
-    weights = String(default=None)
     # TODO: Support auto nbins in the future - 2n-th root of total entries?
     nbins = List(Int, help="Number of bins")
-    # TODO: When migrating to new version of bokeh, make this Nullable
-    range = List(List(Float), help="Ranges in the same order as sample_variables")
-    # TODO: Make this nullable too
-    histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
-    Dictionary of the values to histogram.
-    Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
-        """)
+    if nullable_available:
+        range = Nullable(List(Nullable((List(Float)))), help="Ranges in the same order as sample_variables")
+        weights = Nullable(String(), default=None)
+        histograms = Nullable(Dict(String, Dict(String, Any)), default={"entries": {}}, help="""
+        Dictionary of the values to histogram.
+        Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
+            """)
+    else:
+        range = List(List(Float), help="Ranges in the same order as sample_variables")
+        weights = String(default=None)
+        histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
+        Dictionary of the values to histogram.
+        Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
+            """)

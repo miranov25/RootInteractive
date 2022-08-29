@@ -1,6 +1,11 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
 from bokeh.models import ColumnarDataSource
 
+try:
+    from bokeh.core.properties import Nullable
+    nullable_available = True
+except ImportError:
+    nullable_available = False
 
 class HistogramCDS(ColumnarDataSource):
 
@@ -17,9 +22,13 @@ class HistogramCDS(ColumnarDataSource):
     source = Instance(ColumnarDataSource, help="Source from which to take the data to histogram")
     view = List(Int)
     sample = String()
-    weights = String(default=None)
+    if nullable_available:
+        weights = Nullable(String(), default=None)
+        range = Nullable(List(Float))
+    else:
+        weights = String(default=None)
+        range = List(Float)
     nbins = Int()
-    range = List(Float)
     histograms = Dict(String, Dict(String, Any), default={"entries": {}}, help="""
     Dictionary of the values to histogram.
     Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
