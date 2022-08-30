@@ -269,7 +269,7 @@ def test_compressCDSPipe():
 
 def test_CompressionCDSPipeDraw():
     df = pd.DataFrame(np.random.random_sample(size=(100000, 4)), columns=list('ABCD'))
-    df["AA"] = ((df.A * 10).round(0)).astype(pd.CategoricalDtype(ordered=True))
+    df["AA"] = (df.A * 10).round(0).astype("int64") #Test if accidentally converting to int64 causes problems
     figureArray = [
        [['A*10'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
         [['AA'], ['C+A', 'C-A', 'A/A']],
@@ -281,9 +281,10 @@ def test_CompressionCDSPipeDraw():
         ['range', ['A']],
         ['range', ['B', 0, 1, 0.1, 0, 1]],
         ['range', ['C'], {'type': 'minmax'}],
-        ['range', ['D'], {'type': 'minmax'}]
+        ['range', ['D'], {'type': 'minmax'}],
+        ['range', ['AA']]
     ]
-    widgetLayoutDesc=[[0, 1], [2, 3], {'sizing_mode': 'scale_width'}]
+    widgetLayoutDesc=[[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
         [2, 3, {'plot_height': 200, 'x_visible': 1, 'y_visible': 2}],
