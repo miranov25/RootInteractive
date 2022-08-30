@@ -12,7 +12,7 @@ export namespace HistogramCDS {
     range:    p.Property<number[] | null>
     sample:      p.Property<string>
     weights:      p.Property<string | null>
-    histograms: p.Property<Record<string, Record<string, any>>>
+    histograms: p.Property<Record<string, Record<string, any> | null>>
   }
 }
 
@@ -29,14 +29,14 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static init_HistogramCDS() {
 
-    this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable})=>({
+    this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable, String, Any})=>({
       source:  [Ref(ColumnDataSource)],
 //      view:         [Nullable(Array(Int)), null],
       nbins:        [Number],
       range:    [Nullable(Array(Number))],
-      sample:      [p.String],
-      weights:      [p.String, null],
-      histograms:  [p.Instance]
+      sample:      [String],
+      weights:      [Nullable(String), null],
+      histograms:  [Any, {}]
     }))
   }
 
@@ -247,7 +247,7 @@ export class HistogramCDS extends ColumnarDataSource {
       if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
-        data[key] = this.histogram(histograms[key].weights)
+        data[key] = this.histogram(histograms[key]!.weights)
       }
     } 
   }

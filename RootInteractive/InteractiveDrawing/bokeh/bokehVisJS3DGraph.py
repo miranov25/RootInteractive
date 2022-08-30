@@ -30,9 +30,9 @@ class BokehVisJSGraph3D(LayoutDOM):
     # The data will actually be stored in the ColumnDataSource, but these
     # properties let us specify the *name* of the column that should be
     # used for each field.
-    x = String
-    y = String
-    z = String
-    style = String
+    x = String()
+    y = String()
+    z = String()
+    style = String()
     options3D = Dict(String, Any)
     print("x", __implementation__)

@@ -35,14 +35,14 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   static init_HistoNdCDS() {
 
-    this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String})=>({
+    this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String, Any})=>({
       source:  [Ref(ColumnarDataSource)],
 //      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
-      weights:      [String, null],
-      histograms:  [p.Instance]
+      weights:      [Nullable(String), null],
+      histograms:  [Any, {}]
     }))
   }
 
@@ -87,7 +87,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._nbins = this.nbins;
 
     let sample_array: ArrayLike<number>[] = []
-    if(this.range === null || this.range.reduce((acc, cur) => acc || (cur === null), false))
+    if(this.range === null || this.range.reduce((acc: boolean, cur) => acc || (cur === null), false))
     for (const column_name of this.sample_variables) {
       const column = this.source.get_column(column_name)
       if (column == null){
