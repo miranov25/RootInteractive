@@ -17,7 +17,7 @@ from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
-from RootInteractive.Tools.compressArray import compressCDSPipe
+from RootInteractive.Tools.compressArray import compressCDSPipe, removeInt64
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
@@ -921,6 +921,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) >= 2:
                 optionWidget.update(variables[-1])
             cds_used = None
+            # By default, uses all named variables from the data source - but they can't be known at this point yet
             localWidget = TextAreaInput(**optionWidget)
             plotArray.append(localWidget)
             if "name" in optionWidget:
@@ -1218,6 +1219,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cdsOrig = cdsValue["cdsOrig"]
             if cdsValue['arrayCompression'] is not None:
                 print("compressCDSPipe")
+                sent_data = {i:removeInt64(iColumn) for i, iColumn in sent_data.items()}
                 cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
                 cdsOrig.inputData = cdsCompress0
                 cdsOrig.sizeMap = sizeMap
