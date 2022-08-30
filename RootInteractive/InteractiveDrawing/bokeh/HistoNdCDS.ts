@@ -35,14 +35,14 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   static init_HistoNdCDS() {
 
-    this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String, Dict, Any})=>({
+    this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String, Any})=>({
       source:  [Ref(ColumnarDataSource)],
 //      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
       weights:      [Nullable(String), null],
-      histograms:  [Dict(Any), {}]
+      histograms:  [Any, {}]
     }))
   }
 
