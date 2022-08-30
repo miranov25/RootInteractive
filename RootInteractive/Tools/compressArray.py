@@ -38,6 +38,17 @@ def roundRelativeBinary(df, nBits):
     return result
 
 
+def removeInt64(column):
+    type = column.dtype
+    if type.kind in ['i', 'u'] and type.itemsize == 8:
+        maxvalue = column.max()
+        minvalue = column.min()
+        if maxvalue > 0x7FFFFFFF or minvalue < -0x80000000:
+            return column.astype("float64")
+        return column.astype("int32")
+    return column
+
+
 def roundAbsolute(df, delta):
     type=df.dtype
     if type.kind not in ['f', 'c', 'i', 'u']:
@@ -146,6 +157,8 @@ def compressArray(inputArray, actionArray, keepValues=False):
                 currentArray = zlib.compress(currentArray)
             if action == "unzip":
                 currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
+            if action == "removeInt64":
+                currentArray = removeInt64(currentArray)
             if action == "base64":
                 currentArray = base64.b64encode(currentArray).decode("utf-8")
             if action == "debase64":
