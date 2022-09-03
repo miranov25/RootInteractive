@@ -8,7 +8,10 @@ from sklearn.tree import DecisionTreeClassifier
 #
 from joblib import Parallel, delayed
 import threading
-from sklearn.utils.fixes import _joblib_parallel_args
+try:
+    from sklearn.utils.fixes import _joblib_parallel_args
+except:
+    pass
 from scipy import stats
 
 def _accumulate_prediction(predict, X, out,col, lock):
@@ -48,6 +51,36 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     lock = threading.Lock()
     statOut={}
     Parallel(n_jobs=n_jobs, verbose=rf.verbose,**_joblib_parallel_args(require="sharedmem"),)(
+            delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
+            for col,e in enumerate(rf.estimators_)
+    )
+    #
+    if "median" in statDictionary: statOut["median"]=np.median(allRF, 0)
+    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRF, 0)
+    if "std"  in statDictionary: statOut["std"]=np.std(allRF, 0)
+    if "quantile" in   statDictionary:
+        statOut["quantiles"]={}
+        for quant in statDictionary["quantile"]:
+            statOut["quantiles"][quant]=np.quantile(allRF,quant,axis=0)
+    if "trim_mean" in   statDictionary:
+        statOut["trim_mean"]={}
+        for quant in statDictionary["trim_mean"]:
+            statOut["trim_mean"][quant]=stats.trim_mean(allRF,quant,axis=0)
+    return statOut
+def predictRFStatNew(rf, X, statDictionary,n_jobs):
+    """
+    inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
+    predict statistics from random forest
+    :param rf:                  random forest object
+    :param X:                   input vector
+    :param statDictionary:      dictionary of statistics to predict
+    :param n_jobs:              number of parallel jobs for prediction
+    :return:                    dictionary with requested output statistics
+    """
+    allRF = np.zeros((len(rf.estimators_), X.shape[0]))
+    lock = threading.Lock()
+    statOut={}
+    Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
             delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
             for col,e in enumerate(rf.estimators_)
     )
