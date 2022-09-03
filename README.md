@@ -1,10 +1,10 @@
 # RootInteractive
 
-Code for interactive visualization of multidimensional data in ROOT or native Python formats (Panda, numpy)
+Code for interactive visualisation of multidimensional data in ROOT or native Python formats (Panda, numpy).
 Support for ROOT data structures:
-* TTree and TTreeFormula, Aliases .. 
-* TFormula, resp. any static Root/AliRoot functions
-* RDataFrame <-> awkward - work i progress
+* TTree and TTreeFormula, aliases ... 
+* TFormula, or any static Root/AliRoot functions.
+* RDataFrame <-> awkward - work in progress
 
 #### No python packages dependencies on AliRoot
 * ROOT + libStat 
@@ -13,17 +13,25 @@ Support for ROOT data structures:
 
 ## RootInteractive content:
 
-* **Visualization part wrappers**
-  * Interective easily configurable visualization of un-binned and binned data
-  * Interactive histogramming
-  * client/server application Jupyter, Bokeh
-  * client application - (Bokeh standalone)
+* **Visualisation Part Wrapper**. 
+* Interactive, easily configurable visualisation of unbinned and binned data. 
+  *  
+* Interactive histogramming 
+* Client/server application Jupyter, Bokeh 
+* Client standalone application - (Bokeh Standalone)
   
 
 
 * **Interactive   histogramming and data aggregation**  in many dimensions on client
-* 
-* **Machine learning part ** work in progrees (mostly ErrPar branch)
+  * figure parameterization
+    * [READMEfigure](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEfigure.md)
+  * alias/client side function parameterization
+    * [READMEaliase](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEalias.md)
+  * interactive histogramming parameterization and examples:
+    * [READMEhistogram](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEhistogram.md)
+  * layout of the fugures and widgets
+    * [READMElayout](/TODO)
+* **Machine learning part ** work in progrees
   * Wrappers for decision trees and Neural Net
   * Provides interface for the reducible, irreducible errors, proability density function
   * Local linear forest, resp. local kernel regression
@@ -35,12 +43,7 @@ Support for ROOT data structures:
 * RootInteractive github (source code)
   * https://github.com/miranov25/RootInteractive
   * JIRA: https://alice.its.cern.ch/jira/browse/PWGPP-485
-** Data server at CERN
-  * https://rootinteractive.web.cern.ch/RootInteractive/data/ 
-  * data on eos: 
-    * /eos/user/r/rootinteractive/www/testData/
-    * /eos/user/r/rootinteractive/www/data/
-* Documentation server at CERN
+* Documentation server at CERN (TODO -add reular update)
   * https://rootinteractive.web.cern.ch/RootInteractive/html/ 
   * Not yet regularly updated - TODO
   * /eos/user/r/rootinteractive/www/html/
@@ -52,6 +55,10 @@ Support for ROOT data structures:
   * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/test_bokehClientHistogram.ipynb 
 * 3.) Custom function on client:
   * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/customJsColumns.ipynb 
+
+## ALICE ROOTIntteractive tutorial
+Sevearal ALICE use case (detector calibration, QA/QC)
+* https://indico.cern.ch/event/1135398/
 
 
 ### Galery material in the ALICE agenda and document server
