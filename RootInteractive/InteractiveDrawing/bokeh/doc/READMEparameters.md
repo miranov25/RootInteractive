@@ -1,0 +1,95 @@
+## README for parameterArray
+
+The ParameterArray is used for the parameterisation 
+of the figures, histograms, selection, weights and the graphic properties on the client.
+
+The declarative programming used in bokehDrawSA is a type of coding where developers express the computational 
+logic without having to programme the control flow of each process. This can help simplify coding, as developers 
+only need to describe what they want the programme to achieve, rather than explicitly prescribing the steps or 
+commands required to achieve the desired result.
+
+`
+bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300,
+                           aliasArray=aliasArray, histogramArray=histoArray,arrayCompression=arrayCompression)`
+
+For example usage see also Jupyter notebook tutorial file:
+* https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/standAlone.ipynb
+
+Bokeh parameters are declared in parameterArray. The widgets that contain parameters must be added to the widget array and the widget layout. 
+To simplify the creation and use of the parameter array, a dictionary of predefined parameters has been created.
+
+
+## parameterArray options:
+
+* name - the name with which it is indexed in figureArray / aliasArray.
+* value - the initial value - the option "default" must be specified, otherwise it will be initialised with the first value in the option list
+* range - if controlled by a slider, the range that the variable can occupy.
+* options - the options that the parameter can have as a value.
+
+## Controllable by parameterArray:
+* parameters of figure array
+  * varX, varY, varZ
+* paramters for histograms:
+  * axis variables
+  * nBins
+  * ranges
+* parametrizible functions in aliasArray  
+* Graphics parameters:
+  * marker size
+  * legend options - in this example we set the legend font size
+* functions in aliasArray
+
+## Predefined parameters
+ https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveParameters.py#L1-L7
+
+ * Figure options could be parameterized on client. Following parameters to be  provided:
+   * parameterArray, widgets, widgetLayout, figureOptions ...
+ * The naming convention is following naming in the bokehDraw:
+    *  parameterArray - array of parameters  to be added to the parameterArray
+    *  widgets        - array of widgets controlling parameters to be added to wifgets
+    *  widgetLayout   - array of widgets ID to be added to the widget
+    *  figureOptions  - map of the options to be added to the figureArray
+
+* Example predefined parameters for the legend layout parameterization:
+  * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveParameters.py#L1-L7
+* Example predefined parameters for statistic parameterization
+  * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveParameters.py#L42-L53
+* Example predefined parameters for the markers
+  * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveParameters.py#L15-L20
+
+## Example parameter array
+
+
+#### test_Alias.py
+
+https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_Alias.py#L21-L37
+* Parameterisation of the graphic and user-parameterisable function, and user-defined Javascript function.
+
+    ```python
+    parameterArray = [
+        {"name": "size", "value":7, "range":[0, 30]},
+        {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
+        {"name": "paramX", "value":10, "range": [-20, 20]},
+        {"name": "C_cut", "value": 1, "range": [0, 1]},
+        {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"}
+    ]
+    
+    # This interface with two arrays is only for the case when functions are reused with different columns as target
+    jsFunctionArray = [
+        {
+            "name": "saxpy",
+            "parameters": ["paramX"],
+            "fields": ["x", "y"],
+            "func": "return paramX*x+y"
+        }
+    ]
+    ``` 
+  
+#### test_bokehClientHistogram.py
+* Definition of histogram parameters in prameterArray
+https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L32-L36
+* Usage in the histogramArray
+https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L57-L62
+* Adding parameters to widgets:
+https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L50
