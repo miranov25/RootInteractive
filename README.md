@@ -1,23 +1,24 @@
 # RootInteractive
 
-Code for interactive visualisation of multidimensional data in ROOT or native Python formats (Panda, numpy).
+Code for the interactive visualisation of multidimensional data in ROOT or native Python formats (Panda, numpy).
+
 Support for ROOT data structures:
 * TTree and TTreeFormula, aliases ... 
 * TFormula, or any static Root/AliRoot functions.
 * RDataFrame <-> awkward - work in progress
 
-#### No python packages dependencies on AliRoot
-* ROOT + libStat 
 
+Root and PyRoot (AliRoot/O2) data structures could be used as input data sources. However, the code also works with pandas only, without the need to have the ROOT package installed. Internally, these data structures are converted into the Bokeh CDS (ColumnDataSource) or in our RootInteractive
+CDS for the NDimensioanl histograms, projections and aggregated information.
 
 
 ## RootInteractive content:
 
-* **Visualisation Part Wrapper**. 
-* Interactive, easily configurable visualisation of unbinned and binned data.
+* Visualisation part -simple bokeh wrapper. 
+* Interactive, easily configurable visualisation of non-binned and binned data.
 * Interactive histogramming 
 * Client/server application Jupyter, Bokeh 
-* Client standalone application - (Bokeh Standalone)
+* Standalone client application - (Bokeh Standalone Dashboard)
   
 
 
@@ -32,8 +33,8 @@ logic without having to programme the control flow of each process. This can hel
 only need to describe what they want the programme to achieve, rather than explicitly prescribing the steps or 
 commands required to achieve the desired result.
 
-The interactive visulization is declared in the 6 arrays:
-```
+The interactive visualization is declared in the 6 arrays as ine the example bellow
+```python
 bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300,
                            aliasArray=aliasArray, histogramArray=histoArray)
@@ -48,8 +49,9 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
 
 #### _figureArrray_ - figure parameterization 
 * see [READMEfigure](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEfigure.md)
+* Defining scatter/histogram/derived figures using input data source 
 * Example declaration of the figure from data source with columns ABCD
-  ```
+  ```python
   figureArray = [
   [['A'], ['A*A-C*C'], {"size": 2, "colorZvar": "A", "errY": "errY", "errX":"0.01"}],
   [['A'], ['C+A', 'C-A', 'A/A']],
@@ -60,6 +62,7 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
   ]
   ```
 #### _histogramAray_ - interactive histogramming parameterization and examples
+* Defining interactive ND histogramsand derived statistics,  updated based on the user selection, resp. by parametriz 
 * see [READMEhistogram](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEhistogram.md) 
 * Example of creating a 3D histogram showing mean, sum and standard in the projection with colour codein the second dimension
   ```python
