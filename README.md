@@ -14,15 +14,15 @@ CDS for the NDimensioanl histograms, projections and aggregated information.
 
 ## RootInteractive content:
 
-* Visualisation part -simple bokeh wrapper. 
 * Interactive, easily configurable visualisation of non-binned and binned data.
-* Interactive histogramming 
+* Interactive n-dimensional histogramming/projection and derived aggregated information extraction
 * Client/server application Jupyter, Bokeh 
 * Standalone client application - (Bokeh Standalone Dashboard)
+*  Lossy and lossless data compression (server- > client)
   
 
 
-### Interactive   histogramming and data aggregation  in many dimensions on client
+### Interactive visualization, histogramming and data aggregation in N-dimensions on client
  
 
 The figure array declaration is used as an argument in bokehDrawSA to create an array of figures/graphs/scatter plots/
@@ -37,7 +37,7 @@ The interactive visualization is declared in the 6 arrays as ine the example bel
 ```python
 bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300,
-                           aliasArray=aliasArray, histogramArray=histoArray)
+                           aliasArray=aliasArray, histogramArray=histoArray,arrayCompression=arrayCompression)
 ```
 * figureArray
 * histogramArray
@@ -45,6 +45,7 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
 * layout
 * widgetLayout
 * parameterArray
+* arrayCompression
 
 
 #### _figureArrray_ - figure parameterization 
@@ -145,6 +146,21 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
             "Markers":["markerSize"]
         }
         ```
+
+#### _arrayCompresion_ - 
+  * see [READMEcompression](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEcompression.md) 
+  * Significant data compression of the data (up to O(%)) for server- > client transmission and for storage in the html file. 
+   * Compression depends heavily on the entropy of the data after lossy compression.
+   * Lossy and lossles copression expressed by regular gexpression per columns
+   * In realistic use cases facto 10-100 compression achived
+   * further copression - using javascript aliases on client  instead data transfer 
+  * Example declaration:
+    ```python
+    arrayCompressionParam=[(".*conv.*Sigma.*",[("relative",7), ("code",0), ("zip",0), ("base64",0)]),
+                               (".*delta.*",[("relative",10), ("code",0), ("zip",0), ("base64",0)]),
+                               (".*i2.*",[("relative",7), ("code",0), ("zip",0), ("base64",0)]),
+                               (".*",[("relative",8), ("code",0), ("zip",0), ("base64",0)])]
+    ```
 
 ### Machine learning part  -  work in progrees
   * Wrappers for decision trees and Neural Net
