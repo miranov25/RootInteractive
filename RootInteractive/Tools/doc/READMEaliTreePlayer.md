@@ -28,6 +28,24 @@ varList=[
 columnMask=[["dumpVar_",""]]
 df = tree2Panda(ROOT.treeTr0, varList, "(rndm<0.3)||dumpVar_IR<1000|(rndm<0.6&&dumpVar_isMC)", exclude=["YYYY"], columnMask=columnMask,nEntries=nEntries)
 ```
+* Momentum resolution example use case
+  * using columnMaks to replace long cryptic names with shorte and also supress unsuported . in variable names
+  * https://gitlab.cern.ch/alice-tpc-offline/alice-tpc-notes/-/blob/7ab10e422686f2641b1a3fb92bb5db78a10fd3fb/JIRA/PWGPP-695/momentumResolution.py#L158-168
+  *
+  ```python
+         varList = [
+                     ".*particle.fPdgCode.*",".*particleMother.fPdgCode.*", ".*logPtRes.*",         # MC
+                     ".*Refit.*", ".*On.*",                                                         # status
+                     ".*cls.*","ncrROCA","nclFractionROCA",                                         # ncl, ncr
+                     "sqrtConstChi2",".*normChi2.*",                                                 # chi2s
+                     "TPCCross","mdEdx",
+                     "dSectorM", "alphaM", "tgl","qPt",
+                     "mPtMC", "isPrim","isFromStrangessITS","isFromMaterialITS","isSec"]           # MC info
+  
+          columnMask=[["particle__particle_f","p_"],["particleMother__particleMother_f","pMother_"],["esdTrack__esdTrack_",""]]
+          dfPt = tree2Panda(tree, varList, "select0", exclude=[], columnMask=columnMask,nEntries=nEntries)
+  ```
+
 
 ### _GetMetadata_, _addMetadata_
 
