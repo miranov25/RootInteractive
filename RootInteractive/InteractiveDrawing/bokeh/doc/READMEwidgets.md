@@ -84,10 +84,11 @@ In the first version of the  RootInteractive some options could be specified as 
   * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L57-L62
 ### Real data use case - TPC clusters MC/data comparison
 
-https://gitlab.cern.ch/alice-tpc-offline/alice-tpc-notes/-/blob/7ab10e422686f2641b1a3fb92bb5db78a10fd3fb/JIRA/ATO-609/clusterDumpDraw.ipynb
+* https://gitlab.cern.ch/alice-tpc-offline/alice-tpc-notes/-/blob/7ab10e422686f2641b1a3fb92bb5db78a10fd3fb/JIRA/ATO-609/clusterDumpDraw.ipynb
+* https://indico.cern.ch/event/1126852/contributions/5024254/attachments/2499244/4293937/tpcClusters.html
 
 * defining parameter array
-  * `varX` - variable (column|alis) to histogram 
+  * `varX` - variable (column|alias) to histogram 
   * `nbinsX`, `nbinsY` - dynamic binning on client
   * `qScaleMC`     - user defined scaling used further in alias as multiplicative function
 ```python
@@ -131,3 +132,5 @@ widgetParams=[
               ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
 ]
 ```
+* example view
+![img.png](img.png)
