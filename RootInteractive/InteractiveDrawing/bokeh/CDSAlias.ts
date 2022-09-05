@@ -118,7 +118,7 @@ export class CDSAlias extends ColumnarDataSource {
             }            
         } else{
             new_column = []
-            for (let i = 0; i < fields[0].length; i++) {
+            for (let i = 0; i < len; i++) {
                 const row = fields.map((x: any[]) => x[i])
                 // This will likely have very bad performance
                 new_column.push(column.transform.compute(row))
