@@ -51,14 +51,14 @@ aliasArray = [
     },
     {
         "name": "efficiency_A",
-        "variables": ["entries", "entries_C_cut"],
-        "func": "return entries_C_cut / entries",
+        "variables": ["bin_count", "entries_C_cut"],
+        "func": "return entries_C_cut / bin_count",
         "context": "histoA"
     },
     {
         "name": "efficiency_AC",
-        "variables": ["entries", "entries_C_cut"],
-        "func": "return entries_C_cut / entries",
+        "variables": ["bin_count", "entries_C_cut"],
+        "func": "return entries_C_cut / bin_count",
         "context": "histoAC"
     },
     {
@@ -70,9 +70,9 @@ aliasArray = [
 
 figureArray = [
     [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B', "custom_column"], {"size":"size"}],
-    [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
-    [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}],
-    [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}],
+    [['bin_center'], ['efficiency_A', 'entries_C_cut / bin_count'], {"source":"histoA", "size":"size"}],
+    [['bin_center'], ['bin_count', 'entries_C_cut'], {"source":"histoA", "size":"size", "errY":["sqrt(bin_count)","sqrt(entries_C_cut)"]}],
+    [['bin_center_0'], ['efficiency_AC'], {"source":"histoAC", "size":"size", "colorZvar": "bin_center_1"}],
     {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}
 ]
 
@@ -184,6 +184,7 @@ def test_makeColumns():
     assert len(varList) == 9
     assert len(sources) == 6
     assert ctx_updated[-1] == "histoA"
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["log(1+bin_count)"], ["histoA"], cdsDict, paramDict, functionDict)
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
