@@ -87,9 +87,9 @@ https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/Interac
     ``` 
   
 #### test_bokehClientHistogram.py
-* Definition of histogram parameters in prameterArray
-https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L32-L36
+* Definition of histogram parameters in parameterArray
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L32-L36
 * Usage in the histogramArray
-https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L57-L62
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L57-L62
 * Adding parameters to widgets:
-https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L50
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L50
