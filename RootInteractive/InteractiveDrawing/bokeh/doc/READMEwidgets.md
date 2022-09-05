@@ -39,16 +39,28 @@ In the first version of the  RootInteractive some options could be specified as 
 * _toggle_
 * _text_
 
-## RootInteractive special
+## RootInteractive special widgets
 * _textQuery_
 * _multiSelectBitmask_
+  * selection using bitmask - e.g. for cut selection
+  * _how_ option
+    * "any" - using logical OR - at minimum one selected bit should be ON
+    * "all" - using locgial AND - all selected bits has to be ON
+    * see [cluster example](#Real-data-use-case---TPC-clusters-MC/data-comparison)
 * _spinnerRange_
+  * more flexible compared to standard bokeh range
+  * possibility to specify <min,max> by text
+  * spinner decrease/increase as exponential
 
 ### Widget special options
 * _name_
   * can be specified for all widgets, used to identify widget in widget layout
 *_toggleable_    
   * switch to enable/disable usage of the widget
+* _type_ - for slider and range
+  * "minmax" - using minimum mmaxim for column in dat souce as limit
+  * "sigma": indication - n sima range used
+    
 
 
 ### Example usage test_bokehDrawSA.py
@@ -69,3 +81,53 @@ https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6
 
 * defining widgets for data source selection and parameter control
 https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L49
+
+### Real data use case - TPC clusters MC/data comparison
+
+https://gitlab.cern.ch/alice-tpc-offline/alice-tpc-notes/-/blob/7ab10e422686f2641b1a3fb92bb5db78a10fd3fb/JIRA/ATO-609/clusterDumpDraw.ipynb
+
+* defining parameter array
+  * `varX` - variable (column|alis) to histogram 
+  * `nbinsX`, `nbinsY` - dynamic binning on client
+  * `qScaleMC`     - user defined scaling used further in alias as multiplicative function
+```python
+ parameterArray = [  
+    {"name": "varX", "value":"qMax", "options":["qMax","qTot","qMaxS","sigmaPad","sigmaTime","mask","dTime","dPad","IR","iRow","stackID","iSec"]},
+    {"name": "nbinsX", "value":30, "range":[10, 500]},
+    {"name": "nbinsY", "value":30, "range":[10, 100]},
+    {"name": "qScaleMC", "value":1, "range":[0.5, 2]},
+    {"name": "yAxisTransform", "value":"linear", "options":["linear","sqrt","log"]},
+]
+```
+* making widgets
+  * _spinnerRange_ for the qMax used to be able to select <min,max> by text or spinner without complication of binning 
+```python
+widgetParams=[
+              #['spinnerRange', ['qMax'], {}],
+              ['spinnerRange', ['qMax'],{"name": "qMax"}],
+              #['range', ['qMax'],{"name": "qMax"}],
+              ['range', ['qTot'],{"name": "qTot"}],
+#              ['range', ['weight'],{"name": "weight"}],
+              ['range', ['iRow'],{"name": "iRow"}],
+              #
+              ['range', ['dPad'],{"name": "dPad"}],
+              ['range', ['sigmaPad'],{"name": "sigmaPad"}],
+              ['range', ['dTime'],{"name": "dTime"}],
+              ['range', ['sigmaTime'],{"name": "sigmaTime"}],
+              #
+              ['multiSelect',["Run"],{"name":"Run"}],
+              ['multiSelect',["IR"],{"name":"IR"}],
+              ['multiSelect',["isMC"],{"name":"isMC"}],
+              ['multiSelect',["iSec"],{"name":"iSec"}],
+              ['multiSelect',["stackID"],{"name":"stackID"}],
+              ['multiSelect',["hasTrack"],{"name":"hasTrack"}],
+              ['multiSelectBitmask', ['clMask'], {"mapping": {"gold":0x10,"split pad":1,"split time":2,"edge":4,"single":8}, "how":"any", "name": "clusterMaskAny", "title": "cluster mask (OR)"}],
+              ['multiSelectBitmask', ['clMask'], {"mapping": {"gold":0x10,"split pad":1,"split time":2,"edge":4,"single":8}, "how":"all", "name": "clusterMaskAll", "title": "cluster mask (AND)"}],
+              #
+              ['select', ['varX'], {"name": "varX"}],
+              ['spinner', ['nbinsY'], {"name": "nbinsY"}],
+              ['spinner', ['nbinsX'], {"name": "nbinsX"}],
+              ['slider', ['qScaleMC'], {"name": "qScaleMC"}],
+              ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
+]
+```
