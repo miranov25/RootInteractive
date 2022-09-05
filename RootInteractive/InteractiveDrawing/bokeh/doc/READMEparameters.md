@@ -8,10 +8,11 @@ logic without having to programme the control flow of each process. This can hel
 only need to describe what they want the programme to achieve, rather than explicitly prescribing the steps or 
 commands required to achieve the desired result.
 
-`
+```python
 bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300,
-                           aliasArray=aliasArray, histogramArray=histoArray,arrayCompression=arrayCompression)`
+                           aliasArray=aliasArray, histogramArray=histoArray,arrayCompression=arrayCompression)
+```
 
 For example usage see also Jupyter notebook tutorial file:
 * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/standAlone.ipynb
@@ -22,11 +23,13 @@ To simplify the creation and use of the parameter array, a dictionary of predefi
 
 ## parameterArray options:
 `[name,value,options]`
-* name - the name with which it is indexed in figureArray / aliasArray.
-* value - the initial value - the option "default" must be specified, otherwise it will be initialised with the first value in the option list
-* options - the options that the parameter can have as a value.
+* _name_ - the name with which it is indexed in figureArray / aliasArray.
+* _value_ - the initial value - the option "default" must be specified, otherwise it will be initialised with the first value in the option list
+* _{options}_ - the options that the parameter can have as a value.
+
 Options:
-* range - special option if controlled by a slider, the range that the variable can occupy.
+* _range_ - special option if controlled by a slider, the range that the variable can occupy.
+* options - options for select e.g list of variables to draw
 
 ## Controllable by parameterArray:
 * parameters of figure array
