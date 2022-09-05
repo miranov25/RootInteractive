@@ -532,7 +532,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
             mapper.func = this.value
             mapper.update_func()
-            mapper.change.emit()
                     """)])
                 else:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])

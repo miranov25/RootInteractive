@@ -1,11 +1,26 @@
 import ast
 import numpy as np
 
-# This is not used yet - will be used when aliases will be able to use generated javascript code
+from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
+
 JAVASCRIPT_GLOBALS = {
     "sin": "Math.sin",
     "cos": "Math.cos",
-    "log": "Math.log"
+    "arcsin": "Math.asin",
+    "arccos": "Math.acos",
+    "arctan": "Math.atan",
+    "exp": "Math.exp",
+    "log": "Math.log",
+    "log2": "Math.log2",
+    "log10": "Math.log10",
+    "sqrt": "Math.sqrt",
+    "abs": "Math.abs",
+    "sinh": "Math.sinh",
+    "cosh": "Math.cosh",
+    "arctan2": "Math.atan2",
+    "arccosh": "Math.acosh",
+    "arcsinh": "Math.asinh",
+    "arctanh": "Math.atanh"
 }
 
 math_functions = {
@@ -36,6 +51,8 @@ class ColumnEvaluator:
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
+        self.paramDependencies = set()
+        self.aliasDependencies = set()
         self.firstGeneratedID = firstGeneratedID
         self.code = code
         self.isSource = True 
@@ -50,6 +67,8 @@ class ColumnEvaluator:
             return self.visit_Name(node)
         elif isinstance(node, ast.Num):
             return self.visit_Num(node)
+        elif isinstance(node, ast.BinOp):
+            return self.visit_BinOp(node)
         else:
             return self.eval_fallback(node)
 
@@ -77,6 +96,11 @@ class ColumnEvaluator:
                 args.append(self.visit(iArg))
                 implementation += args[-1]["implementation"]
             implementation += ')'
+            return {
+                "implementation": implementation,
+                "type": "javascript",
+                "name": self.code
+            }
         return self.eval_fallback(node)
 
     def visit_Num(self, node: ast.Num):
@@ -84,6 +108,7 @@ class ColumnEvaluator:
         self.isSource = False
         return {
             "name": str(node.n),
+            "implementation": str(node.n),
             "type": "constant",
             "value": node.n
         }
@@ -98,13 +123,16 @@ class ColumnEvaluator:
                 self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]))
                 return {
                     "name": node.attr,
+                    "implementation": node.attr,
                     "type": "alias"
                 }
             if "fields" in self.aliasDict[self.context][node.attr]:
                 for i in self.aliasDict[self.context][node.attr]["fields"]:
                     self.dependencies.add((self.context, i))
+            self.aliasDependencies.add(node.attr)
             return {
                 "name": node.attr,
+                "implementation": node.attr,
                 "type": "alias"
             }
         if self.cdsDict[self.context]["type"] == "join":
@@ -115,6 +143,7 @@ class ColumnEvaluator:
             if node.attr in self.cdsDict:
                 return {
                     "name": node.attr,
+                    "implementation": node.attr,
                     "type": "table",
                     "attrChain": attrChain + [node.attr]
                 }
@@ -131,8 +160,10 @@ class ColumnEvaluator:
             if(cds_used < len(attrChain)):
                 if attrChain[cds_used] in [cds["left"], cds["right"]]:
                     self.dependencies.add((attrChain[cds_used], node.attr))
+            self.aliasDependencies.add(node.attr)
             return {
                 "name": node.attr,
+                "implementation": node.attr,
                 "type": "column"
             }
         if not isinstance(node.value, ast.Name):
@@ -156,8 +187,10 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
             #}           
+        self.aliasDependencies.add(node.attr)
         return {
             "name": node.attr,
+            "implementation": node.attr,
             "type": "column"
         }
 
@@ -168,8 +201,10 @@ class ColumnEvaluator:
             if "options" in self.paramDict[node.id]:
                 for iOption in self.paramDict[node.id]["options"]:
                     self.dependencies.add((self.context, iOption))
+            self.paramDependencies.add(node.id)
             return {
                 "name": node.id,
+                "implementation": node.id,
                 "type": "parameter"
             }
         if node.id in [self.context, "self"]:
@@ -216,8 +251,10 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in histogram " + histogram["name"]
             #}
+        self.aliasDependencies.add(id)
         return {
             "name": id,
+            "implementation": id,
             "type": "column"
         }        
 
@@ -235,6 +272,41 @@ class ColumnEvaluator:
             "value": eval(code, {}, locals),
             "type": "server_derived_column"
             }
+
+    def visit_BinOp(self, node):
+        if "data" in self.cdsDict[self.context]:
+            return self.eval_fallback(node)
+        op = node.op
+        if isinstance(op, ast.Add):
+            operator_infix = " + "
+        elif isinstance(op, ast.Sub):
+            operator_infix = " - "
+        elif isinstance(op, ast.Mult):
+            operator_infix = " * "
+        elif isinstance(op, ast.Div):
+            operator_infix = " / "
+        elif isinstance(op, ast.Mod):
+            operator_infix = " % "
+        elif isinstance(op, ast.LShift):
+            operator_infix = " << "
+        elif isinstance(op, ast.RShift):
+            operator_infix = " >> "
+        elif isinstance(op, ast.RShift):
+            operator_infix = " >> "
+        elif isinstance(op, ast.BitOr):
+            operator_infix = " | "
+        elif isinstance(op, ast.BitXor):
+            operator_infix = " ^ "
+        elif isinstance(op, ast.BitAnd):
+            operator_infix = " & "
+        else:
+            raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
+        implementation = f"({self.visit(node.left)['implementation']}){operator_infix}({self.visit(node.right)['implementation']})"
+        return {
+            "name": self.code,
+            "type": "javascript",
+            "implementation": implementation
+        }
         
 
 def checkColumn(columnKey, tableKey, cdsDict):
@@ -260,7 +332,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
     for i in range(max(len(variableNames), len(context))):
         i_var = variableNames[i % nvars]
         i_context = context[i % n_context] 
-        if i_context == "$IGNORE":
+        if i_context in ["$IGNORE", "auto"]:
             variables.append(None)
             ctx_updated.append(i_context)
             continue
@@ -274,8 +346,22 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
         queryAST = ast.parse(i_var, mode="eval")
         evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
         column = evaluator.visit(queryAST.body)
-        variables.append(column)
         i_context = evaluator.context
+        if column["type"] == "javascript":
+            if aliasDict is not None:
+                if i_context not in aliasDict:
+                    aliasDict[i_context] = {}
+                columnName = column["name"]
+                func = "return "+column["implementation"]
+                variablesAlias = list(evaluator.aliasDependencies)
+                transform = CustomJSNAryFunction(parameters={}, fields=variablesAlias, func=func)
+                aliasDict[i_context][columnName] = {"transform": transform, "fields": variablesAlias}
+                newColumn = {
+                    "type": "alias",
+                    "name": columnName
+                }
+                column = newColumn
+        variables.append(column)
         if evaluator.isSource:
             used_names.update({(i_context, column["name"])})
         else:
