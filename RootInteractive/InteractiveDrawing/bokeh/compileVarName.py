@@ -69,6 +69,8 @@ class ColumnEvaluator:
             return self.visit_Num(node)
         elif isinstance(node, ast.BinOp):
             return self.visit_BinOp(node)
+        elif isinstance(node, ast.UnaryOp):
+            return self.visit_UnaryOp(node)
         else:
             return self.eval_fallback(node)
 
@@ -308,6 +310,22 @@ class ColumnEvaluator:
             "implementation": implementation
         }
         
+    def visit_UnaryOp(self, node: ast.UnaryOp):
+        if "data" in self.cdsDict[self.context]:
+            return self.eval_fallback(node)
+        op = node.op
+        if isinstance(op, ast.UAdd):
+            operator_prefix = "+"
+        elif isinstance(op, ast.USub):
+            operator_prefix = "-"
+        else:
+            operator_prefix = "!"
+        implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
+        return {
+            "name": self.code,
+            "type": "javascript",
+            "implementation": implementation
+        }
 
 def checkColumn(columnKey, tableKey, cdsDict):
     return False
