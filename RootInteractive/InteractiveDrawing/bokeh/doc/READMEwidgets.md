@@ -65,23 +65,23 @@ In the first version of the  RootInteractive some options could be specified as 
 
 ### Example usage test_bokehDrawSA.py
 * defining parameters of dashboard
-https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py#L52-L59
-* defining widgets controling data source selection and parameters
-* Some example of RootInteractive custom widgets:
-  * in example below some widgets are toglebal, their usage can be switched ON and OFF 
-  * spinnerRange can be used for ubound range selection with exponential delta step
-https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py#L76-L96
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py#L52-L59
+* Definition of widgets to control the selection of data sources and parameters. Some examples of custom widgets from RootInteractive: 
+  * in the following example some widgets are linked together, their use can be toggled ON and OFF 
+  * spinnerRange can be used to select a range with exponential delta step.
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py#L76-L96
 
 
 ### Example usage test_bokehClienHistogram.py
 * defining parameter for visualization
   * number of  bins 
   * histogram ranges
-https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L32-L36
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L32-L36
 
 * defining widgets for data source selection and parameter control
-https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L49
-
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L38-L49
+* use histogram parameters `nBins`,`histoRangeA` in histograms
+  * https://github.com/miranov25/RootInteractive/blob/97885d5967b18c1a432e7fb49806d6f946b6df6a/RootInteractive/InteractiveDrawing/bokeh/test_bokehClientHistogram.py#L57-L62
 ### Real data use case - TPC clusters MC/data comparison
 
 https://gitlab.cern.ch/alice-tpc-offline/alice-tpc-notes/-/blob/7ab10e422686f2641b1a3fb92bb5db78a10fd3fb/JIRA/ATO-609/clusterDumpDraw.ipynb
