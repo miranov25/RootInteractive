@@ -51,14 +51,14 @@ aliasArray = [
     },
     {
         "name": "efficiency_A",
-        "variables": ["entries", "entries_C_cut"],
-        "func": "return entries_C_cut / entries",
+        "variables": ["bin_count", "entries_C_cut"],
+        "func": "return entries_C_cut / bin_count",
         "context": "histoA"
     },
     {
         "name": "efficiency_AC",
-        "variables": ["entries", "entries_C_cut"],
-        "func": "return entries_C_cut / entries",
+        "variables": ["bin_count", "entries_C_cut"],
+        "func": "return entries_C_cut / bin_count",
         "context": "histoAC"
     },
     {
@@ -70,9 +70,9 @@ aliasArray = [
 
 figureArray = [
     [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B', "custom_column"], {"size":"size"}],
-    [['histoA.bin_center'], ['efficiency_A'], {"context":"histoA", "size":"size"}],
-    [['histoA.bin_center'], ['histoA.entries', 'histoA.entries_C_cut'], {"context":"histoA", "size":"size"}],
-    [['histoAC.bin_center_0'], ['efficiency_AC'], {"context":"histoAC", "size":"size", "colorZvar": "histoAC.bin_center_1"}],
+    [['bin_center'], ['efficiency_A', 'entries_C_cut / bin_count', "C_accepted/bin_count"], {"source":"histoA", "size":"size"}],
+    [['bin_center'], ['bin_count', 'entries_C_cut', "C_accepted"], {"source":"histoA", "size":"size", "errY":["sqrt(bin_count)","sqrt(entries_C_cut)","sqrt(C_accepted)"]}],
+    [['bin_center_0'], ['efficiency_AC'], {"source":"histoAC", "size":"size", "colorZvar": "bin_center_1"}],
     {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize"}}
 ]
 
@@ -82,6 +82,9 @@ histoArray = [
             "entries": None,
             "entries_C_cut": {
                 "weights": "C_accepted"
+            },
+            "C_accepted": {
+                "weights": "C < C_cut"
             }
         }
     },
@@ -177,13 +180,19 @@ def test_customJsFunctionBokehDrawArray_v():
 def test_makeColumns():
     varList, ctx_updated, memoized_columns, sources = (None, None, None, None)
     df = pd.DataFrame(np.random.random_sample(size=(200000, 3)), columns=list('XYZ'))
+    df["boolY"] = df.eval("Y<Z")
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
-    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count"], None, cdsDict, paramDict, functionDict)
-    assert len(varList) == 9
-    assert len(sources) == 6
-    assert ctx_updated[-1] == "histoA"
+    aliasDict={}
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count", "X<paramA or boolY"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
+    assert len(varList) == 10
+    assert len(sources) == 7
+    assert ctx_updated[-2] == "histoA"
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["log(1+bin_count)", "-1<=-bin_count<1"], ["histoA"], cdsDict, paramDict, functionDict, aliasDict=aliasDict)
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
+    print(aliasDict)
+
+test_makeColumns()
