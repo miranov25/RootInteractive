@@ -71,6 +71,8 @@ class ColumnEvaluator:
             return self.visit_BinOp(node)
         elif isinstance(node, ast.UnaryOp):
             return self.visit_UnaryOp(node)
+        elif isinstance(node, ast.Compare):
+            return self.visit_Compare(node)
         else:
             return self.eval_fallback(node)
 
@@ -321,6 +323,38 @@ class ColumnEvaluator:
         else:
             operator_prefix = "!"
         implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
+        return {
+            "name": self.code,
+            "type": "javascript",
+            "implementation": implementation
+        }
+
+    def visit_Compare(self, node:ast.Compare):
+        if "data" in self.cdsDict[self.context]:
+            return self.eval_fallback(node) 
+        js_comparisons = []      
+        for i, op in enumerate(node.ops): 
+            if i==0:
+                lhs = self.visit(node.left)["implementation"]
+            else:
+                lhs = self.visit(node.comparators[i-1])["implementation"]
+            rhs = self.visit(node.comparators[i])["implementation"]
+            if isinstance(op, ast.Eq):
+                op_infix = " === "
+            elif isinstance(op, ast.NotEq):
+                op_infix = " !== "           
+            elif isinstance(op, ast.Lt):
+                op_infix = " < "
+            elif isinstance(op, ast.LtE):
+                op_infix = " <= "
+            elif isinstance(op, ast.Gt):
+                op_infix = " > "
+            elif isinstance(op, ast.GtE):
+                op_infix = " >= "
+            else:
+                raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
+            js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
+        implementation = " && ".join(js_comparisons)
         return {
             "name": self.code,
             "type": "javascript",
