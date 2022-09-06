@@ -180,11 +180,12 @@ def test_customJsFunctionBokehDrawArray_v():
 def test_makeColumns():
     varList, ctx_updated, memoized_columns, sources = (None, None, None, None)
     df = pd.DataFrame(np.random.random_sample(size=(200000, 3)), columns=list('XYZ'))
+    df["boolY"] = df.eval("Y<Z")
     paramDict = {"paramA": {"value": "5"}}
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
     aliasDict={}
-    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count", "X<paramA"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count", "X<paramA or boolY"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
     assert len(varList) == 10
     assert len(sources) == 7
     assert ctx_updated[-2] == "histoA"
@@ -193,3 +194,5 @@ def test_makeColumns():
     print(memoized_columns)
     print(sources)
     print(aliasDict)
+
+test_makeColumns()
