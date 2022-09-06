@@ -74,6 +74,8 @@ class ColumnEvaluator:
             return self.visit_UnaryOp(node)
         elif isinstance(node, ast.Compare):
             return self.visit_Compare(node)
+        elif isinstance(node, ast.BoolOp):
+            return self.visit_BoolOp(node)
         else:
             return self.eval_fallback(node)
 
@@ -350,6 +352,19 @@ class ColumnEvaluator:
                 raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
             js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
         implementation = " && ".join(js_comparisons)
+        return {
+            "name": self.code,
+            "type": "javascript",
+            "implementation": implementation
+        }
+    
+    def visit_BoolOp(self, node:ast.BoolOp):
+        js_values = [f"({self.visit(i)['implementation']})" for i in node.values]
+        if isinstance(node.op, ast.And):
+            op_infix = " && "
+        elif isinstance(node.op, ast.Or):
+            op_infix = " || "
+        implementation = op_infix.join(js_values)
         return {
             "name": self.code,
             "type": "javascript",
