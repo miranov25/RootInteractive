@@ -2,6 +2,7 @@ import ast
 import numpy as np
 
 from RootInteractive.InteractiveDrawing.bokeh.CustomJSNAryFunction import CustomJSNAryFunction
+from bokeh.models.callbacks import CustomJS
 
 JAVASCRIPT_GLOBALS = {
     "sin": "Math.sin",
@@ -92,8 +93,7 @@ class ColumnEvaluator:
                 "type": "client_function",
                 "name": self.code
             }
-        if node.func.id in JAVASCRIPT_GLOBALS and "data" not in self.cdsDict[self.context]:
-            #TODO: Add code generation
+        if node.func.id in JAVASCRIPT_GLOBALS:
             args = []
             implementation = JAVASCRIPT_GLOBALS[node.func.id] + '('
             for iArg in node.args:
@@ -109,7 +109,6 @@ class ColumnEvaluator:
 
     def visit_Num(self, node: ast.Num):
         # Kept for compatibility with old Python
-        self.isSource = False
         return {
             "name": str(node.n),
             "implementation": str(node.n),
@@ -120,10 +119,10 @@ class ColumnEvaluator:
     def visit_Attribute(self, node: ast.Attribute):
         if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
             # We have an alias in aliasDict
-            self.isSource = False
+            self.isSource = self.isSource and \
+                            isinstance(self.aliasDict[self.context][node.attr], str) and \
+                            self.aliasDict[self.context][node.attr] == node.attr
             if isinstance(self.aliasDict[self.context][node.attr], str):
-                if self.aliasDict[self.context][node.attr] == node.attr:
-                    self.isSource = True
                 self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]))
                 return {
                     "name": node.attr,
@@ -278,8 +277,6 @@ class ColumnEvaluator:
             }
 
     def visit_BinOp(self, node):
-        if "data" in self.cdsDict[self.context]:
-            return self.eval_fallback(node)
         op = node.op
         if isinstance(op, ast.Add):
             operator_infix = " + "
@@ -303,6 +300,8 @@ class ColumnEvaluator:
             operator_infix = " ^ "
         elif isinstance(op, ast.BitAnd):
             operator_infix = " & "
+        elif isinstance(op, ast.Pow):
+            operator_infix = "**"
         else:
             raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
         implementation = f"({self.visit(node.left)['implementation']}){operator_infix}({self.visit(node.right)['implementation']})"
@@ -313,8 +312,6 @@ class ColumnEvaluator:
         }
         
     def visit_UnaryOp(self, node: ast.UnaryOp):
-        if "data" in self.cdsDict[self.context]:
-            return self.eval_fallback(node)
         op = node.op
         if isinstance(op, ast.UAdd):
             operator_prefix = "+"
@@ -330,8 +327,6 @@ class ColumnEvaluator:
         }
 
     def visit_Compare(self, node:ast.Compare):
-        if "data" in self.cdsDict[self.context]:
-            return self.eval_fallback(node) 
         js_comparisons = []      
         for i, op in enumerate(node.ops): 
             if i==0:
@@ -400,13 +395,25 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
         column = evaluator.visit(queryAST.body)
         i_context = evaluator.context
         if column["type"] == "javascript":
-            if aliasDict is not None:
+            # Make the column on the server if possible both on server and on client
+            # Possibly only do this if lossy compression causes numerical instability?
+            if evaluator.isSource:
+                column = evaluator.eval_fallback(queryAST.body)
+            elif aliasDict is not None:
                 if i_context not in aliasDict:
                     aliasDict[i_context] = {}
                 columnName = column["name"]
                 func = "return "+column["implementation"]
                 variablesAlias = list(evaluator.aliasDependencies)
-                transform = CustomJSNAryFunction(parameters={}, fields=variablesAlias, func=func)
+                parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+                transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
+                for j in parameters:
+                    if "subscribed_events" not in paramDict[j]:
+                        paramDict[j]["subscribed_events"] = []
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+                                        mapper.parameters[param] = this.value
+                                        mapper.update_args()
+                                                """)])
                 aliasDict[i_context][columnName] = {"transform": transform, "fields": variablesAlias}
                 newColumn = {
                     "type": "alias",
