@@ -76,6 +76,8 @@ class ColumnEvaluator:
             return self.visit_Compare(node)
         elif isinstance(node, ast.BoolOp):
             return self.visit_BoolOp(node)
+        elif isinstance(node, ast.IfExp):
+            return self.visit_IfExp(node)
         else:
             return self.eval_fallback(node)
 
@@ -365,6 +367,17 @@ class ColumnEvaluator:
         elif isinstance(node.op, ast.Or):
             op_infix = " || "
         implementation = op_infix.join(js_values)
+        return {
+            "name": self.code,
+            "type": "javascript",
+            "implementation": implementation
+        }
+
+    def visit_IfExp(self, node:ast.IfExp):
+        test = self.visit(node.test)["implementation"]
+        body = self.visit(node.body)["implementation"]
+        orelse = self.visit(node.orelse)["implementation"]
+        implementation = f"({test})?({body}):({orelse})"
         return {
             "name": self.code,
             "type": "javascript",
