@@ -185,8 +185,8 @@ def test_makeColumns():
     functionDict = {"saxpy": {"name": "saxpy", "fields": ["a", "x", "y"]}}
     cdsDict = {"histoA": {"nbins": 10, "type": "histogram", "variables": ["X"], "source": None}, None: {"data": df, "type": "source"}}
     aliasDict={}
-    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "histoA.bin_count", "X<paramA or boolY"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
-    assert len(varList) == 10
+    varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "X if Y<paramA else Z","histoA.bin_count", "X<paramA or boolY"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
+    assert len(varList) == 11
     assert len(sources) == 7
     assert ctx_updated[-2] == "histoA"
     varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["log(1+bin_count)", "-1<=-bin_count<1"], ["histoA"], cdsDict, paramDict, functionDict, aliasDict=aliasDict)
