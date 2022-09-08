@@ -255,3 +255,28 @@ def testJoin():
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, sourceArray=sourceArray, aliasArray=aliasArray)
     
+def test_StableQuantile():
+    output_file("test_BokehClientHistogramQuantile.html")
+    histoArray = [
+        {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": [10, "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
+        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]}
+    ]
+    sourceArray = [
+        {"name": "projection_join", "left": "histoAB_1", "right":"projectionA", "left_on":["bin_center_1"], "right_on": ["bin_center_1"]}
+    ]
+    figureArray = [
+        [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "histoAB_1"}],
+        [['bin_center_0'], ['std'], {"source": "histoAB_1"}],
+        [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "projectionA"}],
+        [['bin_center_0'], ['std'], {"source": "projectionA"}],
+        [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": ["histoAB_1", "histoAB_1", "histoAB_1", "projectionA", "projectionA", "projectionA"]}],
+        [['bin_center_0'], ['std'], {"source": ["histoAB_1", "projectionA"]}],
+        {"size": "size"}
+    ]
+    figureLayoutDesc={
+        "binned": [[0,1]],
+        "unbinned": [[2,3]],
+        "both": [[4,5]]
+    }
+    xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
