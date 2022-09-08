@@ -6,7 +6,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(2000000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -259,7 +259,9 @@ def test_StableQuantile():
     output_file("test_BokehClientHistogramQuantile.html")
     histoArray = [
         {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": [10, "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
-        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]}
+        {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": [10, "nBinsB"], "weights":"C-A/2", "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
+        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]},
+        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]}
     ]
     sourceArray = [
         {"name": "projection_join", "left": "histoAB_1", "right":"projectionA", "left_on":["bin_center_1"], "right_on": ["bin_center_1"]}
@@ -271,12 +273,25 @@ def test_StableQuantile():
         [['bin_center_0'], ['std'], {"source": "projectionA"}],
         [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": ["histoAB_1", "histoAB_1", "histoAB_1", "projectionA", "projectionA", "projectionA"]}],
         [['bin_center_0'], ['std'], {"source": ["histoAB_1", "projectionA"]}],
+        [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "histoABWeight_1"}],
+        [['bin_center_0'], ['std'], {"source": "histoABWeight_1"}],
+        [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "projectionAWeight"}],
+        [['bin_center_0'], ['std'], {"source": "projectionAWeight"}],
+        [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": ["histoABWeight_1", "histoABWeight_1", "histoABWeight_1", "projectionAWeight", "projectionAWeight", "projectionAWeight"]}],
+        [['bin_center_0'], ['std'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
         {"size": "size"}
     ]
     figureLayoutDesc={
-        "binned": [[0,1]],
-        "unbinned": [[2,3]],
-        "both": [[4,5]]
+        "Without weights":{
+            "binned": [[0,1]],
+            "unbinned": [[2,3]],
+            "both": [[4,5]]
+        },
+        "With weights":{
+            "binned": [[6,7]],
+            "unbinned": [[8,9]],
+            "both": [[10,11]]
+        }
     }
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
