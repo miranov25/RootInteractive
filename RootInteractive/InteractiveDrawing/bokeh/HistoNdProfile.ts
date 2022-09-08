@@ -2,6 +2,57 @@ import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {HistoNdCDS} from "./HistoNdCDS"
 import * as p from "core/properties"
 
+function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number, begin=0, end=-1){
+  // TODO: Use a smarter algorithm
+  // This algorithm should be linear average case, but worst case is quadratic
+  if(end < 0) end += sample.length + 1
+  let ok = false
+  while(!ok){
+    //debugger;
+    let pivot = sample[k]
+    let pivot_idx = begin
+    for(let i=begin; i<end; i++){
+      pivot_idx += compare(sample[i], pivot) < 0 ? 1 : 0
+    }
+    let pointer_mid = pivot_idx
+    let pointer_high = end-1
+    let pointer_low=begin
+    while(pointer_low<pivot_idx){
+      let x = sample[pointer_low]
+      let cmp = compare(x, pivot)
+      if(cmp>0){
+        sample[pointer_low] = sample[pointer_high]
+        sample[pointer_high] = x
+        --pointer_high
+      } else if(cmp === 0){
+        sample[pointer_low] = sample[pointer_mid]
+        sample[pointer_mid] = x
+        ++pointer_mid
+      } else {
+        ++pointer_low
+      }
+    }
+    while(pointer_mid <= pointer_high){
+      let x = sample[pointer_mid]
+      let cmp = compare(x, pivot)     
+      if(cmp === 0){
+        ++pointer_mid
+      } else {
+        sample[pointer_mid] = sample[pointer_high]
+        sample[pointer_high] = x
+        --pointer_high
+      }
+    }
+    if(k < pivot_idx){
+      end = pivot_idx
+    } else if(k >= pointer_mid){
+      begin = pointer_mid
+    } else {
+      ok = true
+    }
+  }
+}
+
 export namespace HistoNdProfile {
   export type Attrs = p.AttrsOf<Props>
 
@@ -171,14 +222,15 @@ export class HistoNdProfile extends ColumnarDataSource {
                   // TODO: Use a more efficient algorithm than brute force
                   const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
                   const index_high = global_cumulative_histogram![x+y+z]
-                  const indices = [...Array(index_high-index_low).keys()].map(i => i + index_low)
-                  indices.sort((a,b) => sorted_entries![a] - sorted_entries![b])
+//                  const indices = [...Array(index_high-index_low).keys()].map(i => i + index_low)
+//                  indices.sort((a,b) => sorted_entries![a] - sorted_entries![b])
                   if(sorted_weights == null){
                     // In this case maybe we could use kth value instead
                     while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
                       const k = this.quantiles[iQuantile] * entries - low
+                      kth_value(sorted_entries!, (k|0)+index_low, (a,b) => a-b, index_low, index_high)
                       //TODO: Use lerp not nearest
-                      quantile_columns[iQuantile].push(sorted_entries![indices[k|0]])
+                      quantile_columns[iQuantile].push(sorted_entries![(k|0)+index_low])
                       iQuantile++
                     }                   
                   } else {
