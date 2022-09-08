@@ -413,15 +413,41 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   _compute_sorted_indices(){
-    let {view} = this
-    if(view == null){
-      view = [...Array(this.get_length()).keys()]
-    }
+    const {view, source, sample_variables} = this
+    //let view_sorted = view != null ? [...view]: [...Array(this.get_length()).keys()]
     let sample_array: ArrayLike<number>[] = []
-    for (const column_name of this.sample_variables) {
-      sample_array.push(this.source.get_column(column_name)!)
+    for (const column_name of sample_variables) {
+      sample_array.push(source.get_column(column_name)!)
     }
-    return [...view].sort((a, b) => this.getbin(a, sample_array) - this.getbin(b, sample_array))
+    // This is the bottleneck - Array.sort()
+    //view_sorted.sort((a, b) => this.getbin(a, sample_array) - this.getbin(b, sample_array))
+    let working_indices = [...this.cumulative_histogram_noweights()]
+    const n_entries = working_indices[working_indices.length-1]
+    let histogram = this.histogram(null)
+    for(let i=0; i<working_indices.length; i++){
+      working_indices[i] -= histogram[i]
+    }
+    const view_sorted: number[] = Array(n_entries)
+    const l = view != null ? view.length : source.get_length()!
+    if(view == null){
+      for(let i=0; i<l; i++){
+        let bin_idx = this.getbin(i, sample_array)
+        if(bin_idx >= 0){
+          view_sorted[working_indices[bin_idx]] = i
+          working_indices[bin_idx] ++
+        }
+      }
+    } else {
+      for(let i=0; i<l; i++){
+        let bin_idx = this.getbin(view[i], sample_array)
+        if(bin_idx >= 0){
+          view_sorted[working_indices[bin_idx]] = view[i]
+          working_indices[bin_idx] ++
+        }
+      }
+    }
+
+    return view_sorted
   }
 
 }
