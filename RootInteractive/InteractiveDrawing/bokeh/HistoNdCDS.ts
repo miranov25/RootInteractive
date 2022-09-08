@@ -384,14 +384,19 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   public sorted_column_orig(key: string){
-    // TODO: This might be really slow, and bottleneck isn't clear - if it's Array.sort() then counting sort might be faster
     // This is only used for non-associative histograms - exposed to speed up computing projections with stable quantiles / range sums
     if(this._sorted_indices == null){
       this._sorted_indices = this._compute_sorted_indices()
     }
     const col = this.source.get_column(key)
     if(col == null) return null
-    return this._sorted_indices?.map(x => col[x])
+    const col_new = Array(this._sorted_indices.length)
+    const l = this._sorted_indices.length
+    const sorted_indices = this._sorted_indices
+    for(let i=0; i<l; i++){
+      col_new[i] = col[sorted_indices[i]]
+    }
+    return col_new
   }
 
   public cumulative_histogram_noweights(){
@@ -414,16 +419,13 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   _compute_sorted_indices(){
     const {view, source, sample_variables} = this
-    //let view_sorted = view != null ? [...view]: [...Array(this.get_length()).keys()]
     let sample_array: ArrayLike<number>[] = []
     for (const column_name of sample_variables) {
       sample_array.push(source.get_column(column_name)!)
     }
-    // This is the bottleneck - Array.sort()
-    //view_sorted.sort((a, b) => this.getbin(a, sample_array) - this.getbin(b, sample_array))
     let working_indices = [...this.cumulative_histogram_noweights()]
     const n_entries = working_indices[working_indices.length-1]
-    let histogram = this.histogram(null)
+    let histogram = this.get_column("bin_count") as number[]
     for(let i=0; i<working_indices.length; i++){
       working_indices[i] -= histogram[i]
     }
