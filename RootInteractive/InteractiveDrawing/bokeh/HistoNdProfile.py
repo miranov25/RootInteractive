@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, List, Float, Int
+from bokeh.core.properties import Instance, List, Float, Int, Bool
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 
@@ -19,3 +19,4 @@ class HistoNdProfile(ColumnarDataSource):
     axis_idx = Int(default=0)
     quantiles = List(Float)
     sum_range = List(List(Float))
+    stable = Bool(default=False)

@@ -68,6 +68,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   public view: number[] | null
+  private _sorted_indices: number[] | null
 
   public dim: number
 
@@ -85,6 +86,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   update_range(): void {
     this._nbins = this.nbins;
+    this._sorted_indices = null
 
     let sample_array: ArrayLike<number>[] = []
     if(this.range === null || this.range.reduce((acc: boolean, cur) => acc || (cur === null), false))
@@ -364,6 +366,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public change_selection(){
     this._stale_range = true
+    this._sorted_indices = null
     this.data = {}
     this.change.emit()
   }
@@ -378,6 +381,47 @@ export class HistoNdCDS extends ColumnarDataSource {
       this._strides[i+1] = this._strides[i]*this._nbins[i]
     }
     this.dim = dim
+  }
+
+  public sorted_column_orig(key: string){
+    // TODO: This might be really slow, and bottleneck isn't clear - if it's Array.sort() then counting sort might be faster
+    // This is only used for non-associative histograms - exposed to speed up computing projections with stable quantiles / range sums
+    if(this._sorted_indices == null){
+      this._sorted_indices = this._compute_sorted_indices()
+    }
+    const col = this.source.get_column(key)
+    if(col == null) return null
+    return this._sorted_indices?.map(x => col[x])
+  }
+
+  public cumulative_histogram_noweights(){
+    // TODO: Add caching - recomputing this histogram might be a bottleneck
+    let histogram
+    if(this.weights == null){
+      histogram = this.get_column("bin_count") as number[]
+    } else {
+      histogram = this.histogram(null)
+    }
+    let cumulativeHistogram = [...histogram]
+    let acc = 0
+    let l = histogram.length
+    for (let i=0; i<l; i++){
+      acc += histogram[i]
+      cumulativeHistogram[i] = acc
+    }
+    return cumulativeHistogram
+  }
+
+  _compute_sorted_indices(){
+    let {view} = this
+    if(view == null){
+      view = [...Array(this.get_length()).keys()]
+    }
+    let sample_array: ArrayLike<number>[] = []
+    for (const column_name of this.sample_variables) {
+      sample_array.push(this.source.get_column(column_name)!)
+    }
+    return [...view].sort((a, b) => this.getbin(a, sample_array) - this.getbin(b, sample_array))
   }
 
 }

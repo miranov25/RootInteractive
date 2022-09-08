@@ -666,7 +666,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         """)])
                         histoRange[rangeIdx] = paramDict[iRange]["value"]
             iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
-            #TODO: Add projections
             if "axis" in iSource:
                 axisIndices = iSource["axis"]
                 projectionsLocal = {}
@@ -696,10 +695,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             on_right = []
             if "right_on" in iSource:
                 on_right = iSource["right_on"]
-            how  = "inner"
-            if "how" in iSource:
-                how = iSource["how"]
+            how  = iSource["how"] if "how" in iSource else "inner"
             iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
+        elif cdsType == "projection":
+            axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
+            quantiles = iSource["quantiles"] if "quantiles" in iSource else []
+            sum_range = iSource["sum_range"] if "sum_range" in iSource else []
+            stable = iSource["stable"] if "stable" in iSource else False
+            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, stable=stable)
+            # Tooltips are broken as they depend on the parent
+            # tooltips = defaultNDProfileTooltips(iSource["variables"], axis_idx, quantiles, sum_range)        
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
@@ -710,6 +715,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         elif iSource["type"] == "join":
             cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
             cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
+        elif iSource["type"] == "projection":
+            cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
         name_full = "cdsFull"
         if cds_name is not None:
             name_full = cds_name+"_full"
