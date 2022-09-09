@@ -424,7 +424,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     let working_indices = [...this.cumulative_histogram_noweights()]
     const n_entries = working_indices[working_indices.length-1]
-    let histogram = this.get_column("bin_count") as number[]
+    let histogram = this.histogram(null)
     for(let i=0; i<working_indices.length; i++){
       working_indices[i] -= histogram[i]
     }
