@@ -84,9 +84,12 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _do_cache_bins: boolean
   private _stale_range: boolean
 
+  private _unweighted_histogram: number[] | null
+
   update_range(): void {
     this._nbins = this.nbins;
     this._sorted_indices = null
+    this._unweighted_histogram = null
 
     let sample_array: ArrayLike<number>[] = []
     if(this.range === null || this.range.reduce((acc: boolean, cur) => acc || (cur === null), false))
@@ -170,6 +173,11 @@ export class HistoNdCDS extends ColumnarDataSource {
   }
 
   histogram(weights: string | null): number[]{
+    if(weights == null){
+      if(this._unweighted_histogram != null){
+        return this._unweighted_histogram
+      }
+    }
     console.log("Histogram " + this.name + " " + weights)
     const length = this._strides[this._strides.length-1]
     let sample_array: ArrayLike<number>[] = []
@@ -231,6 +239,9 @@ export class HistoNdCDS extends ColumnarDataSource {
           }
         }
       }
+    }
+    if(weights == null){
+      this._unweighted_histogram = bincount
     }
     return bincount
   }
@@ -366,6 +377,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   public change_selection(){
     this._stale_range = true
     this._sorted_indices = null
+    this._unweighted_histogram = null
     this.data = {}
     this.change.emit()
   }
