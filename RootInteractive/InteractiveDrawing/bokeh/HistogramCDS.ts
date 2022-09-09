@@ -242,8 +242,7 @@ export class HistogramCDS extends ColumnarDataSource {
         errorbar_edge[i] = bincount[i] - Math.sqrt(bincount[i])
       }
       data[key] = errorbar_edge
-    }
-    if(histograms != null){
+    } else if(histograms != null){
       if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
