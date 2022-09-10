@@ -258,10 +258,10 @@ def testJoin():
 def test_StableQuantile():
     output_file("test_BokehClientHistogramQuantile.html")
     histoArray = [
-        {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": [10, "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
-        {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": [10, "nBinsB"], "weights":"C-A/2", "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
-        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]},
-        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "stable":True, "type":"projection", "quantiles": [.05, .5, .95]}
+        {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
+        {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
+        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
+        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
     ]
     sourceArray = [
         {"name": "projection_join", "left": "histoAB_1", "right":"projectionA", "left_on":["bin_center_1"], "right_on": ["bin_center_1"]}
@@ -293,5 +293,30 @@ def test_StableQuantile():
             "both": [[10,11]]
         }
     }
+    parameterArray=[
+        {'name':"size", "value":7, "range": [0, 20]},
+        {'name':"histoRangeA", "value": [0, 1], "range": [0, 1]},
+        {'name':"nBinsB", "value": 20, "options":[1, 5, 10, 20, 40, 80]},
+        {'name':"nBinsA", "value": 20, "options":[5, 10, 20, 40, 80]},
+    ]
+    widgetParams=[
+        ['range', ['A']],
+        ['range', ['B', 0, 1, 0.1, 0, 1]],
+        ['range', ['C'], {'type': 'minmax'}],
+        ['range', ['D'], {'type': 'sigma', 'bins': 10, 'sigma': 3}],
+        ['multiSelect', ["DDC"]],
+        ['range', ['histoRangeA']],
+        ['select', ['nBinsA']],
+        ['select', ['nBinsB']],
+        ['slider',["size"]],
+    #  ['select',["CC", 0, 1, 2, 3]],
+    #  ['multiSelect',["BoolB"]],
+    ]
+    widgetLayoutDesc={
+        "selection":[[0,1,2],[3,4]],
+        "histograms":[[5,6,7]],
+        "graphics":[[8]]
+    }
+    
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
