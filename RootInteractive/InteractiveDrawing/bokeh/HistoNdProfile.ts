@@ -267,7 +267,6 @@ export class HistoNdProfile extends ColumnarDataSource {
                       mean += sorted_entries![i] * sorted_weights[i]
                     }
                   }
-                  mean += bin_count[x+y+z] * bin_centers[x+y+z]
                 }
               } else 
               {
