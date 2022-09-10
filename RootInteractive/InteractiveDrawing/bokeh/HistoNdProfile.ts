@@ -274,10 +274,28 @@ export class HistoNdProfile extends ColumnarDataSource {
                   mean += bin_count[x+y+z] * bin_centers[x+y+z]
                 }
               }
-              mean /= entries
               let std = 0
-              for (let y = 0; y < stride_high; y+= stride_low) {
-                std += (bin_centers[x+y+z] - mean) * (bin_centers[x+y+z] - mean) * bin_count[x+y+z]
+              mean /= entries
+              if(unbinned){
+                for (let y = 0; y < stride_high; y+= stride_low) {
+                  const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
+                  const index_high = global_cumulative_histogram![x+y+z]
+                  if(sorted_weights == null){
+                    for(let i=index_low; i<index_high; ++i){
+                      std += sorted_entries![i] * sorted_entries![i]
+                    }
+                  } else {
+                    for(let i=index_low; i<index_high; ++i){
+                      std += sorted_entries![i] * sorted_entries![i] * sorted_weights[i]
+                    }
+                  }
+                }
+                std -= mean*mean*entries
+              } else 
+              {
+                for (let y = 0; y < stride_high; y+= stride_low) {
+                  std += (bin_centers[x+y+z] - mean) * (bin_centers[x+y+z] - mean) * bin_count[x+y+z]
+                }
               }
               std /= entries
               std = Math.sqrt(std)
