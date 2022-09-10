@@ -1673,15 +1673,15 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                     variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
                 if len(x) == 2:
                     return variables[0]
-                return variables[int(x[-1])]
-            if x[0] == "quantile":
+                return variables[int(x[2])]
+            if x[0] == "quantile" and len(x) == 2:
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
                     histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                     projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
                     return "quantile " + str(quantile) + " " + histogramOrig.sample_variables[projectionIdx]
                 return "quantile " + str(quantile)
-            if x[0] == "sum":
+            if x[0] == "sum" and x[1] == "range" and len(x) == 3:
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if cdsDict[cdsName]["type"] == "projection":
