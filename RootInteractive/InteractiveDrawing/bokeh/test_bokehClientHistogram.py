@@ -263,34 +263,51 @@ def test_StableQuantile():
         {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
         {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
     ]
-    sourceArray = [
-        {"name": "projection_join", "left": "histoAB_1", "right":"projectionA", "left_on":["bin_center_1"], "right_on": ["bin_center_1"]}
+    aliasArray = [
+        {
+            "name": f"{i}_normed",
+            "variables": [i, "bin_center_0"],
+            "func": f"return {i} / bin_center_0**2",
+            "context": j
+        } for i in ["mean", "std", "quantile_0",  "quantile_1", "quantile_2"] for j in ["histoAB_1", "histoABWeight_1", "projectionA", "projectionAWeight"]
     ]
     figureArray = [
         [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "histoAB_1"}],
         [['bin_center_0'], ['std'], {"source": "histoAB_1"}],
+        [['bin_center_0'], ['mean_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": "histoAB_1"}],
+        [['bin_center_0'], ['std_normed'], {"source": "histoAB_1"}],
         [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "projectionA"}],
         [['bin_center_0'], ['std'], {"source": "projectionA"}],
+        [['bin_center_0'], ['mean_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": "projectionA"}],
+        [['bin_center_0'], ['std_normed'], {"source": "projectionA"}],
         [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": ["histoAB_1", "histoAB_1", "histoAB_1", "projectionA", "projectionA", "projectionA"]}],
         [['bin_center_0'], ['std'], {"source": ["histoAB_1", "projectionA"]}],
+        [['bin_center_0'], ['quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": ["histoAB_1", "histoAB_1", "histoAB_1", "projectionA", "projectionA", "projectionA"]}],
+        [['bin_center_0'], ['std_normed'], {"source": ["histoAB_1", "projectionA"]}],
         [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "histoABWeight_1"}],
         [['bin_center_0'], ['std'], {"source": "histoABWeight_1"}],
+        [['bin_center_0'], ['mean_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": "histoABWeight_1"}],
+        [['bin_center_0'], ['std_normed'], {"source": "histoABWeight_1"}],
         [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "projectionAWeight"}],
         [['bin_center_0'], ['std'], {"source": "projectionAWeight"}],
+        [['bin_center_0'], ['mean_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": "projectionAWeight"}],
+        [['bin_center_0'], ['std_normed'], {"source": "projectionAWeight"}],
         [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": ["histoABWeight_1", "histoABWeight_1", "histoABWeight_1", "projectionAWeight", "projectionAWeight", "projectionAWeight"]}],
         [['bin_center_0'], ['std'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
+        [['bin_center_0'], ['quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": ["histoABWeight_1", "histoABWeight_1", "histoABWeight_1", "projectionAWeight", "projectionAWeight", "projectionAWeight"]}],
+        [['bin_center_0'], ['std_normed'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
         {"size": "size"}
     ]
     figureLayoutDesc={
         "Without weights":{
-            "binned": [[0,1]],
-            "unbinned": [[2,3]],
-            "both": [[4,5]]
+            "binned": [[0,1], [2,3]],
+            "unbinned": [[4,5],[6,7]],
+            "both": [[8,9],[10,11]]
         },
         "With weights":{
-            "binned": [[6,7]],
-            "unbinned": [[8,9]],
-            "both": [[10,11]]
+            "binned": [[12,13],[14,15]],
+            "unbinned": [[16,17],[18,19]],
+            "both": [[20,21],[22,23]]
         }
     }
     parameterArray=[
@@ -319,4 +336,4 @@ def test_StableQuantile():
     }
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
