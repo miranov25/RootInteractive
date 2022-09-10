@@ -123,7 +123,8 @@ export namespace HistoNdProfile {
     axis_idx: p.Property<number>
     quantiles: p.Property<number[]>
     sum_range: p.Property<number[][]>
-    stable: p.Property<boolean>
+    unbinned: p.Property<boolean>
+    weights: p.Property<string | null>
   }
 }
 
@@ -142,12 +143,13 @@ export class HistoNdProfile extends ColumnarDataSource {
 
   static init_HistoNdProfile() {
 
-    this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int, Boolean})=>({
+    this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int, Boolean, String, Nullable})=>({
       source:  [Ref(HistoNdCDS)],
       axis_idx: [Int, 0],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       sum_range: [Array(Array(Number)), []],
-      stable: [Boolean, false]
+      unbinned: [Boolean, false],
+      weights: [Nullable(String), null]
     }))
   }
 
@@ -168,13 +170,13 @@ export class HistoNdProfile extends ColumnarDataSource {
   }
 
   update(): void {
-        const {source, axis_idx, stable} = this
+        const {source, axis_idx, unbinned, quantiles, sum_range, weights} = this
         let mean_column = []
         let std_column = []
         let entries_column = []
         let isOK_column = []
         let quantile_columns:Array<Array<number>> = []
-        for (let i = 0; i < this.quantiles.length; i++) {
+        for (let i = 0; i < quantiles.length; i++) {
           quantile_columns.push([])
         }
         let integral_columns:Array<Array<number>> = []
@@ -186,11 +188,11 @@ export class HistoNdProfile extends ColumnarDataSource {
           efficiency_columns.push([])
         }
 
-        const stride_low = this.source.get_stride(this.axis_idx)
-        const stride_high = this.source.get_stride(this.axis_idx+1)
+        const stride_low = source.get_stride(axis_idx)
+        const stride_high = source.get_stride(axis_idx+1)
 
-        for(let i=0; i<this.source.dim; i++){
-          if(i != this.axis_idx){
+        for(let i=0; i<source.dim; i++){
+          if(i != axis_idx){
               this.data["bin_bottom_"+i] = []
               this.data["bin_center_"+i] =[]
               this.data["bin_top_"+i] = []
@@ -203,14 +205,21 @@ export class HistoNdProfile extends ColumnarDataSource {
         let bin_centers_filtered:Array<Array<number>> = []
         let bin_top_filtered:Array<Array<number>> = []
         let bin_bottom_filtered:Array<Array<number>> = []
-        for (let i = 0; i < this.source.dim; i++) {
-          bin_centers_all.push(this.source.get_column("bin_center_"+i) as number[])
+        for (let i = 0; i < source.dim; i++) {
+          bin_centers_all.push(source.get_column("bin_center_"+i) as number[])
           bin_centers_filtered.push([])
-          bin_top_all.push(this.source.get_column("bin_top_"+i) as number[])
+          bin_top_all.push(source.get_column("bin_top_"+i) as number[])
           bin_top_filtered.push([])
-          bin_bottom_all.push(this.source.get_column("bin_bottom_"+i) as number[])
+          bin_bottom_all.push(source.get_column("bin_bottom_"+i) as number[])
           bin_bottom_filtered.push([])
         }
+
+        const axis_name = source.sample_variables[axis_idx]
+
+        const global_cumulative_histogram = unbinned ? source.cumulative_histogram_noweights() : null
+        // const sorted_indices = unbinned && source.compute_sorted_indices()
+        const sorted_weights = unbinned && weights != null? source.sorted_column_orig(weights) : null
+        const sorted_entries = unbinned ? source.sorted_column_orig(axis_name) : null
 
         const bin_count = source.get_column("bin_count") as number[]
         const bin_centers = source.get_column("bin_center_"+axis_idx) as number[]
@@ -219,24 +228,15 @@ export class HistoNdProfile extends ColumnarDataSource {
 
         const nbins_total = source.length
 
-        const axis_name = source.sample_variables[axis_idx]
-        const weights_name = source.weights
-
-        const global_cumulative_histogram = stable ? source.cumulative_histogram_noweights() : null
-        const sorted_weights = stable && weights_name != null? source.sorted_column_orig(weights_name) : null
-        const sorted_entries = stable ? source.sorted_column_orig(axis_name) : null
-
         for(let x = 0; x < nbins_total; x += stride_high){
           for(let z = 0; z < stride_low; z ++){
       //      console.log(x)
       //      console.log(z)
-            for(let i=0; i<this.source.dim; i++){
-              if(i != this.axis_idx){
-              //    (this.data["bin_bottom_"+i] as any[]).push(this.source.get_array("bin_bottom_"+i)[z/length+x])
+            for(let i=0; i<source.dim; i++){
+              if(i != axis_idx){
                   bin_bottom_filtered[i].push(bin_bottom_all[i][x+z])
                   bin_centers_filtered[i].push(bin_centers_all[i][x+z])
                   bin_top_filtered[i].push(bin_top_all[i][x+z])
-              //    (this.data["bin_top_"+i] as any[]).push(this.source.get_array("bin_top_"+i)[z/length+x])
               }
             }
             if(bin_count === null || bin_centers === null ){
@@ -246,7 +246,6 @@ export class HistoNdProfile extends ColumnarDataSource {
               isOK_column.push(false)
               continue
             }
-      //      let histogram_axis = []
             let cumulative_histogram = []
             let entries = 0
             for(let y=0; y < stride_high; y += stride_low){
@@ -255,8 +254,26 @@ export class HistoNdProfile extends ColumnarDataSource {
             }
             if(entries > 0){
               let mean = 0
-              for (let y = 0; y < stride_high; y+= stride_low) {
-                mean += bin_count[x+y+z] * bin_centers[x+y+z]
+              if(unbinned){
+                for (let y = 0; y < stride_high; y+= stride_low) {
+                  const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
+                  const index_high = global_cumulative_histogram![x+y+z]
+                  if(sorted_weights == null){
+                    for(let i=index_low; i<index_high; ++i){
+                      mean += sorted_entries![i]
+                    }
+                  } else {
+                    for(let i=index_low; i<index_high; ++i){
+                      mean += sorted_entries![i] * sorted_weights[i]
+                    }
+                  }
+                  mean += bin_count[x+y+z] * bin_centers[x+y+z]
+                }
+              } else 
+              {
+                for (let y = 0; y < stride_high; y+= stride_low) {
+                  mean += bin_count[x+y+z] * bin_centers[x+y+z]
+                }
               }
               mean /= entries
               let std = 0
@@ -273,23 +290,20 @@ export class HistoNdProfile extends ColumnarDataSource {
               let high = 0
               let iQuantile = 0
               // Invalid quantiles - negative
-              while(iQuantile < this.quantiles.length && this.quantiles[iQuantile] < 0){
+              while(iQuantile < quantiles.length && quantiles[iQuantile] < 0){
                 quantile_columns[iQuantile].push(NaN)
                 iQuantile++
               }
-              for (let j = 0; j < cumulative_histogram.length && iQuantile < this.quantiles.length; j++) {
+              for (let j = 0; j < cumulative_histogram.length && iQuantile < quantiles.length; j++) {
                 const y = j*stride_low
                 high = cumulative_histogram[j]
-                if(stable){
-                  // TODO: Use a more efficient algorithm than brute force
+                if(unbinned){
                   const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
                   const index_high = global_cumulative_histogram![x+y+z]
-//                  const indices = [...Array(index_high-index_low).keys()].map(i => i + index_low)
-//                  indices.sort((a,b) => sorted_entries![a] - sorted_entries![b])
                   if(sorted_weights == null){
                     // In this case maybe we could use kth value instead
-                    while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
-                      const k = this.quantiles[iQuantile] * entries - low
+                    while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
+                      const k = quantiles[iQuantile] * entries - low
                       const k_floor = k | 0
                       //const m = k % 1
                       kth_value(sorted_entries!, k_floor+index_low, (a,b) => a-b, index_low, index_high)
@@ -298,8 +312,8 @@ export class HistoNdProfile extends ColumnarDataSource {
                       iQuantile++
                     }                   
                   } else {
-                    while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
-                      const k = this.quantiles[iQuantile] * entries - low
+                    while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
+                      const k = quantiles[iQuantile] * entries - low
                       const idx = weighted_kth_value(sorted_entries!, sorted_weights, k, index_low, index_high)
                       quantile_columns[iQuantile].push(sorted_entries![idx])
                       iQuantile++
@@ -307,8 +321,8 @@ export class HistoNdProfile extends ColumnarDataSource {
                   }
                 } else {
                   // Lerp within bin
-                  while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
-                    const m = (this.quantiles[iQuantile] * entries - low)/(high-low)
+                  while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
+                    const m = (quantiles[iQuantile] * entries - low)/(high-low)
                     quantile_columns[iQuantile].push(edges_left[y]*(1-m)+edges_right[y]*m)
                     iQuantile++
                   }
@@ -316,7 +330,7 @@ export class HistoNdProfile extends ColumnarDataSource {
                 low = high
               }
               // Invalid quantiles - more than 100% or empty bin
-              while(iQuantile < this.quantiles.length){
+              while(iQuantile < quantiles.length){
                 quantile_columns[iQuantile].push(NaN)
                 iQuantile++
               }
@@ -334,8 +348,8 @@ export class HistoNdProfile extends ColumnarDataSource {
             const high = edges_right[edges_right.length-1]
             const scale = cumulative_histogram.length / (high - low)
             const origin = -low * scale
-            for (let iBox = 0; iBox < this.sum_range.length; iBox++) {
-              const bounding_box = this.sum_range[iBox];
+            for (let iBox = 0; iBox < sum_range.length; iBox++) {
+              const bounding_box = sum_range[iBox];
               const index_left = bounding_box[0] * scale + origin
               let val_left = 0
               let val_right = 0

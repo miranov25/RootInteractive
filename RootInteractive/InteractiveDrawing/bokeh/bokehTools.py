@@ -676,7 +676,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if "quantiles" in iSource:
                     quantiles = iSource["quantiles"]
                 for j in axisIndices:
-                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles,
+                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
                                                 sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
                     projectionsLocal[i] = cdsProfile
                     tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
@@ -701,8 +701,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
             quantiles = iSource["quantiles"] if "quantiles" in iSource else []
             sum_range = iSource["sum_range"] if "sum_range" in iSource else []
-            stable = iSource["stable"] if "stable" in iSource else False
-            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, stable=stable)
+            unbinned = iSource["unbinned"] if "unbinned" in iSource else False
+            weights = iSource["weights"] if "weights" in iSource else None
+            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned, weights=weights)
             # Tooltips are broken as they depend on the parent
             # tooltips = defaultNDProfileTooltips(iSource["variables"], axis_idx, quantiles, sum_range)        
         else:

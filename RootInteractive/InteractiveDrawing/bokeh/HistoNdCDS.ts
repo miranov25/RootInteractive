@@ -179,6 +179,9 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
     }
     console.log("Histogram " + this.name + " " + weights)
+    if(this._sorted_indices != null && weights != null){
+      return this.histogram_sorted(weights)
+    }
     const length = this._strides[this._strides.length-1]
     let sample_array: ArrayLike<number>[] = []
     for (const column_name of this.sample_variables) {
@@ -242,6 +245,26 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     if(weights == null){
       this._unweighted_histogram = bincount
+    }
+    return bincount
+  }
+
+  histogram_sorted(weights: string){
+    let bincount: number[] = Array(length)
+    const {_sorted_indices, source} = this
+    const cumulative_histogram = this.cumulative_histogram_noweights()
+    const weights_column = source.get_column(weights)
+    if(weights_column == null){
+      return this.histogram(null)
+    }
+    for(let i=0; i<cumulative_histogram.length; i++){
+      let acc = 0
+      const begin = i ? cumulative_histogram[i-1] : 0
+      const end = cumulative_histogram[i]
+      for(let j=begin; j<end; j++){
+        acc += weights_column[_sorted_indices![j]]
+      }
+      bincount[i] = acc
     }
     return bincount
   }
@@ -396,14 +419,11 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public sorted_column_orig(key: string){
     // This is only used for non-associative histograms - exposed to speed up computing projections with stable quantiles / range sums
-    if(this._sorted_indices == null){
-      this._sorted_indices = this._compute_sorted_indices()
-    }
+    const sorted_indices = this.compute_sorted_indices()
     const col = this.source.get_column(key)
     if(col == null) return null
-    const col_new = Array(this._sorted_indices.length)
-    const l = this._sorted_indices.length
-    const sorted_indices = this._sorted_indices
+    const col_new = Array(sorted_indices.length)
+    const l = sorted_indices.length
     for(let i=0; i<l; i++){
       col_new[i] = col[sorted_indices[i]]
     }
@@ -412,12 +432,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public cumulative_histogram_noweights(){
     // TODO: Add caching - recomputing this histogram might be a bottleneck
-    let histogram
-    if(this.weights == null){
-      histogram = this.get_column("bin_count") as number[]
-    } else {
-      histogram = this.histogram(null)
-    }
+    const histogram = this.histogram(null)
     let cumulativeHistogram = [...histogram]
     let acc = 0
     let l = histogram.length
@@ -428,7 +443,10 @@ export class HistoNdCDS extends ColumnarDataSource {
     return cumulativeHistogram
   }
 
-  _compute_sorted_indices(){
+  public compute_sorted_indices(){
+    if(this._sorted_indices != null){
+      return this._sorted_indices
+    }
     const {view, source, sample_variables} = this
     let sample_array: ArrayLike<number>[] = []
     for (const column_name of sample_variables) {
@@ -459,7 +477,7 @@ export class HistoNdCDS extends ColumnarDataSource {
         }
       }
     }
-
+    this._sorted_indices = view_sorted
     return view_sorted
   }
 
