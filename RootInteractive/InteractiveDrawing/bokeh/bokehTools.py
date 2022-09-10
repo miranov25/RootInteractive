@@ -1672,24 +1672,28 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 return cdsDict[cdsName]["variables"][int(x[-1])]
             if x[0] == "quantile":
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
-                if '_' in cdsName:
-                    histoName, projectionIdx = cdsName.split("_")
-                    return "quantile " + str(quantile) + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
+                if cdsDict[cdsName]["type"] == "projection":
+                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                    return "quantile " + str(quantile) + " " + histogramOrig.sample_variables[projectionIdx]
                 return "quantile " + str(quantile)
             if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
-                    if '_' in cdsName:
-                        histoName, projectionIdx = cdsName.split("_")
-                        return "sum " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    if cdsDict[cdsName]["type"] == "projection":
+                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        return "sum " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
                 else:
-                    if '_' in cdsName:
-                        histoName, projectionIdx = cdsName.split("_")
-                        return "p " + cdsDict[histoName]["variables"][int(projectionIdx)] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
+                    if cdsDict[cdsName]["type"] == "projection":
+                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        return "p " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
                     return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
         else:
-            if '_' in cdsName:
-                histoName, projectionIdx = cdsName.split("_")
-                return varName + " " + cdsDict[histoName]["variables"][int(projectionIdx)]
+            if cdsDict[cdsName]["type"] == "projection":
+                histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                return varName + " " + histogramOrig.sample_variables[projectionIdx]
     return prefix+varName
