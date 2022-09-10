@@ -1052,7 +1052,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if varColor["type"] == "parameter":
                         axis_title = paramDict[varColor["name"]]["value"]
                     else:
-                        axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cmap_cds_name)
+                        axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
                     color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
                     if varColor["type"] == "parameter":
                         paramDict[varColor["name"]]["subscribed_events"].append(["value", color_bar, "title"])
