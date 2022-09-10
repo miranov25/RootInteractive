@@ -1655,11 +1655,11 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return varName
     if cdsName in cdsDict:
+        if cdsDict[cdsName]["type"] == "join":
+            return varName
         prefix = ""
         if not removeCdsName:
             prefix =  cdsName+"."
-        if "variables" not in cdsDict[cdsName]:
-            return varName
         if varName.startswith(cdsName+"."):
             varName = varName[len(cdsName)+1:]
         if '_' in varName:
@@ -1667,9 +1667,13 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 return "entries"
             x = varName.split("_")
             if x[0] == "bin":
+                if "variables" in cdsDict[cdsName]:
+                    variables = cdsDict[cdsName]["variables"]
+                else:
+                    variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
                 if len(x) == 2:
-                    return cdsDict[cdsName]["variables"][0]
-                return cdsDict[cdsName]["variables"][int(x[-1])]
+                    return variables[0]
+                return variables[int(x[-1])]
             if x[0] == "quantile":
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
