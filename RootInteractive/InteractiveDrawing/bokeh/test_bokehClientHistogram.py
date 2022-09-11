@@ -260,8 +260,12 @@ def test_StableQuantile():
     histoArray = [
         {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
         {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
+        {"name": "histo3D", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsB"], "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
+        {"name": "histo3D_weight", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
         {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
-        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
+        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"},
+        {"name": "projection3D", "axis_idx":[2], "source": "histo3D", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
+        {"name": "projection3D_weight", "axis_idx":[2], "source": "histo3D_weight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
     ]
     aliasArray = [
         {
@@ -296,18 +300,28 @@ def test_StableQuantile():
         [['bin_center_0'], ['std'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
         [['bin_center_0'], ['quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": ["histoABWeight_1", "histoABWeight_1", "histoABWeight_1", "projectionAWeight", "projectionAWeight", "projectionAWeight"]}],
         [['bin_center_0'], ['std_normed'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
+        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/bin_center_0'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/bin_center_0'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/bin_center_0'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/bin_center_0'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         {"size": "size"}
     ]
     figureLayoutDesc={
         "Without weights":{
-            "binned": [[0,1], [2,3]],
-            "unbinned": [[4,5],[6,7]],
-            "both": [[8,9],[10,11]]
+            "binned": [[0,1], [2,3], {'plot_height': 200}],
+            "unbinned": [[4,5],[6,7], {'plot_height': 200}],
+            "both": [[8,9],[10,11], {'plot_height': 200}],
+            "3D": [[24,25],[26,27], {'plot_height': 200}]
         },
         "With weights":{
-            "binned": [[12,13],[14,15]],
-            "unbinned": [[16,17],[18,19]],
-            "both": [[20,21],[22,23]]
+            "binned": [[12,13],[14,15], {'plot_height': 200}],
+            "unbinned": [[16,17],[18,19], {'plot_height': 200}],
+            "both": [[20,21],[22,23], {'plot_height': 200}],
+            "3D": [[28,29],[30,31], {'plot_height': 200}]
         }
     }
     parameterArray=[
