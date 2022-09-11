@@ -260,8 +260,8 @@ def test_StableQuantile():
     histoArray = [
         {"name": "histoAB", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
         {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None], "axis": [1], "quantiles": [.05, .5, .95]},
-        {"name": "histo3D", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsB"], "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
-        {"name": "histo3D_weight", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
+        {"name": "histo3D", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsA", "nBinsB"], "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
+        {"name": "histo3D_weight", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsA", "nBinsB"], "weights":"1+A", "range": ["histoRangeA", None, None], "axis": [2], "quantiles": [.05, .5, .95]},
         {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
         {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"},
         {"name": "projection3D", "axis_idx":[2], "source": "histo3D", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
@@ -300,13 +300,13 @@ def test_StableQuantile():
         [['bin_center_0'], ['std'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
         [['bin_center_0'], ['quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed', 'quantile_0_normed', 'quantile_1_normed', 'quantile_2_normed'], {"source": ["histoABWeight_1", "histoABWeight_1", "histoABWeight_1", "projectionAWeight", "projectionAWeight", "projectionAWeight"]}],
         [['bin_center_0'], ['std_normed'], {"source": ["histoABWeight_1", "projectionAWeight"]}],
-        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std/bin_center_0'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std/bin_center_0'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std/bin_center_0'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['quantile_0/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std/bin_center_0'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         {"size": "size"}
     ]
