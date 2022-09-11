@@ -1049,7 +1049,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         """, args={"field": mapperC["field"], "cmap": mapperC["transform"]})) 
                     color = mapperC
                     # Also add the color bar
-                    if varColor["type"] == "parameter":
+                    if "colorAxisTitle" in optionLocal:
+                        axis_title = optionLocal["colorAxisTitle"]
+                    elif varColor["type"] == "parameter":
                         axis_title = paramDict[varColor["name"]]["value"]
                     else:
                         axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
