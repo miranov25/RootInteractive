@@ -6,7 +6,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(200000, 4))*2-1, columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(20000, 4))*2-1, columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -275,6 +275,14 @@ def test_StableQuantile():
             "context": j
         } for i in ["mean", "std", "quantile_0",  "quantile_1", "quantile_2"] for j in ["histoAB_1", "histoABWeight_1", "projectionA", "projectionAWeight"]
     ]
+    aliasArray += [
+        {
+            "name": "std_true",
+            "variables": ["bin_bottom_0", "bin_top_0", "bin_bottom_1", "bin_top_1", "bin_center_0", "bin_center_1"],
+            "func": "return Math.sqrt((4*(bin_center_0*bin_center_1*(bin_top_0-bin_bottom_0))**2+((bin_top_1-bin_bottom_1)*bin_center_0**2)**2)/12)",
+            "context": j
+        } for j in ["histo3D_2", "histo3D_weight_2", "projection3D", "projection3D_weight"]
+    ]
     figureArray = [
         [['bin_center_0'], ['mean', 'quantile_0', 'quantile_1', 'quantile_2'], {"source": "histoAB_1"}],
         [['bin_center_0'], ['std'], {"source": "histoAB_1"}],
@@ -303,19 +311,19 @@ def test_StableQuantile():
         [['bin_center_0'], ['quantile_1'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['std/(bin_center_0*(bin_top_0-bin_bottom_0))'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/std_true'], {"source": "histo3D_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['std/(bin_center_0*(bin_center_0+2*bin_center_1)*(bin_top_0-bin_bottom_0))'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/std_true'], {"source": "projection3D", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['std/(bin_center_0*(bin_top_0-bin_bottom_0))'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/std_true'], {"source": "histo3D_weight_2", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1'], {"source": "projection3D_weight", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['std'], {"source": "projection3D_weight", "colorZvar": "bin_center_1"}],
         [['bin_center_0'], ['quantile_1/(bin_center_0**2)'], {"source": "projection3D_weight", "colorZvar": "bin_center_1"}],
-        [['bin_center_0'], ['std/(bin_center_0*(bin_top_0-bin_bottom_0))'], {"source": "projection3D_weight", "colorZvar": "bin_center_1"}],
+        [['bin_center_0'], ['std/std_true'], {"source": "projection3D_weight", "colorZvar": "bin_center_1"}],
         {"size": "size"}
     ]
     figureLayoutDesc={
