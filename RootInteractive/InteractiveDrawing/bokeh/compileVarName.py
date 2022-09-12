@@ -447,6 +447,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     "type": "alias",
                     "name": columnName
                 }
+                evaluator.dependencies.update({(evaluator.context, i) for i in evaluator.aliasDependencies})
                 column = newColumn
         variables.append(column)
         if evaluator.isSource:
