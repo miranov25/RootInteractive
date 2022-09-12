@@ -62,7 +62,7 @@ figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
     [['X'], ['C+A', 'C-A', 'A/A'], {"name": "fig1"}],
-    [['B'], ['C+B', 'C-B'], { "colorZvar": "colorZ", "errY": "errY", "rescaleColorMapper": True}],
+    [['B'], ['C+B', 'C-B'], { "colorZvar": "B", "errY": "errY", "rescaleColorMapper": True, "colorAxisLabel": "B (cm/s)"}],
     [['D'], ['(A+B+C)*DD'], {"colorZvar": "colorZ", "size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
