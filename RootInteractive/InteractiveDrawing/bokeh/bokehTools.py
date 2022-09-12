@@ -679,9 +679,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
                                                 sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
                     projectionsLocal[i] = cdsProfile
-                    tooltips = defaultNDProfileTooltips(iSource["variables"], j, quantiles, sum_range)
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
-                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "tooltips": tooltips, "source": cds_name} 
+                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
                 iSource["profiles"] = projectionsLocal
         elif cdsType == "join":
             left = None
@@ -702,8 +701,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             quantiles = iSource["quantiles"] if "quantiles" in iSource else []
             sum_range = iSource["sum_range"] if "sum_range" in iSource else []
             unbinned = iSource["unbinned"] if "unbinned" in iSource else False
-            weights = iSource["weights"] if "weights" in iSource else None
-            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned, weights=weights)
+            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
             # Tooltips are broken as they depend on the parent
             # tooltips = defaultNDProfileTooltips(iSource["variables"], axis_idx, quantiles, sum_range)        
         else:
@@ -718,6 +716,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
         elif iSource["type"] == "projection":
             cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
+            cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
         name_full = "cdsFull"
         if cds_name is not None:
             name_full = cds_name+"_full"
@@ -1007,7 +1008,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
-        cmap_cds_name = None
 
         hover_tool_renderers = {}
 
@@ -1276,6 +1276,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 continue
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
+        # HACK: we need to add the aliasDict to the dependency tree somehow as bokeh can't find it - to be removed when dependency trees on client work with that
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
         for iWidget in widgetList:
