@@ -187,12 +187,10 @@ def test_makeColumns():
     aliasDict={}
     varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["1", "Y", "10*X+Y", "Y", "X*(Y**(5/2))", "X*(Y**(5/2))/Z", "sqrt(X)","paramA", "X if Y<paramA else Z","histoA.bin_count", "X<paramA or boolY"], None, cdsDict, paramDict, functionDict, aliasDict=aliasDict)
     assert len(varList) == 11
-    assert len(sources) == 7
+    assert len(sources) == 9
     assert ctx_updated[-2] == "histoA"
     varList, ctx_updated, memoized_columns, sources = getOrMakeColumns(["log(1+bin_count)", "-1<=-bin_count<1"], ["histoA"], cdsDict, paramDict, functionDict, aliasDict=aliasDict)
     print(ctx_updated)
     print(memoized_columns)
     print(sources)
     print(aliasDict)
-
-test_makeColumns()
