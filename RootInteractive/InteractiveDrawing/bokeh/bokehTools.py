@@ -675,9 +675,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 quantiles = []
                 if "quantiles" in iSource:
                     quantiles = iSource["quantiles"]
+                unbinned = iSource.get("unbinned_projections", False)
                 for j in axisIndices:
                     cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
+                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig", unbinned=unbinned)
                     projectionsLocal[i] = cdsProfile
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
                     "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
