@@ -1128,9 +1128,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if optionLocal['size'] in paramDict:
                     paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                    if cds_name not in hover_tool_renderers:
-                        hover_tool_renderers[cds_name] = []
-                    hover_tool_renderers[cds_name].append(drawnGlyph)
+                if cds_name not in hover_tool_renderers:
+                    hover_tool_renderers[cds_name] = []
+                hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
