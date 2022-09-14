@@ -1115,6 +1115,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                    if optionLocal['size'] in paramDict:
+                        paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
                     raise NotImplementedError(f"Visualization type not suppoerted: {visualization_type}")
                 if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
@@ -1126,8 +1128,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             transform.change.emit()
                         """)])
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
-                if optionLocal['size'] in paramDict:
-                    paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 if cds_name not in hover_tool_renderers:
                     hover_tool_renderers[cds_name] = []
                 hover_tool_renderers[cds_name].append(drawnGlyph)
