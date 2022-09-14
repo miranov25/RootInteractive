@@ -405,64 +405,71 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
     if aliasDict is None:
         aliasDict = {}
     for i in range(max(len(variableNames), len(context))):
-        i_var = variableNames[i % nvars]
+        variables_tuple = variableNames[i % nvars]
         i_context = context[i % n_context] 
-        if i_context in ["$IGNORE", "auto"]:
+        if i_context == "$IGNORE":
             variables.append(None)
             ctx_updated.append(i_context)
             continue
-        if i_context in memoizedColumns and i_var in memoizedColumns[i_context]:
-            variables.append(memoizedColumns[i_context][i_var])
-            ctx_updated.append(i_context)
-            continue
-        if (i_context, i_var) in forbiddenColumns:
-            # Unresolvable cyclic dependency in table - stack trace should tell exactly what went wrong
-            raise RuntimeError("Cyclic dependency detected")
-        queryAST = ast.parse(i_var, mode="eval")
-        evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
-        column = evaluator.visit(queryAST.body)
-        i_context = evaluator.context
-        if column["type"] == "javascript":
-            # Make the column on the server if possible both on server and on client
-            # Possibly only do this if lossy compression causes numerical instability?
+        if not isinstance(variables_tuple, tuple):
+            variables_tuple = (variables_tuple,)
+        columns = []
+        for i_var in variables_tuple:
+            if i_context in memoizedColumns and i_var in memoizedColumns[i_context]:
+                columns.append(memoizedColumns[i_context][i_var])
+                continue
+            if (i_context, i_var) in forbiddenColumns:
+                # Unresolvable cyclic dependency in table - stack trace should tell exactly what went wrong
+                raise RuntimeError("Cyclic dependency detected")
+            queryAST = ast.parse(i_var, mode="eval")
+            evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
+            column = evaluator.visit(queryAST.body)
+            i_context = evaluator.context
+            if column["type"] == "javascript":
+                # Make the column on the server if possible both on server and on client
+                # Possibly only do this if lossy compression causes numerical instability?
+                if evaluator.isSource:
+                    column = evaluator.eval_fallback(queryAST.body)
+                elif aliasDict is not None:
+                    if i_context not in aliasDict:
+                        aliasDict[i_context] = {}
+                    columnName = column["name"]
+                    func = "return "+column["implementation"]
+                    variablesAlias = list(evaluator.aliasDependencies)
+                    parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+                    transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
+                    for j in parameters:
+                        if "subscribed_events" not in paramDict[j]:
+                            paramDict[j]["subscribed_events"] = []
+                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+                                            mapper.parameters[param] = this.value
+                                            mapper.update_args()
+                                                    """)])
+                    aliasDict[i_context][columnName] = {"transform": transform, "fields": variablesAlias}
+                    newColumn = {
+                        "type": "alias",
+                        "name": columnName
+                    }
+                    evaluator.dependencies.update({(evaluator.context, i) for i in evaluator.aliasDependencies})
+                    column = newColumn
             if evaluator.isSource:
-                column = evaluator.eval_fallback(queryAST.body)
-            elif aliasDict is not None:
-                if i_context not in aliasDict:
-                    aliasDict[i_context] = {}
-                columnName = column["name"]
-                func = "return "+column["implementation"]
-                variablesAlias = list(evaluator.aliasDependencies)
-                parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
-                transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
-                for j in parameters:
-                    if "subscribed_events" not in paramDict[j]:
-                        paramDict[j]["subscribed_events"] = []
-                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
-                                        mapper.parameters[param] = this.value
-                                        mapper.update_args()
-                                                """)])
-                aliasDict[i_context][columnName] = {"transform": transform, "fields": variablesAlias}
-                newColumn = {
-                    "type": "alias",
-                    "name": columnName
-                }
-                evaluator.dependencies.update({(evaluator.context, i) for i in evaluator.aliasDependencies})
-                column = newColumn
-        variables.append(column)
-        if evaluator.isSource:
-            used_names.update({(i_context, column["name"])})
+                used_names.update({(i_context, column["name"])})
+            else:
+                direct_dependencies = list(evaluator.dependencies)
+                dependency_columns = [i[1] for i in direct_dependencies]
+                dependency_tables = [i[0] for i in direct_dependencies]
+                _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
+                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
+                used_names.update(sources_local)
+            if i_context in memoizedColumns:
+                memoizedColumns[i_context][i_var] = column
+            else:
+                memoizedColumns[i_context] = {i_var: column}
+            columns.append(column)
+        if len(columns) == 1:
+            variables.append(columns[0])
         else:
-            direct_dependencies = list(evaluator.dependencies)
-            dependency_columns = [i[1] for i in direct_dependencies]
-            dependency_tables = [i[0] for i in direct_dependencies]
-            _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
-                                                                    memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
-            used_names.update(sources_local)
+            variables.append(tuple(columns))
         ctx_updated.append(i_context)
-        if i_context in memoizedColumns:
-            memoizedColumns[i_context][i_var] = column
-        else:
-            memoizedColumns[i_context] = {i_var: column}
         
     return variables, ctx_updated, memoizedColumns, used_names
