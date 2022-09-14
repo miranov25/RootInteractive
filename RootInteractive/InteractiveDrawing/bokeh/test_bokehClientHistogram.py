@@ -6,7 +6,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -58,7 +58,7 @@ histoArray = [
     {"name": "histoA", "variables": ["A"], "nbins":20, "range": "histoRangeA", "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
     {"name": "histoB", "variables": ["B"], "nbins":"nBinsB", "range": [0, 1]},
     {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, "nBinsB", 10], "range": ["histoRangeA", None, None], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
-    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, "nBinsB"], "range": ["histoRangeA", None], "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
+    {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, "nBinsB"], "range": ["histoRangeA", None], "unbinned_projections":True, "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
 ]
 
 def testBokehClientHistogram():
@@ -95,10 +95,10 @@ def testBokehClientHistogramOnlyHisto():
 def testBokehClientHistogramProfileA():
     output_file("test_BokehClientHistogramProfileA.html")
     figureArray = [
-        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_0', 'histoAB_1.quantile_1', 'histoAB_1.quantile_2'], {"size":"size"}],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.quantile_1', 'histoAB_1.mean'], {"size":"size"}],
+        [['bin_center_0'], ['quantile_0', 'quantile_1', 'quantile_2'], {"size":"size", "source":"histoAB_1"}],
+        [['bin_center_0'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_1"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2", "size":"size"}],
-        [['histoAB_1.bin_center_0'], ['histoAB_1.std'], {"size":"size"}],
+        [['bin_center_0'], ['std'], {"size":"size", "source":"histoAB_1"}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -113,10 +113,10 @@ def testBokehClientHistogramProfileA():
 def testBokehClientHistogramProfileB():
     output_file("test_BokehClientHistogramProfileB.html")
     figureArray = [
-        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_0', 'histoAB_0.quantile_1', 'histoAB_0.quantile_2'], {"size":"size"}],
-        [['histoAB_0.bin_center_1'], ['histoAB_0.quantile_1', 'histoAB_0.mean'], {"size":"size"}],
+        [['bin_center_1'], ['quantile_0', 'quantile_1', 'quantile_2'], {"size":"size", "source":"histoAB_0"}],
+        [['bin_center_1'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_0"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
-        [['histoAB_0.bin_center_1'], ['histoAB_0.std'], {"size":"size"}],
+        [['bin_center_1'], ['std'], {"size":"size", "source":"histoAB_0"}],
         ["tableHisto", {"rowwise": False}]
     ]
     figureLayoutDesc=[
@@ -369,5 +369,3 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
-
-testBokehClientHistogramOnlyHisto()
