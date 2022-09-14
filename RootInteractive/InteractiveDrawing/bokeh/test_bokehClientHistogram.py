@@ -6,7 +6,7 @@ from pandas import CategoricalDtype
 output_file("test_bokehClientHistogram.html")
 # import logging
 
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4))*2-1, columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -77,10 +77,10 @@ def testBokehClientHistogram():
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
-        [['A'], ['histoA']],
-        [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
-        [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
-        [['B'], ['histoB'], {"flip_histogram_axes": True}],
+        [['bin_center'], ['bin_count'], {"source": "histoA"}],
+        [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": "sqrt(bin_count)", "source":"histoAB"}],
+        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
+        [['bin_count'], ['bin_center'], {"source": "histoB"}],
         ["tableHisto", {"rowwise": False, "include": "histoA$|histoB$"}]
     ]
     figureLayoutDesc=[
@@ -369,3 +369,5 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
+testBokehClientHistogramOnlyHisto()
