@@ -158,7 +158,10 @@ class bokehDrawSA(object):
                     optionList.append(entry)
                     continue
                 for word in entry:
-                    tmp+=word+":"
+                    if isinstance(word, tuple):
+                        tmp += ",".join(word)+":"
+                    else:
+                        tmp+=word+":"
         varList=""
         for word in re.split('[^a-zA-Z0-9]', tmp[:-1]):
             if not word.isnumeric():

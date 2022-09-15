@@ -675,9 +675,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 quantiles = []
                 if "quantiles" in iSource:
                     quantiles = iSource["quantiles"]
+                unbinned = iSource.get("unbinned_projections", False)
                 for j in axisIndices:
                     cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig")
+                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig", unbinned=unbinned)
                     projectionsLocal[i] = cdsProfile
                     cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
                     "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
@@ -702,8 +703,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             sum_range = iSource["sum_range"] if "sum_range" in iSource else []
             unbinned = iSource["unbinned"] if "unbinned" in iSource else False
             iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
-            # Tooltips are broken as they depend on the parent
-            # tooltips = defaultNDProfileTooltips(iSource["variables"], axis_idx, quantiles, sum_range)        
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
@@ -1078,7 +1077,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cds_name != "$IGNORE":
                 cds_used = cdsDict[cds_name]["cds"]
 
-            if varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
+            if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
@@ -1086,29 +1085,29 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 elif histoHandle["type"] == "histo2d":
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
-                varNameX = variables_dict["X"]["name"]
-                varNameY = variables_dict["Y"]["name"]
                 drawnGlyph = None
                 colorMapperCallback = """
                 glyph.fill_color={...glyph.fill_color, field:this.value}
                 glyph.line_color={...glyph.line_color, field:this.value}
                 """
-                if "visualization_type" in optionLocal and optionLocal["visualization_type"] == "heatmap":
-                    x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
-                    y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                    if "top" in optionLocal and "bottom" in optionLocal and "left" in optionLocal and "right" in optionLocal:
-                        top = optionLocal["top"]
-                        bottom = optionLocal["bottom"]
-                        left = optionLocal["left"]
-                        right = optionLocal["right"]
-                    else :
-                        top = "bin_top_1"
-                        bottom = "bin_bottom_1"
-                        left = "bin_bottom_0"
-                        right = "bin_top_0"
+                visualization_type = optionLocal.get("visualization_type")
+                if visualization_type is None:
+                    if isinstance(variables_dict["X"], tuple):
+                        visualization_type = "heatmap"
+                    else:
+                        visualization_type = "scatter"
+                if visualization_type == "heatmap":
+                    left = variables_dict["X"][0]["name"]
+                    right = variables_dict["X"][1]["name"]
+                    bottom = variables_dict["Y"][0]["name"]
+                    top = variables_dict["Y"][1]["name"]
+                    x_label = getHistogramAxisTitle(cdsDict, left, cds_name)
+                    y_label = getHistogramAxisTitle(cdsDict, bottom, cds_name)
                     drawnGlyph = figureI.quad(top=top, bottom=bottom, left=left, right=right,
                     fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
-                else:
+                elif visualization_type == "scatter":
+                    varNameX = variables_dict["X"]["name"]
+                    varNameY = variables_dict["Y"]["name"]
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
@@ -1117,9 +1116,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                    drawnGlyph.js_on_change('visible', CustomJS(args={"source": cds_used, "dummy": ColumnDataSource()}, code="""
-                            this.data_source = this.visible ? source : dummy
-                """))
+                    if optionLocal['size'] in paramDict:
+                        paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
+                else:
+                    raise NotImplementedError(f"Visualization type not suppoerted: {visualization_type}")
                 if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
@@ -1129,11 +1129,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             transform.change.emit()
                         """)])
                     paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
-                if optionLocal['size'] in paramDict:
-                    paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                    if cds_name not in hover_tool_renderers:
-                        hover_tool_renderers[cds_name] = []
-                    hover_tool_renderers[cds_name].append(drawnGlyph)
+                if cds_name not in hover_tool_renderers:
+                    hover_tool_renderers[cds_name] = []
+                hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
                     errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                     errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
@@ -1160,13 +1158,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         plotTitle = ""
 
         for varY in variables[1]:
-            if hasattr(dfQuery, "meta") and '.' not in varY:
+            if hasattr(dfQuery, "meta") and isinstance(varY, str) and '.' not in varY:
                 yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
             else:
                 yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
             yAxisTitle += ','
         for varX in variables[0]:
-            if hasattr(dfQuery, "meta") and '.' not in varX:
+            if hasattr(dfQuery, "meta") and isinstance(varX, str) and '.' not in varX:
                 xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
             else:
                 xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
@@ -1655,6 +1653,8 @@ def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
     return {"field": varError["name"], "transform": transform}
 
 def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
+    if isinstance(varName, tuple):
+        return getHistogramAxisTitle(cdsDict, varName[0], cdsName, removeCdsName)
     if cdsName is None:
         return varName
     if cdsName in cdsDict:
