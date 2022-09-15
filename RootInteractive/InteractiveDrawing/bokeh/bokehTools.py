@@ -1133,7 +1133,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     hover_tool_renderers[cds_name] = []
                 hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
-                    if isinstance(variables_dict['errX'], str):
+                    if isinstance(variables_dict['errX'], dict):
                         errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
                         errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
                     elif isinstance(variables_dict['errX'], tuple):
@@ -1141,7 +1141,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         errorX = Quad(top=varNameY, bottom=varNameY, left=barLower, right=barUpper, line_color=color)                        
                     figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
-                    if isinstance(variables_dict['errY'], str):
+                    if isinstance(variables_dict['errY'], dict):
                         errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                         errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     elif isinstance(variables_dict['errY'], tuple):
