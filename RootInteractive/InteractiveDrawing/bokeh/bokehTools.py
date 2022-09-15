@@ -1133,12 +1133,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     hover_tool_renderers[cds_name] = []
                 hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
-                    errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
-                    errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
+                    if isinstance(variables_dict['errX'], dict):
+                        errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
+                        errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
+                    elif isinstance(variables_dict['errX'], tuple):
+                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errX'], variables_dict['X'], cds_used)
+                        errorX = Quad(top=varNameY, bottom=varNameY, left=barLower, right=barUpper, line_color=color)                        
                     figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
-                    errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
-                    errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
+                    if isinstance(variables_dict['errY'], dict):
+                        errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
+                        errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
+                    elif isinstance(variables_dict['errY'], tuple):
+                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used)
+                        errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
                     figureI.add_glyph(cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
@@ -1651,6 +1659,19 @@ def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
     if varError["type"] == "parameter":
         return {"field": paramDict[varError["name"]]["value"], "transform": transform}
     return {"field": varError["name"], "transform": transform}
+
+def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source):
+    varNameX = varX["name"]
+    # This JS callback can be optimized if needed
+    transform_lower = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+        const column = [...source.get_column(key)]
+        return column.map((x, i) => x-xs[i])
+    """)
+    transform_upper = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+        const column = [...source.get_column(key)]
+        return column.map((x, i) => x+xs[i])
+    """)
+    return ({"field":varError[0]["name"], "transform":transform_lower}, {"field":varError[1]["name"], "transform":transform_upper})
 
 def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if isinstance(varName, tuple):
