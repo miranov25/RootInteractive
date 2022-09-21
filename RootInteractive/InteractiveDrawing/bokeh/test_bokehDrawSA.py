@@ -142,12 +142,3 @@ def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     assert (df0.keys() == df.keys()).all()
-
-def testBokehDrawArraySA_tree():
-    if "ROOT" not in sys.modules:
-        pytest.skip("no ROOT module")
-    output_file("test_bokehDrawSAArray_fromTTree.html")
-    fig=bokehDrawSA.fromArray(tree, "A>0", figureArray, widgets, tooltips=tooltips, layout=figureLayoutDesc)
-
-output_file("test_BokehDrawArrayWidget.html")
-bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray)
