@@ -39,13 +39,13 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300,
                            aliasArray=aliasArray, histogramArray=histoArray,arrayCompression=arrayCompression)
 ```
-* figureArray
-* histogramArray
-* aliasArray
-* layout
-* widgetLayout
-* parameterArray
-* arrayCompression
+* [figureArray](RootInteractive/InteractiveDrawing/bokeh/doc/READMEfigure.md)
+* [histogramArray](RootInteractive/InteractiveDrawing/bokeh/doc/READMEhistogram.md)
+* [aliasArray](RootInteractive/InteractiveDrawing/bokeh/doc/READMEalias.md)
+* [layout](RootInteractive/InteractiveDrawing/bokeh/doc/READMElayout.md)
+* [widgetLayout](RootInteractive/InteractiveDrawing/bokeh/doc/READMElayoutWidget.md)
+* [parameterArray](RootInteractive/InteractiveDrawing/bokeh/doc/READMEparameters.md)
+* [arrayCompression](RootInteractive/InteractiveDrawing/bokeh/doc/READMEcompression.md)
 
 
 #### _figureArrray_ - figure parameterization 
@@ -123,7 +123,7 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
     }
     ```
 
-#### _layout_ - layout of the layout
+#### _layout_ - layout of the widgets
   * see [READMElayoutWidget](/RootInteractive/InteractiveDrawing/bokeh/doc/READMElayoutWidget.md)
   * Layout declared by and dictionary(tabs)/array of figure IDs (index or name ID)
   * Properties per row/simple layout/tab layout can be specified. More local properties have priority.    

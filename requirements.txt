@@ -8,7 +8,7 @@ uproot
 iminuit
 ## root_pandas
 ##---------------------   graphics  dependencies
-bokeh>2,<2.3
+bokeh>2,<2.5              # possibility to use new bokeh #150
 matplotlib
 plotly
 qgrid
@@ -26,12 +26,4 @@ scikit-hep
 forestci
 tensorflow
 keras
-# tests and tutorials
-pytest
-nbval
-pytest_tornasync
-pytest-json-report
-pytest-regressions
-pytest-datadir
-pytest-parallel
-jq
+
