@@ -31,6 +31,7 @@ from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 import numpy as np
 import pandas as pd
 import re
+import ast
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 
 # tuple of Bokeh markers
@@ -489,6 +490,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     widgetArray = []
     widgetDict = {}
 
+    cdsDict = makeCDSDict(sourceArray, paramDict)
+
     jsFunctionDict = {}
     for i in jsFunctionArray:
         customJsArgList = {}
@@ -536,8 +539,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
             if "expr" in i:
-                pass
+                exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
+                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, None, i["expr"], aliasDict)
+                result = evaluator.visit(exprTree.body)
+                if result["type"] == "javascript":
+                    func = "return "+result["implementation"]
+                    fields = list(evaluator.aliasDependencies)
+                    parameters = list(evaluator.paramDependencies)
+                    customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields, func=func)
+                else:
+                    aliasDict[i["name"]] = result["name"]
+                    break
             else:
+                parameters = i.get("parameters", None)
                 fields = i["variables"]
             if "context" in i:
                 if i["context"] not in aliasDict:
@@ -545,8 +560,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 aliasDict[i["context"]][i["name"]] = {"fields": fields, "transform": transform}
             else:
                 aliasDict[None][i["name"]] = {"fields": fields, "transform": transform}
-            if "parameters" in i:
-                for j in i["parameters"]:
+            if parameters is not None:
+                for j in parameters:
                     paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
             mapper.parameters[param] = this.value
             mapper.update_args()
@@ -560,155 +575,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     memoized_columns = {}
     sources = set()
-
-    # Create the cdsDict - identify types from user input and make empty ColumnDataSources
-    cdsDict = {}
-    for i, iSource in enumerate(sourceArray):
-        iSource = iSource.copy()
-        # Detect the name, error on collision
-        cds_name = "anonymous_"+str(i)
-        if "name" in iSource:
-            cds_name = iSource["name"]
-        else:
-            raise ValueError("Column data sources other than the main one must have a name")
-        if cds_name in cdsDict:
-            raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
-        cdsDict[cds_name] = iSource
-
-        # Detect the type
-        if "type" not in iSource:
-            if "data" in iSource:
-                cdsType = "source"
-                if "arrayCompression" not in iSource:
-                    iSource["arrayCompression"] = None
-            elif "variables" in iSource:
-                nvars = len(iSource["variables"])
-                if nvars == 1:
-                    cdsType = "histogram"
-                elif nvars == 2:
-                    cdsType = "histo2d"
-                else:
-                    cdsType = "histoNd"
-            elif "left" in iSource or "right" in iSource:
-                cdsType = "join"
-            else:
-                # Cannot determine type automatically
-                raise ValueError(iSource)
-            iSource["type"] = cdsType
-        cdsType = iSource["type"]
-
-        # Create the name for cdsOrig
-        name_orig = "cdsOrig"
-        if cds_name is not None:
-            name_orig = cds_name+"_orig"
-
-        # Create cdsOrig
-        if cdsType == "source":
-            # HACK: Add "index" column for user convenience
-            if "index" not in iSource["data"]:
-                iSource["data"]["index"] = np.arange(len(list(iSource["data"].values)), dtype=np.int32)
-            if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
-                iSource["cdsOrig"] = CDSCompress(name=name_orig)
-            else:
-                iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
-        elif cdsType == "histogram":
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
-            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
-            if "source" not in iSource:
-                iSource["source"] = None
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHistoTooltips
-            nbins = 10
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
-            if nbins in paramDict:
-                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
-                            histogram.nbins = this.value | 0;
-                            histogram.change_selection();
-                        """)])
-                nbins = paramDict[nbins]["value"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"]
-            if isinstance(histoRange, str) and histoRange in paramDict:
-                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
-                histoRange = paramDict[histoRange]["value"]
-            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
-        elif cdsType in ["histo2d", "histoNd"]:
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
-            if "source" not in iSource:
-                iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHisto2DTooltips
-            nbins = [10]*len(iSource["variables"])
-            if "nbins" in iSource:
-                nbins = iSource["nbins"].copy()
-            for binsIdx, iBins in enumerate(nbins):
-                if isinstance(iBins, str) and iBins in paramDict:
-                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
-                        histogram.nbins[i] = this.value | 0;
-                        histogram.update_nbins();
-                        histogram.invalidate_cached_bins();
-                        histogram.change_selection();
-                    """)])
-                    nbins[binsIdx] = paramDict[iBins]["value"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"].copy()
-            if histoRange is not None:
-                for rangeIdx, iRange in enumerate(histoRange):
-                    if isinstance(iRange, str) and iRange in paramDict:
-                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": rangeIdx}, code="""
-                            histogram.range[i] = this.value;
-                            histogram.invalidate_cached_bins();
-                            histogram.change_selection();
-                        """)])
-                        histoRange[rangeIdx] = paramDict[iRange]["value"]
-            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
-            if "axis" in iSource:
-                axisIndices = iSource["axis"]
-                projectionsLocal = {}
-                sum_range = []
-                if "sum_range" in iSource:
-                    sum_range = iSource["sum_range"]
-                quantiles = []
-                if "quantiles" in iSource:
-                    quantiles = iSource["quantiles"]
-                unbinned = iSource.get("unbinned_projections", False)
-                for j in axisIndices:
-                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig", unbinned=unbinned)
-                    projectionsLocal[i] = cdsProfile
-                    cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
-                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
-                iSource["profiles"] = projectionsLocal
-        elif cdsType == "join":
-            left = None
-            if "left" in iSource:
-                left = iSource["left"]
-            right = None
-            if "left" in iSource:
-                right = iSource["left"]
-            if "left_on" in iSource:
-                on_left = iSource["left_on"]
-            on_right = []
-            if "right_on" in iSource:
-                on_right = iSource["right_on"]
-            how  = iSource["how"] if "how" in iSource else "inner"
-            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
-        elif cdsType == "projection":
-            axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
-            quantiles = iSource["quantiles"] if "quantiles" in iSource else []
-            sum_range = iSource["sum_range"] if "sum_range" in iSource else []
-            unbinned = iSource["unbinned"] if "unbinned" in iSource else False
-            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
-        else:
-            raise NotImplementedError("Unrecognized CDS type: " + cdsType)
             
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
@@ -1731,3 +1597,154 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
                 return varName + " " + histogramOrig.sample_variables[projectionIdx]
     return prefix+varName
+
+def makeCDSDict(sourceArray, paramDict):
+    # Create the cdsDict - identify types from user input and make empty ColumnDataSources
+    cdsDict = {}
+    for i, iSource in enumerate(sourceArray):
+        iSource = iSource.copy()
+        # Detect the name, error on collision
+        cds_name = "anonymous_"+str(i)
+        if "name" in iSource:
+            cds_name = iSource["name"]
+        else:
+            raise ValueError("Column data sources other than the main one must have a name")
+        if cds_name in cdsDict:
+            raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
+        cdsDict[cds_name] = iSource
+
+        # Detect the type
+        if "type" not in iSource:
+            if "data" in iSource:
+                cdsType = "source"
+                if "arrayCompression" not in iSource:
+                    iSource["arrayCompression"] = None
+            elif "variables" in iSource:
+                nvars = len(iSource["variables"])
+                if nvars == 1:
+                    cdsType = "histogram"
+                elif nvars == 2:
+                    cdsType = "histo2d"
+                else:
+                    cdsType = "histoNd"
+            elif "left" in iSource or "right" in iSource:
+                cdsType = "join"
+            else:
+                # Cannot determine type automatically
+                raise ValueError(iSource)
+            iSource["type"] = cdsType
+        cdsType = iSource["type"]
+
+        # Create the name for cdsOrig
+        name_orig = "cdsOrig"
+        if cds_name is not None:
+            name_orig = cds_name+"_orig"
+
+        # Create cdsOrig
+        if cdsType == "source":
+            # HACK: Add "index" column for user convenience
+            if "index" not in iSource["data"]:
+                iSource["data"]["index"] = np.arange(len(list(iSource["data"].values)), dtype=np.int32)
+            if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
+                iSource["cdsOrig"] = CDSCompress(name=name_orig)
+            else:
+                iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
+        elif cdsType == "histogram":
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
+            if "source" not in iSource:
+                iSource["source"] = None
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHistoTooltips
+            nbins = 10
+            if "nbins" in iSource:
+                nbins = iSource["nbins"]
+            if nbins in paramDict:
+                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
+                            histogram.nbins = this.value | 0;
+                            histogram.change_selection();
+                        """)])
+                nbins = paramDict[nbins]["value"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"]
+            if isinstance(histoRange, str) and histoRange in paramDict:
+                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
+                histoRange = paramDict[histoRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
+        elif cdsType in ["histo2d", "histoNd"]:
+            weights = None
+            if "weights" in iSource:
+                weights = iSource["weights"]
+            if "source" not in iSource:
+                iSource["source"] = None
+            iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHisto2DTooltips
+            nbins = [10]*len(iSource["variables"])
+            if "nbins" in iSource:
+                nbins = iSource["nbins"].copy()
+            for binsIdx, iBins in enumerate(nbins):
+                if isinstance(iBins, str) and iBins in paramDict:
+                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
+                        histogram.nbins[i] = this.value | 0;
+                        histogram.update_nbins();
+                        histogram.invalidate_cached_bins();
+                        histogram.change_selection();
+                    """)])
+                    nbins[binsIdx] = paramDict[iBins]["value"]
+            histoRange = None
+            if "range" in iSource:
+                histoRange = iSource["range"].copy()
+            if histoRange is not None:
+                for rangeIdx, iRange in enumerate(histoRange):
+                    if isinstance(iRange, str) and iRange in paramDict:
+                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": rangeIdx}, code="""
+                            histogram.range[i] = this.value;
+                            histogram.invalidate_cached_bins();
+                            histogram.change_selection();
+                        """)])
+                        histoRange[rangeIdx] = paramDict[iRange]["value"]
+            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
+            if "axis" in iSource:
+                axisIndices = iSource["axis"]
+                projectionsLocal = {}
+                sum_range = []
+                if "sum_range" in iSource:
+                    sum_range = iSource["sum_range"]
+                quantiles = []
+                if "quantiles" in iSource:
+                    quantiles = iSource["quantiles"]
+                unbinned = iSource.get("unbinned_projections", False)
+                for j in axisIndices:
+                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
+                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig", unbinned=unbinned)
+                    projectionsLocal[i] = cdsProfile
+                    cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
+                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
+                iSource["profiles"] = projectionsLocal
+        elif cdsType == "join":
+            left = None
+            if "left" in iSource:
+                left = iSource["left"]
+            right = None
+            if "left" in iSource:
+                right = iSource["left"]
+            if "left_on" in iSource:
+                on_left = iSource["left_on"]
+            on_right = []
+            if "right_on" in iSource:
+                on_right = iSource["right_on"]
+            how  = iSource["how"] if "how" in iSource else "inner"
+            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
+        elif cdsType == "projection":
+            axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
+            quantiles = iSource["quantiles"] if "quantiles" in iSource else []
+            sum_range = iSource["sum_range"] if "sum_range" in iSource else []
+            unbinned = iSource["unbinned"] if "unbinned" in iSource else False
+            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
+        else:
+            raise NotImplementedError("Unrecognized CDS type: " + cdsType)
+    return cdsDict
