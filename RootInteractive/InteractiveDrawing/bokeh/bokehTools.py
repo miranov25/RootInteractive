@@ -31,7 +31,7 @@ from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 import numpy as np
 import pandas as pd
 import re
-
+from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -526,7 +526,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     customJsArgList[j] = paramDict[j]["value"]
             if "v_func" in i:
                 transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
-            else:
+            elif "func" in i:
                 if i["func"] in paramDict:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=paramDict[i["func"]]["value"])
                     paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
@@ -535,12 +535,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """)])
                 else:
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+            if "expr" in i:
+                pass
+            else:
+                fields = i["variables"]
             if "context" in i:
                 if i["context"] not in aliasDict:
                     aliasDict[i["context"]] = {}
-                aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": transform}
+                aliasDict[i["context"]][i["name"]] = {"fields": fields, "transform": transform}
             else:
-                aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": transform}
+                aliasDict[None][i["name"]] = {"fields": fields, "transform": transform}
             if "parameters" in i:
                 for j in i["parameters"]:
                     paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
@@ -879,11 +883,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     filter.range[0] = this.value
                     other.step = this.step = (other.value - this.value) * .05
                     filter.properties.range.change.emit()
+                    filter.change.emit()
                     """))
                 localWidgetMax.js_on_change("value", CustomJS(args={"other":localWidgetMin, "filter": widgetFilter}, code="""
                     filter.range[1] = this.value
                     other.step = this.step = (this.value - other.value) * .05
                     filter.properties.range.change.emit()
+                    filter.change.emit()
                     """))
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
