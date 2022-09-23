@@ -514,6 +514,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in aliasArray:
         customJsArgList = {}
         transform = None
+        if not isinstance(i, dict):
+            if len(i) == 2:
+                i = {"name":i[0], "expr":i[1]}
+            if len(i) == 3:
+                i = {"name":i[0], "expr":i[1], "context": i[2]}
         aliasSet.add(i["name"])
         if "transform" in i:
             if i["transform"] in jsFunctionDict:
