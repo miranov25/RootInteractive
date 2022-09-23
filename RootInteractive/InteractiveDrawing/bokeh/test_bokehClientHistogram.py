@@ -268,12 +268,7 @@ def test_StableQuantile():
         {"name": "projection3D_weight", "axis_idx":[2], "source": "histo3D_weight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
     ]
     aliasArray = [
-        {
-            "name": f"{i}_normed",
-            "variables": [i, "bin_center_0"],
-            "func": f"return {i} / bin_center_0**2",
-            "context": j
-        } for i in ["mean", "std", "quantile_0",  "quantile_1", "quantile_2"] for j in ["histoAB_1", "histoABWeight_1", "projectionA", "projectionAWeight"]
+        (f"{i}_normed", f"{i} / bin_center_0**2", j) for i in ["mean", "std", "quantile_0",  "quantile_1", "quantile_2"] for j in ["histoAB_1", "histoABWeight_1", "projectionA", "projectionAWeight"]
     ]
     aliasArray += [
         {
