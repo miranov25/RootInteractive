@@ -45,9 +45,7 @@ aliasArray = [
     },
     {
         "name": "C_accepted",
-        "variables": ["C"],
-        "parameters": ["C_cut"],
-        "func": "return C < C_cut"
+        "expr": "C < C_cut"
     },
     {
         "name": "efficiency_A",
