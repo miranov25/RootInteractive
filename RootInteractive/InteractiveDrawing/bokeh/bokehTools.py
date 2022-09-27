@@ -545,7 +545,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
             if "expr" in i:
                 exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
-                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, {}, i["expr"], aliasDict)
+                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
                 result = evaluator.visit(exprTree.body)
                 if result["type"] == "javascript":
                     func = "return "+result["implementation"]
