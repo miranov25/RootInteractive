@@ -1497,19 +1497,6 @@ def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
         tooltips.append((f"Sum_normed {varNames[axis_idx]} in [{iRange[0]}, {iRange[1]}]", "@sum_normed_" + str(i)))
     return tooltips
 
-def getOrMakeColumn(dfQuery, column, cdsName, ignoreDict={}):
-    if '.' in column:
-        c = column.split('.')
-        if cdsName is None or cdsName == c[0]:
-            return [dfQuery, c[1], c[0]]
-        else:
-            raise ValueError("Inconsistent CDS")
-    else:
-        if column in ignoreDict:
-            return [dfQuery, column, cdsName]
-        dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
-        return [dfQuery, column, None]
-
 def getTooltipColumns(tooltips):
     if isinstance(tooltips, str):
         return {}
