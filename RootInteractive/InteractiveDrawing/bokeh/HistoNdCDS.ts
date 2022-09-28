@@ -86,10 +86,14 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   private _unweighted_histogram: number[] | null
 
+  private _sorted_column_pool: number[][]
+
   update_range(): void {
     this._nbins = this.nbins;
     this._sorted_indices = null
     this._unweighted_histogram = null
+
+    this._sorted_column_pool = []
 
     let sample_array: ArrayLike<number>[] = []
     if(this.range === null || this.range.reduce((acc: boolean, cur) => acc || (cur === null), false))
@@ -172,7 +176,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       this._stale_range = false
   }
 
-  histogram(weights: string | null): number[]{
+  histogram(weights: string | null, weights_transform: ((x:number) => number) | null=null): number[]{
     if(weights == null){
       if(this._unweighted_histogram != null){
         return this._unweighted_histogram
@@ -180,7 +184,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     console.log("Histogram " + this.name + " " + weights)
     if(this._sorted_indices != null && weights != null){
-      return this.histogram_sorted(weights)
+      return this.histogram_sorted(weights, weights_transform)
     }
     const length = this._strides[this._strides.length-1]
     let sample_array: ArrayLike<number>[] = []
@@ -206,10 +210,19 @@ export class HistoNdCDS extends ColumnarDataSource {
         if (weights_array == null){
           throw ReferenceError("Column "+ weights + " not found in " + this.source.name)
         }
-        for(let i=0; i<n_indices; i++){
-          const bin = this.getbin(i, sample_array)
-          if(bin >= 0 && bin < length){
-            bincount[bin] += weights_array[i]
+        if(weights_transform != null){
+          for(let i=0; i<n_indices; i++){
+            const bin = this.getbin(i, sample_array)
+            if(bin >= 0 && bin < length){
+              bincount[bin] += weights_transform(weights_array[i])
+            }
+          }
+        } else {
+          for(let i=0; i<n_indices; i++){
+            const bin = this.getbin(i, sample_array)
+            if(bin >= 0 && bin < length){
+              bincount[bin] += weights_array[i]
+            }
           }
         }
       } else {
@@ -249,7 +262,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     return bincount
   }
 
-  histogram_sorted(weights: string){
+  histogram_sorted(weights: string, weights_transform: ((x:number) => number)| null){
     let bincount: number[] = Array(length)
     const {_sorted_indices, source} = this
     const cumulative_histogram = this.cumulative_histogram_noweights()
@@ -261,8 +274,14 @@ export class HistoNdCDS extends ColumnarDataSource {
       let acc = 0
       const begin = i ? cumulative_histogram[i-1] : 0
       const end = cumulative_histogram[i]
-      for(let j=begin; j<end; j++){
-        acc += weights_column[_sorted_indices![j]]
+      if(weights_transform != null){
+        for(let j=begin; j<end; j++){
+          acc += weights_transform(weights_column[_sorted_indices![j]])
+        }
+      } else{
+        for(let j=begin; j<end; j++){
+          acc += weights_column[_sorted_indices![j]]
+        }
       }
       bincount[i] = acc
     }
@@ -422,8 +441,11 @@ export class HistoNdCDS extends ColumnarDataSource {
     const sorted_indices = this.compute_sorted_indices()
     const col = this.source.get_column(key)
     if(col == null) return null
-    const col_new = Array(sorted_indices.length)
     const l = sorted_indices.length
+    let col_new = this._sorted_column_pool.pop()
+    if(col_new == undefined){
+      col_new = Array(l)
+    }
     for(let i=0; i<l; i++){
       col_new[i] = col[sorted_indices[i]]
     }
@@ -479,6 +501,10 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     this._sorted_indices = view_sorted
     return view_sorted
+  }
+
+  public return_column_to_pool(column: number[]){
+    this._sorted_column_pool.push(column)
   }
 
 }

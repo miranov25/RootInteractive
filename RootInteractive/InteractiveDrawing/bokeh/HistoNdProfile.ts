@@ -425,6 +425,12 @@ export class HistoNdProfile extends ColumnarDataSource {
           }
         }
         this._stale = false
+        if(sorted_weights != null){
+          source.return_column_to_pool(sorted_weights)
+        }
+        if(sorted_entries != null){
+          source.return_column_to_pool(sorted_entries)
+        }
   }
 
   get_column(key: string){
