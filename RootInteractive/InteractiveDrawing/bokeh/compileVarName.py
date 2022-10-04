@@ -200,6 +200,12 @@ class ColumnEvaluator:
                 "implementation": node.id,
                 "type": "auto"
             }
+        if self.locals and node.id in self.locals[-1]:
+            return {
+                "name": node.id,
+                "implementation": node.id,
+                "type": "auto"
+            }            
         if node.id in JAVASCRIPT_GLOBALS:
             return {
                 "name": node.id,
@@ -396,9 +402,14 @@ class ColumnEvaluator:
         }
 
     def visit_Lambda(self, node:ast.Lambda):
-        args = node.args
-        impl_args = ', '.join([self.visit(i)["implementation"] for i in args])
+        args = [i.arg for i in node.args.args]
+        impl_args = ', '.join([i.arg for i in node.args.args])
+        if self.locals:
+            self.locals.append(self.locals[-1] | set(args))
+        else:
+            self.locals.append(set(args))
         impl_body = self.visit(node.body)["implementation"]
+        self.locals.pop()
         return {
             "name": self.code,
             "type": "js_lambda",
