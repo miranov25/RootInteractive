@@ -203,7 +203,7 @@ class ColumnEvaluator:
         if node.id in JAVASCRIPT_GLOBALS:
             return {
                 "name": node.id,
-                "implementation": node.id,
+                "implementation": JAVASCRIPT_GLOBALS[node.id],
                 "type": "js_lambda"
             }
         if node.id in self.funcDict:

@@ -449,7 +449,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "legendTitle": None,
         'nPointRender': 10000,
         "nbins": 10,
-        "weights": None,
         "range": None,
         "flip_histogram_axes": False,
         "show_histogram_error": False,
@@ -834,6 +833,28 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionLocal.update(variables[-1])
             nvars -= 1
 
+        x_transform = optionLocal.get("x_transform", None)
+        y_transform = optionLocal.get("y_transform", None)
+        if isinstance(y_transform, str):
+            exprTree = ast.parse(y_transform, filename="<unknown>", mode="eval")
+            evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
+            result = evaluator.visit(exprTree.body)
+            if result["type"] == "js_lambda":
+                y_transform_customjs = CustomJSTransform(args={}, v_func=f"""
+                    return xs.map({result["implementation"]});
+                """)
+            elif result["type"] == "parameter":
+                y_transform_customjs = CustomJSTransform(args={}, v_func=f"""
+                    const l = xs.length;
+                    result = [];
+                    for(let i=0; i<l; ++i){{
+                        result.push({result["implementation"]}(xs[i]))
+                    }}
+                    return result;
+                """)
+            # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
+            # later 2 vectors
+
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             if axis_index < nvars:
@@ -985,10 +1006,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
+                    dataSpecY = {"field":varNameY, "transform":y_transform_customjs} if y_transform else varNameY
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                        drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
+                        drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=y_label + " vs " + x_label)
                     else:
                         drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
@@ -1510,11 +1532,6 @@ def getTooltipColumns(tooltips):
                 result.add(iField[1:])
     return result
 
-def makeBokehDataSpec(thing: dict, paramDict: dict):
-    if thing["type"] == "constant":
-        return {"value": thing["value"]}
-    return {"field": thing["name"]}
-
 def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
     if varError["type"] == "constant":
         return {"value": varError["value"]*2}
@@ -1537,7 +1554,7 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source):
     """)
     return ({"field":varError[0]["name"], "transform":transform_lower}, {"field":varError[1]["name"], "transform":transform_upper})
 
-def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
+def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True, transform=None):
     if isinstance(varName, tuple):
         return getHistogramAxisTitle(cdsDict, varName[0], cdsName, removeCdsName)
     if cdsName is None:
@@ -1642,9 +1659,7 @@ def makeCDSDict(sourceArray, paramDict):
             else:
                 iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
+            weights = iSource.get("weights", None)
             iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
             if "source" not in iSource:
                 iSource["source"] = None
@@ -1667,9 +1682,7 @@ def makeCDSDict(sourceArray, paramDict):
                 histoRange = paramDict[histoRange]["value"]
             iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
+            weights = iSource.get("weights", None)
             if "source" not in iSource:
                 iSource["source"] = None
             iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
