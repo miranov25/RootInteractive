@@ -838,20 +838,28 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if isinstance(y_transform, str):
             exprTree = ast.parse(y_transform, filename="<unknown>", mode="eval")
             evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
-            result = evaluator.visit(exprTree.body)
-            if result["type"] == "js_lambda":
-                y_transform_customjs = CustomJSTransform(args={}, v_func=f"""
-                    return xs.map({result["implementation"]});
+            y_transform_parsed = evaluator.visit(exprTree.body)
+            y_transform_parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+            y_transform_parsed["parameters"] = y_transform_parameters
+            if y_transform_parsed["type"] == "js_lambda":
+                y_transform_customjs = CustomJSTransform(args=y_transform_parameters, v_func=f"""
+                    return xs.map({y_transform_parsed["implementation"]});
                 """)
-            elif result["type"] == "parameter":
+            elif y_transform_parsed["type"] == "parameter":
                 y_transform_customjs = CustomJSTransform(args={}, v_func=f"""
                     const l = xs.length;
                     result = [];
                     for(let i=0; i<l; ++i){{
-                        result.push({result["implementation"]}(xs[i]))
+                        result.push({y_transform_parsed["implementation"]}(xs[i]))
                     }}
                     return result;
                 """)
+            if y_transform_parameters is not None:
+                for j in y_transform_parameters:
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs, "param":j}, code="""
+            mapper.args[param] = this.value
+            mapper.change.emit()
+                    """)])
             # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
             # later 2 vectors
 
@@ -1041,8 +1049,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     if isinstance(variables_dict['errY'], dict):
-                        errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
-                        errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
+                        if y_transform:
+                            barLower, barUpper = errorBarWidthAsymmetric((variables_dict['errY'],variables_dict['errY']), variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
+                            errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
+                        else:
+                            errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
+                            errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     elif isinstance(variables_dict['errY'], tuple):
                         barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used)
                         errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
@@ -1541,17 +1553,42 @@ def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
         return {"field": paramDict[varError["name"]]["value"], "transform": transform}
     return {"field": varError["name"], "transform": transform}
 
-def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source):
+def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=None, paramDict = None):
     varNameX = varX["name"]
     # This JS callback can be optimized if needed
-    transform_lower = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
-        const column = [...source.get_column(key)]
-        return column.map((x, i) => x-xs[i])
-    """)
-    transform_upper = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
-        const column = [...source.get_column(key)]
-        return column.map((x, i) => x+xs[i])
-    """)
+    if paramDict is None:
+        paramDict = {}
+    if transform is None:
+        transform_lower = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => x-xs[i])
+        """)
+        transform_upper = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => x+xs[i])
+        """)
+    else:
+        args = transform["parameters"] | {"source":data_source, "key":varNameX}
+        transform_lower = CustomJSTransform(args=args, v_func=f"""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => {transform["implementation"]}(x-xs[i]))
+        """)
+        transform_upper = CustomJSTransform(args=args, v_func=f"""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => {transform["implementation"]}(x+xs[i]))
+        """)        
+        for j in transform["parameters"]:
+            if j in paramDict:
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_lower, "param":j}, code="""
+                    mapper.args[param] = this.value
+                    mapper.change.emit()
+                            """)])
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_upper, "param":j}, code="""
+                    mapper.args[param] = this.value
+                    mapper.change.emit()
+                            """)])
+            else:
+                raise KeyError("Parameter "+j+" not found")
     return ({"field":varError[0]["name"], "transform":transform_lower}, {"field":varError[1]["name"], "transform":transform_upper})
 
 def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True, transform=None):
