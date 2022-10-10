@@ -1,12 +1,8 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
-from bokeh.io import curdoc
 from pandas import CategoricalDtype
 
-output_file("test_bokehClientHistogram.html")
-# import logging
-
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -32,7 +28,8 @@ tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)
 parameterArray=[
     {'name':"size", "value":7, "range": [0, 20]},
     {'name':"histoRangeA", "value": [0, 1], "range": [0, 1]},
-    {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]}
+    {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]},
+    {'name':"transformY", "value":None, "options":[None, "sqrt", "lambda x: log(x+1)"]}
 ]
 
 widgetParams=[
@@ -43,11 +40,12 @@ widgetParams=[
     ['multiSelect', ["DDC"]],
     ['slider',["size"]],
     ['range', ['histoRangeA']],
-    ['select', ['nBinsB']]
+    ['select', ['nBinsB']],
+    ['select', ['transformY']]
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5], [6, 7], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -81,8 +79,8 @@ def testBokehClientHistogram():
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
-        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")]}],
-        [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB"}],
+        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "y_transform":"transformY"}],
+        [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB", "y_transform":"transformY"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
         [['bin_count'], ['bin_center'], {"source": "histoB"}],
         ["tableHisto", {"rowwise": False, "include": "histoA$|histoB$"}],
@@ -380,3 +378,5 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
+testBokehClientHistogramOnlyHisto()
