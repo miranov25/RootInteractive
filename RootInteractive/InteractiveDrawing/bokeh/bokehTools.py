@@ -836,6 +836,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         x_transform = optionLocal.get("x_transform", None)
         y_transform = optionLocal.get("y_transform", None)
         if isinstance(y_transform, str):
+            #TODO: Extract function and use recursion
             exprTree = ast.parse(y_transform, filename="<unknown>", mode="eval")
             evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
             y_transform_parsed = evaluator.visit(exprTree.body)
@@ -846,14 +847,36 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     return xs.map({y_transform_parsed["implementation"]});
                 """)
             elif y_transform_parsed["type"] == "parameter":
-                y_transform_customjs = CustomJSTransform(args={}, v_func=f"""
-                    const l = xs.length;
-                    result = [];
-                    for(let i=0; i<l; ++i){{
-                        result.push({y_transform_parsed["implementation"]}(xs[i]))
-                    }}
-                    return result;
-                """)
+                if "options" not in paramDict[y_transform_parsed["name"]]:
+                    raise KeyError(y_transform_parsed["name"])
+                js_transforms = {}
+                parsed_options = {}
+                default_func = paramDict[y_transform_parsed["name"]]["value"]
+                if default_func is None:
+                    default_func = "None"
+                y_transform_parsed["default"] = default_func
+                y_transform_customjs = CustomJSTransform(args={"current":default_func}, v_func="return options[current].v_compute(xs)")
+                for func_option in paramDict[y_transform_parsed["name"]]["options"]:
+                    if func_option is None:
+                        option_customjs = CustomJSTransform(v_func="return xs")
+                        js_transforms["None"] = option_customjs
+                        continue
+                    func_option_tree = ast.parse(func_option, filename="<unknown>", mode="eval")
+                    func_option_evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
+                    option_parsed = func_option_evaluator.visit(func_option_tree.body)
+                    option_parameters = {i:paramDict[i]["value"] for i in func_option_evaluator.paramDependencies}
+                    option_customjs = CustomJSTransform(args=option_parameters, v_func=f"""
+                        return xs.map({option_parsed["implementation"]});
+                    """)
+                    js_transforms[func_option] = option_customjs
+                    parsed_options[func_option] = option_parsed
+                    y_transform_parameters = y_transform_parameters | option_parameters
+                y_transform_parsed["options"] = parsed_options
+                y_transform_customjs.args["options"] = js_transforms
+                paramDict[y_transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs}, code="""
+            mapper.args.current = this.value
+            mapper.change.emit()
+                    """)])
             if y_transform_parameters is not None:
                 for j in y_transform_parameters:
                     paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs, "param":j}, code="""
@@ -1056,7 +1079,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
                             errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     elif isinstance(variables_dict['errY'], tuple):
-                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used)
+                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
                         errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
                     figureI.add_glyph(cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
@@ -1567,6 +1590,39 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
             const column = [...source.get_column(key)]
             return column.map((x, i) => x+xs[i])
         """)
+    elif transform["type"] == "parameter":
+        options_lower = {}
+        options_upper = {}
+        transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
+        transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
+        for i, iOption in transform["options"].items():
+            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+                const column = [...source.get_column(key)]
+                return column.map((x, i) => {iOption["implementation"]}(x-xs[i]))
+            """)
+            options_lower[i] = transform_lower_i
+            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+                const column = [...source.get_column(key)]
+                return column.map((x, i) => {iOption["implementation"]}(x+xs[i]))
+            """)
+            options_upper[i] = transform_upper_i
+        options_lower["null"] = options_lower["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => (x-xs[i]))
+        """)
+        options_upper["null"] = options_upper["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => (x+xs[i]))
+        """)
+        transform_lower.args["options"] = options_lower
+        transform_upper.args["options"] = options_upper
+        paramDict[transform["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower, "mapper_upper":transform_upper}, code="""
+            console.log("change")
+            mapper_lower.args.current = this.value
+            mapper_upper.args.current = this.value
+            mapper_lower.change.emit()
+            mapper_upper.change.emit()
+        """)])
     else:
         args = transform["parameters"] | {"source":data_source, "key":varNameX}
         transform_lower = CustomJSTransform(args=args, v_func=f"""
