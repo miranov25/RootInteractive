@@ -1429,8 +1429,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             dfCategorical = df[params[0]]
         codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
         optionsPlot = optionsPlot.dropna().to_list()
-    for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str((val))
+    optionsPlot = [str(i) for i in optionsPlot]
     default_value = 0
     if isinstance(default, int):
         if 0 <= default < len(optionsPlot):
