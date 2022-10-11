@@ -870,7 +870,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """)
                     js_transforms[func_option] = option_customjs
                     parsed_options[func_option] = option_parsed
-                    y_transform_parameters = y_transform_parameters | option_parameters
+                    y_transform_parameters.update(option_parameters)
                 y_transform_parsed["options"] = parsed_options
                 y_transform_customjs.args["options"] = js_transforms
                 paramDict[y_transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs}, code="""
@@ -1386,7 +1386,7 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
         pass
     if options['type'] == 'user':
         start, end, step = params[1], params[2], params[3]
-    elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
+    elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
         start = np.nanmin(df[name])
         end = np.nanmax(df[name])
         step = (end - start) / options['bins']
@@ -1626,7 +1626,8 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
             mapper_upper.change.emit()
         """)])
     else:
-        args = transform["parameters"] | {"source":data_source, "key":varNameX}
+        args = transform["parameters"].copy()
+        args.update({"source":data_source, "key":varNameX})
         transform_lower = CustomJSTransform(args=args, v_func=f"""
             const column = [...source.get_column(key)]
             return column.map((x, i) => {transform["implementation"]}(x-xs[i]))
