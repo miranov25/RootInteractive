@@ -113,7 +113,8 @@ def testBokehClientHistogramProfileA():
         [['bin_center_0'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_1"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2", "size":"size"}],
         [['bin_center_0'], ['std'], {"size":"size", "source":"histoAB_1"}],
-        ["tableHisto", {"rowwise": False}]
+        ["tableHisto", {"rowwise": False}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -131,7 +132,8 @@ def testBokehClientHistogramProfileB():
         [['bin_center_1'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_0"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['bin_center_1'], ['std'], {"size":"size", "source":"histoAB_0"}],
-        ["tableHisto", {"rowwise": False}]
+        ["tableHisto", {"rowwise": False}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -150,7 +152,8 @@ def testBokehClientHistogramRowwiseTable():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
-        ["tableHisto", {"rowwise": True, "exclude": r".*_.*"}]
+        ["tableHisto", {"rowwise": True, "exclude": r".*_.*"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -170,7 +173,8 @@ def testBokehClientHistogram3d():
         [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -192,7 +196,7 @@ def testBokehClientHistogram3d_colormap():
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
         [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        {"size": "size", "rescaleColorMapper": True}
+        {"size": "size", "rescaleColorMapper": True, "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -215,7 +219,7 @@ def testBokehClientHistogram3d_colormap_noscale():
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2"}],
-        {"size": "size"}
+        {"size": "size", "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -258,7 +262,7 @@ def testJoin():
         [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.entries', 'histoB.bin_count']],
         [['histoB_join_histoAB_0.bin_center_1'], ['histoB_join_histoAB_0.delta_mean']],
         [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
-        {"size": "size"}
+        {"size": "size", "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
