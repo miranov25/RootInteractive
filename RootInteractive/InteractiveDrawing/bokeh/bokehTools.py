@@ -1030,9 +1030,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     right = variables_dict["X"][1]["name"]
                     bottom = variables_dict["Y"][0]["name"]
                     top = variables_dict["Y"][1]["name"]
+                    dataSpecBottom = {"field":bottom, "transform":y_transform_customjs} if y_transform else bottom
+                    dataSpecTop = {"field":top, "transform":y_transform_customjs} if y_transform else top
                     x_label = getHistogramAxisTitle(cdsDict, left, cds_name)
                     y_label = getHistogramAxisTitle(cdsDict, bottom, cds_name)
-                    drawnGlyph = figureI.quad(top=top, bottom=bottom, left=left, right=right,
+                    drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=left, right=right,
                     fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
