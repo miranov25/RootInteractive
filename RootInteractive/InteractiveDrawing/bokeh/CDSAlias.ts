@@ -191,7 +191,6 @@ export class CDSAlias extends ColumnarDataSource {
       } else if(Object.prototype.toString.call(column) === '[object String]'){
         if(key === column){
           should_invalidate = true
-          break
         }
       }
       if(should_invalidate){

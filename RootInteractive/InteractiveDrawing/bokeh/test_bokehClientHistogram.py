@@ -55,7 +55,11 @@ figureLayoutDesc=[
 ]
 
 histoArray = [
-    {"name": "histoA", "variables": ["A"], "nbins":20, "range": "histoRangeA", "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]]},
+    {"name": "histoA", "variables": ["A"], "nbins":20, "range": "histoRangeA", "quantiles": [.05, .5, .95], "sum_range": [[.25, .75], [.4, .6]],
+         "histograms": {
+            "cumulative": {"cumulative":True},
+            "cdf": {"cumulative":True, "density":True}
+         }},
     {"name": "histoB", "variables": ["B"], "nbins":"nBinsB", "range": [0, 1]},
     {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, "nBinsB", 10], "range": ["histoRangeA", None, None], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, "nBinsB"], "range": ["histoRangeA", None], "unbinned_projections":True, "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
@@ -81,14 +85,26 @@ def testBokehClientHistogramOnlyHisto():
         [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
         [['bin_count'], ['bin_center'], {"source": "histoB"}],
-        ["tableHisto", {"rowwise": False, "include": "histoA$|histoB$"}]
+        ["tableHisto", {"rowwise": False, "include": "histoA$|histoB$"}],
+        [['bin_center'], ['cumulative'], {"source": "histoA"}],
+        [['bin_center_0'], ['cumulative'], {"source": "histoAB_1"}],
+        [['bin_center'], ['cdf'], {"source": "histoA"}],
+        [['bin_center_0'], ['cdf'], {"source": "histoAB_1"}]
     ]
-    figureLayoutDesc=[
-        [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        [4, {'plot_height': 40}],
-        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
-    ]
+    figureLayoutDesc={
+            "Histograms":[
+                [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+                [2, 3, {'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+                [4, {'plot_height': 40}],
+                {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2, "size": 5}
+            ],
+            "Cumulative":[
+                [5,6, {'commonX': 5, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
+                [7,8, {'commonX': 5, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}]
+            ]
+
+        }
+
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray)
 
