@@ -1847,7 +1847,7 @@ def makeCDSDict(sourceArray, paramDict):
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
     return cdsDict
 
-def makeAxisLabelFromTemplate(template:str, paramDict:dict):
+def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     components = re.split(r"\{(\w+)\}", template)
     if len(components) == 1:
         return components[0]
@@ -1859,5 +1859,7 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict):
                 label.components[i] = this.value;
                 label.change.emit();
             """)])
+        if components[i] in meta:
+            components[i] = meta[components[i]].get("AxisTitle", components[i])
     label.components = components
     return label
