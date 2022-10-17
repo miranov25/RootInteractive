@@ -71,7 +71,8 @@ def testBokehClientHistogram():
         [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2",
                                                             "rescaleColorMapper": True, "size":"size"}],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
-                                                    "rescaleColorMapper": True, "size":"size"}]
+                                                    "rescaleColorMapper": True, "size":"size"}],
+        {"y_transform":"transformY"}
     ]
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, histogramArray=histoArray)
@@ -382,5 +383,3 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
-
-testBokehClientHistogramOnlyHisto()
