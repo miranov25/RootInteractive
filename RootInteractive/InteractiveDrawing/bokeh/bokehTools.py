@@ -5,6 +5,7 @@ from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.plots import Plot
 from bokeh.transform import *
+from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
@@ -942,6 +943,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figure_cds_name = None
         mapperC = None
 
+        xAxisTitleBuilder = []
+        yAxisTitleBuilder = []
+
         for i in range(length):
             variables_dict = {}
             for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
@@ -1000,7 +1004,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
-            varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
             cds_used = None
             if cds_name != "$IGNORE":
@@ -1043,8 +1046,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                        drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
-                                color=color, marker=marker, legend_label=y_label + " vs " + x_label)
+                        legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict)
+                        if isinstance(legend_label, str):
+                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_label=legend_label)
+                        else:
+                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                color=color, marker=marker, legend_label=''.join(legend_label.components))
                     else:
                         drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
@@ -1096,35 +1104,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
                 figure_cds_name = ""
+            xAxisTitleBuilder.append(x_label)
+            yAxisTitleBuilder.append(y_label)
 
-        xAxisTitle = ""
-        yAxisTitle = ""
-        plotTitle = ""
-
-        for varY in variables[1]:
-            if hasattr(dfQuery, "meta") and isinstance(varY, str) and '.' not in varY:
-                yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
-            else:
-                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
-            yAxisTitle += ','
-        for varX in variables[0]:
-            if hasattr(dfQuery, "meta") and isinstance(varX, str) and '.' not in varX:
-                xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
-            else:
-                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
-            xAxisTitle += ','
-        xAxisTitle = xAxisTitle[:-1]
-        yAxisTitle = yAxisTitle[:-1]
+        xAxisTitle = ", ".join(xAxisTitleBuilder)
+        yAxisTitle = ", ".join(yAxisTitleBuilder)
 
         if optionLocal["xAxisTitle"] is not None:
             xAxisTitle = optionLocal["xAxisTitle"]
         if optionLocal["yAxisTitle"] is not None:
             yAxisTitle = optionLocal["yAxisTitle"]
-        plotTitle += yAxisTitle + " vs " + xAxisTitle
+        plotTitle = yAxisTitle + " vs " + xAxisTitle
         if optionLocal["plotTitle"] is not None:
             plotTitle = optionLocal["plotTitle"]
 
+        plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict)
+
         figureI.title.text = plotTitle
+        if isinstance(plotTitleModel, ConcatenatedString):
+            plotTitleModel.js_on_change()
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
 
@@ -1649,14 +1647,14 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
                 raise KeyError("Parameter "+j+" not found")
     return ({"field":varError[0]["name"], "transform":transform_lower}, {"field":varError[1]["name"], "transform":transform_upper})
 
-def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True, transform=None):
+def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if isinstance(varName, tuple):
         return getHistogramAxisTitle(cdsDict, varName[0], cdsName, removeCdsName)
     if cdsName is None:
-        return varName
+        return f"{{{varName}}}"
     if cdsName in cdsDict:
         if cdsDict[cdsName]["type"] == "join":
-            return varName
+            return f"{{{varName}}}"
         prefix = ""
         if not removeCdsName:
             prefix =  cdsName+"."
@@ -1672,34 +1670,34 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True, transfo
                 else:
                     variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
                 if len(x) == 2:
-                    return variables[0]
-                return variables[int(x[2])]
+                    return f"{{{variables[0]}}}"
+                return f"{{{variables[int(x[2])]}}}"
             if x[0] == "quantile" and len(x) == 2:
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
                     histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                     projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                    return "quantile " + str(quantile) + " " + histogramOrig.sample_variables[projectionIdx]
-                return "quantile " + str(quantile)
-            if x[0] == "sum" and x[1] == "range" and len(x) == 3:
+                    return f"quantile {quantile} {{{ histogramOrig.sample_variables[projectionIdx] }}}"
+                return f"quantile {{{quantile}}}"
+            if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if cdsDict[cdsName]["type"] == "projection":
                         histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                         projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                        return "sum " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                    return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                else:
+                        return f"sum {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                    return f"sum in [{range[0]}, {range[1]}]"
+                elif len(x) == 3:
                     if cdsDict[cdsName]["type"] == "projection":
                         histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                         projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                        return "p " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                    return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
+                        return f"p {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                    return f"p in [{range[0]}, {range[1]}]"
         else:
             if cdsDict[cdsName]["type"] == "projection":
                 histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                 projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                return varName + " " + histogramOrig.sample_variables[projectionIdx]
+                return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
     return prefix+varName
 
 def makeCDSDict(sourceArray, paramDict):
@@ -1848,3 +1846,18 @@ def makeCDSDict(sourceArray, paramDict):
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
     return cdsDict
+
+def makeAxisLabelFromTemplate(template:str, paramDict:dict):
+    components = re.split(r"\{(\w+)\}", template)
+    if len(components) == 1:
+        return components[0]
+    label = ConcatenatedString()
+    for i in range(1, len(components), 2):
+        if components[i] in paramDict:
+            components[i] = paramDict[components[i]]["value"]
+            paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
+                label.components[i] = this.value;
+                label.change.emit();
+            """)])
+    label.components = components
+    return label
