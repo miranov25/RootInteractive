@@ -175,6 +175,7 @@ export class HistoNdProfile extends ColumnarDataSource {
         let std_column = []
         let entries_column = []
         let isOK_column = []
+        let cumulative_column = []
         let quantile_columns:Array<Array<number>> = []
         for (let i = 0; i < quantiles.length; i++) {
           quantile_columns.push([])
@@ -228,6 +229,8 @@ export class HistoNdProfile extends ColumnarDataSource {
 
         const nbins_total = source.length
 
+        let entries_total = 0
+
         for(let x = 0; x < nbins_total; x += stride_high){
           for(let z = 0; z < stride_low; z ++){
       //      console.log(x)
@@ -244,6 +247,7 @@ export class HistoNdProfile extends ColumnarDataSource {
               std_column.push(NaN)
               entries_column.push(NaN)
               isOK_column.push(false)
+              cumulative_column.push(null)
               continue
             }
             let cumulative_histogram = []
@@ -252,6 +256,8 @@ export class HistoNdProfile extends ColumnarDataSource {
               entries += bin_count[x+y+z]
               cumulative_histogram.push(entries)
             }
+            cumulative_column.push(entries_total + entries/2)
+            entries_total += entries
             if(entries > 0){
               let mean = 0
               if(unbinned){
@@ -402,6 +408,8 @@ export class HistoNdProfile extends ColumnarDataSource {
         this.data["std"] = std_column
         this.data["entries"] = entries_column
         this.data["isOK"] = isOK_column
+        this.data["cumulative"] = cumulative_column
+        this.data["cdf"] = cumulative_column.map((x) => x / entries_total)
         for (let iQuantile = 0; iQuantile < quantile_columns.length; iQuantile++) {
           this.data["quantile_"+iQuantile] = quantile_columns[iQuantile]
         }

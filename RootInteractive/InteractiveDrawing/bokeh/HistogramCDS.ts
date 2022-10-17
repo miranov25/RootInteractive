@@ -135,7 +135,7 @@ export class HistogramCDS extends ColumnarDataSource {
       this._stale_range = false
   }
 
-  histogram(weights: string | null): number[]{
+  histogram(weights: string | null, weights_transform: ((x:number) => number) | null=null ): number[]{
     const bincount = Array<number>(this._nbins)
     bincount.fill(0)
     const sample_array = this.source.get_column(this.sample)
@@ -150,10 +150,19 @@ export class HistogramCDS extends ColumnarDataSource {
         if (weights_array == null){
           throw ReferenceError("Column not defined: "+ weights)
         }
-        for(let i=0; i<n_indices; i++){
-          const bin = this.getbin(sample_array[i])
-          if(bin >= 0 && bin < this._nbins){
-            bincount[bin] += weights_array[i]
+        if (weights_transform != null){
+          for(let i=0; i<n_indices; i++){
+            const bin = this.getbin(sample_array[i])
+            if(bin >= 0 && bin < this._nbins){
+              bincount[bin] += weights_transform(weights_array[i])
+            }
+          }          
+        } else {
+          for(let i=0; i<n_indices; i++){
+            const bin = this.getbin(sample_array[i])
+            if(bin >= 0 && bin < this._nbins){
+              bincount[bin] += weights_array[i]
+            }
           }
         }
       } else {
@@ -246,7 +255,30 @@ export class HistogramCDS extends ColumnarDataSource {
       if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
-        data[key] = this.histogram(histograms[key]!.weights)
+        const h = histograms[key]!
+        const histogram = this.histogram(h.weights)
+        if(h.cumulative){
+          let acc = 0
+          let cumulative = []
+          for(const x of histogram){
+            acc += x
+            cumulative.push(acc)
+          }
+          if(h.density){
+            for(let i=0; i<cumulative.length; i++){
+              cumulative[i] /= acc
+            }
+          }
+          data[key] = cumulative
+        } else {
+          if(h.density){
+            const c = histogram.reduce((acc, cur) => acc+cur) / this._transform_scale
+            for(let i=0; i<histogram.length; i++){
+              histogram[i] /=  c
+            }
+          }          
+          data[key] = histogram
+        }
       }
     } 
   }
