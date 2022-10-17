@@ -175,7 +175,7 @@ export class HistoNdProfile extends ColumnarDataSource {
         let std_column = []
         let entries_column = []
         let isOK_column = []
-        let cumulative_column = []
+        let cumulative_column: number[] = []
         let quantile_columns:Array<Array<number>> = []
         for (let i = 0; i < quantiles.length; i++) {
           quantile_columns.push([])
@@ -247,7 +247,7 @@ export class HistoNdProfile extends ColumnarDataSource {
               std_column.push(NaN)
               entries_column.push(NaN)
               isOK_column.push(false)
-              cumulative_column.push(null)
+              cumulative_column.push(NaN)
               continue
             }
             let cumulative_histogram = []
