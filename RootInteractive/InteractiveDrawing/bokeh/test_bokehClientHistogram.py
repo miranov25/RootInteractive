@@ -384,5 +384,3 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
-
-testBokehClientHistogramOnlyHisto()
