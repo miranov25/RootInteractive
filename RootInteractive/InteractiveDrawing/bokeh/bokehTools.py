@@ -1214,8 +1214,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": columnKey},
                                                                                             code="""
                                                                                                 cdsAlias.mapping[key] = this.value;
-                                                                                                cdsAlias.compute_function(key);
-                                                                                                cdsAlias.change.emit();
+                                                                                                cdsAlias.invalidate_column(key);
                                                                                             """)])
 
     for iCds, widgets in widgetDict.items():
