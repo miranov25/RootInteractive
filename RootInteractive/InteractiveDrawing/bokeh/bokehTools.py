@@ -984,13 +984,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     # Also add the color bar
                     if "colorAxisTitle" in optionLocal:
                         axis_title = optionLocal["colorAxisTitle"]
-                    elif varColor["type"] == "parameter":
-                        axis_title = paramDict[varColor["name"]]["value"]
                     else:
                         axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
-                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
-                    if varColor["type"] == "parameter":
-                        paramDict[varColor["name"]]["subscribed_events"].append(["value", color_bar, "title"])
+                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
+                    axis_title = makeAxisLabelFromTemplate(axis_title, paramDict, meta)
+                    applyParametricAxisLabel(axis_title, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
             else:
@@ -1123,24 +1121,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         plotTitle = optionLocal.get("plotTitle", plotTitle)
 
         xAxisTitleModel = makeAxisLabelFromTemplate(xAxisTitle, paramDict, meta)
+        applyParametricAxisLabel(xAxisTitleModel, figureI.xaxis[0], "axis_label")
         yAxisTitleModel = makeAxisLabelFromTemplate(yAxisTitle, paramDict, meta)
+        applyParametricAxisLabel(yAxisTitleModel, figureI.yaxis[0], "axis_label")
         plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict, meta)
-
-        if isinstance(plotTitleModel, ConcatenatedString):
-            plotTitleModel.js_on_change("change", CustomJS(args={"target":figureI.title}, code="target.text = this.value"))
-            figureI.title.text = ''.join(plotTitleModel.components)
-        else:
-            figureI.title.text = plotTitleModel
-        if isinstance(xAxisTitleModel, ConcatenatedString):
-            xAxisTitleModel.js_on_change("change", CustomJS(args={"target":figureI.xaxis[0]}, code="target.axis_label = this.value"))
-            figureI.xaxis.axis_label = ''.join(xAxisTitleModel.components)
-        else:
-            figureI.xaxis.axis_label = xAxisTitleModel
-        if isinstance(yAxisTitleModel, ConcatenatedString):
-            yAxisTitleModel.js_on_change("change", CustomJS(args={"target":figureI.yaxis[0]}, code="target.axis_label = this.value"))
-            figureI.yaxis.axis_label = ''.join(yAxisTitleModel.components)
-        else:
-            figureI.yaxis.axis_label = yAxisTitleModel
+        applyParametricAxisLabel(plotTitleModel, figureI.title, "text")
 
         if color_bar is not None:
             figureI.add_layout(color_bar, 'right')
@@ -1884,3 +1869,10 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
         components[i] = meta.get(components[i]+".AxisTitle", components[i])
     label.components = components
     return label
+
+def applyParametricAxisLabel(label, target, attr):
+    if isinstance(label, ConcatenatedString):
+        label.js_on_change("change", CustomJS(args={"target":target, "attr":attr}, code="target[attr] = this.value"))
+        target.update(**{attr:''.join(label.components)})
+    elif isinstance(label, str):
+        target.update(**{attr:label})
