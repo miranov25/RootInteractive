@@ -80,7 +80,7 @@ def testBokehClientHistogram():
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
-        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")]}],
+        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "yAxisTitle":"{transformY}(N)"}],
         [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
         [['bin_count'], ['bin_center'], {"source": "histoB"}],
@@ -384,3 +384,5 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
+testBokehClientHistogramOnlyHisto()
