@@ -36,13 +36,18 @@ export class ConcatenatedString extends Model {
 
   connect_signals(): void {
     super.connect_signals()
+    this.connect(this.properties.components.change, () => {this.#is_dirty = true})
   }
 
   compute(): string{
     if (this.#is_dirty){
-        this.#value = String.prototype.concat(this.components)
+        this.#value = String.prototype.concat(...this.components)
     }
     return this.#value
+  }
+
+  get value(){
+    return this.compute()
   }
 
 }

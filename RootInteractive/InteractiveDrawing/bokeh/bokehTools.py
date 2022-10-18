@@ -55,6 +55,8 @@ BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "le
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
 
+RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
+
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
         "verbose": 0,
@@ -580,6 +582,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     memoized_columns = {}
     sources = set()
+
+    meta = dfQuery.meta.metaData.copy()
             
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
@@ -1013,8 +1017,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoHandle = cdsDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
+                    x_label = f"{{{histoHandle['variables'][0]}}}"
+                    y_label = "entries"
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
                 elif histoHandle["type"] == "histo2d":
+                    x_label = f"{{{histoHandle['variables'][0]}}}"
+                    y_label = f"{{{histoHandle['variables'][1]}}}"
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
                 drawnGlyph = None
@@ -1046,7 +1054,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                        legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict)
+                        legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
                         if isinstance(legend_label, str):
                             drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_label=legend_label)
@@ -1104,8 +1112,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
                 figure_cds_name = ""
-            xAxisTitleBuilder.append(x_label)
-            yAxisTitleBuilder.append(y_label)
+            if len(variables[0]) > len(xAxisTitleBuilder):
+                xAxisTitleBuilder.append(x_label)
+            if len(variables[1]) > len(yAxisTitleBuilder):
+                yAxisTitleBuilder.append(y_label)
 
         xAxisTitle = ", ".join(xAxisTitleBuilder)
         yAxisTitle = ", ".join(yAxisTitleBuilder)
@@ -1118,11 +1128,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if optionLocal["plotTitle"] is not None:
             plotTitle = optionLocal["plotTitle"]
 
-        plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict)
+        plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict, meta)
 
         figureI.title.text = plotTitle
         if isinstance(plotTitleModel, ConcatenatedString):
-            plotTitleModel.js_on_change()
+            plotTitleModel.js_on_change("change", CustomJS(args={"target":figureI.title}, code="target.text = this.value"))
+            figureI.title.text = ''.join(plotTitleModel.components)
+        else:
+            figureI.title.text = plotTitleModel
+
         figureI.xaxis.axis_label = xAxisTitle
         figureI.yaxis.axis_label = yAxisTitle
 
@@ -1848,18 +1862,16 @@ def makeCDSDict(sourceArray, paramDict):
     return cdsDict
 
 def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
-    components = re.split(r"\{(\w+)\}", template)
-    if len(components) == 1:
-        return components[0]
+    components = re.split(RE_CURLY_BRACE, template)
     label = ConcatenatedString()
     for i in range(1, len(components), 2):
         if components[i] in paramDict:
-            components[i] = paramDict[components[i]]["value"]
             paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
                 label.components[i] = this.value;
+                label.properties.components.change.emit()
                 label.change.emit();
             """)])
-        if components[i] in meta:
-            components[i] = meta[components[i]].get("AxisTitle", components[i])
+            components[i] = paramDict[components[i]]["value"]
+        components[i] = meta.get(components[i]+".AxisTitle", components[i])
     label.components = components
     return label
