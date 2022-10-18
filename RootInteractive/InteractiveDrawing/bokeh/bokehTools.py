@@ -1866,11 +1866,19 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     label = ConcatenatedString()
     for i in range(1, len(components), 2):
         if components[i] in paramDict:
-            paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
-                label.components[i] = this.value;
-                label.properties.components.change.emit()
-                label.change.emit();
-            """)])
+            if "options" in paramDict[components[i]]:
+                options = {j:meta.get(j+".AxisTitle", j) for j in paramDict[components[i]]["options"]}
+                paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label, "options":options}, code="""
+                    label.components[i] = options[this.value];
+                    label.properties.components.change.emit();
+                    label.change.emit();
+                """)])
+            else:
+                paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
+                    label.components[i] = this.value;
+                    label.properties.components.change.emit();
+                    label.change.emit();
+                """)])
             components[i] = paramDict[components[i]]["value"]
         components[i] = meta.get(components[i]+".AxisTitle", components[i])
     label.components = components
