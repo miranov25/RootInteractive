@@ -1049,6 +1049,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
                         legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
                         if isinstance(legend_label, str):
                             drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
