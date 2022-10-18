@@ -1853,7 +1853,9 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     for i in range(1, len(components), 2):
         if components[i] in paramDict:
             if "options" in paramDict[components[i]]:
-                options = {j:meta.get(f"{j}.AxisTitle", j) for j in paramDict[components[i]]["options"]}
+                options = {str(j):meta.get(f"{j}.AxisTitle", str(j)) for j in paramDict[components[i]]["options"]}
+                if 'None' in options:
+                    options["None"] = ''
                 paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label, "options":options}, code="""
                     label.components[i] = options[this.value];
                     label.properties.components.change.emit();
@@ -1866,7 +1868,8 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
                     label.change.emit();
                 """)])
             components[i] = paramDict[components[i]]["value"]
-        components[i] = meta.get(components[i]+".AxisTitle", components[i])
+        components[i] = str(components[i]) if components[i] is not None else ''
+        components[i] = meta.get(f"{components[i]}.AxisTitle", components[i])
     label.components = components
     return label
 
