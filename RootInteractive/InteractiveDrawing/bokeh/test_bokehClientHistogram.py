@@ -89,6 +89,7 @@ def testBokehClientHistogramOnlyHisto():
         [['bin_center_0'], ['cumulative'], {"source": "histoAB_1"}],
         [['bin_center'], ['cdf'], {"source": "histoA"}],
         [['bin_center_0'], ['cdf'], {"source": "histoAB_1"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc={
             "Histograms":[
