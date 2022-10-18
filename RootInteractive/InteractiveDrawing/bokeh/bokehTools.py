@@ -1853,7 +1853,7 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     for i in range(1, len(components), 2):
         if components[i] in paramDict:
             if "options" in paramDict[components[i]]:
-                options = {j:meta.get(j+".AxisTitle", j) for j in paramDict[components[i]]["options"]}
+                options = {j:meta.get(f"{j}.AxisTitle", j) for j in paramDict[components[i]]["options"]}
                 paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label, "options":options}, code="""
                     label.components[i] = options[this.value];
                     label.properties.components.change.emit();
