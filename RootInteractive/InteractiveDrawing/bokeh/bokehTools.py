@@ -5,6 +5,7 @@ from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.plots import Plot
 from bokeh.transform import *
+from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
@@ -53,6 +54,8 @@ defaultHisto2DTooltips = [
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
+
+RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -449,14 +452,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "legendTitle": None,
         'nPointRender': 10000,
         "nbins": 10,
-        "weights": None,
         "range": None,
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
-        "xAxisTitle": None,
-        "yAxisTitle": None,
-        "plotTitle": None,
         "removeExtraColumns": False
     }
     options.update(kwargs)
@@ -545,7 +544,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
             if "expr" in i:
                 exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
-                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, {}, i["expr"], aliasDict)
+                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
                 result = evaluator.visit(exprTree.body)
                 if result["type"] == "javascript":
                     func = "return "+result["implementation"]
@@ -580,6 +579,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     memoized_columns = {}
     sources = set()
+
+    meta = dfQuery.meta.metaData.copy()
             
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
@@ -834,6 +835,59 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionLocal.update(variables[-1])
             nvars -= 1
 
+        x_transform = optionLocal.get("x_transform", None)
+        y_transform = optionLocal.get("y_transform", None)
+        if isinstance(y_transform, str):
+            #TODO: Extract function and use recursion
+            exprTree = ast.parse(y_transform, filename="<unknown>", mode="eval")
+            evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
+            y_transform_parsed = evaluator.visit(exprTree.body)
+            y_transform_parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+            y_transform_parsed["parameters"] = y_transform_parameters
+            if y_transform_parsed["type"] == "js_lambda":
+                y_transform_customjs = CustomJSTransform(args=y_transform_parameters, v_func=f"""
+                    return xs.map({y_transform_parsed["implementation"]});
+                """)
+            elif y_transform_parsed["type"] == "parameter":
+                if "options" not in paramDict[y_transform_parsed["name"]]:
+                    raise KeyError(y_transform_parsed["name"])
+                js_transforms = {}
+                parsed_options = {}
+                default_func = paramDict[y_transform_parsed["name"]]["value"]
+                if default_func is None:
+                    default_func = "None"
+                y_transform_parsed["default"] = default_func
+                y_transform_customjs = CustomJSTransform(args={"current":default_func}, v_func="return options[current].v_compute(xs)")
+                for func_option in paramDict[y_transform_parsed["name"]]["options"]:
+                    if func_option is None:
+                        option_customjs = CustomJSTransform(v_func="return xs")
+                        js_transforms["None"] = option_customjs
+                        continue
+                    func_option_tree = ast.parse(func_option, filename="<unknown>", mode="eval")
+                    func_option_evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
+                    option_parsed = func_option_evaluator.visit(func_option_tree.body)
+                    option_parameters = {i:paramDict[i]["value"] for i in func_option_evaluator.paramDependencies}
+                    option_customjs = CustomJSTransform(args=option_parameters, v_func=f"""
+                        return xs.map({option_parsed["implementation"]});
+                    """)
+                    js_transforms[func_option] = option_customjs
+                    parsed_options[func_option] = option_parsed
+                    y_transform_parameters.update(option_parameters)
+                y_transform_parsed["options"] = parsed_options
+                y_transform_customjs.args["options"] = js_transforms
+                paramDict[y_transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs}, code="""
+            mapper.args.current = this.value
+            mapper.change.emit()
+                    """)])
+            if y_transform_parameters is not None:
+                for j in y_transform_parameters:
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs, "param":j}, code="""
+            mapper.args[param] = this.value
+            mapper.change.emit()
+                    """)])
+            # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
+            # later 2 vectors
+
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
             if axis_index < nvars:
@@ -890,6 +944,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         figure_cds_name = None
         mapperC = None
 
+        xAxisTitleBuilder = []
+        yAxisTitleBuilder = []
+
         for i in range(length):
             variables_dict = {}
             for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
@@ -927,13 +984,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     # Also add the color bar
                     if "colorAxisTitle" in optionLocal:
                         axis_title = optionLocal["colorAxisTitle"]
-                    elif varColor["type"] == "parameter":
-                        axis_title = paramDict[varColor["name"]]["value"]
                     else:
                         axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
-                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0), title=axis_title)
-                    if varColor["type"] == "parameter":
-                        paramDict[varColor["name"]]["subscribed_events"].append(["value", color_bar, "title"])
+                    color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
+                    axis_title = makeAxisLabelFromTemplate(axis_title, paramDict, meta)
+                    applyParametricAxisLabel(axis_title, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
             else:
@@ -948,7 +1003,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 2:
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
-            varX = variables[0][i % lengthX]
             varY = variables[1][i % lengthY]
             cds_used = None
             if cds_name != "$IGNORE":
@@ -958,8 +1012,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoHandle = cdsDict[varY]
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
+                    x_label = f"{{{histoHandle['variables'][0]}}}"
+                    y_label = "entries"
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
                 elif histoHandle["type"] == "histo2d":
+                    x_label = f"{{{histoHandle['variables'][0]}}}"
+                    y_label = f"{{{histoHandle['variables'][1]}}}"
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
             else:
                 drawnGlyph = None
@@ -978,18 +1036,28 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     right = variables_dict["X"][1]["name"]
                     bottom = variables_dict["Y"][0]["name"]
                     top = variables_dict["Y"][1]["name"]
+                    dataSpecBottom = {"field":bottom, "transform":y_transform_customjs} if y_transform else bottom
+                    dataSpecTop = {"field":top, "transform":y_transform_customjs} if y_transform else top
                     x_label = getHistogramAxisTitle(cdsDict, left, cds_name)
                     y_label = getHistogramAxisTitle(cdsDict, bottom, cds_name)
-                    drawnGlyph = figureI.quad(top=top, bottom=bottom, left=left, right=right,
+                    drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=left, right=right,
                     fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
+                    dataSpecY = {"field":varNameY, "transform":y_transform_customjs} if y_transform else varNameY
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
-                        drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
-                                color=color, marker=marker, legend_label=y_label + " vs " + x_label)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
+                        legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
+                        if isinstance(legend_label, str):
+                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_label=legend_label)
+                        else:
+                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                color=color, marker=marker, legend_label=''.join(legend_label.components))
                     else:
                         drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
@@ -1019,10 +1087,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     figureI.add_glyph(cds_used, errorX)
                 if variables_dict['errY'] is not None:
                     if isinstance(variables_dict['errY'], dict):
-                        errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
-                        errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
+                        if y_transform:
+                            barLower, barUpper = errorBarWidthAsymmetric((variables_dict['errY'],variables_dict['errY']), variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
+                            errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
+                        else:
+                            errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
+                            errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
                     elif isinstance(variables_dict['errY'], tuple):
-                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used)
+                        barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
                         errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
                     figureI.add_glyph(cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
@@ -1037,37 +1109,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 figure_cds_name = cds_name
             elif figure_cds_name != cds_name:
                 figure_cds_name = ""
+            if len(variables[0]) > len(xAxisTitleBuilder):
+                xAxisTitleBuilder.append(x_label)
+            if len(variables[1]) > len(yAxisTitleBuilder):
+                yAxisTitleBuilder.append(y_label)
 
-        xAxisTitle = ""
-        yAxisTitle = ""
-        plotTitle = ""
+        xAxisTitle = ", ".join(xAxisTitleBuilder)
+        yAxisTitle = ", ".join(yAxisTitleBuilder)
+        plotTitle = yAxisTitle + " vs " + xAxisTitle
 
-        for varY in variables[1]:
-            if hasattr(dfQuery, "meta") and isinstance(varY, str) and '.' not in varY:
-                yAxisTitle += dfQuery.meta.metaData.get(varY + ".AxisTitle", varY)
-            else:
-                yAxisTitle += getHistogramAxisTitle(cdsDict, varY, cds_name, False)
-            yAxisTitle += ','
-        for varX in variables[0]:
-            if hasattr(dfQuery, "meta") and isinstance(varX, str) and '.' not in varX:
-                xAxisTitle += dfQuery.meta.metaData.get(varX + ".AxisTitle", varX)
-            else:
-                xAxisTitle += getHistogramAxisTitle(cdsDict, varX, cds_name, False)
-            xAxisTitle += ','
-        xAxisTitle = xAxisTitle[:-1]
-        yAxisTitle = yAxisTitle[:-1]
+        xAxisTitle = optionLocal.get("xAxisTitle", xAxisTitle)
+        yAxisTitle = optionLocal.get("yAxisTitle", yAxisTitle)
+        plotTitle = optionLocal.get("plotTitle", plotTitle)
 
-        if optionLocal["xAxisTitle"] is not None:
-            xAxisTitle = optionLocal["xAxisTitle"]
-        if optionLocal["yAxisTitle"] is not None:
-            yAxisTitle = optionLocal["yAxisTitle"]
-        plotTitle += yAxisTitle + " vs " + xAxisTitle
-        if optionLocal["plotTitle"] is not None:
-            plotTitle = optionLocal["plotTitle"]
-
-        figureI.title.text = plotTitle
-        figureI.xaxis.axis_label = xAxisTitle
-        figureI.yaxis.axis_label = yAxisTitle
+        xAxisTitleModel = makeAxisLabelFromTemplate(xAxisTitle, paramDict, meta)
+        applyParametricAxisLabel(xAxisTitleModel, figureI.xaxis[0], "axis_label")
+        yAxisTitleModel = makeAxisLabelFromTemplate(yAxisTitle, paramDict, meta)
+        applyParametricAxisLabel(yAxisTitleModel, figureI.yaxis[0], "axis_label")
+        plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict, meta)
+        applyParametricAxisLabel(plotTitleModel, figureI.title, "text")
 
         if color_bar is not None:
             figureI.add_layout(color_bar, 'right')
@@ -1141,8 +1201,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[value["name"]]["subscribed_events"].append(["value", CustomJS(args={"cdsAlias": cdsDict[cdsKey]["cdsFull"], "key": columnKey},
                                                                                             code="""
                                                                                                 cdsAlias.mapping[key] = this.value;
-                                                                                                cdsAlias.compute_function(key);
-                                                                                                cdsAlias.change.emit();
+                                                                                                cdsAlias.invalidate_column(key);
                                                                                             """)])
 
     for iCds, widgets in widgetDict.items():
@@ -1327,7 +1386,7 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
         pass
     if options['type'] == 'user':
         start, end, step = params[1], params[2], params[3]
-    elif (options['type'] == 'auto') | (options['type'] == 'minmax'):
+    elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
         start = np.nanmin(df[name])
         end = np.nanmax(df[name])
         step = (end - start) / options['bins']
@@ -1370,8 +1429,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             dfCategorical = df[params[0]]
         codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
         optionsPlot = optionsPlot.dropna().to_list()
-    for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str((val))
+    optionsPlot = [str(i) for i in optionsPlot]
     default_value = 0
     if isinstance(default, int):
         if 0 <= default < len(optionsPlot):
@@ -1497,19 +1555,6 @@ def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
         tooltips.append((f"Sum_normed {varNames[axis_idx]} in [{iRange[0]}, {iRange[1]}]", "@sum_normed_" + str(i)))
     return tooltips
 
-def getOrMakeColumn(dfQuery, column, cdsName, ignoreDict={}):
-    if '.' in column:
-        c = column.split('.')
-        if cdsName is None or cdsName == c[0]:
-            return [dfQuery, c[1], c[0]]
-        else:
-            raise ValueError("Inconsistent CDS")
-    else:
-        if column in ignoreDict:
-            return [dfQuery, column, cdsName]
-        dfQuery, column = pandaGetOrMakeColumn(dfQuery, column)
-        return [dfQuery, column, None]
-
 def getTooltipColumns(tooltips):
     if isinstance(tooltips, str):
         return {}
@@ -1523,11 +1568,6 @@ def getTooltipColumns(tooltips):
                 result.add(iField[1:])
     return result
 
-def makeBokehDataSpec(thing: dict, paramDict: dict):
-    if thing["type"] == "constant":
-        return {"value": thing["value"]}
-    return {"field": thing["name"]}
-
 def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
     if varError["type"] == "constant":
         return {"value": varError["value"]*2}
@@ -1537,27 +1577,86 @@ def errorBarWidthTwoSided(varError: dict, paramDict: dict, transform=None):
         return {"field": paramDict[varError["name"]]["value"], "transform": transform}
     return {"field": varError["name"], "transform": transform}
 
-def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source):
+def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=None, paramDict = None):
     varNameX = varX["name"]
     # This JS callback can be optimized if needed
-    transform_lower = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
-        const column = [...source.get_column(key)]
-        return column.map((x, i) => x-xs[i])
-    """)
-    transform_upper = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
-        const column = [...source.get_column(key)]
-        return column.map((x, i) => x+xs[i])
-    """)
+    if paramDict is None:
+        paramDict = {}
+    if transform is None:
+        transform_lower = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => x-xs[i])
+        """)
+        transform_upper = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => x+xs[i])
+        """)
+    elif transform["type"] == "parameter":
+        options_lower = {}
+        options_upper = {}
+        transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
+        transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
+        for i, iOption in transform["options"].items():
+            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+                const column = [...source.get_column(key)]
+                return column.map((x, i) => {iOption["implementation"]}(x-xs[i]))
+            """)
+            options_lower[i] = transform_lower_i
+            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+                const column = [...source.get_column(key)]
+                return column.map((x, i) => {iOption["implementation"]}(x+xs[i]))
+            """)
+            options_upper[i] = transform_upper_i
+        options_lower["null"] = options_lower["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => (x-xs[i]))
+        """)
+        options_upper["null"] = options_upper["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => (x+xs[i]))
+        """)
+        transform_lower.args["options"] = options_lower
+        transform_upper.args["options"] = options_upper
+        paramDict[transform["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower, "mapper_upper":transform_upper}, code="""
+            console.log("change")
+            mapper_lower.args.current = this.value
+            mapper_upper.args.current = this.value
+            mapper_lower.change.emit()
+            mapper_upper.change.emit()
+        """)])
+    else:
+        args = transform["parameters"].copy()
+        args.update({"source":data_source, "key":varNameX})
+        transform_lower = CustomJSTransform(args=args, v_func=f"""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => {transform["implementation"]}(x-xs[i]))
+        """)
+        transform_upper = CustomJSTransform(args=args, v_func=f"""
+            const column = [...source.get_column(key)]
+            return column.map((x, i) => {transform["implementation"]}(x+xs[i]))
+        """)        
+        for j in transform["parameters"]:
+            if j in paramDict:
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_lower, "param":j}, code="""
+                    mapper.args[param] = this.value
+                    mapper.change.emit()
+                            """)])
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_upper, "param":j}, code="""
+                    mapper.args[param] = this.value
+                    mapper.change.emit()
+                            """)])
+            else:
+                raise KeyError("Parameter "+j+" not found")
     return ({"field":varError[0]["name"], "transform":transform_lower}, {"field":varError[1]["name"], "transform":transform_upper})
 
 def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if isinstance(varName, tuple):
         return getHistogramAxisTitle(cdsDict, varName[0], cdsName, removeCdsName)
     if cdsName is None:
-        return varName
+        return f"{{{varName}}}"
     if cdsName in cdsDict:
         if cdsDict[cdsName]["type"] == "join":
-            return varName
+            return f"{{{varName}}}"
         prefix = ""
         if not removeCdsName:
             prefix =  cdsName+"."
@@ -1573,34 +1672,34 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 else:
                     variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
                 if len(x) == 2:
-                    return variables[0]
-                return variables[int(x[2])]
+                    return f"{{{variables[0]}}}"
+                return f"{{{variables[int(x[2])]}}}"
             if x[0] == "quantile" and len(x) == 2:
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
                     histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                     projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                    return "quantile " + str(quantile) + " " + histogramOrig.sample_variables[projectionIdx]
-                return "quantile " + str(quantile)
-            if x[0] == "sum" and x[1] == "range" and len(x) == 3:
+                    return f"quantile {quantile} {{{ histogramOrig.sample_variables[projectionIdx] }}}"
+                return f"quantile {{{quantile}}}"
+            if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if cdsDict[cdsName]["type"] == "projection":
                         histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                         projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                        return "sum " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                    return "sum in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                else:
+                        return f"sum {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                    return f"sum in [{range[0]}, {range[1]}]"
+                elif len(x) == 3:
                     if cdsDict[cdsName]["type"] == "projection":
                         histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                         projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                        return "p " + histogramOrig.sample_variables[projectionIdx] + " in [" + str(range[0]) + ", " + str(range[1]) + "]"
-                    return "p in ["+ str(range[0]) + ", " + str(range[1]) + "]"
+                        return f"p {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                    return f"p in [{range[0]}, {range[1]}]"
         else:
             if cdsDict[cdsName]["type"] == "projection":
                 histogramOrig = cdsDict[cdsName]["cdsOrig"].source
                 projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                return varName + " " + histogramOrig.sample_variables[projectionIdx]
+                return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
     return prefix+varName
 
 def makeCDSDict(sourceArray, paramDict):
@@ -1655,9 +1754,7 @@ def makeCDSDict(sourceArray, paramDict):
             else:
                 iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
+            weights = iSource.get("weights", None)
             iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
             if "source" not in iSource:
                 iSource["source"] = None
@@ -1680,9 +1777,7 @@ def makeCDSDict(sourceArray, paramDict):
                 histoRange = paramDict[histoRange]["value"]
             iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
         elif cdsType in ["histo2d", "histoNd"]:
-            weights = None
-            if "weights" in iSource:
-                weights = iSource["weights"]
+            weights = iSource.get("weights", None)
             if "source" not in iSource:
                 iSource["source"] = None
             iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
@@ -1753,3 +1848,36 @@ def makeCDSDict(sourceArray, paramDict):
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
     return cdsDict
+
+def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
+    components = re.split(RE_CURLY_BRACE, template)
+    label = ConcatenatedString()
+    for i in range(1, len(components), 2):
+        if components[i] in paramDict:
+            if "options" in paramDict[components[i]]:
+                options = {str(j):meta.get(f"{j}.AxisTitle", str(j)) for j in paramDict[components[i]]["options"]}
+                if 'None' in options:
+                    options["None"] = ''
+                paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label, "options":options}, code="""
+                    label.components[i] = options[this.value];
+                    label.properties.components.change.emit();
+                    label.change.emit();
+                """)])
+            else:
+                paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
+                    label.components[i] = this.value;
+                    label.properties.components.change.emit();
+                    label.change.emit();
+                """)])
+            components[i] = paramDict[components[i]]["value"]
+        components[i] = str(components[i]) if components[i] is not None else ''
+        components[i] = meta.get(f"{components[i]}.AxisTitle", components[i])
+    label.components = components
+    return label
+
+def applyParametricAxisLabel(label, target, attr):
+    if isinstance(label, ConcatenatedString):
+        label.js_on_change("change", CustomJS(args={"target":target, "attr":attr}, code="target[attr] = this.value"))
+        target.update(**{attr:''.join(label.components)})
+    elif isinstance(label, str):
+        target.update(**{attr:label})

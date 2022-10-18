@@ -58,6 +58,8 @@ class ColumnEvaluator:
         self.code = code
         self.isSource = True 
         self.aliasDict = aliasDict
+        self.isAuto = False
+        self.locals = []
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -78,38 +80,27 @@ class ColumnEvaluator:
             return self.visit_BoolOp(node)
         elif isinstance(node, ast.IfExp):
             return self.visit_IfExp(node)
+        elif isinstance(node, ast.Lambda):
+            return self.visit_Lambda(node)
         else:
             return self.eval_fallback(node)
 
     def visit_Call(self, node: ast.Call):
-        # This is never used in bokehDrawArray but there's still a unit test for it, and the dependency tree is generated correctly even in this case
-        if not isinstance(node.func, ast.Name):
-            raise ValueError("Functions in variables list can only be specified by names")
-        if node.func.id in self.funcDict:
-            args = []
-            for iArg in node.args:
-                args.append(self.visit(iArg))
-            return {
-                "value": {
-                    "func": node.func.id,
-                    "args": args
-                },
-                "type": "client_function",
-                "name": self.code
-            }
-        if node.func.id in JAVASCRIPT_GLOBALS:
-            args = []
-            implementation = JAVASCRIPT_GLOBALS[node.func.id] + '('
-            for iArg in node.args:
-                args.append(self.visit(iArg))
-                implementation += args[-1]["implementation"]
-            implementation += ')'
-            return {
-                "implementation": implementation,
-                "type": "javascript",
-                "name": self.code
-            }
-        return self.eval_fallback(node)
+        left = self.visit(node.func)
+        if left["type"] == "parameter":
+            # TODO: Make a parameter unswitcher - should help improve performance - but same can also apply to other scalars?
+            pass
+        args = []
+        implementation = JAVASCRIPT_GLOBALS[node.func.id] + '('
+        for iArg in node.args:
+            args.append(self.visit(iArg))
+            implementation += args[-1]["implementation"]
+        implementation += ')'
+        return {
+            "implementation": implementation,
+            "type": "javascript",
+            "name": self.code
+        }
 
     def visit_Num(self, node: ast.Num):
         # Kept for compatibility with old Python
@@ -123,17 +114,15 @@ class ColumnEvaluator:
     def visit_Attribute(self, node: ast.Attribute):
         if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
             # We have an alias in aliasDict
-            self.isSource = self.isSource and \
-                            isinstance(self.aliasDict[self.context][node.attr], str) and \
-                            self.aliasDict[self.context][node.attr] == node.attr
-            if isinstance(self.aliasDict[self.context][node.attr], str):
-                self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]))
+            self.isSource = False
+            if "expr" in self.aliasDict[self.context][node.attr]:
+                self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]["expr"]))
                 return {
                     "name": node.attr,
                     "implementation": node.attr,
                     "type": "alias"
                 }
-            if "fields" in self.aliasDict[self.context][node.attr]:
+            elif "fields" in self.aliasDict[self.context][node.attr]:
                 for i in self.aliasDict[self.context][node.attr]["fields"]:
                     self.dependencies.add((self.context, i))
             self.aliasDependencies.add(node.attr)
@@ -203,12 +192,40 @@ class ColumnEvaluator:
 
     def visit_Name(self, node: ast.Name):
         # There are two cases, either we are selecting the namespace or the column from the current one
+        if node.id == "auto":
+            self.isSource = False
+            self.isAuto = True
+            return {
+                "name": node.id,
+                "implementation": node.id,
+                "type": "auto"
+            }
+        if self.locals and node.id in self.locals[-1]:
+            return {
+                "name": node.id,
+                "implementation": node.id,
+                "type": "auto"
+            }            
+        if node.id in JAVASCRIPT_GLOBALS:
+            return {
+                "name": node.id,
+                "implementation": JAVASCRIPT_GLOBALS[node.id],
+                "type": "js_lambda"
+            }
+        if node.id in self.funcDict:
+            self.isSource = False
+            return {
+                "name": node.id,
+                "implementation": node.id,
+                "type": "js_lambda"
+            }
         if node.id in self.paramDict:
             self.isSource = False
             if "options" in self.paramDict[node.id]:
                 for iOption in self.paramDict[node.id]["options"]:
                     self.dependencies.add((self.context, iOption))
             self.paramDependencies.add(node.id)
+            # Detect if parameter is a lambda here?
             return {
                 "name": node.id,
                 "implementation": node.id,
@@ -382,6 +399,21 @@ class ColumnEvaluator:
             "name": self.code,
             "type": "javascript",
             "implementation": implementation
+        }
+
+    def visit_Lambda(self, node:ast.Lambda):
+        args = [i.arg for i in node.args.args]
+        impl_args = ', '.join([i.arg for i in node.args.args])
+        if self.locals:
+            self.locals.append(self.locals[-1] | set(args))
+        else:
+            self.locals.append(set(args))
+        impl_body = self.visit(node.body)["implementation"]
+        self.locals.pop()
+        return {
+            "name": self.code,
+            "type": "js_lambda",
+            "implementation": f"(({impl_args})=>({impl_body}))"
         }
 
 def checkColumn(columnKey, tableKey, cdsDict):

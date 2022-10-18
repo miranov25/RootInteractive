@@ -1,12 +1,8 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
-from bokeh.io import curdoc
 from pandas import CategoricalDtype
 
-output_file("test_bokehClientHistogram.html")
-# import logging
-
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -32,7 +28,8 @@ tooltips = [("VarA", "(@A)"), ("VarB", "(@B)"), ("VarC", "(@C)"), ("VarD", "(@D)
 parameterArray=[
     {'name':"size", "value":7, "range": [0, 20]},
     {'name':"histoRangeA", "value": [0, 1], "range": [0, 1]},
-    {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]}
+    {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]},
+    {'name':"transformY", "value":None, "options":[None, "sqrt", "lambda x: log(x+1)"]}
 ]
 
 widgetParams=[
@@ -43,11 +40,12 @@ widgetParams=[
     ['multiSelect', ["DDC"]],
     ['slider',["size"]],
     ['range', ['histoRangeA']],
-    ['select', ['nBinsB']]
+    ['select', ['nBinsB']],
+    ['select', ['transformY']]
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5], [6, 7], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -73,7 +71,8 @@ def testBokehClientHistogram():
         [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2",
                                                             "rescaleColorMapper": True, "size":"size"}],
         [['B'], ['histoB', '(C+B)*10', '(C-B)*10'], {"size": 7, "colorZvar": "C", "errY": "errY",
-                                                    "rescaleColorMapper": True, "size":"size"}]
+                                                    "rescaleColorMapper": True, "size":"size"}],
+        {"y_transform":"transformY"}
     ]
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, histogramArray=histoArray)
@@ -81,7 +80,7 @@ def testBokehClientHistogram():
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
-        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")]}],
+        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "yAxisTitle":"{transformY}(N)"}],
         [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
         [['bin_count'], ['bin_center'], {"source": "histoB"}],
@@ -89,7 +88,8 @@ def testBokehClientHistogramOnlyHisto():
         [['bin_center'], ['cumulative'], {"source": "histoA"}],
         [['bin_center_0'], ['cumulative'], {"source": "histoAB_1"}],
         [['bin_center'], ['cdf'], {"source": "histoA"}],
-        [['bin_center_0'], ['cdf'], {"source": "histoAB_1"}]
+        [['bin_center_0'], ['cdf'], {"source": "histoAB_1"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc={
             "Histograms":[
@@ -115,7 +115,8 @@ def testBokehClientHistogramProfileA():
         [['bin_center_0'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_1"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2", "size":"size"}],
         [['bin_center_0'], ['std'], {"size":"size", "source":"histoAB_1"}],
-        ["tableHisto", {"rowwise": False}]
+        ["tableHisto", {"rowwise": False}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -133,7 +134,8 @@ def testBokehClientHistogramProfileB():
         [['bin_center_1'], ['quantile_1', 'mean'], {"size":"size", "source":"histoAB_0"}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['bin_center_1'], ['std'], {"size":"size", "source":"histoAB_0"}],
-        ["tableHisto", {"rowwise": False}]
+        ["tableHisto", {"rowwise": False}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -152,7 +154,8 @@ def testBokehClientHistogramRowwiseTable():
         [['A'], ['histoAB'], {"visualization_type": "colZ", "show_histogram_error": True}],
         [['A'], ['histoAB'], {"yAxisTitle": "(A+B)/2"}],
         [['B'], ['histoB'], {"flip_histogram_axes": True}],
-        ["tableHisto", {"rowwise": True, "exclude": r".*_.*"}]
+        ["tableHisto", {"rowwise": True, "exclude": r".*_.*"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1,  {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -172,7 +175,8 @@ def testBokehClientHistogram3d():
         [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}]
+        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2", "size": "size"}],
+        {"y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -194,7 +198,7 @@ def testBokehClientHistogram3d_colormap():
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
         [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        {"size": "size", "rescaleColorMapper": True}
+        {"size": "size", "rescaleColorMapper": True, "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -217,7 +221,7 @@ def testBokehClientHistogram3d_colormap_noscale():
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2"}],
         [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2"}],
-        {"size": "size"}
+        {"size": "size", "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
@@ -260,7 +264,7 @@ def testJoin():
         [['histoAB_0.bin_center_1', 'histoB.bin_center'], ['histoAB_0.entries', 'histoB.bin_count']],
         [['histoB_join_histoAB_0.bin_center_1'], ['histoB_join_histoAB_0.delta_mean']],
         [['histoAB_0.bin_center_1'], ['histoAB_0.std']],
-        {"size": "size"}
+        {"size": "size", "y_transform":"transformY"}
     ]
     figureLayoutDesc=[
         [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],

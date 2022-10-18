@@ -51,7 +51,8 @@ export class CustomJSNAryFunction extends Model {
   update_func(){
     this.args_keys = Object.keys(this.parameters)
     this.args_values = Object.values(this.parameters)
-      this.scalar_func = new Function(...this.args_keys, ...this.fields, '"use strict";\n'+this.func)
+    this.scalar_func = new Function(...this.args_keys, ...this.fields, '"use strict";\n'+this.func)
+    this.change.emit()
   }
 
   compute(x: any[]){
@@ -61,7 +62,8 @@ export class CustomJSNAryFunction extends Model {
   update_vfunc(){
     this.args_keys = Object.keys(this.parameters)
     this.args_values = Object.values(this.parameters)
-    this.vector_func = new Function(...this.args_keys, ...this.fields, '"use strict";\n'+this.v_func)
+    this.vector_func = new Function(...this.args_keys, ...this.fields, "$output",'"use strict";\n'+this.v_func)
+    this.change.emit()
   }
 
   update_args(){

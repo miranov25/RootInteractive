@@ -67,7 +67,7 @@ figureArray = [
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],
     #marker color works only once - should be constructed in wrapper
     [['D'], ['D*10'], {"size": 10, "errY": "errY"}],
-    {"size":"size", "legend_options": {"label_text_font_size": "legendFontSize", "visible": "legendVisible"}}
+    {"size":"size", "y_transform":"lambda x: x+size", "legend_options": {"label_text_font_size": "legendFontSize", "visible": "legendVisible"}}
 ]
 
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
@@ -142,3 +142,6 @@ def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     assert (df0.keys() == df.keys()).all()
+
+output_file("test_BokehDrawArrayWidget.html")
+fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")
