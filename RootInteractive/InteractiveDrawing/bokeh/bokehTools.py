@@ -456,9 +456,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
-        "xAxisTitle": None,
-        "yAxisTitle": None,
-        "plotTitle": None,
         "removeExtraColumns": False
     }
     options.update(kwargs)
@@ -1119,26 +1116,31 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         xAxisTitle = ", ".join(xAxisTitleBuilder)
         yAxisTitle = ", ".join(yAxisTitleBuilder)
-
-        if optionLocal["xAxisTitle"] is not None:
-            xAxisTitle = optionLocal["xAxisTitle"]
-        if optionLocal["yAxisTitle"] is not None:
-            yAxisTitle = optionLocal["yAxisTitle"]
         plotTitle = yAxisTitle + " vs " + xAxisTitle
-        if optionLocal["plotTitle"] is not None:
-            plotTitle = optionLocal["plotTitle"]
 
+        xAxisTitle = optionLocal.get("xAxisTitle", xAxisTitle)
+        yAxisTitle = optionLocal.get("yAxisTitle", yAxisTitle)
+        plotTitle = optionLocal.get("plotTitle", plotTitle)
+
+        xAxisTitleModel = makeAxisLabelFromTemplate(xAxisTitle, paramDict, meta)
+        yAxisTitleModel = makeAxisLabelFromTemplate(yAxisTitle, paramDict, meta)
         plotTitleModel = makeAxisLabelFromTemplate(plotTitle, paramDict, meta)
 
-        figureI.title.text = plotTitle
         if isinstance(plotTitleModel, ConcatenatedString):
             plotTitleModel.js_on_change("change", CustomJS(args={"target":figureI.title}, code="target.text = this.value"))
             figureI.title.text = ''.join(plotTitleModel.components)
         else:
             figureI.title.text = plotTitleModel
-
-        figureI.xaxis.axis_label = xAxisTitle
-        figureI.yaxis.axis_label = yAxisTitle
+        if isinstance(xAxisTitleModel, ConcatenatedString):
+            xAxisTitleModel.js_on_change("change", CustomJS(args={"target":figureI.xaxis[0]}, code="target.axis_label = this.value"))
+            figureI.xaxis.axis_label = ''.join(xAxisTitleModel.components)
+        else:
+            figureI.xaxis.axis_label = xAxisTitleModel
+        if isinstance(yAxisTitleModel, ConcatenatedString):
+            yAxisTitleModel.js_on_change("change", CustomJS(args={"target":figureI.yaxis[0]}, code="target.axis_label = this.value"))
+            figureI.yaxis.axis_label = ''.join(yAxisTitleModel.components)
+        else:
+            figureI.yaxis.axis_label = yAxisTitleModel
 
         if color_bar is not None:
             figureI.add_layout(color_bar, 'right')
