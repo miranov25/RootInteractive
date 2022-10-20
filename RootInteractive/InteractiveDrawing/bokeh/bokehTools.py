@@ -990,28 +990,37 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     top = variables_dict["Y"][1]["name"]
                     dataSpecBottom = {"field":bottom, "transform":y_transform_customjs} if y_transform else bottom
                     dataSpecTop = {"field":top, "transform":y_transform_customjs} if y_transform else top
+                    dataSpecLeft = {"field":left, "transform":x_transform_customjs} if x_transform else left
+                    dataSpecRight = {"field":right, "transform":x_transform_customjs} if x_transform else right
                     x_label = getHistogramAxisTitle(cdsDict, left, cds_name)
+                    if x_transform:
+                        x_label = f"{{{x_transform}}} {x_label}"
                     y_label = getHistogramAxisTitle(cdsDict, bottom, cds_name)
-                    drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=left, right=right,
+                    if y_transform:
+                        y_label = f"{{{y_transform}}} {y_label}"
+                    drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=dataSpecLeft, right=dataSpecRight,
                     fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
+                    dataSpecX = {"field":varNameX, "transform":x_transform_customjs} if x_transform else varNameX
                     dataSpecY = {"field":varNameY, "transform":y_transform_customjs} if y_transform else varNameY
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        if x_transform:
+                            x_label = f"{{{x_transform}}} {x_label}"
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
                         if y_transform:
                             y_label = f"{{{y_transform}}} {y_label}"
                         legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
                         if isinstance(legend_label, str):
-                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                            drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_label=legend_label)
                         else:
-                            drawnGlyph = figureI.scatter(x=varNameX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                            drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=''.join(legend_label.components))
                     else:
-                        drawnGlyph = figureI.scatter(x=varNameX, y=varNameY, fill_alpha=1, source=cds_used, size=markerSize,
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
