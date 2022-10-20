@@ -836,57 +836,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             nvars -= 1
 
         x_transform = optionLocal.get("x_transform", None)
+        x_transform_parsed, x_transform_customjs = make_transform(x_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
         y_transform = optionLocal.get("y_transform", None)
-        if isinstance(y_transform, str):
-            #TODO: Extract function and use recursion
-            exprTree = ast.parse(y_transform, filename="<unknown>", mode="eval")
-            evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
-            y_transform_parsed = evaluator.visit(exprTree.body)
-            y_transform_parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
-            y_transform_parsed["parameters"] = y_transform_parameters
-            if y_transform_parsed["type"] == "js_lambda":
-                y_transform_customjs = CustomJSTransform(args=y_transform_parameters, v_func=f"""
-                    return xs.map({y_transform_parsed["implementation"]});
-                """)
-            elif y_transform_parsed["type"] == "parameter":
-                if "options" not in paramDict[y_transform_parsed["name"]]:
-                    raise KeyError(y_transform_parsed["name"])
-                js_transforms = {}
-                parsed_options = {}
-                default_func = paramDict[y_transform_parsed["name"]]["value"]
-                if default_func is None:
-                    default_func = "None"
-                y_transform_parsed["default"] = default_func
-                y_transform_customjs = CustomJSTransform(args={"current":default_func}, v_func="return options[current].v_compute(xs)")
-                for func_option in paramDict[y_transform_parsed["name"]]["options"]:
-                    if func_option is None:
-                        option_customjs = CustomJSTransform(v_func="return xs")
-                        js_transforms["None"] = option_customjs
-                        continue
-                    func_option_tree = ast.parse(func_option, filename="<unknown>", mode="eval")
-                    func_option_evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, y_transform, aliasDict)
-                    option_parsed = func_option_evaluator.visit(func_option_tree.body)
-                    option_parameters = {i:paramDict[i]["value"] for i in func_option_evaluator.paramDependencies}
-                    option_customjs = CustomJSTransform(args=option_parameters, v_func=f"""
-                        return xs.map({option_parsed["implementation"]});
-                    """)
-                    js_transforms[func_option] = option_customjs
-                    parsed_options[func_option] = option_parsed
-                    y_transform_parameters.update(option_parameters)
-                y_transform_parsed["options"] = parsed_options
-                y_transform_customjs.args["options"] = js_transforms
-                paramDict[y_transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs}, code="""
-            mapper.args.current = this.value
-            mapper.change.emit()
-                    """)])
-            if y_transform_parameters is not None:
-                for j in y_transform_parameters:
-                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":y_transform_customjs, "param":j}, code="""
-            mapper.args[param] = this.value
-            mapper.change.emit()
-                    """)])
-            # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
-            # later 2 vectors
+        y_transform_parsed, y_transform_customjs = make_transform(y_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
 
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
@@ -1881,3 +1833,56 @@ def applyParametricAxisLabel(label, target, attr):
         target.update(**{attr:''.join(label.components)})
     elif isinstance(label, str):
         target.update(**{attr:label})
+
+def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict):
+    if isinstance(transform, str):
+        exprTree = ast.parse(transform, filename="<unknown>", mode="eval")
+        evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, transform, aliasDict)
+        transform_parsed = evaluator.visit(exprTree.body)
+        transform_parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+        transform_parsed["parameters"] = transform_parameters
+        if transform_parsed["type"] == "js_lambda":
+            transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
+                return xs.map({transform_parsed["implementation"]});
+            """)
+        elif transform_parsed["type"] == "parameter":
+            if "options" not in paramDict[transform_parsed["name"]]:
+                raise KeyError(transform_parsed["name"])
+            js_transforms = {}
+            parsed_options = {}
+            default_func = paramDict[transform_parsed["name"]]["value"]
+            if default_func is None:
+                default_func = "None"
+            transform_parsed["default"] = default_func
+            transform_customjs = CustomJSTransform(args={"current":default_func}, v_func="return options[current].v_compute(xs)")
+            for func_option in paramDict[transform_parsed["name"]]["options"]:
+                if func_option is None:
+                    option_customjs = CustomJSTransform(v_func="return xs")
+                    js_transforms["None"] = option_customjs
+                    continue
+                func_option_tree = ast.parse(func_option, filename="<unknown>", mode="eval")
+                func_option_evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, transform, aliasDict)
+                option_parsed = func_option_evaluator.visit(func_option_tree.body)
+                option_parameters = {i:paramDict[i]["value"] for i in func_option_evaluator.paramDependencies}
+                option_customjs = CustomJSTransform(args=option_parameters, v_func=f"""
+                    return xs.map({option_parsed["implementation"]});
+                """)
+                js_transforms[func_option] = option_customjs
+                parsed_options[func_option] = option_parsed
+                transform_parameters.update(option_parameters)
+            transform_parsed["options"] = parsed_options
+            transform_customjs.args["options"] = js_transforms
+            paramDict[transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_customjs}, code="""
+        mapper.args.current = this.value
+        mapper.change.emit()
+                """)])
+        if transform_parameters is not None:
+            for j in transform_parameters:
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_customjs, "param":j}, code="""
+        mapper.args[param] = this.value
+        mapper.change.emit()
+                """)])
+        return (transform_parsed, transform_customjs)
+    return (None, None)
+        # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
+        # later 2 vectors
