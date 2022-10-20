@@ -1050,13 +1050,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if isinstance(variables_dict['errY'], dict):
                         if y_transform:
                             barLower, barUpper = errorBarWidthAsymmetric((variables_dict['errY'],variables_dict['errY']), variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
-                            errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
+                            errorY = Quad(top=barUpper, bottom=barLower, left=dataSpecX, right=dataSpecX, line_color=color)
                         else:
                             errWidthY = errorBarWidthTwoSided(variables_dict['errY'], paramDict)
-                            errorY = HBar(left=varNameX, right=varNameX, height=errWidthY, y=varNameY, line_color=color)
+                            errorY = HBar(left=dataSpecX, right=dataSpecX, height=errWidthY, y=varNameY, line_color=color)
                     elif isinstance(variables_dict['errY'], tuple):
                         barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errY'], variables_dict['Y'], cds_used, y_transform_parsed, paramDict)
-                        errorY = Quad(top=barUpper, bottom=barLower, left=varNameX, right=varNameX, line_color=color)
+                        errorY = Quad(top=barUpper, bottom=barLower, left=dataSpecX, right=dataSpecX, line_color=color)
                     figureI.add_glyph(cds_used, errorY)
                 if 'tooltips' in optionLocal and cds_names[i] is None:
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
