@@ -174,7 +174,12 @@ export class CDSAlias extends ColumnarDataSource {
   }
 
   invalidate_column(key: string, emit_change=true){
-    if(!this.cached_columns.has(key)) return
+    if(!this.cached_columns.has(key)){
+      if(emit_change){
+        this.change.emit()
+      }
+      return
+    }
     this.cached_columns.delete(key)
     // A bruteforce solution should work, there shouldn't be that many columns that it's problematic
     const candidate_columns = Object.keys(this.mapping)
