@@ -1562,8 +1562,8 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
     elif transform["type"] == "parameter":
         options_lower = {}
         options_upper = {}
-        transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
-        transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="console.log(options);return options[current].v_compute(xs)")
+        transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
+        transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         for i, iOption in transform["options"].items():
             transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
                 const column = [...source.get_column(key)]
@@ -1586,7 +1586,6 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
         transform_lower.args["options"] = options_lower
         transform_upper.args["options"] = options_upper
         paramDict[transform["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower, "mapper_upper":transform_upper}, code="""
-            console.log("change")
             mapper_lower.args.current = this.value
             mapper_upper.args.current = this.value
             mapper_lower.change.emit()
