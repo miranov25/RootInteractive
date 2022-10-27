@@ -102,7 +102,7 @@ export class CDSAlias extends ColumnarDataSource {
         }
     } else if(column.hasOwnProperty("fields")){
         const fields = column.fields.map((x: string) => this.get_array(x))
-        let new_column = column.transform.v_compute(fields)
+        let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column){
             data[key] = new_column
         } else if(data[key] != null){
