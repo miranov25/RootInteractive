@@ -62,7 +62,7 @@ export class CustomJSNAryFunction extends Model {
   update_vfunc(){
     this.args_keys = Object.keys(this.parameters)
     this.args_values = Object.values(this.parameters)
-    this.vector_func = new Function(...this.args_keys, ...this.fields, "$output",'"use strict";\n'+this.v_func)
+    this.vector_func = new Function(...this.args_keys, ...this.fields, "data_source", "$output",'"use strict";\n'+this.v_func)
     this.change.emit()
   }
 
@@ -72,9 +72,9 @@ export class CustomJSNAryFunction extends Model {
     this.change.emit()
   }
 
-  v_compute(xs: any[]){
+  v_compute(xs: any[], data_source: any, output: any[] | null =null){
       if(this.vector_func){
-          return this.vector_func(...this.args_values, ...xs)
+          return this.vector_func(...this.args_values, ...xs, data_source, output)
       } else {
           return null
       }
