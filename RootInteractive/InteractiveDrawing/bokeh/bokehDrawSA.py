@@ -83,12 +83,10 @@ class bokehDrawSA(object):
             self.dataSource = df.query(query).copy()
         if hasattr(df, 'metaData'):
             self.dataSource.metaData = df.metaData
-        self.cdsOrig = ColumnDataSource(self.dataSource)
+        self.cdsOrig = None
         if len(varX) == 0:
             return
-        if ":" not in varX:
-            self.dataSource.sort_values(varX, inplace=True)
-        self.figure, self.cdsSel, self.plotArray = drawColzArray(df, query, varX, varY, varColor, p, **options)
+        self.figure, self.cdsSel, self.plotArray = (None, None, None)
         self.plotArray.append(self.initWidgets(widgetsDescription))
         self.pAll=gridplotRow(self.plotArray)
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)
