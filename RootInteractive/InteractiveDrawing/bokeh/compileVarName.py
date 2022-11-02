@@ -91,7 +91,7 @@ class ColumnEvaluator:
             # TODO: Make a parameter unswitcher - should help improve performance - but same can also apply to other scalars?
             pass
         args = []
-        implementation = JAVASCRIPT_GLOBALS[node.func.id] + '('
+        implementation = left['implementation'] + '('
         for iArg in node.args:
             args.append(self.visit(iArg))
             implementation += args[-1]["implementation"]
