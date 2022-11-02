@@ -137,7 +137,6 @@ class bokehDrawSA(object):
             'nPointRender': 10000,
             "histogramArray": [],
             'parameterArray': [],
-            "aliasArray": [],
             "sourceArray": []
         }
         options.update(kwargs)
@@ -171,8 +170,13 @@ class bokehDrawSA(object):
         if "arrayCompression" in options:
             self.isNotebook = False
         mergedFigureArray = figureArray + widgetsDescription
+        enhancedAliasArray = [{"name":"index","variables":[],"v_func":"""
+            const arange = Array(data_source.get_length());
+            for (let i=0; i<arange.length; i++) arange[i] = i;
+            return arange;
+        """}] + options.get("aliasArray", [])
         self.figure, self.cdsSel, self.plotArray, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, self.plotDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **kwargs)
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, self.plotDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, aliasArray = enhancedAliasArray, **kwargs)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):

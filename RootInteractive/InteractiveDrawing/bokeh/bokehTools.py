@@ -1713,9 +1713,6 @@ def makeCDSDict(sourceArray, paramDict):
 
         # Create cdsOrig
         if cdsType == "source":
-            # HACK: Add "index" column for user convenience
-            if "index" not in iSource["data"]:
-                iSource["data"]["index"] = np.arange(len(list(iSource["data"].values)), dtype=np.int32)
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
