@@ -447,6 +447,9 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
             variables_tuple = (variables_tuple,)
         columns = []
         for i_var in variables_tuple:
+            if i_var is None:
+                columns.append(None)
+                continue
             if i_context in memoizedColumns and i_var in memoizedColumns[i_context]:
                 columns.append(memoizedColumns[i_context][i_var])
                 continue

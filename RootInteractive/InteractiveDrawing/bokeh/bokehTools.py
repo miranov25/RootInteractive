@@ -1029,15 +1029,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
                     raise NotImplementedError(f"Visualization type not suppoerted: {visualization_type}")
-                if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
+                if varColor is not None and varColor["name"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
                         # HACK: This changes the color mapper's domain, which only consists of one field. 
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"transform": color["transform"]}, code="""
+                        paramDict[varColor["name"]]["subscribed_events"].append(["value", CustomJS(args={"transform": color["transform"]}, code="""
                             transform.domain[0] = [transform.domain[0][0], this.value]
                             transform.change.emit()
                         """)])
-                    paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
+                    paramDict[varColor["name"]]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if cds_name not in hover_tool_renderers:
                     hover_tool_renderers[cds_name] = []
                 hover_tool_renderers[cds_name].append(drawnGlyph)
