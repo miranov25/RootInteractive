@@ -1045,10 +1045,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if isinstance(variables_dict['errX'], dict):
                         if x_transform:
                             barLower, barUpper = errorBarWidthAsymmetric((variables_dict['errX'],variables_dict['errX']), variables_dict['X'], cds_used, x_transform_parsed, paramDict)
-                            errorX = Quad(top=varNameY, bottom=varNameY, left=barLower, right=barUpper, line_color=color)                          
+                            errorX = Quad(top=dataSpecY, bottom=dataSpecY, left=barLower, right=barUpper, line_color=color)                          
                         else:
                             errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
-                            errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
+                            errorX = VBar(top=dataSpecY, bottom=dataSpecY, width=errWidthX, x=varNameX, line_color=color)
                     elif isinstance(variables_dict['errX'], tuple):
                         barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errX'], variables_dict['X'], cds_used)
                         errorX = Quad(top=dataSpecY, bottom=dataSpecY, left=barLower, right=barUpper, line_color=color)                        
