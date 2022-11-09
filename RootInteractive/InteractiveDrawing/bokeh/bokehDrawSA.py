@@ -175,8 +175,9 @@ class bokehDrawSA(object):
             for (let i=0; i<arange.length; i++) arange[i] = i;
             return arange;
         """}] + options.get("aliasArray", [])
+        options["aliasArray"] = enhancedAliasArray
         self.figure, self.cdsSel, self.plotArray, self.cmapList, self.cdsOrig, self.histoList,\
-            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, self.plotDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, aliasArray = enhancedAliasArray, **kwargs)
+            self.cdsHistoSummary, self.profileList, self.paramDict, self.aliasDict, self.plotDict = bokehDrawArray(self.dataSource, None, mergedFigureArray, **options)
         # self.cdsOrig=ColumnDataSource(dataFrameOrig)
         #self.Widgets = self.initWidgets(widgetString)
         if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
