@@ -20,11 +20,14 @@ https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutoria
 
 
 #### Parameters each element of the array takes
-* _name_ - the name of alias
-* _variables_ - the names of the columns used by the transform (defined as columns in data source) 
-* _parameters_ - parameters controlled by widget
-* _func_- the function to be computed on the client
-* _context_ - the name of the input data source
+* Short format (NEW, working only for scalar)
+  * Shorthand: (name, expr) or (name, expr, table/DataSource) tuple
+* Longer format
+  * _name_ - the name of alias
+  * _variables_ - the names of the columns used by the transform (defined as columns in data source) 
+  * _parameters_ - parameters controlled by widget
+  * _func_- the function to be computed on the client
+  * _context_ - the name of the input data source
 
 #### Example alias array as used in the tutorial
 

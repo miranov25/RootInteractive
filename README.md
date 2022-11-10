@@ -65,7 +65,7 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
 #### _histogramAray_ - interactive histogramming parameterization and examples
 * Defining interactive ND histogramsand derived statistics,  updated based on the user selection, resp. by parametriz 
 * see [READMEhistogram](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEhistogram.md) 
-* Example of creating a 3D histogram showing mean, sum and standard in the projection with colour codein the second dimension
+* Example of creating a 3D histogram showing mean, sum and standard in the projection with colour code in the second dimension
   ```python
   histoArray = [
           {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, 10, 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]]},
@@ -100,7 +100,9 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
               "variables": ["entries", "entries_C_cut"],
               "func": "return entries_C_cut / entries",
               "context": "histoA"
-          }
+          },
+          # Shorthand notation - only for scala functions
+          ("effC", "entries_C_cut / bin_count", "histoAC"),
       ]
   ```    
 
