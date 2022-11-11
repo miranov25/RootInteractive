@@ -688,7 +688,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     varName = variables[1]
                 else:
                     optionWidget["callback"] = "selection"
-                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
                     varName = column[0]["name"]
                     if column[0]["type"] == "column":
                         fakeDf = {varName: dfQuery[varName]}
@@ -751,8 +751,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 start, end, step = makeSliderParameters(fakeDf, variables[1], **optionWidget)
                 formatter = optionWidget.get("format", "0.[0000]")
                 relativeStep = optionWidget.get("relativeStep", .05)
-                localWidgetMin = Spinner(title=f"min({label})", low=start, value=start, high=end, step=step, format=formatter)
-                localWidgetMax = Spinner(title=f"max({label})", low=start, value=end, high=end, step=step, format=formatter)
+                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
+                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
                 widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
                 localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
                     filter.range[0] = this.value
@@ -1355,8 +1355,12 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
     if options['type'] == 'user':
         start, end, step = params[1], params[2], params[3]
     elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
-        start = np.nanmin(df[name])
-        end = np.nanmax(df[name])
+        if df is not None and name in df:
+            start = np.nanmin(df[name])
+            end = np.nanmax(df[name])
+        else:
+            start = 0
+            end = 1
         step = (end - start) / options['bins']
     elif (options['type'] == 'unique'):
         start = np.nanmin(df[name])
