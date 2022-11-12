@@ -9,7 +9,7 @@ Support for ROOT data structures:
 
 
 Root and PyRoot (AliRoot/O2) data structures could be used as input data sources. However, the code also works with pandas only, without the need to have the ROOT package installed. Internally, these data structures are converted into the Bokeh CDS (ColumnDataSource) or in our RootInteractive
-CDS for the NDimensioanl histograms, projections and aggregated information.
+CDS for the NDimensional histograms, projections and aggregated information.
 
 
 ## RootInteractive content:
@@ -101,7 +101,7 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
               "func": "return entries_C_cut / entries",
               "context": "histoA"
           },
-          # Shorthand notation - only for scala functions
+          # Shorthand notation - only for scalar functions
           ("effC", "entries_C_cut / bin_count", "histoAC"),
       ]
   ```    
