@@ -688,7 +688,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     varName = variables[1]
                 else:
                     optionWidget["callback"] = "selection"
-                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
                     varName = column[0]["name"]
                     if column[0]["type"] == "column":
                         fakeDf = {varName: dfQuery[varName]}
@@ -751,8 +751,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 start, end, step = makeSliderParameters(fakeDf, variables[1], **optionWidget)
                 formatter = optionWidget.get("format", "0.[0000]")
                 relativeStep = optionWidget.get("relativeStep", .05)
-                localWidgetMin = Spinner(title=f"min({label})", low=start, value=start, high=end, step=step, format=formatter)
-                localWidgetMax = Spinner(title=f"max({label})", low=start, value=end, high=end, step=step, format=formatter)
+                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
+                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
                 widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
                 localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
                     filter.range[0] = this.value
@@ -1029,15 +1029,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
                     raise NotImplementedError(f"Visualization type not suppoerted: {visualization_type}")
-                if "colorZvar" in optionLocal and optionLocal["colorZvar"] in paramDict:
+                if varColor is not None and varColor["name"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
                         # HACK: This changes the color mapper's domain, which only consists of one field. 
-                        paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"transform": color["transform"]}, code="""
+                        paramDict[varColor["name"]]["subscribed_events"].append(["value", CustomJS(args={"transform": color["transform"]}, code="""
                             transform.domain[0] = [transform.domain[0][0], this.value]
                             transform.change.emit()
                         """)])
-                    paramDict[optionLocal['colorZvar']]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
+                    paramDict[varColor["name"]]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if cds_name not in hover_tool_renderers:
                     hover_tool_renderers[cds_name] = []
                 hover_tool_renderers[cds_name].append(drawnGlyph)
@@ -1045,10 +1045,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if isinstance(variables_dict['errX'], dict):
                         if x_transform:
                             barLower, barUpper = errorBarWidthAsymmetric((variables_dict['errX'],variables_dict['errX']), variables_dict['X'], cds_used, x_transform_parsed, paramDict)
-                            errorX = Quad(top=varNameY, bottom=varNameY, left=barLower, right=barUpper, line_color=color)                          
+                            errorX = Quad(top=dataSpecY, bottom=dataSpecY, left=barLower, right=barUpper, line_color=color)                          
                         else:
                             errWidthX = errorBarWidthTwoSided(variables_dict['errX'], paramDict)
-                            errorX = VBar(top=varNameY, bottom=varNameY, width=errWidthX, x=varNameX, line_color=color)
+                            errorX = VBar(top=dataSpecY, bottom=dataSpecY, width=errWidthX, x=varNameX, line_color=color)
                     elif isinstance(variables_dict['errX'], tuple):
                         barLower, barUpper = errorBarWidthAsymmetric(variables_dict['errX'], variables_dict['X'], cds_used)
                         errorX = Quad(top=dataSpecY, bottom=dataSpecY, left=barLower, right=barUpper, line_color=color)                        
@@ -1355,8 +1355,12 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
     if options['type'] == 'user':
         start, end, step = params[1], params[2], params[3]
     elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
-        start = np.nanmin(df[name])
-        end = np.nanmax(df[name])
+        if df is not None and name in df:
+            start = np.nanmin(df[name])
+            end = np.nanmax(df[name])
+        else:
+            start = 0
+            end = 1
         step = (end - start) / options['bins']
     elif (options['type'] == 'unique'):
         start = np.nanmin(df[name])
@@ -1713,9 +1717,6 @@ def makeCDSDict(sourceArray, paramDict):
 
         # Create cdsOrig
         if cdsType == "source":
-            # HACK: Add "index" column for user convenience
-            if "index" not in iSource["data"]:
-                iSource["data"]["index"] = np.arange(len(list(iSource["data"].values)), dtype=np.int32)
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
