@@ -6,8 +6,7 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
   // TODO: Use a smarter algorithm
   // This algorithm should be linear average case, but worst case is quadratic
   if(end < 0) end += sample.length + 1
-  let ok = false
-  while(!ok){
+  while(begin<end){
     //debugger;
     let pivot = sample[k]
     let pivot_idx = begin
@@ -48,7 +47,7 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
     } else if(k >= pointer_mid){
       begin = pointer_mid
     } else {
-      ok = true
+      break
     }
   }
 }
