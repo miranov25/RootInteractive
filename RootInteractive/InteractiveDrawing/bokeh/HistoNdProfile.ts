@@ -6,6 +6,9 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
   // TODO: Use a smarter algorithm
   // This algorithm should be linear average case, but worst case is quadratic
   if(end < 0) end += sample.length + 1
+  if(k<begin || k>=end) {
+    throw Error("Element out of range: " + (k-begin))
+  }
   while(begin<end){
     //debugger;
     let pivot = sample[k]
