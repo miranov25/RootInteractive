@@ -753,19 +753,22 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 relativeStep = optionWidget.get("relativeStep", .05)
                 localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
                 localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
-                widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
-                localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
-                    filter.range[0] = this.value
-                    other.step = this.step = (other.value - this.value) * relative_step
-                    filter.properties.range.change.emit()
-                    filter.change.emit()
-                    """))
-                localWidgetMax.js_on_change("value", CustomJS(args={"other":localWidgetMin, "filter": widgetFilter, "relative_step":relativeStep}, code="""
-                    filter.range[1] = this.value
-                    other.step = this.step = (this.value - other.value) * relative_step
-                    filter.properties.range.change.emit()
-                    filter.change.emit()
-                    """))
+                if optionWidget["callback"] == "parameter":
+                    pass
+                else:
+                    widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
+                    localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
+                        other.step = this.step = (other.value - this.value) * relative_step
+                        filter.range[0] = this.value
+                        filter.properties.range.change.emit()
+                        filter.change.emit()
+                        """))
+                    localWidgetMax.js_on_change("value", CustomJS(args={"other":localWidgetMin, "filter": widgetFilter, "relative_step":relativeStep}, code="""
+                        other.step = this.step = (this.value - other.value) * relative_step
+                        filter.range[1] = this.value
+                        filter.properties.range.change.emit()
+                        filter.change.emit()
+                        """))
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=True, width=70)
@@ -901,6 +904,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         xAxisTitleBuilder = []
         yAxisTitleBuilder = []
+        color_axis_title = None
 
         for i in range(length):
             variables_dict = {}
@@ -938,12 +942,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     color = mapperC
                     # Also add the color bar
                     if "colorAxisTitle" in optionLocal:
-                        axis_title = optionLocal["colorAxisTitle"]
+                        color_axis_title = optionLocal["colorAxisTitle"]
                     else:
-                        axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
+                        color_axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
                     color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-                    axis_title = makeAxisLabelFromTemplate(axis_title, paramDict, meta)
-                    applyParametricAxisLabel(axis_title, color_bar, "title")
+                    color_axis_title_model = makeAxisLabelFromTemplate(color_axis_title, paramDict, meta)
+                    applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
             else:
@@ -1085,6 +1089,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         xAxisTitle = ", ".join(xAxisTitleBuilder)
         yAxisTitle = ", ".join(yAxisTitleBuilder)
         plotTitle = yAxisTitle + " vs " + xAxisTitle
+        if color_axis_title is not None:
+            plotTitle = f"{plotTitle} vs {color_axis_title}"
 
         xAxisTitle = optionLocal.get("xAxisTitle", xAxisTitle)
         yAxisTitle = optionLocal.get("yAxisTitle", yAxisTitle)
