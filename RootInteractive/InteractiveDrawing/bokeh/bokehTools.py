@@ -1575,12 +1575,12 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
         transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         for i, iOption in transform["options"].items():
-            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iOption["parameters"]}, v_func=f"""
                 const column = [...source.get_column(key)]
                 return column.map((x, i) => {iOption["implementation"]}(x-xs[i]))
             """)
             options_lower[i] = transform_lower_i
-            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func=f"""
+            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iOption["parameters"]}, v_func=f"""
                 const column = [...source.get_column(key)]
                 return column.map((x, i) => {iOption["implementation"]}(x+xs[i]))
             """)
@@ -1856,7 +1856,7 @@ def applyParametricAxisLabel(label, target, attr):
     elif isinstance(label, str):
         target.update(**{attr:label})
 
-def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict):
+def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=None):
     if isinstance(transform, str):
         exprTree = ast.parse(transform, filename="<unknown>", mode="eval")
         evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, transform, aliasDict)
@@ -1882,16 +1882,9 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict):
                     option_customjs = CustomJSTransform(v_func="return xs")
                     js_transforms["None"] = option_customjs
                     continue
-                func_option_tree = ast.parse(func_option, filename="<unknown>", mode="eval")
-                func_option_evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, transform, aliasDict)
-                option_parsed = func_option_evaluator.visit(func_option_tree.body)
-                option_parameters = {i:paramDict[i]["value"] for i in func_option_evaluator.paramDependencies}
-                option_customjs = CustomJSTransform(args=option_parameters, v_func=f"""
-                    return xs.map({option_parsed["implementation"]});
-                """)
+                option_parsed, option_customjs = make_transform(func_option, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=transform_customjs)
                 js_transforms[func_option] = option_customjs
                 parsed_options[func_option] = option_parsed
-                transform_parameters.update(option_parameters)
             transform_parsed["options"] = parsed_options
             transform_customjs.args["options"] = js_transforms
             paramDict[transform_parsed["name"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform_customjs}, code="""
@@ -1904,6 +1897,8 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict):
         mapper.args[param] = this.value
         mapper.change.emit()
                 """)])
+        if parent is not None:
+            transform_customjs.js_on_change("change", CustomJS(args={"parent":parent}, code="parent.change.emit()"))
         return (transform_parsed, transform_customjs)
     return (None, None)
         # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
