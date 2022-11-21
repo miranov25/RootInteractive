@@ -29,7 +29,8 @@ parameterArray=[
     {'name':"size", "value":7, "range": [0, 20]},
     {'name':"histoRangeA", "value": [0, 1], "range": [0, 1]},
     {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]},
-    {'name':"transformY", "value":None, "options":[None, "sqrt", "lambda x: log(x+1)"]}
+    {'name':"transformY", "value":None, "options":[None, "sqrt", "lambda x: log(x+eps)"]},
+    {'name':"eps", "value":1, "range": [.1, 5]}
 ]
 
 widgetParams=[
@@ -41,11 +42,12 @@ widgetParams=[
     ['slider',["size"]],
     ['range', ['histoRangeA']],
     ['select', ['nBinsB']],
-    ['select', ['transformY']]
+    ['select', ['transformY']],
+    ['slider', ['eps'], {"name": "eps"}]
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8, "eps"], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
