@@ -1575,16 +1575,24 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
         transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         for i, iOption in transform["options"].items():
-            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iOption["parameters"]}, v_func=f"""
+            iParameters = iOption.get("parameters", {})
+            transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iParameters}, v_func=f"""
                 const column = [...source.get_column(key)]
                 return column.map((x, i) => {iOption["implementation"]}(x-xs[i]))
             """)
             options_lower[i] = transform_lower_i
-            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iOption["parameters"]}, v_func=f"""
+            transform_upper_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iParameters}, v_func=f"""
                 const column = [...source.get_column(key)]
                 return column.map((x, i) => {iOption["implementation"]}(x+xs[i]))
             """)
             options_upper[i] = transform_upper_i
+            for j in iParameters:
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower_i, "mapper_upper":transform_upper_i, "param":j}, code="""
+        mapper_lower.args[param] = this.value
+        mapper_lower.change.emit()
+        mapper_upper.args[param] = this.value
+        mapper_upper.change.emit()
+                """)])
         options_lower["null"] = options_lower["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
             const column = [...source.get_column(key)]
             return column.map((x, i) => (x-xs[i]))
