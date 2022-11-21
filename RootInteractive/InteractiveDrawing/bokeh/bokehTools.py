@@ -1587,11 +1587,14 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
             """)
             options_upper[i] = transform_upper_i
             for j in iParameters:
-                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower_i, "mapper_upper":transform_upper_i, "param":j}, code="""
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper_lower":transform_lower_i, "mapper_upper":transform_upper_i,
+                "parent_lower":transform_lower, "parent_upper": transform_upper, "param":j}, code="""
         mapper_lower.args[param] = this.value
         mapper_lower.change.emit()
         mapper_upper.args[param] = this.value
         mapper_upper.change.emit()
+        parent_lower.change.emit()
+        parent_upper.change.emit()
                 """)])
         options_lower["null"] = options_lower["None"] = CustomJSTransform(args={"source":data_source, "key":varNameX}, v_func="""
             const column = [...source.get_column(key)]
