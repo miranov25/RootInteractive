@@ -500,7 +500,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     for j in variablesParam:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
-                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":columnName, "table":cdsDict[i_context]}, code="""
+                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":columnName, "table":cdsDict[i_context]["cds"]}, code="""
                                             table.mapping[column_name].fields[idx] = this.value
                                             table.invalidate_column(columnName)
                                                     """)])
