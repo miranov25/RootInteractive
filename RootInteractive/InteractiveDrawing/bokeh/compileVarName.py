@@ -494,6 +494,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     columnName = column["name"]
                     func = "return "+column["implementation"]
                     variablesAlias = list(evaluator.aliasDependencies)
+                    fieldsAlias = list(evaluator.aliasDependencies)
                     parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
                     variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
                     nvars_local = len(variablesAlias)
@@ -504,9 +505,10 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                                             table.mapping[column_name].fields[idx] = this.value
                                             table.invalidate_column(columnName)
                                                     """)])
-                        variablesAlias.append(j)
+                        variablesAlias.append(paramDict[j]["value"])
+                        fieldsAlias.append(j)
                         nvars = nvars+1
-                    transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
+                    transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
