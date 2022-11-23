@@ -504,7 +504,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                                             table.mapping[column_name].fields[idx] = this.value
                                             table.invalidate_column(columnName)
                                                     """)])
-                        variablesAlias.append(paramDict[j]["value"])
+                        variablesAlias.append(j)
                         nvars = nvars+1
                     transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
                     for j in parameters:
