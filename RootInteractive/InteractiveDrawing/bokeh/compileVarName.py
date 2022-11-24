@@ -507,7 +507,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                                                     """)])
                         variablesAlias.append(paramDict[j]["value"])
                         fieldsAlias.append(j)
-                        nvars = nvars+1
+                        nvars_local = nvars_local+1
                     transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
