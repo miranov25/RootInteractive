@@ -24,6 +24,26 @@ JAVASCRIPT_GLOBALS = {
     "arctanh": "Math.atanh"
 }
 
+JAVASCRIPT_N_ARGS = {
+    "sin": 1,
+    "cos": 1,
+    "arcsin": 1,
+    "arccos": 1,
+    "arctan": 1,
+    "exp": 1,
+    "log": 1,
+    "log2": 1,
+    "log10": 1,
+    "sqrt": 1,
+    "abs": 1,
+    "sinh": 1,
+    "cosh": 1,
+    "arctan2": 2,
+    "arccosh": 1,
+    "arcsinh": 1,
+    "arctanh": 1
+}
+
 math_functions = {
     "sin": np.sin,
     "cos": np.cos,
@@ -210,6 +230,7 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": JAVASCRIPT_GLOBALS[node.id],
+                "n_args": JAVASCRIPT_N_ARGS[node.id],
                 "type": "js_lambda"
             }
         if node.id in self.funcDict:
@@ -217,6 +238,7 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
+                "n_args": len(self.funcDict[node.id]["parameters"]),
                 "type": "js_lambda"
             }
         if node.id in self.paramDict:
@@ -225,7 +247,7 @@ class ColumnEvaluator:
                 for iOption in self.paramDict[node.id]["options"]:
                     self.dependencies.add((self.context, iOption))
             self.paramDependencies.add(node.id)
-            # Detect if parameter is a lambda here?
+            # Detect if parameter is a lambda here? 
             return {
                 "name": node.id,
                 "implementation": node.id,
@@ -413,6 +435,7 @@ class ColumnEvaluator:
         return {
             "name": self.code,
             "type": "js_lambda",
+            "n_args": len(args),
             "implementation": f"(({impl_args})=>({impl_body}))"
         }
 
@@ -471,8 +494,21 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     columnName = column["name"]
                     func = "return "+column["implementation"]
                     variablesAlias = list(evaluator.aliasDependencies)
-                    parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
-                    transform = CustomJSNAryFunction(parameters=parameters, fields=variablesAlias, func=func)
+                    fieldsAlias = list(evaluator.aliasDependencies)
+                    parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
+                    variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
+                    nvars_local = len(variablesAlias)
+                    for j in variablesParam:
+                        if "subscribed_events" not in paramDict[j]:
+                            paramDict[j]["subscribed_events"] = []
+                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":columnName, "table":cdsDict[i_context]["cdsFull"]}, code="""
+                                            table.mapping[column_name].fields[idx] = this.value
+                                            table.invalidate_column(column_name)
+                                                    """)])
+                        variablesAlias.append(paramDict[j]["value"])
+                        fieldsAlias.append(j)
+                        nvars_local = nvars_local+1
+                    transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []

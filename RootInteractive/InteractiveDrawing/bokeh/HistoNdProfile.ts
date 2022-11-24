@@ -6,7 +6,7 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
   // TODO: Use a smarter algorithm
   // This algorithm should be linear average case, but worst case is quadratic
   if(end < 0) end += sample.length + 1
-  if(k<begin || k>=end) {
+  if(!(k>=begin && k<end)) {
     throw Error("Element out of range: " + (k-begin))
   }
   while(begin<end){
@@ -14,8 +14,9 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
     let pivot = sample[k]
     let pivot_idx = begin
     for(let i=begin; i<end; i++){
-      pivot_idx += compare(sample[i], pivot) < 0 ? 1 : 0
+      pivot_idx += isNaN(sample[i]) || compare(sample[i], pivot) < 0 ? 1 : 0
     }
+    if(pivot_idx === end && isNaN(pivot)) return
     let pointer_mid = pivot_idx
     let pointer_high = end-1
     let pointer_low=begin
@@ -50,7 +51,7 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
     } else if(k >= pointer_mid){
       begin = pointer_mid
     } else {
-      break
+      return
     }
   }
 }
