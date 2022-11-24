@@ -503,7 +503,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                             paramDict[j]["subscribed_events"] = []
                         paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":columnName, "table":cdsDict[i_context]["cdsFull"]}, code="""
                                             table.mapping[column_name].fields[idx] = this.value
-                                            table.invalidate_column(columnName)
+                                            table.invalidate_column(column_name)
                                                     """)])
                         variablesAlias.append(paramDict[j]["value"])
                         fieldsAlias.append(j)
