@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 import re
 import ast
+import json
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 
 # tuple of Bokeh markers
@@ -844,7 +845,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         x_transform = optionLocal.get("x_transform", None)
         x_transform_parsed, x_transform_customjs = make_transform(x_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
         y_transform = optionLocal.get("y_transform", None)
-        y_transform_parsed, y_transform_customjs = make_transform(y_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
+        y_transform_parsed, y_transform_customjs = make_transform(y_transform, paramDict, aliasDict, cdsDict, jsFunctionDict, orientation=1)
 
         variablesLocal = [None]*len(BOKEH_DRAW_ARRAY_VAR_NAMES)
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
@@ -1010,8 +1011,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
-                    dataSpecX = {"field":varNameX, "transform":x_transform_customjs} if x_transform else varNameX
-                    dataSpecY = {"field":varNameY, "transform":y_transform_customjs} if y_transform else varNameY
+                    x_transform_modified = modify_2d_transform(x_transform_parsed, x_transform_customjs, variables_dict["Y"]["name"], cds_used) if x_transform else None
+                    y_transform_modified = modify_2d_transform(y_transform_parsed, y_transform_customjs, variables_dict["X"]["name"], cds_used) if y_transform else None
+                    dataSpecX = {"field":varNameX, "transform":x_transform_modified} if x_transform else varNameX
+                    dataSpecY = {"field":varNameY, "transform":y_transform_modified} if y_transform else varNameY
                     if optionLocal["legend_field"] is None:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
@@ -1575,6 +1578,8 @@ def errorBarWidthAsymmetric(varError: tuple, varX: dict, data_source, transform=
         transform_upper = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         transform_lower = CustomJSTransform(args={"current":transform["default"]}, v_func="return options[current].v_compute(xs)")
         for i, iOption in transform["options"].items():
+            if iOption is None:
+                continue
             iParameters = iOption.get("parameters", {})
             transform_lower_i = CustomJSTransform(args={"source":data_source, "key":varNameX, **iParameters}, v_func=f"""
                 const column = [...source.get_column(key)]
@@ -1867,7 +1872,7 @@ def applyParametricAxisLabel(label, target, attr):
     elif isinstance(label, str):
         target.update(**{attr:label})
 
-def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=None):
+def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=None, orientation=0):
     if isinstance(transform, str):
         exprTree = ast.parse(transform, filename="<unknown>", mode="eval")
         evaluator = ColumnEvaluator(None, cdsDict, paramDict, jsFunctionDict, transform, aliasDict)
@@ -1875,9 +1880,14 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, par
         transform_parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
         transform_parsed["parameters"] = transform_parameters
         if transform_parsed["type"] == "js_lambda":
-            transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
-                return xs.map({transform_parsed["implementation"]});
-            """)
+            if transform_parsed["n_args"] == 1:
+                transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
+                    return xs.map({transform_parsed["implementation"]});
+                """)
+            elif transform_parsed["n_args"] == 2:
+                transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
+                    return xs.map((x, i) => ({transform_parsed["implementation"]}{"(x, ys[i])" if orientation==1 else "(ys[i],x)"}));
+                """)
         elif transform_parsed["type"] == "parameter":
             if "options" not in paramDict[transform_parsed["name"]]:
                 raise KeyError(transform_parsed["name"])
@@ -1892,8 +1902,9 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, par
                 if func_option is None:
                     option_customjs = CustomJSTransform(v_func="return xs")
                     js_transforms["None"] = option_customjs
+                    parsed_options["None"] = None
                     continue
-                option_parsed, option_customjs = make_transform(func_option, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=transform_customjs)
+                option_parsed, option_customjs = make_transform(func_option, paramDict, aliasDict, cdsDict, jsFunctionDict, parent=transform_customjs, orientation=orientation)
                 js_transforms[func_option] = option_customjs
                 parsed_options[func_option] = option_parsed
             transform_parsed["options"] = parsed_options
@@ -1911,6 +1922,22 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, par
         if parent is not None:
             transform_customjs.js_on_change("change", CustomJS(args={"parent":parent}, code="parent.change.emit()"))
         return (transform_parsed, transform_customjs)
-    return (None, None)
+    return (None, CustomJSTransform(v_func="return xs"))
         # Result has to be either lambda expression or parameter where all options are lambdas, signature must take 1 vector
         # later 2 vectors
+
+def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_source):
+    if transform_orig_parsed is None:
+        return transform_orig_js
+    if transform_orig_parsed["type"] == "js_lambda":
+        if transform_orig_parsed["n_args"] == 1:
+            return transform_orig_js
+        return CustomJSTransform(args={"varY":varY, "data_source":data_source, **transform_orig_js.args}, v_func=f"const ys = data_source.get_array(varY);\n{transform_orig_js.v_func}")
+    if transform_orig_parsed["type"] == "parameter":
+        transform_new = CustomJSTransform(args={"current":transform_orig_js.args["current"]}, v_func="return options[current].v_compute(xs)")
+        options_new = {}
+        for i, iOption in transform_orig_parsed["options"].items():
+            options_new[i] = modify_2d_transform(iOption, transform_orig_js.args["options"][i], varY, data_source)
+        transform_new.args["options"] = options_new
+        transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
+        return transform_new
