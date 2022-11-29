@@ -1886,6 +1886,7 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, par
                 """)
             elif transform_parsed["n_args"] == 2:
                 transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
+                    const ys = data_source.get_column(varY);
                     return xs.map((x, i) => ({transform_parsed["implementation"]}{"(x, ys[i])" if orientation==1 else "(ys[i],x)"}));
                 """)
         elif transform_parsed["type"] == "parameter":
@@ -1932,7 +1933,7 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
     if transform_orig_parsed["type"] == "js_lambda":
         if transform_orig_parsed["n_args"] == 1:
             return transform_orig_js
-        return CustomJSTransform(args={"varY":varY, "data_source":data_source, **transform_orig_js.args}, v_func=f"const ys = data_source.get_array(varY);\n{transform_orig_js.v_func}")
+        return CustomJSTransform(args={"varY":varY, "data_source":data_source, **transform_orig_js.args}, v_func=transform_orig_js.v_func)
     if transform_orig_parsed["type"] == "parameter":
         transform_new = CustomJSTransform(args={"current":transform_orig_js.args["current"]}, v_func="return options[current].v_compute(xs)")
         options_new = {}
