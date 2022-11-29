@@ -1933,7 +1933,10 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
     if transform_orig_parsed["type"] == "js_lambda":
         if transform_orig_parsed["n_args"] == 1:
             return transform_orig_js
-        return CustomJSTransform(args={"varY":varY, "data_source":data_source, **transform_orig_js.args}, v_func=transform_orig_js.v_func)
+        # Reconstruct the callbacks for args
+        transform_new = CustomJSTransform(args={"varY":varY, "data_source":data_source, **transform_orig_js.args}, v_func=transform_orig_js.v_func)
+        transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args = {...mapper_new.args, ...this.args}; mapper_new.change.emit()"))
+        return transform_new
     if transform_orig_parsed["type"] == "parameter":
         transform_new = CustomJSTransform(args={"current":transform_orig_js.args["current"]}, v_func="return options[current].v_compute(xs)")
         options_new = {}
