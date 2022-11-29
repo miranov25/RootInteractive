@@ -56,8 +56,9 @@ parameterArray = [
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "legendVisible", "value":True},
     {"name": "nPoints", "range":[0, 1200], "value": 1000},
-    {"name": "transformX", "value":None, "options":[None, "sqrt", "arctan2", "lambda x,y: y*cos(x)"]},
-    {"name": "transformY", "value":None, "options":[None, "sqrt", "lambda x,y: sqrt(x*x+y*y)", "lambda x,y: y*sin(x)"]}
+    {"name": "transformX", "value":None, "options":[None, "sqrt", "arctan2", "lambda x,y: y*cos(x+paramX)"]},
+    {"name": "transformY", "value":None, "options":[None, "sqrt", "lambda x,y: sqrt(x*x+y*y)", "lambda x,y: y*sin(x+paramX)"]},
+    {"name": "paramX", "value":0, "range":[-6,6]}
 ]
 
 figureArray = [
@@ -96,12 +97,13 @@ widgetParams=[
     ['toggle', ['legendVisible'], {"name": "legendVisible"}],
     ['spinner', ['nPoints'], {"name": "nPointsRender"}],
     ['select', ['transformX'], {"name": "transformX"}],
-    ['select', ['transformY'], {"name": "transformY"}]
+    ['select', ['transformY'], {"name": "transformY"}],
+    ['slider', ['paramX'], {"name":"paramX"}]
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, "widgetC"], [3, 4], ["widgetAA", 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
-    "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], ["transformX", "transformY"], {'sizing_mode': 'scale_width'}]
+    "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], ["transformX", "transformY", "paramX"], {'sizing_mode': 'scale_width'}]
     }
 
 figureLayoutDesc={
