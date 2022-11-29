@@ -9,21 +9,22 @@ iminuit
 ## root_pandas
 ##---------------------   graphics  dependencies
 bokeh>2,<2.5              # possibility to use new bokeh #150
-matplotlib
-plotly
-qgrid
-bqplot
-beakerx
+#matplotlib               - optional
+#plotly                   - to remove
+#qgrid                    - to remove
+#bqplot
+#beakerx
 # ----------------------   jupyter notebook dependencies
 ipywidgets
 runtime
 requests
+jupyter
 # ---------------------    machine learning dependencies
 sklearn
 xgboost
 #scikit-garden
-scikit-hep
-forestci
-tensorflow
-keras
+# scikit-hep             - Optional
+#forestci
+#tensorflow
+#keras
 

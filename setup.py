@@ -27,16 +27,16 @@ setup(
         'nbval',
         'tabulate',
         ## root dependencies
-        'uproot',
+        #'uproot',
         'iminuit',
         #'root_pandas',
         ##---------------------   graphics  dependencies
         'bokeh>2,<=2.3',
         'matplotlib',
-        'plotly',
-        'qgrid',
-        'bqplot',
-        'beakerx',
+        #'plotly',
+        #'qgrid',
+        #'bqplot',
+        #'beakerx',
         # ----------------------   jupyter notebook dependencies
         'ipywidgets',
         'runtime',
@@ -45,9 +45,10 @@ setup(
         'sklearn',
         # 'scikit-garden',
         'scikit-hep',
-        'forestci',
-        'tensorflow',
-        'keras',
+        #'forestci',
+        #'tensorflow',
+        #'keras',
+        "jinja2==3.0.3"
         # ------------------      dependencies needed for test and tutorials in special requirement file requirement_Devel.txt
     ]
 )
