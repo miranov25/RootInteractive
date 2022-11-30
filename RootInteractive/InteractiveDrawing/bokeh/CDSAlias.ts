@@ -101,7 +101,7 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
-        const fields = column.fields.map((x: string) => this.get_array(x))
+        const fields = column.fields.map((x: string) => isNaN(Number(x)) ? this.get_array(x) : Array(len).fill(Number(x)))
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column){
             data[key] = new_column
