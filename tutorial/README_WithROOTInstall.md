@@ -104,19 +104,26 @@ export venvPrefix=/path/to/your/virtual/python/environments
 git clone https://github.com/miranov25/RootInteractive $RootInteractive
 ```
 
-* install and use git version  - to be done once or if the O2/AliRoot version wil change (on top of version O2sim/v20220220-1)
+* install and use git version  - to be done once or if the O2/AliRoot version wil change (on top of version O2sim/v20220220-1) or ROOT
 ```shell
+source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
+or source ALICE code
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
+
 python3 -m venv ${venvPrefix}/setup2
 source ${venvPrefix}/setup2/bin/activate
 # python3 -m pip install   -r  $RootInteractive/requirements.txt
 python3 -m pip install   -e  $RootInteractive
+# install devel packages to be able to test 
+pip install -r  $RootInteractive/requirements_Devel.txt
 ```
 
 * initialize environment
 ```shell
 ssh -X lxplus8.cern.ch
 # you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus8.cern.ch
+source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
+or 
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
 source ${venvPrefix}/setup2/bin/activate
 export PYTHONPATH=$RootInteractive/:$PYTHONPATH
@@ -178,11 +185,17 @@ python3 -m venv ${venvPrefix}/setup2
 source ${venvPrefix}/setup2/bin/activate
 # python3 -m pip install   -r  $RootInteractive/requirements.txt
 python3 -m pip install   -e  $RootInteractive
-
 ```
-* initialize local O2 installation and virutal environment
+
+* initialize  ROOT or O2/AliPhsycis installation if needed, e.g: 
 ```shell
-eval $(alienv printenv O2::latest)
+  source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
+  or
+   eval $(alienv printenv O2::latest)
+```
+
+* initialize virtual environment on top of installation
+```shell
 source ${venvPrefix}/setup2/bin/activate
 export PYTHONPATH=$RootInteractive/:$PYTHONPATH
 ```
