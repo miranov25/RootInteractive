@@ -9,12 +9,10 @@ from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import Concaten
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
-from bokeh.palettes import *
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, Panel, TableColumn, TextAreaInput, Toggle, Spinner, RadioButtonGroup
+from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, Panel, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
-from RootInteractive.Tools.pandaTools import pandaGetOrMakeColumn
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
@@ -33,8 +31,9 @@ import numpy as np
 import pandas as pd
 import re
 import ast
-import json
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
+from bokeh.palettes import all_palettes
+from RootInteractive.InteractiveDrawing.palettes import kBird256
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -443,7 +442,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'ncols': -1,
         'layout': '',
         'widgetLayout': '',
-        'palette': Spectral6,
+        'palette': kBird256,
         "markers": bokehMarkers,
         "colors": 'Category10',
         "rescaleColorMapper": False,
@@ -574,7 +573,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
 
     plotArray = []
-    colorAll = all_palettes[options['colors']]
+    colorAll = all_palettes[options['colors']] if isinstance(options['colors'], str) else options['colors']
     colorMapperDict = {}
     cdsHistoSummary = None
 
@@ -919,16 +918,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if mapperC is not None:
                     color = mapperC
                 else:
+                    palette = optionLocal['palette']
+                    if isinstance(palette, str):
+                        palette = all_palettes[palette]
                     rescaleColorMapper = optionLocal["rescaleColorMapper"] or varColor["type"] == "parameter" or cdsDict[cds_name]["type"] in ["histogram", "histo2d", "histoNd"]
                     if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
                         low = np.nanmin(cdsDict[cds_name]["data"][varColor["name"]])
                         high= np.nanmax(cdsDict[cds_name]["data"][varColor["name"]])
-                        mapperC = linear_cmap(field_name=varColor["name"], palette=optionLocal['palette'], low=low, high=high)
+                        mapperC = linear_cmap(field_name=varColor["name"], palette=palette, low=low, high=high)
                     else:
                         if varColor["name"] in colorMapperDict:
                             mapperC = colorMapperDict[varColor["name"]]
                         else:
-                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=optionLocal['palette'])}
+                            mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=palette)}
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
