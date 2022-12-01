@@ -15,13 +15,17 @@ output_file("test_bokehDrawSA.html")
 # import logging
 
 if "ROOT" in sys.modules:
-    TFile.SetCacheFileDir("../../data/")
-    tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCDE.*", ".*", 0)
-    tree.SetAlias("errY","A*0.02+0.02")
-    AddMetadata(tree, "A.AxisTitle", "A (cm)")
-    AddMetadata(tree, "B.AxisTitle", "B (cm/s)")
-    AddMetadata(tree, "C.AxisTitle", "B (s)")
-    AddMetadata(tree, "D.AxisTitle", "D (a.u.)")
+    try: # TODO -use uproot to convert from panda to tree
+        TFile.SetCacheFileDir("../../data/")
+        tree, treeList, fileList = LoadTrees("echo http://rootinteractive.web.cern.ch/RootInteractive/data/tutorial/bokehDraw/treeABCD.root", ".*", ".*ABCDE.*", ".*", 0)
+        tree.SetAlias("errY","A*0.02+0.02")
+        AddMetadata(tree, "A.AxisTitle", "A (cm)")
+        AddMetadata(tree, "B.AxisTitle", "B (cm/s)")
+        AddMetadata(tree, "C.AxisTitle", "B (s)")
+        AddMetadata(tree, "D.AxisTitle", "D (a.u.)")
+    except:
+        pass
+
 
 df = pd.DataFrame(np.random.random_sample(size=(20000, 6)), columns=list('ABCDEF'))
 initMetadata(df)
