@@ -9,7 +9,7 @@ setup(
     author='Marian I. Ivanov, Marian Ivanov  ',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.01.07',
+    version='v0.01.08',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -27,27 +27,17 @@ setup(
         'nbval',
         'tabulate',
         ## root dependencies
-        #'uproot',
         'iminuit',
-        #'root_pandas',
         ##---------------------   graphics  dependencies
         'bokeh>2,<=2.3',
         'matplotlib',
-        #'plotly',
-        #'qgrid',
-        #'bqplot',
-        #'beakerx',
         # ----------------------   jupyter notebook dependencies
         'ipywidgets',
         'runtime',
         'requests',
         # ---------------------    machine learning dependencies
         'sklearn',
-        # 'scikit-garden',
         'scikit-hep',
-        #'forestci',
-        #'tensorflow',
-        #'keras',
         "jinja2==3.0.3"
         # ------------------      dependencies needed for test and tutorials in special requirement file requirement_Devel.txt
     ]
