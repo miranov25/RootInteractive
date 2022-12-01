@@ -7,6 +7,7 @@ import pytest
 #import pickle
 from pandas import CategoricalDtype
 import typing as ty
+import math
 
 if "ROOT" in sys.modules:
     from ROOT import TFile, gSystem
@@ -61,7 +62,7 @@ parameterArray = [
     {"name": "legendVisible", "value":True},
     {"name": "nPoints", "range":[0, 1200], "value": 1000},
     {"name": "transformX", "value":None, "options":[None, "sqrt", "arctan2", "lambda x,y: y*cos(x+paramX)"]},
-    {"name": "transformY", "value":None, "options":[None, "sqrt", "lambda x,y: sqrt(x*x+y*y)", "lambda x,y: y*sin(x+paramX)"]},
+    {"name": "transformY", "value":None, "options":[None, "sqrt", "lambda x,y: sqrt(x*x+y*y)", "lambda x,y: y*sin(x+paramX)", "lambda x,y: y/x"]},
     {"name": "paramX", "value":0, "range":[-6,6]}
 ]
 
@@ -153,5 +154,5 @@ def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     assert (df0.keys() == df.keys()).all()
 
-output_file("test_BokehDrawArrayWidget.html")
-fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")
+#output_file("test_BokehDrawArrayWidget.html")
+#fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")
