@@ -112,7 +112,7 @@ export class CDSCompress extends ColumnDataSource {
     let arrayOut=arrayIn.array
     for(var i =  arrayIn.actionArray.length-1;i>=0; i--) {
       console.log((i + 1) + " --> " + arrayIn.actionArray[i])
-      const action = arrayIn.actionArray[i] instanceof String ? arrayIn.actionArray[i][0] : arrayIn.actionArray[i]
+      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.actionArray[i] : arrayIn.actionArray[i][0]
       if (action == "base64"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
