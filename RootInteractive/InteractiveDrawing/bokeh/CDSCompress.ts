@@ -105,7 +105,6 @@ export class CDSCompress extends ColumnDataSource {
 
   initialize(): void {
     super.initialize()
-    //this.data = {}
     console.info("CDSCompress::initialize")
     this.inflateCompressedBokehObjectBase64()
   }
@@ -120,8 +119,6 @@ export class CDSCompress extends ColumnDataSource {
         })
       }
       if (action == "zip") {
-        //arrayOut=Buffer.from(arrayOut, 'base64');
-        //var myArr = new Uint8Array(arrayOut)
         arrayOut = pako.inflate(arrayOut)
         const dtype = arrayIn.dtype
         if(arrayIn.byteorder !== BYTE_ORDER){
@@ -164,27 +161,16 @@ export class CDSCompress extends ColumnDataSource {
       }
     }
     return arrayOut
-    //arrayIn.actionArray.reverse().forEach(x => console.log(x))
   }
 
   inflateCompressedBokehObjectBase64() {
     this.data = {};
-    let objectOut0 = Object;
-    let objectOut = (objectOut0 as any);
     let objectIn = (this.inputData as any);
-    let length=0;
     for (let arr in objectIn) {
       let arrOut = this.inflateCompressedBokehBase64(objectIn[arr]);
       this.data[arr]=arrOut;
-      //if (arrOut.length!=length)
-      length=arrOut.length
       console.log(arr);
     }
-    this.data["index"]=new Uint32Array(length)
-     for (let i = 0; i < length; i++) {
-         this.data["index"][i]=i;
-        }
-    return objectOut
   }
 
 }
