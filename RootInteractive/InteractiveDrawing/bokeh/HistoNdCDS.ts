@@ -385,7 +385,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     let range_max = -Infinity
     const l = column.length
     for(let x=0; x<l; x++){
-      if(!isNaN(column[x])){
+      if(isFinite(column[x])){
         range_min = Math.min(range_min, column[x])
         range_max = Math.max(range_max, column[x])
       }
@@ -406,7 +406,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     const l = this.view!.length
     for(let x=0; x<l; x++){
       const y = view[x]
-      if(!isNaN(column[y])){
+      if(isFinite(column[y])){
         range_min = Math.min(range_min, column[y])
         range_max = Math.max(range_max, column[y])
       }
