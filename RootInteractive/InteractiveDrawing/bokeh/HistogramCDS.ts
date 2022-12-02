@@ -91,6 +91,10 @@ export class HistogramCDS extends ColumnarDataSource {
             range_min -= 1
             range_max += 1
           }
+          if(!isFinite(range_min)){
+            range_min = 0
+            range_max = 1
+          }
           this._range_min = range_min
           this._range_max = range_max
         } else {
@@ -117,6 +121,10 @@ export class HistogramCDS extends ColumnarDataSource {
           if(range_min == range_max){
             range_min -= 1
             range_max += 1
+          }
+          if(!isFinite(range_min)){
+            range_min = 0
+            range_max = 1
           }
           this._range_min = range_min
           this._range_max = range_max

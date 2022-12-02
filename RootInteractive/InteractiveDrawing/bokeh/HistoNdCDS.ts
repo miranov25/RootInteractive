@@ -394,6 +394,10 @@ export class HistoNdCDS extends ColumnarDataSource {
       range_min -= 1
       range_max += 1
     }
+    if(!isFinite(range_min)){
+      range_min = 0
+      range_max = 1
+    }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
     this._do_cache_bins = false
@@ -414,6 +418,10 @@ export class HistoNdCDS extends ColumnarDataSource {
     if(range_min == range_max){
       range_min -= 1
       range_max += 1
+    }
+    if(!isFinite(range_min)){
+      range_min = 0
+      range_max = 1
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
