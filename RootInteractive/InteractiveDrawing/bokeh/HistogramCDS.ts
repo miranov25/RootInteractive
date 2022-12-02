@@ -82,8 +82,10 @@ export class HistogramCDS extends ColumnarDataSource {
           let range_max = -Infinity
           const l = sample_arr.length
           for(let x=0; x<l; x++){
-            range_min = Math.min(range_min, sample_arr[x])
-            range_max = Math.max(range_max, sample_arr[x])
+            if(!isNaN(sample_arr[x])){
+              range_min = Math.min(range_min, sample_arr[x])
+              range_max = Math.max(range_max, sample_arr[x])
+            }
           }
           if(range_min == range_max){
             range_min -= 1
@@ -107,8 +109,10 @@ export class HistogramCDS extends ColumnarDataSource {
           const l = this.view.length
           for(let x=0; x<l; x++){
             const y = view[x]
-            range_min = Math.min(range_min, sample_arr[y])
-            range_max = Math.max(range_max, sample_arr[y])
+            if(!isNaN(sample_arr[y])){
+              range_min = Math.min(range_min, sample_arr[y])
+              range_max = Math.max(range_max, sample_arr[y])
+            }
           }
           if(range_min == range_max){
             range_min -= 1
