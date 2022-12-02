@@ -113,13 +113,13 @@ export class CDSCompress extends ColumnDataSource {
     let arrayOut=arrayIn.array
     for(var i =  arrayIn.actionArray.length-1;i>=0; i--) {
       console.log((i + 1) + " --> " + arrayIn.actionArray[i])
-      if (arrayIn.actionArray[i][0] == "base64") {
-        //arrayOut=Buffer.from(arrayOut, 'base64');
+      const action = arrayIn.actionArray[i] instanceof String ? arrayIn.actionArray[i][0] : arrayIn.actionArray[i]
+      if (action == "base64"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
-        });
+        })
       }
-      if (arrayIn.actionArray[i][0] == "zip") {
+      if (action == "zip") {
         //arrayOut=Buffer.from(arrayOut, 'base64');
         //var myArr = new Uint8Array(arrayOut)
         arrayOut = pako.inflate(arrayOut)
@@ -144,14 +144,14 @@ export class CDSCompress extends ColumnDataSource {
         }
         if (dtype == "float32"){
           arrayOut = new Float32Array(arrayOut.buffer)
-           arrayOut = new Float64Array(arrayOut)
+          arrayOut = new Float64Array(arrayOut)
         }
         if (dtype == "float64"){
           arrayOut = new Float64Array(arrayOut.buffer)
         }
         console.log(arrayOut)
       }
-      if (arrayIn.actionArray[i][0] == "code") {
+      if (action == "code") {
         if(arrayIn.skipCode){
           continue
         }
