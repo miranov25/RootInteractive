@@ -34,6 +34,7 @@ import ast
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 from bokeh.palettes import all_palettes
 from RootInteractive.InteractiveDrawing.palettes import kBird256
+import base64
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -489,7 +490,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     widgetArray = []
     widgetDict = {}
 
-    cdsDict = makeCDSDict(sourceArray, paramDict)
+    cdsDict = makeCDSDict(sourceArray, paramDict, options={"nPointRender":options["nPointRender"]})
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -544,14 +545,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
             if "expr" in i:
                 exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
-                evaluator = ColumnEvaluator(i.get("context", None), cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
+                context = i.get("context", None)
+                evaluator = ColumnEvaluator(context, cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
                 result = evaluator.visit(exprTree.body)
                 if result["type"] == "javascript":
                     func = "return "+result["implementation"]
                     fields = list(evaluator.aliasDependencies)
                     parameters = list(evaluator.paramDependencies)
+                    parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
+                    variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
                     customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields, func=func)
+                    nvars_local = len(fields)
+                    variablesAlias = fields.copy()
+                    for j in variablesParam:
+                        if "subscribed_events" not in paramDict[j]:
+                            paramDict[j]["subscribed_events"] = []
+                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
+                                            table.mapping[column_name].fields[idx] = this.value
+                                            table.invalidate_column(column_name)
+                                                    """)])
+                        variablesAlias.append(paramDict[j]["value"])
+                        fields.append(j)
+                        nvars_local = nvars_local+1
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), func=func)
+                    fields = variablesAlias
                 else:
                     aliasDict[i["name"]] = result["name"]
                     break
@@ -581,41 +598,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     sources = set()
 
     meta = dfQuery.meta.metaData.copy()
-            
-    for cds_name, iSource in cdsDict.items():
-        cdsOrig = iSource["cdsOrig"]
-        if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
-        elif iSource["type"] == "join":
-            cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
-            cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
-        elif iSource["type"] == "projection":
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
-            cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
-        name_full = "cdsFull"
-        if cds_name is not None:
-            name_full = cds_name+"_full"
-        # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
-
-        # Add downsampler
-        name_normal = "default source"
-        if cds_name is not None:
-            name_normal = cds_name
-        nPoints = options["nPointRender"]
-        if options["nPointRender"] in paramDict:
-            nPoints = paramDict[options["nPointRender"]]["value"]
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
-        if options["nPointRender"] in paramDict:
-            paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
-                            downsampler.nPoints = this.value | 0
-                            downsampler.update()
-                        """)])
-
-        if "tooltips" not in iSource:
-            iSource["tooltips"] = []
 
     profileList = []
 
@@ -1156,6 +1138,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 print("compressCDSPipe")
                 sent_data = {i:removeInt64(iColumn) for i, iColumn in sent_data.items()}
                 cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+                for keyCompressed, valueCompressed in cdsCompress0.items():
+                    if isinstance(valueCompressed["array"], bytes):
+                        cdsCompress0[keyCompressed]["array"] = base64.b64encode(valueCompressed["array"]).decode("utf-8")
+                        cdsCompress0[keyCompressed]["actionArray"].append("base64")
                 cdsOrig.inputData = cdsCompress0
                 cdsOrig.sizeMap = sizeMap
             else:
@@ -1701,7 +1687,7 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
     return prefix+varName
 
-def makeCDSDict(sourceArray, paramDict):
+def makeCDSDict(sourceArray, paramDict, options={}):
     # Create the cdsDict - identify types from user input and make empty ColumnDataSources
     cdsDict = {}
     for i, iSource in enumerate(sourceArray):
@@ -1843,6 +1829,41 @@ def makeCDSDict(sourceArray, paramDict):
             iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
+
+    for cds_name, iSource in cdsDict.items():
+        cdsOrig = iSource["cdsOrig"]
+        if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
+            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
+        elif iSource["type"] == "join":
+            cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
+            cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
+        elif iSource["type"] == "projection":
+            cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
+            cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
+        name_full = "cdsFull"
+        if cds_name is not None:
+            name_full = cds_name+"_full"
+        # Add middleware for aliases
+        iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
+
+        # Add downsampler
+        name_normal = "default source"
+        if cds_name is not None:
+            name_normal = cds_name
+        nPoints = options["nPointRender"]
+        if options["nPointRender"] in paramDict:
+            nPoints = paramDict[options["nPointRender"]]["value"]
+        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
+        if options["nPointRender"] in paramDict:
+            paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
+                            downsampler.nPoints = this.value | 0
+                            downsampler.update()
+                        """)])
+
+        if "tooltips" not in iSource:
+            iSource["tooltips"] = []
     return cdsDict
 
 def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
