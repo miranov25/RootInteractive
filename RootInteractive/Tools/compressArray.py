@@ -8,9 +8,9 @@ import sys
 import re
 import collections
 
-arrayCompressionRelative8=[(".*",[("relative",8), ("code",0), ("zip",0), ("base64",0)])]
-arrayCompressionRelative16=[(".*",[("relative",16), ("code",0), ("zip",0), ("base64",0)])]
-arrayCompressionRelative32=[(".*",[("relative",32), ("code",0), ("zip",0), ("base64",0)])]
+arrayCompressionRelative8=[(".*",[("relative",8), "code", "zip", "base64"])]
+arrayCompressionRelative16=[(".*",[("relative",16), "code", "zip", "base64"])]
+arrayCompressionRelative32=[(".*",[("relative",32), "code", "zip", "base64"])]
 
 def getCompressionSize(inputObject):
     return len(pickle.dumps(zlib.compress(inputObject)))
@@ -50,6 +50,7 @@ def removeInt64(column):
 
 
 def roundAbsolute(df, delta):
+    # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
     if type.kind not in ['f', 'c', 'i', 'u']:
         return df
@@ -142,55 +143,57 @@ def compressArray(inputArray, actionArray, keepValues=False):
     arrayInfo = {"actionArray": actionArray, "history": []}
     currentArray = inputArray
     counter=0
-    for action, actionParam in actionArray:
-       # try:
-            if keepValues:
-                arrayInfo["history"].append(currentArray)
-            if action == "relative":
-                currentArray = roundRelativeBinary(currentArray, actionParam)
-            if action == "delta":
-                currentArray = roundAbsolute(currentArray, actionParam)
-            if action == "zip":
-                if isinstance(currentArray, pd.Series):
-                    currentArray = currentArray.to_numpy()
-                arrayInfo["dtype"] = currentArray.dtype.name
-                currentArray = zlib.compress(currentArray)
-            if action == "unzip":
-                currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
-            if action == "removeInt64":
-                currentArray = removeInt64(currentArray)
-            if action == "base64":
-                currentArray = base64.b64encode(currentArray).decode("utf-8")
-            if action == "debase64":
-                currentArray = base64.b64decode(currentArray)
-            if action == "code":
-                # Skip for normal number types, these can be unpacked in an easier way.
-                # Do not send int64 arrays to the client, it will not work
-                if currentArray.dtype.kind not in ['O', 'S', 'U']:
-                    arrayInfo["skipCode"] = True
-                    continue
-                arrayInfo["skipCode"] = False
-                values = currentArray.unique()
-                dictValues = {}
-                dictValuesI = {}
-                for i, value in enumerate(values):
-                    dictValues[value] = i
-                    dictValuesI[i] = value
-                    arrayInfo["valueCode"] = dictValuesI
-                if values.size < 2 ** 8:
-                    currentArray = currentArray.map(dictValues).astype("int8")
-                elif values.size < 2 ** 16:
-                    currentArray = currentArray.map(dictValues).astype("int16")
-                else:
-                    currentArray = currentArray.map(dictValues).astype("int32")
-            if action == "decode":
-                if not arrayInfo["skipCode"]:
-                    arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
-                    currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
-            counter+=1
-       # except:
-        #    print("compressArray - Unexpected error in ", action,  sys.exc_info()[0])
-            #pass
+    for actionTuple in actionArray:
+        if isinstance(actionTuple, tuple):
+            action = actionTuple[0]
+            actionParam = actionTuple[1] if len(actionTuple) > 1 else None
+        else:
+            action = actionTuple
+            actionParam = None
+        if keepValues:
+            arrayInfo["history"].append(currentArray)
+        if action == "relative":
+            currentArray = roundRelativeBinary(currentArray, actionParam)
+        if action == "delta":
+            currentArray = roundAbsolute(currentArray, actionParam)
+        if action == "zip":
+            if isinstance(currentArray, pd.Series):
+                currentArray = currentArray.to_numpy()
+            arrayInfo["dtype"] = currentArray.dtype.name
+            currentArray = zlib.compress(currentArray)
+        if action == "unzip":
+            currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
+        if action == "removeInt64":
+            currentArray = removeInt64(currentArray)
+        if action == "base64":
+            currentArray = base64.b64encode(currentArray).decode("utf-8")
+        if action == "base64_decode":
+            currentArray = base64.b64decode(currentArray)
+        if action == "code":
+            # Skip for normal number types, these can be unpacked in an easier way.
+            # Do not send int64 arrays to the client, it will not work
+            if currentArray.dtype.kind not in ['O', 'S', 'U']:
+                arrayInfo["skipCode"] = True
+                continue
+            arrayInfo["skipCode"] = False
+            values = currentArray.unique()
+            dictValues = {}
+            dictValuesI = {}
+            for i, value in enumerate(values):
+                dictValues[value] = i
+                dictValuesI[i] = value
+                arrayInfo["valueCode"] = dictValuesI
+            if values.size < 2 ** 8:
+                currentArray = currentArray.map(dictValues).astype("int8")
+            elif values.size < 2 ** 16:
+                currentArray = currentArray.map(dictValues).astype("int16")
+            else:
+                currentArray = currentArray.map(dictValues).astype("int32")
+        if action == "decode":
+            if not arrayInfo["skipCode"]:
+                arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
+                currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
+        counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
     return arrayInfo

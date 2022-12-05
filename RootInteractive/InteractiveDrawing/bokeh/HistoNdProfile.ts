@@ -16,7 +16,7 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
     for(let i=begin; i<end; i++){
       pivot_idx += isNaN(sample[i]) || compare(sample[i], pivot) < 0 ? 1 : 0
     }
-    if(pivot_idx === end && isNaN(pivot)) return
+    if(pivot_idx >= end && isNaN(pivot)) return
     let pointer_mid = pivot_idx
     let pointer_high = end-1
     let pointer_low=begin
@@ -269,10 +269,12 @@ export class HistoNdProfile extends ColumnarDataSource {
                   const index_high = global_cumulative_histogram![x+y+z]
                   if(sorted_weights == null){
                     for(let i=index_low; i<index_high; ++i){
+                      if (isFinite(sorted_entries![i]))
                       mean += sorted_entries![i]
                     }
                   } else {
                     for(let i=index_low; i<index_high; ++i){
+                      if (isFinite(sorted_entries![i]))
                       mean += sorted_entries![i] * sorted_weights[i]
                     }
                   }
@@ -291,10 +293,12 @@ export class HistoNdProfile extends ColumnarDataSource {
                   const index_high = global_cumulative_histogram![x+y+z]
                   if(sorted_weights == null){
                     for(let i=index_low; i<index_high; ++i){
+                      if (isFinite(sorted_entries![i]))
                       std += sorted_entries![i] * sorted_entries![i]
                     }
                   } else {
                     for(let i=index_low; i<index_high; ++i){
+                      if (isFinite(sorted_entries![i]))
                       std += sorted_entries![i] * sorted_entries![i] * sorted_weights[i]
                     }
                   }

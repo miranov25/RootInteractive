@@ -385,12 +385,18 @@ export class HistoNdCDS extends ColumnarDataSource {
     let range_max = -Infinity
     const l = column.length
     for(let x=0; x<l; x++){
-      range_min = Math.min(range_min, column[x])
-      range_max = Math.max(range_max, column[x])
+      if(isFinite(column[x])){
+        range_min = Math.min(range_min, column[x])
+        range_max = Math.max(range_max, column[x])
+      }
     }
     if(range_min == range_max){
       range_min -= 1
       range_max += 1
+    }
+    if(!isFinite(range_min)){
+      range_min = 0
+      range_max = 1
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
@@ -404,12 +410,18 @@ export class HistoNdCDS extends ColumnarDataSource {
     const l = this.view!.length
     for(let x=0; x<l; x++){
       const y = view[x]
-      range_min = Math.min(range_min, column[y])
-      range_max = Math.max(range_max, column[y])
+      if(isFinite(column[y])){
+        range_min = Math.min(range_min, column[y])
+        range_max = Math.max(range_max, column[y])
+      }
     }
     if(range_min == range_max){
       range_min -= 1
       range_max += 1
+    }
+    if(!isFinite(range_min)){
+      range_min = 0
+      range_max = 1
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    

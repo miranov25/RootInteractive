@@ -105,7 +105,6 @@ export class CDSCompress extends ColumnDataSource {
 
   initialize(): void {
     super.initialize()
-    //this.data = {}
     console.info("CDSCompress::initialize")
     this.inflateCompressedBokehObjectBase64()
   }
@@ -113,15 +112,13 @@ export class CDSCompress extends ColumnDataSource {
     let arrayOut=arrayIn.array
     for(var i =  arrayIn.actionArray.length-1;i>=0; i--) {
       console.log((i + 1) + " --> " + arrayIn.actionArray[i])
-      if (arrayIn.actionArray[i][0] == "base64") {
-        //arrayOut=Buffer.from(arrayOut, 'base64');
+      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.actionArray[i] : arrayIn.actionArray[i][0]
+      if (action == "base64"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
-        });
+        })
       }
-      if (arrayIn.actionArray[i][0] == "zip") {
-        //arrayOut=Buffer.from(arrayOut, 'base64');
-        //var myArr = new Uint8Array(arrayOut)
+      if (action == "zip") {
         arrayOut = pako.inflate(arrayOut)
         const dtype = arrayIn.dtype
         if(arrayIn.byteorder !== BYTE_ORDER){
@@ -144,14 +141,14 @@ export class CDSCompress extends ColumnDataSource {
         }
         if (dtype == "float32"){
           arrayOut = new Float32Array(arrayOut.buffer)
-           arrayOut = new Float64Array(arrayOut)
+          arrayOut = new Float64Array(arrayOut)
         }
         if (dtype == "float64"){
           arrayOut = new Float64Array(arrayOut.buffer)
         }
         console.log(arrayOut)
       }
-      if (arrayIn.actionArray[i][0] == "code") {
+      if (action == "code") {
         if(arrayIn.skipCode){
           continue
         }
@@ -164,27 +161,16 @@ export class CDSCompress extends ColumnDataSource {
       }
     }
     return arrayOut
-    //arrayIn.actionArray.reverse().forEach(x => console.log(x))
   }
 
   inflateCompressedBokehObjectBase64() {
     this.data = {};
-    let objectOut0 = Object;
-    let objectOut = (objectOut0 as any);
     let objectIn = (this.inputData as any);
-    let length=0;
     for (let arr in objectIn) {
       let arrOut = this.inflateCompressedBokehBase64(objectIn[arr]);
       this.data[arr]=arrOut;
-      //if (arrOut.length!=length)
-      length=arrOut.length
       console.log(arr);
     }
-    this.data["index"]=new Uint32Array(length)
-     for (let i = 0; i < length; i++) {
-         this.data["index"][i]=i;
-        }
-    return objectOut
   }
 
 }

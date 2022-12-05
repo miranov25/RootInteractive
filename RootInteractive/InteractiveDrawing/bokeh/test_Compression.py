@@ -127,7 +127,7 @@ def test_Compression0():
 
 @pytest.mark.unittest
 def test_CompressionSequence0(arraySize=10000):
-    actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
         actionArray[3]=("unzip",coding)
         arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
@@ -140,7 +140,7 @@ def test_CompressionSequence0(arraySize=10000):
 
 @pytest.mark.unittest
 def test_CompressionSequenceRel(arraySize=255,nBits=5):
-    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
         actionArray[4]=("unzip",coding)
         arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
@@ -153,7 +153,7 @@ def test_CompressionSequenceRel(arraySize=255,nBits=5):
 
 @pytest.mark.unittest
 def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
-    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
         actionArray[4]=("unzip",coding)
         arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
@@ -167,7 +167,7 @@ def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
 
 @pytest.mark.unittest
 def test_CompressionSample0(arraySize=10000,scale=255):
-    actionArray=[("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
         actionArray[3]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
@@ -180,7 +180,7 @@ def test_CompressionSample0(arraySize=10000,scale=255):
 
 @pytest.mark.unittest
 def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
-    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
         actionArray[4]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
@@ -193,7 +193,7 @@ def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
 
 @pytest.mark.unittest
 def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
-    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8")]
+    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
         actionArray[4]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
@@ -206,7 +206,7 @@ def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
 
 @pytest.mark.unittest
 def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
-    actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("debase64",0),("unzip","int8"),("decode",0)]
+    actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8"),("decode",0)]
     for coding in ["float32", "float64"]:
         #actionArray[5]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
