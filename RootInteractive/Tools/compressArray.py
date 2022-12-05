@@ -6,11 +6,10 @@ import numpy as np
 import pandas as pd
 import sys
 import re
-import collections
 
-arrayCompressionRelative8=[(".*",[("relative",8), "code", "zip", "base64"])]
-arrayCompressionRelative16=[(".*",[("relative",16), "code", "zip", "base64"])]
-arrayCompressionRelative32=[(".*",[("relative",32), "code", "zip", "base64"])]
+arrayCompressionRelative8=[(".*",[("relative",8), "code", "zip"])]
+arrayCompressionRelative16=[(".*",[("relative",16), "code", "zip"])]
+arrayCompressionRelative32=[(".*",[("relative",32), "code", "zip"])]
 
 def getCompressionSize(inputObject):
     return len(pickle.dumps(zlib.compress(inputObject)))
@@ -52,9 +51,15 @@ def removeInt64(column):
 def roundAbsolute(df, delta):
     # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
+    if delta == 0:
+        raise ZeroDivisionError(df, delta)
     if type.kind not in ['f', 'c', 'i', 'u']:
         return df
-    result = np.rint(df / delta) * delta
+    if type.kind in ['i','u'] and delta == 1:
+        # delta == 1 for integer means no change
+        return df
+    quantized = np.rint(df / delta)
+    result = quantized * delta
     deltaMean = (df - result).mean()
     result -= deltaMean
     return result.astype(type)
@@ -93,54 +98,8 @@ def codeMapDF(df, maxFraction=0.5, doPrint=0):
     return mapIndex, mapCodeI
 
 
-def compressArray0(inputArray, maxFraction=0.5, doZip=True, doBase64=True, keepOrig=False, nBitsRelative=None,
-                   deltaAbsolute=None):
-    """
-    compress array  - works for panda - to be tested for vaex
-    :param inputArray:
-    :param maxFraction:
-    :param doZip:
-    :param doBase64:
-    :param keepOrig:
-    :param nBitsRelative:  scalar or array specifying relative precision 5 bits  or np.round(1+np.log2(1+df["weight"])
-    :return:
-    """
-    arrayC = {}
-    if keepOrig:
-        arrayC["inputArray"] = inputArray
-    if nBitsRelative is not None:
-        inputArray = roundRelativeBinary(inputArray, nBitsRelative)
-    if deltaAbsolute is not None:
-        inputArray = roundAbsolute(inputArray, nBitsRelative)
-    values = inputArray.unique()
-    arrayC["isZip"] = False
-    arrayC["indexType"] = ""
-    if values.size < maxFraction * inputArray.shape[0]:
-        dictValues = {}
-        dictValuesI = {}
-        for i, value in enumerate(values):
-            dictValues[value] = i
-            dictValuesI[i] = value
-            arrayC["values"] = dictValuesI
-        if values.size < 255:
-            arrayC["index"] = inputArray.map(dictValues).astype("int8")
-            arrayC["indexType"] = "int8"
-        else:
-            arrayC["index"] = inputArray.map(dictValues).astype("int16")
-            arrayC["indexType"] = "int16"
-        if doZip:
-            arrayC["indexC"] = zlib.compress(arrayC["index"].to_numpy())
-            arrayC["isZip"] = True
-        if doBase64:
-            arrayC["indexC"] = base64.b64encode(arrayC["indexC"])
-        if not keepOrig:
-            arrayC.pop('index', None)
-
-    return arrayC
-
-
 def compressArray(inputArray, actionArray, keepValues=False):
-    arrayInfo = {"actionArray": actionArray, "history": []}
+    arrayInfo = {"actionArray": actionArray.copy(), "history": []}
     currentArray = inputArray
     counter=0
     for actionTuple in actionArray:

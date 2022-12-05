@@ -34,6 +34,7 @@ import ast
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 from bokeh.palettes import all_palettes
 from RootInteractive.InteractiveDrawing.palettes import kBird256
+import base64
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
@@ -1156,6 +1157,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 print("compressCDSPipe")
                 sent_data = {i:removeInt64(iColumn) for i, iColumn in sent_data.items()}
                 cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+                for keyCompressed, valueCompressed in cdsCompress0.items():
+                    if isinstance(valueCompressed["array"], bytes):
+                        cdsCompress0[keyCompressed]["array"] = base64.b64encode(valueCompressed["array"]).decode("utf-8")
+                        cdsCompress0[keyCompressed]["actionArray"].append("base64")
                 cdsOrig.inputData = cdsCompress0
                 cdsOrig.sizeMap = sizeMap
             else:
