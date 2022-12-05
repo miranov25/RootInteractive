@@ -114,7 +114,7 @@ class ColumnEvaluator:
         implementation = left['implementation'] + '('
         for iArg in node.args:
             args.append(self.visit(iArg))
-            implementation += args[-1]["implementation"]
+        implementation += ", ".join([i["implementation"] for i in args])
         implementation += ')'
         return {
             "implementation": implementation,
