@@ -152,11 +152,12 @@ bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDe
 #### _arrayCompresion_ - 
   * see [READMEcompression](/RootInteractive/InteractiveDrawing/bokeh/doc/READMEcompression.md) 
     * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/Tools/compressArray.py#L141-L196
-  * Significant data compression of the data (up to O(%)) for server- > client transmission and for storage in the html file. 
-   * Compression depends heavily on the entropy of the data after lossy compression.
-   * Lossy and lossles copression expressed by regular gexpression per columns
-   * In realistic use cases facto 10-100 compression achived
-   * further copression - using javascript aliases on client  instead data transfer 
+    * https://github.com/miranov25/RootInteractive/blob/master/RootInteractive/tutorial/bokehDraw/compression.ipynb
+  * Significant data compression of the data (up to O(5-10%)) for server- > client transmission and for storage in the html file. 
+   * Compression depends heavily on the entropy of the data after lossy compression and on data repetition
+   * Lossy and lossles compression expressed by regular expression per columns
+   * In realistic use cases facto 10-100 compression achieved
+   * further compression - using javascript aliases on client  instead data transfer 
   * Example declaration:
     ```python
     arrayCompressionParam=[(".*conv.*Sigma.*",[("relative",7), ("code",0), ("zip",0), ("base64",0)]),
