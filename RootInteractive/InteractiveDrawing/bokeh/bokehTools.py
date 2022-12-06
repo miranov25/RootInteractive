@@ -33,7 +33,7 @@ import re
 import ast
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 from bokeh.palettes import all_palettes
-from RootInteractive.InteractiveDrawing.palettes import kBird256
+from RootInteractive.InteractiveDrawing.bokeh.palette import kBird256
 import base64
 
 # tuple of Bokeh markers
