@@ -120,12 +120,15 @@ def compressArray(inputArray, actionArray, keepValues=False):
                 currentArray = currentArray.to_numpy()
             arrayInfo["dtype"] = currentArray.dtype.name
             currentArray = zlib.compress(currentArray)
+            arrayInfo["history"].append(("array", currentArray.dtype.name))
+            arrayInfo["history"].append("inflate")
         if action == "unzip":
             currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
         if action == "removeInt64":
             currentArray = removeInt64(currentArray)
         if action == "base64":
             currentArray = base64.b64encode(currentArray).decode("utf-8")
+            arrayInfo["history"].append("b64decode")
         if action == "base64_decode":
             currentArray = base64.b64decode(currentArray)
         if action == "code":
