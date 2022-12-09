@@ -3,7 +3,6 @@
 #import logging
 #from bokeh.models import *
 #from bokeh.palettes import *
-#from root_numpy import *
 #from bokeh.transform import *
 from RootInteractive.Tools.histoNDTools import *
 
@@ -40,19 +39,6 @@ class histogramND(object):
         self.varNames=HInput['varNames']
         if 'varTitles' in HInput: self.varTitles=HInput['varTitles']
         if 'histoSlice' in HInput: self.histogramSlice=HInput['histoSlice']
-        return self
-
-    @classmethod
-    def fromTHn(cls, rootTHn):
-        self = cls()
-        self.name = rootTHn.GetName()
-        self.title = rootTHn.GetTitle()
-        hTuple = hist2array(rootTHn, False, True, True)
-        self.H = hTuple[0]
-        self.axes = hTuple[1]
-        for axis in range(rootTHn.GetNdimensions()):
-            self.varNames.insert(axis, rootTHn.GetAxis(axis).GetName())
-            self.varTitles.insert(axis, rootTHn.GetAxis(axis).GetTitle())
         return self
 
     @classmethod

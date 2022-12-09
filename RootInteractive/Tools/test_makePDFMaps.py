@@ -1,5 +1,5 @@
 from RootInteractive.Tools.makePDFMaps import *
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 
 
 #
@@ -21,10 +21,12 @@ def test_makePDF():
     slices = ((0, 40, 1, 0), (10, 30, 1, 1), (10, 24, 5, 1), (1, 49, 3, 1), (0, 10, 3, 0))
     dimI = 0
     dframe = makePdfMaps(histo, slices, dimI)
-    dframe["csin"] = np.sin(6.28 * dframe["CBinCenter"])
-    dframe["valueOrig"] = dframe["ABinCenter"] + np.exp(0 * dframe["BBinCenter"]) * dframe["csin"]
-    dframe["deltaMean"] = dframe["means"]-dframe["valueOrig"]
     #
+    aliasArray = [ 
+        ("csin", "sin(6.28*CBinCenter)"),
+        ("valueOrig", "ABinCenter+csin"),
+        ("deltaMean", "means-valueOrig")
+    ]
     tooltips = [("A", "(@ABinCenter)"), ("B", "(@BBinCenter)"), ("C", "(@CBinCenter)"), ("Orig. Value", "(@valueOrig)"), ("Delta", "(@deltaMean)")]
     widgetParams=[
             ['range', ['ABinCenter']],
@@ -46,7 +48,7 @@ def test_makePDF():
     ]
 
     output_file("test_makePDF.html")
-    bokehDrawSA.fromArray(dframe, "ABinNumber>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc)
+    bokehDrawSA.fromArray(dframe, "ABinNumber>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc, aliasArray=aliasArray)
     #
 
 def DistMap():
