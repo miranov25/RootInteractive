@@ -40,6 +40,6 @@ setup(
         'scikit-hep',
         "jinja2==3.0.3",
         # ------------------      dependencies needed for test and tutorials in special requirement file requirement_Devel.txt
-        jupyter                   # not dependence but needed to run tutorials
+        "jupyter"                   # not dependence but needed to run tutorials
     ]
 )
