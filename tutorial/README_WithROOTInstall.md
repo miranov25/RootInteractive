@@ -1,8 +1,10 @@
-# THIS IS WORK in progress
+# THIS IS always WORK in progress, as dependencies are regularly evolved
+The last review of a particular recipe is indicated in the subsections
 
-## buildin container on alice server at GSI or on local laptop:
-* assuming NOTES poits to directory with TPC software
-* setting variables:
+## Building container on alice server at GSI or on local laptop:
+For users working with ALICE TPC and reconstruction software
+* assuming that NOTES the directory with the TPC software is
+* set variables:
     ```
     export SINGULARITY_CACHEDIR=/data.local1/${USER}/
     export SINGULARITY_PREFIX=/data.local1/${USER}/JIRA/ATO-500
@@ -69,14 +71,17 @@ This option was therefore abandomed.
 
 ```
 
-# Installing only as virtual environment at lxplus8
+# Installing only as virtual environment at lxplus9 - 
+As we would like to use otionally Root resp. ALICE system we should use Python3.8 as ROOT and ALICE binaries are dependent on that version
+We have to use lxplus9  as older do not have proper version of some software (python and node)
 * login
 ```shell
-ssh -X lxplus8.cern.ch
-# you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus8.cern.ch
+ssh -X lxplus9.cern.ch
+# you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus9.cern.ch
 ```
 
 * global variables
+** NOTES needed only for the ALICE TPC users 
 ```shell
 export NOTES=/eos/user/m/mivanov/www/github/alice-tpc-notes
 ```
@@ -97,6 +102,7 @@ export venvPrefix=/path/to/your/virtual/python/environments
 # export venvPrefix=$EOSuser/venv
 # export venvPrefix=/eos/user/e/ehellbar/venv
 # export venvPrefix=/eos/user/m/mivanov/www/venv
+## export venvPrefix=/afs/cern.ch/user/m/mivanov/www/venv
 ```
 
 * clone RootInteractive
@@ -110,8 +116,14 @@ source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-o
 or source ALICE code
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
 
-python3 -m venv ${venvPrefix}/setup2
-source ${venvPrefix}/setup2/bin/activate
+* code has to be installed with newer Python  version >3.8 - should be case on that machine
+* to gaunarantee consistency with the sowatware from cvmfs approprate python version to be used
+  * newest O2 use Python 3.9.12
+  * /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh  Python 3.9.12
+
+python3.9 -m venv ${venvPrefix}/setup39
+
+source ${venvPrefix}/setup39/bin/activate
 # python3 -m pip install   -r  $RootInteractive/requirements.txt
 python3 -m pip install   -e  $RootInteractive
 # install devel packages to be able to test 
@@ -120,19 +132,20 @@ pip install -r  $RootInteractive/requirements_Devel.txt
 
 * initialize environment
 ```shell
-ssh -X lxplus8.cern.ch
+ssh -X lxplus9.cern.ch
 # you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus8.cern.ch
 source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
 or 
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
-source ${venvPrefix}/setup2/bin/activate
+source ${venvPrefix}/setup39/bin/activate
 export PYTHONPATH=$RootInteractive/:$PYTHONPATH
 ```
 
-* make test:
+* make some test:
 ```shell
 cd $RootInteractive/RootInteractive/InteractiveDrawing/bokeh/
-pytest test_*py
+pytest test_bokehClientHistogram.py 
+# or full test pytest test_*.py 
 cd $RootInteractive/RootInteractive/tutorial/
 jupyter notebook --no-browser --ip=127.0.0.1
 ```
@@ -161,6 +174,9 @@ jupyter notebook --no-browser --ip=127.0.0.1
     ```
 
 # Installing only as virtual environment on local machine
+Since we want to use the otionally root and ALICE software from cvmfs respectively, we should use appropriate version of Python , since the binaries ROOT and ALICE (Python3.9) depend on this version.
+Configure the virtual environment and use the correct Python.
+
 This should work in principle and was tested on a laptop with ubuntu 20 and a local O2 installation (to be installed locally before). Errors might still occur due to local package or version incompatibilities which can be individual to every machine or use case.
 
 * user defined variables
