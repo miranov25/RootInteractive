@@ -161,6 +161,15 @@ def compressArray(inputArray, actionArray, keepValues=False):
     return arrayInfo
 
 
+def frombuffer(inputArray, step_info):
+    #TODO: Add logic for numpy
+    return inputArray
+
+
+def tobytes(inputArray):
+    #TODO: Add logic for numpy
+    return (inputArray, None)
+
 def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
     """
     compress CDSPipe - based on the arrayCompression
