@@ -51,7 +51,8 @@ time singularity build --fakeroot --fix-perms  $SINGULARITY_PREFIX/tensorflow_la
   jupyter notebook --no-browser --ip=127.0.0.1
   ```
 
-# Container at lxplus  is .sif container not working
+## Container at lxplus  is .sif container not working
+Looks like supported on voluntary basis
 
 bug report submitted https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC3064146
 ```asm
@@ -71,12 +72,18 @@ This option was therefore abandomed.
 
 ```
 
-# Installing only as virtual environment at lxplus9 - 
-As we would like to use otionally Root resp. ALICE system we should use Python3.8 as ROOT and ALICE binaries are dependent on that version
-We have to use lxplus9  as older do not have proper version of some software (python and node)
+## Installing only as virtual environment at lxplus8
+
+Since we want to use the optional root or ALICE software of cvmfs, we should use the appropriate Python version, since the binaries ROOT 
+(Python 3.8) and ALICE (Python3.9) depend on this version.  Configure the virtual environment and use the correct Python.  
+This should work in principle and was tested on a laptop with Ubuntu 20 and a local O2 installation (which should be installed locally beforehand).
+
+In order to be able to use different versions of the software, we usually create different versions of the compatible 
+virtual environment to match root or AliRoot or O2 respectively.  Usually I also try to make virtual environment installation with Python version.
+
 * login
 ```shell
-ssh -X lxplus9.cern.ch
+ssh -X lxplus8.cern.ch
 # you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus9.cern.ch
 ```
 
@@ -96,13 +103,14 @@ export RootInteractive=/path/to/your/RootInteractive/directory
 # examples:
 # export RootInteractive=$EOSuser/RootInteractive
 # export RootInteractive=/eos/user/m/mivanov/www/github/RootInteractive
+# export RootInteractive=/afs/cern.ch/user/m/mivanov/public/github/RootInteractive
 
 export venvPrefix=/path/to/your/virtual/python/environments
 # examples:
 # export venvPrefix=$EOSuser/venv
 # export venvPrefix=/eos/user/e/ehellbar/venv
 # export venvPrefix=/eos/user/m/mivanov/www/venv
-## export venvPrefix=/afs/cern.ch/user/m/mivanov/www/venv
+## export venvPrefix=/afs/cern.ch/user/m/mivanov/public/venv
 ```
 
 * clone RootInteractive
@@ -110,38 +118,54 @@ export venvPrefix=/path/to/your/virtual/python/environments
 git clone https://github.com/miranov25/RootInteractive $RootInteractive
 ```
 
+### Select prefered Root, O2, AliRoot version from cvmfs
+
 * install and use git version  - to be done once or if the O2/AliRoot version wil change (on top of version O2sim/v20220220-1) or ROOT
 ```shell
 source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
+eval $(/cvmfs/alice.cern.ch/bin/alienv printenv ROOT/v6-26-10-alice5-4)
 or source ALICE code
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
+```
 
-* code has to be installed with newer Python  version >3.8 - should be case on that machine
-* to gaunarantee consistency with the sowatware from cvmfs approprate python version to be used
+### Install matching virtual environment for the Root resp. ALICE sowfare from the cvmfs
+* the code must be installed with the newer Python version > 3.8 - should be the case on this computer
+* to ensure consistency with the software of cvmfs, a suitable python version must be used
+* To check the version use
+   `root-config --python-version`
+  * base on that please select the venv version to install
   * newest O2 use Python 3.9.12
   * /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh  Python 3.9.12
+* it is strongly recomened to create virtual enironment explictly with python version and use special names to be able to change  
 
+Example:
+````  
 python3.9 -m venv ${venvPrefix}/setup39
-
 source ${venvPrefix}/setup39/bin/activate
-# python3 -m pip install   -r  $RootInteractive/requirements.txt
+``````
+### Install RootInteractive dependencies
+```
+python3 -m pip install   -r  $RootInteractive/requirements.txt
 python3 -m pip install   -e  $RootInteractive
 # install devel packages to be able to test 
 pip install -r  $RootInteractive/requirements_Devel.txt
 ```
 
-* initialize environment
+### Run from sctrach, initialize environment
 ```shell
-ssh -X lxplus9.cern.ch
+ssh -X lxplus.cern.ch
+source ${venvPrefix}/setup39/bin/activate
 # you might have to use your CERN user name for the login, i.e. ssh -X username@lxplus8.cern.ch
-source  /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.26.04/x86_64-ubuntu20-gcc94-opt/bin/thisroot.sh 
-or 
-eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20220220-1)
+eval $(/cvmfs/alice.cern.ch/bin/alienv printenv O2sim/v20221111-1)
 source ${venvPrefix}/setup39/bin/activate
 export PYTHONPATH=$RootInteractive/:$PYTHONPATH
 ```
 
-* make some test:
+### Make tests
+* RootInetractive Unit test
+* iPython import ROOT test
+* Jupyter notebook test
+
 ```shell
 cd $RootInteractive/RootInteractive/InteractiveDrawing/bokeh/
 pytest test_bokehClientHistogram.py 
@@ -173,11 +197,15 @@ jupyter notebook --no-browser --ip=127.0.0.1
     # ssh -N -f -L 8888:localhost:8888 ehellbar@lxplus8s13.cern.ch
     ```
 
-# Installing only as virtual environment on local machine
-Since we want to use the otionally root and ALICE software from cvmfs respectively, we should use appropriate version of Python , since the binaries ROOT and ALICE (Python3.9) depend on this version.
-Configure the virtual environment and use the correct Python.
+## Installing only as virtual environment on local machine
 
-This should work in principle and was tested on a laptop with ubuntu 20 and a local O2 installation (to be installed locally before). Errors might still occur due to local package or version incompatibilities which can be individual to every machine or use case.
+Since we want to use the optional root or ALICE software of cvmfs, we should use the appropriate Python version, since the binaries ROOT 
+(Python 3.8) and ALICE (Python3.9) depend on this version.  Configure the virtual environment and use the correct Python.  
+This should work in principle and was tested on a laptop with Ubuntu 20 and a local O2 installation (which should be installed locally beforehand).
+
+In order to be able to use different versions of the software, we usually create different versions of the compatible 
+virtual environment to match root or AliRoot or O2 respectively.  Usually I also try to make virtual environment installation with Python version.
+
 
 * user defined variables
 ```shell
@@ -197,8 +225,8 @@ git clone https://github.com/miranov25/RootInteractive $RootInteractive
 
 * install and setup virtual environment
 ```shell
-python3 -m venv ${venvPrefix}/setup2
-source ${venvPrefix}/setup2/bin/activate
+python3 -m venv ${venvPrefix}/setupX
+source ${venvPrefix}/setupX/bin/activate
 # python3 -m pip install   -r  $RootInteractive/requirements.txt
 python3 -m pip install   -e  $RootInteractive
 ```
@@ -212,7 +240,7 @@ python3 -m pip install   -e  $RootInteractive
 
 * initialize virtual environment on top of installation
 ```shell
-source ${venvPrefix}/setup2/bin/activate
+source ${venvPrefix}/setup39/bin/activate
 export PYTHONPATH=$RootInteractive/:$PYTHONPATH
 ```
 
@@ -223,3 +251,31 @@ pytest test_*py
 cd $RootInteractive/RootInteractive/tutorial/
 jupyter notebook
 ```
+
+## Node js installation at lxplus
+
+NvM  (node version) installation following https://www.freecodecamp.org/news/node-version-manager-nvm-install-guide/
+Nodejs at lxplus historical. Version >v14.0.0 needed as in the bokeh requirement
+FAILED test_bokehClientHistogram.py::testBokehClientHistogramRowwiseTable - RuntimeError: node.js v14.0.0 or higher
+Details could be find in the link above. Bellow is shorter version
+
+
+### Step1 install nvm
+```curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash```
+
+### Step2 - list available version of the node.js
+```nvm ls-remote```
+
+### Step 3 install version of the nodejs from list above and make it default
+```
+nvm install v18.12.0
+Downloading and installing node v18.12.0...
+Downloading https://nodejs.org/dist/v18.12.0/node-v18.12.0-linux-x64.tar.xz...
+####################################################################################################################################################################################################### 100,0%
+Computing checksum with sha256sum
+Checksums matched!
+Now using node v18.12.0 (npm v8.19.2)
+Creating default alias: default -> v18.12.0
+```
+### Step4 - switch between different versions of nodejs if needed
+```nvm use vA.B.C```
