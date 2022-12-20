@@ -293,6 +293,9 @@ def test_CompressionCDSPipeDraw():
     output_file("test_CompressionCDSPipeDrawComp8.html")
     xComp8=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                             widgetLayout=widgetLayoutDesc, nPointRender=200,arrayCompression=arrayCompressionRelative8)
+    output_file("test_CompressionCDSPipeDrawCompAbsolute.html")
+    xComp8=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                            widgetLayout=widgetLayoutDesc, nPointRender=200,arrayCompression=[(".*",[("delta",.005), "code", "zip"])])
     output_file("test_CompressionCDSPipeDrawCompNo.html")
     xCompNo=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                             widgetLayout=widgetLayoutDesc, nPointRender=200)
@@ -301,4 +304,4 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
     return df
 
-#df = test_CompressionCDSPipeDraw()
+df = test_CompressionCDSPipeDraw()

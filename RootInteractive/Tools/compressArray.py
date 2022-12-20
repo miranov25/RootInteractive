@@ -128,7 +128,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
             currentArray = removeInt64(currentArray)
         if action == "base64":
             currentArray = base64.b64encode(currentArray).decode("utf-8")
-            arrayInfo["history"].append("b64decode")
+            arrayInfo["history"].append("base64_decode")
         if action == "base64_decode":
             currentArray = base64.b64decode(currentArray)
         if action == "code":
@@ -167,6 +167,8 @@ def frombuffer(inputArray, step_info):
 
 
 def tobytes(inputArray):
+    if isinstance(inputArray, bytes):
+        return (inputArray, None)
     #TODO: Add logic for numpy
     return (inputArray, None)
 
