@@ -110,15 +110,16 @@ export class CDSCompress extends ColumnDataSource {
   }
   inflateCompressedBokehBase64(arrayIn: any ) {
     let arrayOut=arrayIn.array
-    for(var i =  arrayIn.actionArray.length-1;i>=0; i--) {
-      console.log((i + 1) + " --> " + arrayIn.actionArray[i])
-      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.actionArray[i] : arrayIn.actionArray[i][0]
-      if (action == "base64"){
+    for(var i =  arrayIn.history.length-1;i>=0; i--) {
+      console.log((i + 1) + " --> " + arrayIn.history[i])
+      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
+      const actionParams = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? null : arrayIn.history[i][1]
+      if (action == "base64_decode"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
         })
       }
-      if (action == "zip") {
+      if (action == "inflate") {
         arrayOut = pako.inflate(arrayOut)
         const dtype = arrayIn.dtype
         if(arrayIn.byteorder !== BYTE_ORDER){
@@ -149,15 +150,21 @@ export class CDSCompress extends ColumnDataSource {
         console.log(arrayOut)
       }
       if (action == "code") {
-        if(arrayIn.skipCode){
-          continue
-        }
         let size = arrayOut.length
         let arrayOutNew = new Array()
         for (let i = 0; i < size; i++) {
           arrayOutNew.push(arrayIn.valueCode[arrayOut[i]])
         }
         arrayOut=arrayOutNew
+      }
+      if (action == "linear") {
+        if (actionParams == null)
+        {
+          console.error("Not enough parameters");
+          continue;
+        }
+        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => actionParams.origin+actionParams.scale*x)
+        arrayOut = arrayOutNew;
       }
     }
     return arrayOut

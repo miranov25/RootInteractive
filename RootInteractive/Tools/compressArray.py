@@ -48,7 +48,7 @@ def removeInt64(column):
     return column
 
 
-def roundAbsolute(df, delta):
+def roundAbsolute(df, delta, downgrade_type=True):
     # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
     if delta == 0:
@@ -61,8 +61,10 @@ def roundAbsolute(df, delta):
     quantized = np.rint(df / delta)
     result = quantized * delta
     deltaMean = (df - result).mean()
+    if downgrade_type:
+        return quantized.astype(np.int32), {"scale":delta, "origin":deltaMean}
     result -= deltaMean
-    return result.astype(type)
+    return result.astype(type), None
 
 
 def codeMapDF(df, maxFraction=0.5, doPrint=0):
@@ -105,16 +107,18 @@ def compressArray(inputArray, actionArray, keepValues=False):
     for actionTuple in actionArray:
         if isinstance(actionTuple, tuple):
             action = actionTuple[0]
-            actionParam = actionTuple[1] if len(actionTuple) > 1 else None
+            actionParams = actionTuple[1:] if len(actionTuple) > 1 else None
         else:
             action = actionTuple
-            actionParam = None
+            actionParams = []
         if keepValues:
             arrayInfo["history"].append(currentArray)
         if action == "relative":
-            currentArray = roundRelativeBinary(currentArray, actionParam)
+            currentArray = roundRelativeBinary(currentArray, actionParams[0])
         if action == "delta":
-            currentArray = roundAbsolute(currentArray, actionParam)
+            currentArray, decode_transform = roundAbsolute(currentArray, *actionParams)
+            if decode_transform is not None:
+                arrayInfo["history"].append(("linear", decode_transform))
         if action == "zip":
             if isinstance(currentArray, pd.Series):
                 currentArray = currentArray.to_numpy()
@@ -137,6 +141,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if currentArray.dtype.kind not in ['O', 'S', 'U']:
                 arrayInfo["skipCode"] = True
                 continue
+            arrayInfo["history"].append("code")
             arrayInfo["skipCode"] = False
             values = currentArray.unique()
             dictValues = {}
