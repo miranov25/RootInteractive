@@ -19,7 +19,7 @@ def getSize(inputObject):
     return len(pickle.dumps(inputObject))
 
 
-def roundRelativeBinary(df, nBits):
+def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     """ TODO - check more optimal implementation using shifts ... and pipes
     roundRelativeBinary     - round mantissa of float number in nBits, assuming better lossy compression later
     :param df:              - input array (for a moment only pandas or numpy)
@@ -33,8 +33,10 @@ def roundRelativeBinary(df, nBits):
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
     mantissa = np.rint(mantissa * shiftN)/shiftN
-    result=(mantissa * 2 ** exp2.astype(float)).astype(type)
-    return result
+    # If result can be represented by single precision float, use that, otherwise cast to double
+    if downgradeType and type.kind == 'f' and nBits <= 23 and np.min(exp2) > -256 and np.max(exp2) < 255:
+        return np.ldexp(mantissa.astype(np.float32), exp2)
+    return np.ldexp(mantissa, exp2).astype(type)
 
 
 def removeInt64(column):
@@ -62,7 +64,14 @@ def roundAbsolute(df, delta, downgrade_type=True):
     result = quantized * delta
     deltaMean = (df - result).mean()
     if downgrade_type:
-        return quantized.astype(np.int32), {"scale":delta, "origin":deltaMean}
+        dfMin = np.nanmin(quantized)
+        quantized = np.where(np.isnan(df), -1, quantized-dfMin)
+        rangeSize = np.max(quantized)
+        if rangeSize <= 0x7f:
+            return quantized.astype(np.int8), {"scale":delta, "origin":-dfMin-deltaMean}
+        if rangeSize <= 0x7fff:
+            return quantized.astype(np.int16), {"scale":delta, "origin":-dfMin-deltaMean}
+        return quantized.astype(np.int32), {"scale":delta, "origin":-dfMin-deltaMean}
     result -= deltaMean
     return result.astype(type), None
 
@@ -114,7 +123,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
         if keepValues:
             arrayInfo["history"].append(currentArray)
         if action == "relative":
-            currentArray = roundRelativeBinary(currentArray, actionParams[0])
+            currentArray = roundRelativeBinary(currentArray, *actionParams)
         if action == "delta":
             currentArray, decode_transform = roundAbsolute(currentArray, *actionParams)
             if decode_transform is not None:
@@ -160,6 +169,8 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if not arrayInfo["skipCode"]:
                 arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
+        if action == "astype":
+            currentArray = currentArray.astype(actionParams[0])
         counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
