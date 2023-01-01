@@ -68,10 +68,10 @@ def roundAbsolute(df, delta, downgrade_type=True):
         quantized = np.where(np.isnan(df), -1, quantized-dfMin)
         rangeSize = np.max(quantized)
         if rangeSize <= 0x7f:
-            return quantized.astype(np.int8), {"scale":delta, "origin":-dfMin-deltaMean}
+            return quantized.astype(np.int8), {"scale":delta, "origin":dfMin*delta-deltaMean}
         if rangeSize <= 0x7fff:
-            return quantized.astype(np.int16), {"scale":delta, "origin":-dfMin-deltaMean}
-        return quantized.astype(np.int32), {"scale":delta, "origin":-dfMin-deltaMean}
+            return quantized.astype(np.int16), {"scale":delta, "origin":dfMin*delta-deltaMean}
+        return quantized.astype(np.int32), {"scale":delta, "origin":dfMin*delta-deltaMean}
     result -= deltaMean
     return result.astype(type), None
 
