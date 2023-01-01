@@ -103,22 +103,27 @@ export class CDSCompress extends ColumnDataSource {
     }))
   }
 
+  _length: number
+
   initialize(): void {
     super.initialize()
     console.info("CDSCompress::initialize")
-    this.inflateCompressedBokehObjectBase64()
+    this.data = {}
+    this._length = -1
   }
+
   inflateCompressedBokehBase64(arrayIn: any ) {
     let arrayOut=arrayIn.array
-    for(var i =  arrayIn.actionArray.length-1;i>=0; i--) {
-      console.log((i + 1) + " --> " + arrayIn.actionArray[i])
-      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.actionArray[i] : arrayIn.actionArray[i][0]
-      if (action == "base64"){
+    for(var i =  arrayIn.history.length-1;i>=0; i--) {
+      console.log((i + 1) + " --> " + arrayIn.history[i])
+      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
+      const actionParams = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? null : arrayIn.history[i][1]
+      if (action == "base64_decode"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
         })
       }
-      if (action == "zip") {
+      if (action == "inflate") {
         arrayOut = pako.inflate(arrayOut)
         const dtype = arrayIn.dtype
         if(arrayIn.byteorder !== BYTE_ORDER){
@@ -149,9 +154,6 @@ export class CDSCompress extends ColumnDataSource {
         console.log(arrayOut)
       }
       if (action == "code") {
-        if(arrayIn.skipCode){
-          continue
-        }
         let size = arrayOut.length
         let arrayOutNew = new Array()
         for (let i = 0; i < size; i++) {
@@ -159,18 +161,41 @@ export class CDSCompress extends ColumnDataSource {
         }
         arrayOut=arrayOutNew
       }
+      if (action == "linear") {
+        if (actionParams == null)
+        {
+          console.error("Not enough parameters");
+          continue;
+        }
+        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => actionParams.origin+actionParams.scale*x)
+        arrayOut = arrayOutNew;
+      }
     }
     return arrayOut
   }
 
-  inflateCompressedBokehObjectBase64() {
-    this.data = {};
-    let objectIn = (this.inputData as any);
-    for (let arr in objectIn) {
-      let arrOut = this.inflateCompressedBokehBase64(objectIn[arr]);
-      this.data[arr]=arrOut;
-      console.log(arr);
+  get_column(key: string){
+    if (this.data[key] != null) {
+      return this.data[key];
     }
+    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key]);
+    this.data[key]=arrOut;
+    if(this._length === -1) this._length = arrOut.length
+    if(arrOut.length !== this._length){
+      throw Error("Corrupted length: " + arrOut.length + " expected: " + this._length)
+    }
+    console.log(key);    
+    return arrOut;
+  }
+
+  get_length(){
+    if (this._length !== -1) return this._length
+    for(const key in this.inputData){
+      this.get_column(key)
+      break
+    }
+    if(this._length === -1) this._length = 0;
+    return this._length;
   }
 
 }

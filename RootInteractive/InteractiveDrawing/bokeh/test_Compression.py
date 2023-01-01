@@ -268,7 +268,7 @@ def test_compressCDSPipe():
     return outputMap
 
 def test_CompressionCDSPipeDraw():
-    df = pd.DataFrame(np.random.random_sample(size=(100000, 4)), columns=list('ABCD'))
+    df = pd.DataFrame(np.random.random_sample(size=(1000000, 4)), columns=list('ABCD'))
     df["AA"] = (df.A * 10).round(0).astype("int64") #Test if accidentally converting to int64 causes problems
     figureArray = [
        [['A*10'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "errY": "0.1", "errX":"0.01"}],
@@ -293,6 +293,9 @@ def test_CompressionCDSPipeDraw():
     output_file("test_CompressionCDSPipeDrawComp8.html")
     xComp8=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                             widgetLayout=widgetLayoutDesc, nPointRender=200,arrayCompression=arrayCompressionRelative8)
+    output_file("test_CompressionCDSPipeDrawCompAbsolute.html")
+    xComp8=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                            widgetLayout=widgetLayoutDesc, nPointRender=200,arrayCompression=[(".*",[("delta",.005), "code", "zip"])])
     output_file("test_CompressionCDSPipeDrawCompNo.html")
     xCompNo=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                             widgetLayout=widgetLayoutDesc, nPointRender=200)
@@ -301,4 +304,4 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
     return df
 
-#df = test_CompressionCDSPipeDraw()
+#test_CompressionCDSPipeDraw()

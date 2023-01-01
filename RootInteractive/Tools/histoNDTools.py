@@ -1,20 +1,16 @@
 import numpy as np
 import pandas as pd
 import logging
-import sys
-import torch
+try:
+    import torch
+    from RootInteractive.Tools.Histograms.histogramdd_pytorch import histogramdd as histogramdd_pytorch
+except:
+    pass
 from bokeh.models import *
 from bokeh.palettes import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import *
-from RootInteractive.Tools.Histograms.histogramdd_pytorch import histogramdd as histogramdd_pytorch
-from bokeh.palettes import *
 
-if "ROOT" in sys.modules:
-    from root_numpy import *
-
-# from bokeh.io import push_notebook
-
-# Standard
+# Default options
 histoNDOptions = {
     "verbose": 0,
     "colors": Category10,
@@ -69,19 +65,6 @@ def makeHistogram(data, hisString, **kwargs):
     else:
         H, axis = np.histogramdd(data.query(selection)[varList].values, bins=bins, range=hRange)
     return {"H": H, "axes": axis, "name": histoInfo[0], "varNames": varList}
-
-
-def thnToNumpyDD(his):
-    tuple = hist2array(his, False, True, True)
-    histogram = {"H": tuple[0], "axes": tuple[1], "name": his.GetName(), "title": his.GetTitle()}
-    varNames = []
-    varTitles = []
-    for axis in range(his.GetNdimensions()):
-        varNames.insert(axis, his.GetAxis(axis).GetName())
-        varTitles.insert(axis, his.GetAxis(axis).GetTitle())
-    histogram["varNames"] = varNames
-    histogram["varTitles"] = varTitles
-    return histogram
 
 
 def makeHistogramPanda(data, hisString, **kwargs):

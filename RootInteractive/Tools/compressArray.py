@@ -19,7 +19,7 @@ def getSize(inputObject):
     return len(pickle.dumps(inputObject))
 
 
-def roundRelativeBinary(df, nBits):
+def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     """ TODO - check more optimal implementation using shifts ... and pipes
     roundRelativeBinary     - round mantissa of float number in nBits, assuming better lossy compression later
     :param df:              - input array (for a moment only pandas or numpy)
@@ -33,8 +33,10 @@ def roundRelativeBinary(df, nBits):
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
     mantissa = np.rint(mantissa * shiftN)/shiftN
-    result=(mantissa * 2 ** exp2.astype(float)).astype(type)
-    return result
+    # If result can be represented by single precision float, use that, otherwise cast to double
+    if downgradeType and type.kind == 'f' and nBits <= 23 and np.min(exp2) > -256 and np.max(exp2) < 255:
+        return np.ldexp(mantissa.astype(np.float32), exp2)
+    return np.ldexp(mantissa, exp2).astype(type)
 
 
 def removeInt64(column):
@@ -48,7 +50,7 @@ def removeInt64(column):
     return column
 
 
-def roundAbsolute(df, delta):
+def roundAbsolute(df, delta, downgrade_type=True):
     # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
     if delta == 0:
@@ -61,8 +63,17 @@ def roundAbsolute(df, delta):
     quantized = np.rint(df / delta)
     result = quantized * delta
     deltaMean = (df - result).mean()
+    if downgrade_type:
+        dfMin = np.nanmin(quantized)
+        quantized = np.where(np.isnan(df), -1, quantized-dfMin)
+        rangeSize = np.max(quantized)
+        if rangeSize <= 0x7f:
+            return quantized.astype(np.int8), {"scale":delta, "origin":dfMin*delta-deltaMean}
+        if rangeSize <= 0x7fff:
+            return quantized.astype(np.int16), {"scale":delta, "origin":dfMin*delta-deltaMean}
+        return quantized.astype(np.int32), {"scale":delta, "origin":dfMin*delta-deltaMean}
     result -= deltaMean
-    return result.astype(type)
+    return result.astype(type), None
 
 
 def codeMapDF(df, maxFraction=0.5, doPrint=0):
@@ -105,16 +116,18 @@ def compressArray(inputArray, actionArray, keepValues=False):
     for actionTuple in actionArray:
         if isinstance(actionTuple, tuple):
             action = actionTuple[0]
-            actionParam = actionTuple[1] if len(actionTuple) > 1 else None
+            actionParams = actionTuple[1:] if len(actionTuple) > 1 else None
         else:
             action = actionTuple
-            actionParam = None
+            actionParams = []
         if keepValues:
             arrayInfo["history"].append(currentArray)
         if action == "relative":
-            currentArray = roundRelativeBinary(currentArray, actionParam)
+            currentArray = roundRelativeBinary(currentArray, *actionParams)
         if action == "delta":
-            currentArray = roundAbsolute(currentArray, actionParam)
+            currentArray, decode_transform = roundAbsolute(currentArray, *actionParams)
+            if decode_transform is not None:
+                arrayInfo["history"].append(("linear", decode_transform))
         if action == "zip":
             if isinstance(currentArray, pd.Series):
                 currentArray = currentArray.to_numpy()
@@ -128,7 +141,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
             currentArray = removeInt64(currentArray)
         if action == "base64":
             currentArray = base64.b64encode(currentArray).decode("utf-8")
-            arrayInfo["history"].append("b64decode")
+            arrayInfo["history"].append("base64_decode")
         if action == "base64_decode":
             currentArray = base64.b64decode(currentArray)
         if action == "code":
@@ -137,6 +150,7 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if currentArray.dtype.kind not in ['O', 'S', 'U']:
                 arrayInfo["skipCode"] = True
                 continue
+            arrayInfo["history"].append("code")
             arrayInfo["skipCode"] = False
             values = currentArray.unique()
             dictValues = {}
@@ -155,11 +169,24 @@ def compressArray(inputArray, actionArray, keepValues=False):
             if not arrayInfo["skipCode"]:
                 arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
+        if action == "astype":
+            currentArray = currentArray.astype(actionParams[0])
         counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
     return arrayInfo
 
+
+def frombuffer(inputArray, step_info):
+    #TODO: Add logic for numpy
+    return inputArray
+
+
+def tobytes(inputArray):
+    if isinstance(inputArray, bytes):
+        return (inputArray, None)
+    #TODO: Add logic for numpy
+    return (inputArray, None)
 
 def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
     """
