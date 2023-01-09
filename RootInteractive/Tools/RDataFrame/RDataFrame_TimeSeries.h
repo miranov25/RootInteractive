@@ -1,6 +1,6 @@
 /*
-  #include "$RootInteractive/RootInteractive/Tools/RDataFrame_TimeSeries.h"
-  .L $RootInteractive/RootInteractive/Tools/RDataFrame_TimeSeries.h
+  #include "$RootInteractive/RootInteractive/Tools/RDataFrame/RDataFrame_TimeSeries.h"
+  .L $RootInteractive/RootInteractive/Tools/RDataFrame/RDataFrame_TimeSeries.h
 */
 #include "ROOT/RDataFrame.hxx"
 #include "ROOT/RVec.hxx"
@@ -55,7 +55,6 @@ auto getConvolution0(const ROOT::RVec<DataVal>& vecRef, const ROOT::RVec<DataTim
   return std::tuple(vecNearestRef, vecNearestDist);
 }
 
-template <typename DataTime, typename DataVal>
 ///
 /// \tparam DataTime       - type for the time - should be double
 /// \tparam DataVal        - type fot the values - float/double
@@ -69,6 +68,7 @@ template <typename DataTime, typename DataVal>
 ///                           - https://bookdown.org/rdpeng/timeseriesbook/filtering-time-series.html
 /// \param deltaMax        - local neighborhood to process
 /// \return
+template <typename DataTime, typename DataVal>
 auto getStat0(const ROOT::RVec<DataVal>& vecRef, const ROOT::RVec<DataTime>& timeRef, const ROOT::RVec<DataTime>& time0, std::vector<std::string> statVector, float deltaMax)
 {
   bool lower = true;

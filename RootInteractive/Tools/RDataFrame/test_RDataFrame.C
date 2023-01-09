@@ -1,12 +1,12 @@
 /*
  gSystem->AddIncludePath("-I$RootInteractive/")
-.L $RootInteractive/RootInteractive/Tools/test_RDataFrame.C+g
+.L $RootInteractive/RootInteractive/Tools/RDataFrame/test_RDataFrame.C+g
 
 */
 #include "ROOT/RDataFrame.hxx"
 #include "ROOT/RVec.hxx"
 #include "ROOT/RDF/RInterface.hxx"
-#include "RootInteractive/Tools/RDataFrame_TimeSeries.h"
+#include "RootInteractive/Tools/RDataFrame/RDataFrame_TimeSeries.h"
 #include "TRandom.h"
 #pragma link C++ class map<string,ROOT::VecOps::RVec<double> >+;
 
@@ -27,7 +27,7 @@ void testDevel(){
     auto statMap   = getStat0<double,double>(sampleSin, sampleTime,sampleTime,statVector,0.01);
 }
 
-void testRDFSeries(int nTracks){
+ROOT::RDF::RInterface<ROOT::Detail::RDF::RLoopManager, void> testRDFSeries(int nTracks){
     // nTracks=100
      ROOT::RDataFrame df(nTracks);
      auto rdf = df.Define("nPoints", "size_t(10+gRandom->Rndm()*100)");
@@ -48,7 +48,7 @@ void testRDFSeries(int nTracks){
      rdf = rdf.Define("sinTimeMedian","statMap[\"median\"]");
      rdf = rdf.Define("sinTimeStd","statMap[\"std\"]");
      rdf.Snapshot("rdfSeries","rdfSeriesTest1.root");
-
+     return rdf;
 }
 
 
