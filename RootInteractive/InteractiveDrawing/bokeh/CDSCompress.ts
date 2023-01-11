@@ -116,8 +116,8 @@ export class CDSCompress extends ColumnDataSource {
     let arrayOut=arrayIn.array
     for(var i =  arrayIn.history.length-1;i>=0; i--) {
       console.log((i + 1) + " --> " + arrayIn.history[i])
-      const action = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
-      const actionParams = Object.prototype.toString.call(arrayIn.actionArray[i]) === '[object String]' ? null : arrayIn.history[i][1]
+      const action = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
+      const actionParams = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? null : arrayIn.history[i][1]
       if (action == "base64_decode"){
         arrayOut = atob(arrayOut).split("").map(function (x) {
           return x.charCodeAt(0)
@@ -182,7 +182,7 @@ export class CDSCompress extends ColumnDataSource {
     this.data[key]=arrOut;
     if(this._length === -1) this._length = arrOut.length
     if(arrOut.length !== this._length){
-      throw Error("Corrupted length of column" + key + ": " + arrOut.length + " expected: " + this._length)
+      throw Error("Corrupted length of column " + key + ": " + arrOut.length + " expected: " + this._length)
     }
     console.log(key);    
     return arrOut;
