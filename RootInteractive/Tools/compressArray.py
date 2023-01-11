@@ -35,7 +35,7 @@ def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     mantissa = np.rint(mantissa * shiftN)/shiftN
     # If result can be represented by single precision float, use that, otherwise cast to double
     if downgradeType and type.kind == 'f' and nBits <= 23 and np.min(exp2) > -256 and np.max(exp2) < 255:
-        return np.ldexp(mantissa.astype(np.float32), exp2)
+        return np.ldexp(mantissa.astype(np.float32), exp2).astype(np.float32)
     return np.ldexp(mantissa, exp2).astype(type)
 
 
@@ -109,7 +109,7 @@ def codeMapDF(df, maxFraction=0.5, doPrint=0):
     return mapIndex, mapCodeI
 
 
-def compressArray(inputArray, actionArray, keepValues=False):
+def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
     arrayInfo = {"actionArray": actionArray.copy(), "history": []}
     currentArray = inputArray
     counter=0
@@ -171,6 +171,9 @@ def compressArray(inputArray, actionArray, keepValues=False):
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
         if action == "astype":
             currentArray = currentArray.astype(actionParams[0])
+        if verbosity & 2:
+            print(actionTuple)
+            print(len(currentArray))
         counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
@@ -215,7 +218,7 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
         for action in arrayCompression:
             if re.match(action[0], col) == None:
                 continue
-            arrayC = compressArray(df[col], action[1], False)
+            arrayC = compressArray(df[col], action[1], False, verbosity)
             sizeIn = getSize(df[col])
             sizeOut = getSize(arrayC)
             sizeOutAll += sizeOut
