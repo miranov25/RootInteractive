@@ -114,9 +114,6 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
     currentArray = inputArray
     counter=0
     for actionTuple in actionArray:
-        if verbosity & 1:
-            print(actionTuple)
-            print(len(currentArray))
         if isinstance(actionTuple, tuple):
             action = actionTuple[0]
             actionParams = actionTuple[1:] if len(actionTuple) > 1 else None
@@ -174,6 +171,9 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
         if action == "astype":
             currentArray = currentArray.astype(actionParams[0])
+        if verbosity & 1:
+            print(actionTuple)
+            print(len(currentArray))
         counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
