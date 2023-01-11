@@ -171,7 +171,7 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
                 currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
         if action == "astype":
             currentArray = currentArray.astype(actionParams[0])
-        if verbosity & 1:
+        if verbosity & 2:
             print(actionTuple)
             print(len(currentArray))
         counter+=1
