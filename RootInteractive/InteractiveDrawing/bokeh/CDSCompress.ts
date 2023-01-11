@@ -182,7 +182,7 @@ export class CDSCompress extends ColumnDataSource {
     this.data[key]=arrOut;
     if(this._length === -1) this._length = arrOut.length
     if(arrOut.length !== this._length){
-      throw Error("Corrupted length: " + arrOut.length + " expected: " + this._length)
+      throw Error("Corrupted length of column" + key + ": " + arrOut.length + " expected: " + this._length)
     }
     console.log(key);    
     return arrOut;
