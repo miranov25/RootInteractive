@@ -84,7 +84,7 @@ export class RangeFilter extends Model {
       new_vector[i] = a
       has_element ||= a
     }
-    if(has_element){
+    if(!has_element){
       console.warn("Range empty: " + field)
     }
     this.dirty_source = false
