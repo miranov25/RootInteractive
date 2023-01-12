@@ -78,8 +78,15 @@ export class RangeFilter extends Model {
     const index_low = this.index_low
     const index_high = this.index_high === -1 ? col.length : this.index_high
     const [low, high] = this.range
+    let is_empty = true
     for(let i=index_low; i<index_high; i++){
-        new_vector[i] = (col[i] >= low) && (col[i] <= high)
+      const a = (col[i] >= low) && (col[i] <= high)
+      new_vector[i] = a
+      is_empty &&= !a
+    }
+    if(is_empty){
+      console.warn("Range empty: " + field)
+      return cached_vector
     }
     this.dirty_source = false
     this.dirty_widget = false
