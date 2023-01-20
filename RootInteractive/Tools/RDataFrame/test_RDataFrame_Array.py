@@ -92,6 +92,8 @@ def define1D(rdf, name, expression,verbosity):
     # make function header  ->  auto name(columns)
     # loop over id='array1D0
     rdf.GetColumnType("array1D0")
+
+    makeDefine("C","array1D0[1:10]-array1D2[:20:2]", rdf)
     #
     #rdfNew=rdf
     return rdf
