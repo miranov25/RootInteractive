@@ -2,6 +2,8 @@
 
 import ROOT
 import ast
+import RDataFrame_Array
+
 import pprint
 def makeTestRDataFrame():
     # 2 hacks - instatiate classes needed for RDataframe
