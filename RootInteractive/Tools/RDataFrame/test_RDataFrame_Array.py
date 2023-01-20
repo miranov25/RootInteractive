@@ -1,17 +1,31 @@
-# from RootInteractive.Tools.RDataFrame.RDataFrame_Array  import *
+# from RootInteractive.Tools.RDataFrame.test_RDataFrame_Array  import *
+from RootInteractive.Tools.RDataFrame.RDataFrame_Array  import *
 
 import ROOT
 import ast
-import RDataFrame_Array
+#import RDataFrame_Array
 
 import pprint
+def makeTestDictionary():
+    dictData = """
+       #include "ROOT/RDataFrame.hxx"
+       #include "ROOT/RVec.hxx"
+       #include "ROOT/RDF/RInterface.hxx"
+       #include  "TParticle.h"
+       #pragma link C++ class ROOT::RVec < ROOT::RVec < float>> + ;
+       #pragma link C++ class ROOT::RVec < ROOT::RVec < double>> + ;
+       #pragma link C++ class ROOT::VecOps::RVec<ROOT::VecOps::RVec<float>>+;
+       #pragma link C++ class ROOT::VecOps::RVec <TParticle> + ;  
+    """
+    print(dictData,  file=open('dict.C', 'w'))
+    ROOT.gInterpreter.ProcessLine(".L dict.C+")
+
 def makeTestRDataFrame():
     # 2 hacks - instatiate classes needed for RDataframe
-    x=ROOT.AliExternalTrackParam();
-    ROOT.gInterpreter.ProcessLine(".L $NOTES/JIRA/ATO-615/statCounters.C+g")
+    x=ROOT.TParticle();
+    ROOT.gInterpreter.ProcessLine(".L dict.C+")
 
     ROOT.gInterpreter.Declare("""
-        #pragma link C++ class ROOT::RVec < ROOT::RVec < float>> + ;
         auto makeUnitRVec1D = [](int n){
             auto array = ROOT::RVecF(n);
             array.resize(n);
@@ -28,7 +42,7 @@ def makeTestRDataFrame():
             return array2D;
         ;};
         auto makeUnitRVec1DTrack = [](int n){
-            auto array = ROOT::RVec<AliExternalTrackParam>(n);
+            auto array = ROOT::RVec<TParticle>(n);
             array.resize(n);
             //for (size_t i=0; i<n; i++) array=i;
             return array;
@@ -44,7 +58,7 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array1D2","makeUnitRVec1D(nPoints)")
     rdf= rdf.Define("array2D0","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
-    #rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
+    rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrame.root")
     return rdf
 
@@ -80,8 +94,4 @@ def define1D(rdf, name, expression,verbosity):
     rdf.GetColumnType("array1D0")
     #
     #rdfNew=rdf
-    return rdf
-
-def define2D(rdf, expression):
-    rdfNew=rdf
     return rdf
