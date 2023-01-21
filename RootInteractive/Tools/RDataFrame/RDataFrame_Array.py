@@ -225,12 +225,19 @@ auto {self.name}(){{
             """,
         }
 
-def makeDefine(name, code, df):
+def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
     evaluator = RDataFrame_Visit(code, df, name)
     parsed = evaluator.visit(t)
-    if df is not None:
+    if verbose>0:
+        print("====================================\n")
+        print(f"{name}\n", f"{code}")
+        print("====================================\n")
+    if verbose & 0x1:
+        print("Implementation:\n", parsed["implementation"])
+    if verbose & 0x2:
+        print("Dependencies\n", list(evaluator.dependencies))
+    if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
-    print(parsed["implementation"])
 
-# makeDefine("C","A[1:10]-B[:20:2]", None)
+# makeDefine("C","A[1:10]-B[:20:2]", None,3, True)

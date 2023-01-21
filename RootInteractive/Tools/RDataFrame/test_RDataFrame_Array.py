@@ -70,30 +70,23 @@ def dumpAST(expression):
     print(ast.dump(astOut,True,False))
 
 
-def define1D(rdf, name, expression,verbosity):
+def test_define1D(rdf, name, expression,verbosity):
     """
     :param rdf:
     :param expression:
     :return:
     1.) make AST
     2.) check get data
-    expression="array1D0[:]+array1D1[:]"
-    expression="array1D0[0:10]+array1D1[10:20]"
-    expression="array1D0[0:10]+array1D1[0]"
-    expression="cos(array1D0[0:10]+array1D1[0:10])"
-    expression="array1D0[0:10].fun(0)"
-    """
-    astOut=ast.parse(expression, mode="eval")
-    print(ast.dump(astOut,True,False))
-    # to get type
-    columnTypes={}             # id-> types
-    validExpression={}         # to check ROOT.expr
-    typeDim={}                 # type dimension   stl::vector<>   ROOT::RVec<>
-    # make function header  ->  auto name(columns)
-    # loop over id='array1D0
-    rdf.GetColumnType("array1D0")
 
-    makeDefine("C","array1D0[1:10]-array1D2[:20:2]", rdf)
+    """
+    makeTestDictionary()
+    rdf=makeTestRDataFrame()
+    #
+    rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)
+    # rdf2 = makeDefine("arrayD","cos(array1D0[1:10])", rdf,3, True)               # TODO Failing - cos is fund as an obect - not function
+    # rdf2 = makeDefine("arrayD","array1DTrack[1:10].Px()", rdf,3, True)           # TODO Failing - member function not found
+    #
+
     #
     #rdfNew=rdf
     return rdf
