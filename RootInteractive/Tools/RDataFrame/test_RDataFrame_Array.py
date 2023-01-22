@@ -83,10 +83,26 @@ def test_define1D(rdf, name, expression,verbosity):
     rdf=makeTestRDataFrame()
     #
     rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)
-    # rdf2 = makeDefine("arrayD","cos(array1D0[1:10])", rdf,3, True)               # TODO Failing - cos is fund as an obect - not function
+    # rdf2 = makeDefine("arrayD","cos(array1D0[1:10])", rdf,3, True)               # TODO Failing - cos is found as an object - not function  ROOT.<xxx>
+    #
     # rdf2 = makeDefine("arrayD","array1DTrack[1:10].Px()", rdf,3, True)           # TODO Failing - member function not found
     #
 
     #
     #rdfNew=rdf
     return rdf
+
+def getGlobalFunction(name="cos", verbose=0):
+    info={"fun":0, "returnType":"", "nArgs":0}
+    fun = ROOT.gROOT.GetListOfGlobalFunctions().FindObject(name)
+    if fun:
+        info["fun"]=fun
+        info["returnType"]=fun.GetReturnTypeName()
+        info["nArgs"]=fun.GetNargs()
+    # fun.GetReturnTypeName()   -> 'long double'
+    # fun.GetNargs()            ->  1
+    if verbose:
+        print("GetGlobalFunction",name, info)
+    return info
+
+

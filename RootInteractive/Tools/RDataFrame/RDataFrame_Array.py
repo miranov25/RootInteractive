@@ -1,6 +1,32 @@
 import ast
 import numpy as np
 
+def getGlobalFunction(name="cos", verbose=0):
+    info={"fun":0, "returnType":"", "nArgs":0}
+    fun = ROOT.gROOT.GetListOfGlobalFunctions().FindObject(name)
+    if fun:
+        info["fun"]=fun
+        info["returnType"]=fun.GetReturnTypeName()
+        info["nArgs"]=fun.GetNargs()
+    # fun.GetReturnTypeName()   -> 'long double'
+    # fun.GetNargs()            ->  1
+    if verbose:
+        print("GetGlobalFunction",name, info)
+    return info
+
+def getClass(name="TParticle", verbose=0):
+    info={"rClass":0}
+    rClass = ROOT.gROOT.GetListOfClasses().FindObject(name)
+    if rClass:
+        info["rClass"]=rClass
+        info["publicMethods"]=rClass.GetListOfAllPublicMethods()
+        info["publicData"]=rClass.GetListOfAllPublicDataMembers()
+    if verbose:
+        print("GetGlobalFunction",name, info)
+    return info
+
+
+
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, code, df, name):
@@ -233,9 +259,11 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         print("====================================\n")
         print(f"{name}\n", f"{code}")
         print("====================================\n")
-    if verbose & 0x1:
+
+    if (verbose & 0x1) >0 :
         print("Implementation:\n", parsed["implementation"])
-    if verbose & 0x2:
+
+    if (verbose & 0x2) > 0 :
         print("Dependencies\n", list(evaluator.dependencies))
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
