@@ -62,15 +62,10 @@ class RDataFrame_Visit:
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
-        left = self.visit(node.func)
-        if left["type"] == "parameter":
-            # TODO: Make a parameter unswitcher - should help improve performance - but same can also apply to other scalars?
-            pass
-        args = []
+        args = [self.visit(iArg) for iArg in node.args]
+        left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
-        for iArg in node.args:
-            args.append(self.visit(iArg))
-        implementation += ", ".join([i["implementation"] for i in args])
+        implementation += ", ".join([i['implementation'] for i in args])
         implementation += ')'
         return {
             "implementation": implementation,
@@ -89,9 +84,9 @@ class RDataFrame_Visit:
 
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
+        self.dependencies.add(node.id)
         if self.df is not None:
             columnType = self.df.GetColumnType(node.id)
-            self.dependencies.add(node.id)
             return {"implementation": node.id, "type":columnType}
         return {"implementation": node.id, "type":"RVec<double>"}
 
@@ -251,6 +246,21 @@ auto {self.name}(){{
             """,
         }
 
+    def visit_func(self, node, args):
+        # Detect global function from class method
+        if isinstance(node, ast.Name):
+            return self.visit_func_Name(node, args)
+        if isinstance(node, ast.Attribute):
+            return self.visit_func_Attribute(node, args)        
+        raise NotImplementedError(f"{ast.dump(node)} is not supported as a function")
+
+    def visit_func_Name(self, node:ast.Name, args):
+        return {"type":"function", "implementation":node.id}
+
+    def visit_func_Attribute(self, node:ast.Attribute, args):
+        left = self.visit(node.value)
+        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}"}
+
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
     evaluator = RDataFrame_Visit(code, df, name)
@@ -260,12 +270,12 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         print(f"{name}\n", f"{code}")
         print("====================================\n")
 
-    if (verbose & 0x1) >0 :
+    if verbose & 0x1:
         print("Implementation:\n", parsed["implementation"])
 
-    if (verbose & 0x2) > 0 :
+    if verbose & 0x2:
         print("Dependencies\n", list(evaluator.dependencies))
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-# makeDefine("C","A[1:10]-B[:20:2]", None,3, True)
+makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
