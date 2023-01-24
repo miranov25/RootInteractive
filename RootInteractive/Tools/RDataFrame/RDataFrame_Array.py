@@ -241,7 +241,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         return {
             "implementation":f"""auto {self.name}(){{
-    {self.makeOuterLoop(0, f'{body["implementation"]}', body["type"])}
+    {self.makeOuterLoop(0, body["implementation"], body["type"])}
 }} """,
         }
 
@@ -250,7 +250,7 @@ class RDataFrame_Visit:
         template_end_f = ''.join([">" for i in range(depth, len(self.n_iter))])
         depth_f = f"_{depth}" if depth>0 else ""
         depth_f_lower = f"_{depth-1}" if depth>1 else ""
-        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f}" if depth>0 else ""
+        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
         if depth>=len(self.n_iter):
             depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop};"
