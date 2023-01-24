@@ -255,8 +255,8 @@ auto {self.name}(){{
         depth_f = f"_{depth}" if depth>0 else ""
         return f"""
     {template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[0]});
-    for(size_t i=0; i<{self.n_iter[0]}; i++){{
-        result[i] = {self.makeOuterLoop(depth+1, innerLoop, dtype)};
+    for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[0]}; i{depth_f}++){{
+        result[i{depth_f}] = {self.makeOuterLoop(depth+1, innerLoop, dtype)};
     }}
         """
 
@@ -297,4 +297,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
+makeDefine("C","cos(A[1:10,2:11])-B[:20:2]", None,3, True)
