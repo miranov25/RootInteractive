@@ -30,7 +30,7 @@ def getClass(name="TParticle", verbose=0):
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, code, df, name):
-        self.n_iter = None
+        self.n_iter = []
         self.code = code
         self.df = df
         self.name = name
@@ -59,6 +59,8 @@ class RDataFrame_Visit:
             return self.visit_Subscript(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
+        elif isinstance(node, ast.Tuple):
+            return self.visit_Tuple(node)
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
@@ -184,7 +186,7 @@ class RDataFrame_Visit:
             "implementation": implementation
         }
 
-    def visit_Slice(self, node:ast.Slice):
+    def visit_Slice(self, node:ast.Slice, idx=0):
         lower = 0
         if node.lower is not None:
             if isinstance(node.lower, ast.Constant):
@@ -207,10 +209,13 @@ class RDataFrame_Visit:
         if step == 0:
             raise ValueError("Slice step cannot be zero")
         n_iter = (upper-lower)//step
-        if self.n_iter is None:
-            self.n_iter = n_iter
+        if len(self.n_iter) <= idx:
+            self.n_iter.append(n_iter)
+        else:
+            self.n_iter[idx] = n_iter
+        dim_idx = f"_{idx}" if idx>0 else ""
         return {
-            "implementation":f"{lower}{infix}i*{step}",
+            "implementation":f"{lower}{infix}i{dim_idx}*{step}",
             "type":"slice"
         }
 
@@ -237,14 +242,23 @@ class RDataFrame_Visit:
         return {
             "implementation":f"""
 auto {self.name}(){{
-    RVec<{body["type"]}> result({self.n_iter});
-    for(size_t i=0; i<{self.n_iter}; i++){{
-        result[i] = {body["implementation"]};
-    }}
-    return result;
+    {self.makeOuterLoop(0, f'{body["implementation"]}', body["type"])}
 }}
             """,
         }
+
+    def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
+        if depth>=len(self.n_iter):
+             return innerLoop
+        template_begin_f = ''.join(["RVec<" for i in range(depth, len(self.n_iter))])
+        template_end_f = ''.join([">" for i in range(depth, len(self.n_iter))])
+        depth_f = f"_{depth}" if depth>0 else ""
+        return f"""
+    {template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[0]});
+    for(size_t i=0; i<{self.n_iter[0]}; i++){{
+        result[i] = {self.makeOuterLoop(depth+1, innerLoop, dtype)};
+    }}
+        """
 
     def visit_func(self, node, args):
         # Detect global function from class method
@@ -255,11 +269,16 @@ auto {self.name}(){{
         raise NotImplementedError(f"{ast.dump(node)} is not supported as a function")
 
     def visit_func_Name(self, node:ast.Name, args):
-        return {"type":"function", "implementation":node.id}
+        return {"type":"function", "implementation":node.id, "type":"double"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
         return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}"}
+
+    def visit_Tuple(self, node:ast.Tuple):
+        # So far, the only tuple supported is a slice tuple
+        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x])}
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
