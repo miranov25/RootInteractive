@@ -240,25 +240,25 @@ class RDataFrame_Visit:
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
         return {
-            "implementation":f"""
-auto {self.name}(){{
+            "implementation":f"""auto {self.name}(){{
     {self.makeOuterLoop(0, f'{body["implementation"]}', body["type"])}
-}}
-            """,
+}} """,
         }
 
     def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
-        if depth>=len(self.n_iter):
-             return innerLoop
         template_begin_f = ''.join(["RVec<" for i in range(depth, len(self.n_iter))])
         template_end_f = ''.join([">" for i in range(depth, len(self.n_iter))])
         depth_f = f"_{depth}" if depth>0 else ""
-        return f"""
-    {template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[0]});
+        depth_f_lower = f"_{depth-1}" if depth>1 else ""
+        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f}" if depth>0 else ""
+        if depth>=len(self.n_iter):
+            depth_f = f"_{depth-1}" if depth>1 else ""
+            return f"result{depth_f}[i{depth_f}] = {innerLoop}"
+        return f"""{template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[0]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[0]}; i{depth_f}++){{
-        result[i{depth_f}] = {self.makeOuterLoop(depth+1, innerLoop, dtype)};
+        {self.makeOuterLoop(depth+1, innerLoop, dtype)}
     }}
-        """
+    {expr_f}"""
 
     def visit_func(self, node, args):
         # Detect global function from class method
@@ -297,4 +297,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-makeDefine("C","cos(A[1:10,2:11])-B[:20:2]", None,3, True)
+makeDefine("C","cos(A[1:10,2:6])-B[:20:2]", None,3, True)
