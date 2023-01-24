@@ -254,8 +254,8 @@ class RDataFrame_Visit:
         if depth>=len(self.n_iter):
             depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop}"
-        return f"""{template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[0]});
-    for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[0]}; i{depth_f}++){{
+        return f"""{template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[depth]});
+    for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
         {self.makeOuterLoop(depth+1, innerLoop, dtype)}
     }}
     {expr_f}"""
