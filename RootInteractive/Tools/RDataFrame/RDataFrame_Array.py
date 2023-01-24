@@ -71,8 +71,7 @@ class RDataFrame_Visit:
         implementation += ')'
         return {
             "implementation": implementation,
-            "type": "javascript",
-            "name": self.code
+            "type": left["type"]
         }
 
     def visit_Num(self, node: ast.Num):
@@ -269,6 +268,9 @@ class RDataFrame_Visit:
         raise NotImplementedError(f"{ast.dump(node)} is not supported as a function")
 
     def visit_func_Name(self, node:ast.Name, args):
+        if self.df:
+            func = getGlobalFunction(node.id)
+            return {"type":"function", "implementation":node.id, "type":func["returnType"]}
         return {"type":"function", "implementation":node.id, "type":"double"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
@@ -297,4 +299,5 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-makeDefine("C","cos(A[1:10,2:6])-B[:20:2]", None,3, True)
+makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
+makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
