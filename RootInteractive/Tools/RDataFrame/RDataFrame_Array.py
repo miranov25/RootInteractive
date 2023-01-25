@@ -299,5 +299,5 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
-makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
+# makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
+# makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
