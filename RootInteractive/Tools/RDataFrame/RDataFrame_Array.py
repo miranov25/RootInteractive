@@ -238,26 +238,28 @@ class RDataFrame_Visit:
 
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
+        loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
         return {
-            "implementation":f"""auto {self.name}(){{
-    {self.makeOuterLoop(0, body["implementation"], body["type"])}
+            "implementation":f"""{array_type} {self.name}(){{
+    {loop}
 }} """,
+"type": array_type
         }
 
     def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
-        template_begin_f = ''.join(["RVec<" for i in range(depth, len(self.n_iter))])
-        template_end_f = ''.join([">" for i in range(depth, len(self.n_iter))])
         depth_f = f"_{depth}" if depth>0 else ""
         depth_f_lower = f"_{depth-1}" if depth>1 else ""
-        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
         if depth>=len(self.n_iter):
             depth_f = f"_{depth-1}" if depth>1 else ""
-            return f"result{depth_f}[i{depth_f}] = {innerLoop};"
-        return f"""{template_begin_f}{dtype}{template_end_f} result{depth_f}({self.n_iter[depth]});
+            return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
+        next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
+        array_type = f"RVec<{array_type}>"
+        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
+        return f"""{array_type} result{depth_f}({self.n_iter[depth]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
-        {self.makeOuterLoop(depth+1, innerLoop, dtype)}
+        {next_level}
     }}
-    {expr_f}"""
+    {expr_f}""", array_type
 
     def visit_func(self, node, args):
         # Detect global function from class method
@@ -300,4 +302,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
-# makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
+makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
