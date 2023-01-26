@@ -30,7 +30,7 @@ def getClass(name="TParticle", verbose=0):
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, code, df, name):
-        self.n_iter = None
+        self.n_iter = []
         self.code = code
         self.df = df
         self.name = name
@@ -59,23 +59,19 @@ class RDataFrame_Visit:
             return self.visit_Subscript(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
+        elif isinstance(node, ast.Tuple):
+            return self.visit_Tuple(node)
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
-        left = self.visit(node.func)
-        if left["type"] == "parameter":
-            # TODO: Make a parameter unswitcher - should help improve performance - but same can also apply to other scalars?
-            pass
-        args = []
+        args = [self.visit(iArg) for iArg in node.args]
+        left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
-        for iArg in node.args:
-            args.append(self.visit(iArg))
-        implementation += ", ".join([i["implementation"] for i in args])
+        implementation += ", ".join([i['implementation'] for i in args])
         implementation += ')'
         return {
             "implementation": implementation,
-            "type": "javascript",
-            "name": self.code
+            "type": left["type"]
         }
 
     def visit_Num(self, node: ast.Num):
@@ -89,9 +85,9 @@ class RDataFrame_Visit:
 
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
+        self.dependencies.add(node.id)
         if self.df is not None:
             columnType = self.df.GetColumnType(node.id)
-            self.dependencies.add(node.id)
             return {"implementation": node.id, "type":columnType}
         return {"implementation": node.id, "type":"RVec<double>"}
 
@@ -189,7 +185,7 @@ class RDataFrame_Visit:
             "implementation": implementation
         }
 
-    def visit_Slice(self, node:ast.Slice):
+    def visit_Slice(self, node:ast.Slice, idx=0):
         lower = 0
         if node.lower is not None:
             if isinstance(node.lower, ast.Constant):
@@ -212,10 +208,13 @@ class RDataFrame_Visit:
         if step == 0:
             raise ValueError("Slice step cannot be zero")
         n_iter = (upper-lower)//step
-        if self.n_iter is None:
-            self.n_iter = n_iter
+        if len(self.n_iter) <= idx:
+            self.n_iter.append(n_iter)
+        else:
+            self.n_iter[idx] = n_iter
+        dim_idx = f"_{idx}" if idx>0 else ""
         return {
-            "implementation":f"{lower}{infix}i*{step}",
+            "implementation":f"{lower}{infix}i{dim_idx}*{step}",
             "type":"slice"
         }
 
@@ -239,17 +238,51 @@ class RDataFrame_Visit:
 
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
+        loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
         return {
-            "implementation":f"""
-auto {self.name}(){{
-    RVec<{body["type"]}> result({self.n_iter});
-    for(size_t i=0; i<{self.n_iter}; i++){{
-        result[i] = {body["implementation"]};
-    }}
-    return result;
-}}
-            """,
+            "implementation":f"""{array_type} {self.name}(){{
+    {loop}
+}} """,
+"type": array_type
         }
+
+    def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
+        depth_f = f"_{depth}" if depth>0 else ""
+        depth_f_lower = f"_{depth-1}" if depth>1 else ""
+        if depth>=len(self.n_iter):
+            depth_f = f"_{depth-1}" if depth>1 else ""
+            return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
+        next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
+        array_type = f"RVec<{array_type}>"
+        expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
+        return f"""{array_type} result{depth_f}({self.n_iter[depth]});
+    for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
+        {next_level}
+    }}
+    {expr_f}""", array_type
+
+    def visit_func(self, node, args):
+        # Detect global function from class method
+        if isinstance(node, ast.Name):
+            return self.visit_func_Name(node, args)
+        if isinstance(node, ast.Attribute):
+            return self.visit_func_Attribute(node, args)        
+        raise NotImplementedError(f"{ast.dump(node)} is not supported as a function")
+
+    def visit_func_Name(self, node:ast.Name, args):
+        if self.df:
+            func = getGlobalFunction(node.id)
+            return {"type":"function", "implementation":node.id, "type":func["returnType"]}
+        return {"type":"function", "implementation":node.id, "type":"double"}
+
+    def visit_func_Attribute(self, node:ast.Attribute, args):
+        left = self.visit(node.value)
+        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}"}
+
+    def visit_Tuple(self, node:ast.Tuple):
+        # So far, the only tuple supported is a slice tuple
+        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x])}
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
@@ -260,12 +293,13 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         print(f"{name}\n", f"{code}")
         print("====================================\n")
 
-    if (verbose & 0x1) >0 :
+    if verbose & 0x1:
         print("Implementation:\n", parsed["implementation"])
 
-    if (verbose & 0x2) > 0 :
+    if verbose & 0x2:
         print("Dependencies\n", list(evaluator.dependencies))
     if df is not None and not isTest:
         df.Define(name, parsed["implementation"], list(evaluator.dependencies))
 
-# makeDefine("C","A[1:10]-B[:20:2]", None,3, True)
+# makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
+# makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)

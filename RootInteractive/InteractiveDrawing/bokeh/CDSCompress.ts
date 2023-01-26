@@ -188,6 +188,15 @@ export class CDSCompress extends ColumnDataSource {
     return arrOut;
   }
 
+  get_array(key: string) {
+    let column = this.get_column(key)
+    if (column == null)
+        return []
+    else if (!Array.isArray(column))
+        return Array.from(column)
+    return column;
+  }
+
   get_length(){
     if (this._length !== -1) return this._length
     for(const key in this.inputData){
