@@ -241,7 +241,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
-        input_args = ', '.join([f"{value['type']} {key}" for key, value in dependencies_list])
+        input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
         return {
             "implementation":f"""{array_type} {self.name}({input_args}){{
     {loop}
