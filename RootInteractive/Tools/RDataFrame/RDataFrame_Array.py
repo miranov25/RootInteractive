@@ -245,6 +245,7 @@ class RDataFrame_Visit:
         return {
             "implementation":f"""{array_type} {self.name}({input_args}){{
     {loop}
+    return result;
 }} """,
 "type": array_type,
 "dependencies": [i[0] for i in dependencies_list]
