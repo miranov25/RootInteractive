@@ -322,6 +322,8 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         print("Dependencies\n", parsed["dependencies"])
     if df is not None and not isTest:
         ROOT.gInterpreter.Declare( parsed["implementation"])
+        #rdfOut=df.Define(name,eval(f"ROOT.{name}"),parsed["dependencies"])
+        #return rdfOut
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
