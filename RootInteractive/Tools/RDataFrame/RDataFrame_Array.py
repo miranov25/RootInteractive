@@ -25,6 +25,23 @@ def getClass(name="TParticle", verbose=0):
         print("GetGlobalFunction",name, info)
     return info
 
+def getClassMethod(className, methodName):
+    """
+    TODO:  this is a hack - we should get return method description
+    return class Mmthod information
+    :param className:
+    :param methodName:
+    :return:  type of the method if exist
+    className = "AliExternalTrackParam" ; methodName="GetX"
+    """
+    import re
+    try:
+        docString= eval(f"ROOT.{className}.{methodName}.func_doc")
+        returnType = re.sub(f"{className}.*","",docString)
+        return (returnType,docString)
+    except:
+        pass
+    return ("","")
 
 
 class RDataFrame_Visit:

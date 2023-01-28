@@ -82,27 +82,46 @@ def test_define1D(rdf, name, expression,verbosity):
     makeTestDictionary()
     rdf=makeTestRDataFrame()
     #
-    rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)
-    # rdf2 = makeDefine("arrayD","cos(array1D0[1:10])", rdf,3, True)               # TODO Failing - cos is found as an object - not function  ROOT.<xxx>
-    #
-    # rdf2 = makeDefine("arrayD","array1DTrack[1:10].Px()", rdf,3, True)           # TODO Failing - member function not found
+    rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True);
+    rdf2 = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, True);
+    rdf2 = makeDefine("arrayAbs","TMath.Abs(array1D0[1:10])", rdf,3, True);  # this is failing - has many possible return values
+
+
+    rdf2 = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
+
     #
 
     #
     #rdfNew=rdf
     return rdf
 
-def getGlobalFunction(name="cos", verbose=0):
-    info={"fun":0, "returnType":"", "nArgs":0}
-    fun = ROOT.gROOT.GetListOfGlobalFunctions().FindObject(name)
-    if fun:
-        info["fun"]=fun
-        info["returnType"]=fun.GetReturnTypeName()
-        info["nArgs"]=fun.GetNargs()
-    # fun.GetReturnTypeName()   -> 'long double'
-    # fun.GetNargs()            ->  1
-    if verbose:
-        print("GetGlobalFunction",name, info)
-    return info
+def getClassMethod(className, methodName):
+    """
+    TODO:  this is a hack - we should get return method description
+    return class Mmthod information
+    :param className:
+    :param methodName:
+    :return:  type of the method if exist
+    className = "AliExternalTrackParam" ; methodName="GetX"
+    """
+    import re
+    try:
+        docString= eval(f"ROOT.{className}.{methodName}.func_doc")
+        returnType = re.sub(f"{className}.*","",docString)
+        return (returnType,docString)
+    except:
+        pass
+    return ("","")
+def makeFun():
+    ROOT.gInterpreter.Declare(""" 
+     ROOT::VecOps::RVec<double> arrayD(ROOT::VecOps::RVec<float> &array1D0, ROOT::VecOps::RVec<float> &array1D2){
+    ROOT::VecOps::RVec<double> result(10);
+    for(size_t i=0; i<10; i++){
+        result[i] = (array1D0[1+i*1]) - (array1D2[0+i*2]);
+    }
+    return result;
+} 
+
+   """)
 
 
