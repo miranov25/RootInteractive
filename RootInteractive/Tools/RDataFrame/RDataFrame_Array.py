@@ -1,5 +1,5 @@
 import ast
-import numpy as np
+import ROOT
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -34,7 +34,7 @@ class RDataFrame_Visit:
         self.code = code
         self.df = df
         self.name = name
-        self.dependencies = set()
+        self.dependencies = {}
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -85,10 +85,11 @@ class RDataFrame_Visit:
 
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
-        self.dependencies.add(node.id)
         if self.df is not None:
             columnType = self.df.GetColumnType(node.id)
+            self.dependencies[node.id] = {"type":columnType}
             return {"implementation": node.id, "type":columnType}
+        self.dependencies[node.id] = {"type":"RVec<double>"}
         return {"implementation": node.id, "type":"RVec<double>"}
 
     def visit_BinOp(self, node):
@@ -239,11 +240,15 @@ class RDataFrame_Visit:
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
+        dependencies_list = [(key, value) for key, value in self.dependencies.items()]
+        input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
         return {
-            "implementation":f"""{array_type} {self.name}(){{
+            "implementation":f"""{array_type} {self.name}({input_args}){{
     {loop}
+    return result;
 }} """,
-"type": array_type
+"type": array_type,
+"dependencies": [i[0] for i in dependencies_list]
         }
 
     def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
@@ -253,7 +258,7 @@ class RDataFrame_Visit:
             depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
         next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
-        array_type = f"RVec<{array_type}>"
+        array_type = f"ROOT::VecOps::RVec<{array_type}>"
         expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
         return f"""{array_type} result{depth_f}({self.n_iter[depth]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
@@ -297,9 +302,9 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
         print("Implementation:\n", parsed["implementation"])
 
     if verbose & 0x2:
-        print("Dependencies\n", list(evaluator.dependencies))
+        print("Dependencies\n", parsed["dependencies"])
     if df is not None and not isTest:
-        df.Define(name, parsed["implementation"], list(evaluator.dependencies))
+        ROOT.gInterpreter.Declare( parsed["implementation"])
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
