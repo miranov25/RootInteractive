@@ -25,8 +25,9 @@ def getClass(name="TParticle", verbose=0):
         print("GetGlobalFunction",name, info)
     return info
 
-def getClassMethod(className, methodName):
+def getClassMethod(className, methodName, arguments=[]):
     """
+    get return type and check consistency
     TODO:  this is a hack - we should get return method description
     return class Mmthod information
     :param className:
@@ -321,9 +322,19 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if verbose & 0x2:
         print("Dependencies\n", parsed["dependencies"])
     if df is not None and not isTest:
+        # TODO - if function not yet exist declare it
         ROOT.gInterpreter.Declare( parsed["implementation"])
-        #rdfOut=df.Define(name,eval(f"ROOT.{name}"),parsed["dependencies"])
-        #return rdfOut
+        defineLine=f"""
+            auto rdfOut=rdf.Define(name,{name},{parsed["dependencies"]})
+        """
+        # print(defineLine)
+        # ROOT.gInterpreter.ProcessLine(defineLine)
+        # rdfOut=df.Define(name,"ROOT.{name}",parsed["dependencies"])
+        # return ROOT.rdfOut
+        return parsed
+    else:
+        return parsed
+
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)

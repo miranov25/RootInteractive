@@ -82,10 +82,14 @@ def test_define1D(rdf, name, expression,verbosity):
     makeTestDictionary()
     rdf=makeTestRDataFrame()
     #
+    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)
+    #
     rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True);
     rdf2 = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, True);
+    #
     rdf2 = makeDefine("arrayAbs","TMath.Abs(array1D0[1:10])", rdf,3, True);  # this is failing - has many possible return values
-
+    rdf2 = makeDefine("arrayCosA","cos(array1D0[:])", rdf,3, True);          # to check
+    rdf2 = makeDefine("arrayD","array1D0[:]-array1D2[:]", rdf,3, True);      # to test
 
     rdf2 = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
 
@@ -112,16 +116,16 @@ def getClassMethod(className, methodName):
     except:
         pass
     return ("","")
-def makeFun():
-    ROOT.gInterpreter.Declare(""" 
-     ROOT::VecOps::RVec<double> arrayD(ROOT::VecOps::RVec<float> &array1D0, ROOT::VecOps::RVec<float> &array1D2){
-    ROOT::VecOps::RVec<double> result(10);
-    for(size_t i=0; i<10; i++){
-        result[i] = (array1D0[1+i*1]) - (array1D2[0+i*2]);
-    }
-    return result;
-} 
 
-   """)
+def makeDefineRDF(parsed, rdf):
+    ROOT.gInterpreter.Declare( parsed["implementation"])
+    ROOT.rdf=rdf
+    defineLine="""
+        auto rdfOut=rdf.Define("arrayDOut",arrayD,{"array1D0", "array1D2"}); 
+        rdfOut.Describe();
+        """
+    print(defineLine)
+    ROOT.gInterpreter.Declare(defineLine)
+
 
 
