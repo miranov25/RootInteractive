@@ -239,11 +239,16 @@ class RDataFrame_Visit:
 
     def visit_IfExp(self, node:ast.IfExp):
         test = self.visit(node.test)["implementation"]
-        body = self.visit(node.body)["implementation"]
-        orelse = self.visit(node.orelse)["implementation"]
-        implementation = f"({test})?({body}):({orelse})"
+        body = self.visit(node.body)
+        orelse = self.visit(node.orelse)
+        body_implementation = body["implementation"]
+        orelse_implementation = orelse["implementation"]
+        if body["type"] != orelse["type"]:
+            raise TypeError(f"Incompatible types: {body['type']}, {orelse['type']}")
+        implementation = f"({test})?({body_implementation}):({orelse_implementation})"
         return {
-            "implementation": implementation
+            "implementation": implementation,
+            "type":body['type']
         }
 
     def visit_Subscript(self, node:ast.Subscript):
