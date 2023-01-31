@@ -1,5 +1,5 @@
 import ast
-import ROOT
+#import ROOT
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -228,9 +228,9 @@ class RDataFrame_Visit:
             raise ValueError("Slice step cannot be zero")
         n_iter = (upper-lower)//step
         if len(self.n_iter) <= idx:
-            self.n_iter.append(n_iter)
-        else:
-            self.n_iter[idx] = n_iter
+            for i in range(len(self.n_iter), idx+1):
+                self.n_iter.append(None)
+        self.n_iter[idx] = n_iter
         dim_idx = f"_{idx}" if idx>0 else ""
         return {
             "implementation":f"{lower}{infix}i{dim_idx}*{step}",
