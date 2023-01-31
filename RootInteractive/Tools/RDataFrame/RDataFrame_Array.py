@@ -254,7 +254,7 @@ class RDataFrame_Visit:
     def visit_Subscript(self, node:ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        dtype = value["type"]
+        dtype = unpackScalarType(value["type"])
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
             "type":dtype
@@ -311,6 +311,12 @@ class RDataFrame_Visit:
         # So far, the only tuple supported is a slice tuple
         x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
         return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x])}
+
+def unpackScalarType(vecType:str, level:int=0):
+    if level <= 0:
+        return vecType
+    vecTypeNew = vecType.split('<',1)[1][:-1]
+    return unpackScalarType(vecTypeNew, level-1)
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
