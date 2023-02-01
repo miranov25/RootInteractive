@@ -68,7 +68,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     code = \
         """
     const t0 = performance.now();
-    let nSelected=0;
     const precision = 0.000001;
     const size = cdsOrig.length;
 
@@ -165,7 +164,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     if(options.cdsHistoSummary !== null){
         options.cdsHistoSummary.update();
     }
-    console.log(\"nSelected:%d\",nSelected);
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
@@ -598,8 +596,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     sources = set()
 
     meta = dfQuery.meta.metaData.copy()
-
-    profileList = []
 
     optionsChangeList = []
     for i, variables in enumerate(figureArray):
@@ -1193,7 +1189,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
-                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, index=index)
+                                    cdsHistoSummary=cdsHistoSummary, index=index)
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
@@ -1211,7 +1207,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict, plotDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
