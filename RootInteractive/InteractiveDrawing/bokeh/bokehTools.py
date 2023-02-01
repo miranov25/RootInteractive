@@ -68,7 +68,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     code = \
         """
     const t0 = performance.now();
-    let nSelected=0;
     const precision = 0.000001;
     const size = cdsOrig.length;
 
@@ -165,7 +164,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     if(options.cdsHistoSummary !== null){
         options.cdsHistoSummary.update();
     }
-    console.log(\"nSelected:%d\",nSelected);
     """
     if options["verbose"] > 0:
         logging.info("makeJScallback:\n", code)
@@ -598,8 +596,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     sources = set()
 
     meta = dfQuery.meta.metaData.copy()
-
-    profileList = []
 
     optionsChangeList = []
     for i, variables in enumerate(figureArray):
@@ -1158,6 +1154,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         # In future an option can be added for creating them from array
 
         # Add aliases
+        aliasArrayLocal = set()
         for key, value in memoized_columns[cdsKey].items():
             columnKey = value["name"]
             if (cdsKey, columnKey) not in sources:
@@ -1165,6 +1162,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 # User defined aliases
                 if value["type"] == "alias":
                     cdsFull.mapping[columnKey] = aliasDict[cdsKey][columnKey]
+                    if "transform" in aliasDict[cdsKey][columnKey]:
+                        aliasArrayLocal.add(aliasDict[cdsKey][columnKey]["transform"])
                 # Columns directly controlled by parameter
                 elif value["type"] == "parameter":
                     cdsFull.mapping[columnKey] = paramDict[value["name"]]["value"]
@@ -1173,6 +1172,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                                                                 cdsAlias.mapping[key] = this.value;
                                                                                                 cdsAlias.invalidate_column(key);
                                                                                             """)])
+        cdsFull.columnDependencies = list(aliasArrayLocal)
 
     for iCds, widgets in widgetDict.items():
         widgetList = widgets["widgetList"]
@@ -1188,9 +1188,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 continue
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
-        # HACK: we need to add the aliasDict to the dependency tree somehow as bokeh can't find it - to be removed when dependency trees on client work with that
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
-                                    cdsHistoSummary=cdsHistoSummary, profileList=profileList, aliasDict=list(aliasDict.values()), index=index)
+                                    cdsHistoSummary=cdsHistoSummary, index=index)
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
@@ -1208,7 +1207,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, profileList, paramDict, aliasDict, plotDict
+    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
