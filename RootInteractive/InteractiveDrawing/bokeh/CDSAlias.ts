@@ -8,6 +8,7 @@ export namespace CDSAlias {
     source: p.Property<ColumnarDataSource>
     mapping: p.Property<Record<string, any>>
     includeOrigColumns: p.Property<boolean>
+    columnDependencies: p.Property<any[]>
   }
 }
 
@@ -25,10 +26,11 @@ export class CDSAlias extends ColumnarDataSource {
   cached_columns: Set<string>
 
   static init_CDSAlias() {
-    this.define<CDSAlias.Props>(({Ref, Boolean})=>({
+    this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref})=>({
       source:  [Ref(ColumnarDataSource)],
       mapping:    [ p.Instance, {} ],
-      includeOrigColumns: [Boolean, true]
+      includeOrigColumns: [Boolean, true],
+      columnDependencies: [Array(Any), []]
     }))
   }
 
