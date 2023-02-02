@@ -286,8 +286,9 @@ class RDataFrame_Visit:
         loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
         input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
+        signature = f"{array_type} {self.name}({input_args})"
         return {
-            "implementation":f"""{array_type} {self.name}({input_args}){{
+            "implementation":f"""{signature}){{
     {loop}
     return result;
 }} """,
