@@ -1,5 +1,5 @@
 import ast
-#import ROOT
+import ROOT
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -271,7 +271,10 @@ class RDataFrame_Visit:
             if len(self.n_iter) <= idx:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
-            self.n_iter[idx] = n_iter
+            if n_iter <= 0:
+                self.n_iter[idx] = f"{value['implementation']}.size() - ({n_iter})"
+            else:
+                self.n_iter[idx] = n_iter
         dtype = unpackScalarType(value["type"])
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
@@ -367,4 +370,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-makeDefine("B","A[1:]-A[:-1]", None,3, True)
+# makeDefine("B","A[1:]-A[:-1]", None,3, True)
