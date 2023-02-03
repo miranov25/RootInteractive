@@ -1,5 +1,5 @@
 import ast
-# import ROOT
+import ROOT
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -371,4 +371,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-makeDefine("B","A[1:]-A[:-1]", None,3, True)
+# makeDefine("B","A[1:]-A[:-1]", None,3, True)
