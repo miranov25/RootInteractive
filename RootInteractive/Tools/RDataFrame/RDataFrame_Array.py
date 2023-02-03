@@ -79,6 +79,8 @@ class RDataFrame_Visit:
             return self.visit_Slice(node)
         elif isinstance(node, ast.Tuple):
             return self.visit_Tuple(node)
+        elif isinstance(node, ast.Constant):
+            return self.visit_Constant(node)
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
@@ -95,10 +97,14 @@ class RDataFrame_Visit:
     def visit_Num(self, node: ast.Num):
         # Kept for compatibility with old Python
         return {
-            "name": str(node.n),
             "implementation": str(node.n),
-            "type": "constant",
-            "value": node.n
+            "value": node.n,
+        }
+
+    def visit_Constant(self, node: ast.Num):
+        return {
+            "implementation": str(node.value),
+            "value": node.value,
         }
 
     def visit_Name(self, node: ast.Name):
@@ -148,14 +154,24 @@ class RDataFrame_Visit:
         }
 
     def visit_UnaryOp(self, node: ast.UnaryOp):
+        operand = self.visit(node.operand)
         op = node.op
         if isinstance(op, ast.UAdd):
             operator_prefix = "+"
+            # Constant folding hack
+            if "value" in operand:
+                return operand
         elif isinstance(op, ast.USub):
             operator_prefix = "-"
+            if "value" in operand:
+                new_value = -operand["value"]
+                return {
+                    "value": new_value,
+                    "implementation":f"{new_value}"
+                }         
         else:
             operator_prefix = "!"
-        implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
+        implementation = f"{operator_prefix}({operand['implementation']})"
         return {
             "name": self.code,
             "implementation": implementation
@@ -205,18 +221,14 @@ class RDataFrame_Visit:
         }
 
     def visit_Slice(self, node:ast.Slice, idx=0):
-        lower = 0
+        lower_value = 0
         if node.lower is not None:
-            if isinstance(node.lower, ast.Constant):
-                lower = node.lower.value
-            else:
-                raise NotImplementedError(f"Slices are only implemented for constant boundaries, got {ast.dump(node.lower)}")
-        upper = 0
+            lower = self.visit(node.lower)
+            lower_value = lower.get("value", 0)
+        upper_value = 0
         if node.upper is not None:
-            if isinstance(node.upper, ast.Constant):
-                upper = node.upper.value
-            else:
-                raise NotImplementedError(f"Slices are only implemented for constant boundaries, got {ast.dump(node.upper)}")
+            upper = self.visit(node.upper)
+            upper_value = upper.get("value", 0)
         infix="+"
         step = 1
         if node.step is not None:
@@ -226,30 +238,44 @@ class RDataFrame_Visit:
                 raise NotImplementedError(f"Slices are only implemented for constant boundaries, got {ast.dump(node.step)}")
         if step == 0:
             raise ValueError("Slice step cannot be zero")
-        n_iter = (upper-lower)//step
-        if len(self.n_iter) <= idx:
-            self.n_iter.append(n_iter)
-        else:
-            self.n_iter[idx] = n_iter
+        n_iter = (upper_value-lower_value)//step
         dim_idx = f"_{idx}" if idx>0 else ""
         return {
-            "implementation":f"{lower}{infix}i{dim_idx}*{step}",
-            "type":"slice"
+            "implementation":f"{lower_value}{infix}i{dim_idx}*{step}",
+            "type":"slice",
+            "n_iter":n_iter,
+            "high_water":max(lower_value,upper_value)
         }
 
     def visit_IfExp(self, node:ast.IfExp):
         test = self.visit(node.test)["implementation"]
-        body = self.visit(node.body)["implementation"]
-        orelse = self.visit(node.orelse)["implementation"]
-        implementation = f"({test})?({body}):({orelse})"
+        body = self.visit(node.body)
+        orelse = self.visit(node.orelse)
+        body_implementation = body["implementation"]
+        orelse_implementation = orelse["implementation"]
+        if body["type"] != orelse["type"]:
+            raise TypeError(f"Incompatible types: {body['type']}, {orelse['type']}")
+        implementation = f"({test})?({body_implementation}):({orelse_implementation})"
         return {
-            "implementation": implementation
+            "implementation": implementation,
+            "type":body['type']
         }
 
     def visit_Subscript(self, node:ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        dtype = value["type"]
+        n_iter_arr = sliceValue["n_iter"]
+        if not isinstance(n_iter_arr, list):
+            n_iter_arr = [n_iter_arr]
+        for idx, n_iter in enumerate(n_iter_arr):
+            if len(self.n_iter) <= idx:
+                self.n_iter.append(n_iter)
+            # Detect if length needs to be used here
+            if n_iter <= 0:
+                self.n_iter[idx] = f"{value['implementation']}.size() - ({n_iter})"
+            else:
+                self.n_iter[idx] = n_iter
+        dtype = unpackScalarType(value["type"])
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
             "type":dtype
@@ -260,8 +286,9 @@ class RDataFrame_Visit:
         loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
         input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
+        signature = f"{array_type} {self.name}({input_args})"
         return {
-            "implementation":f"""{array_type} {self.name}({input_args}){{
+            "implementation":f"""{signature}){{
     {loop}
     return result;
 }} """,
@@ -305,7 +332,13 @@ class RDataFrame_Visit:
     def visit_Tuple(self, node:ast.Tuple):
         # So far, the only tuple supported is a slice tuple
         x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x])}
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}
+
+def unpackScalarType(vecType:str, level:int=0):
+    if level <= 0:
+        return vecType
+    vecTypeNew = vecType.split('<',1)[1][:-1]
+    return unpackScalarType(vecTypeNew, level-1)
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
@@ -338,3 +371,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
+# makeDefine("B","A[1:]-A[:-1]", None,3, True)
