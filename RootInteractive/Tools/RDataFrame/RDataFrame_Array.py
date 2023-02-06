@@ -391,7 +391,9 @@ class RDataFrame_Visit:
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
-        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}"}
+        className = left["type"]
+        (returnType, docstring) = getClassMethod(className, node.attr, args)
+        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}", "returnType":returnType}
 
     def visit_Tuple(self, node:ast.Tuple):
         # So far, the only tuple supported is a slice tuple
