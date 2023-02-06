@@ -45,6 +45,35 @@ def getClassMethod(className, methodName, arguments=[]):
     return ("","")
 
 
+def scalar_type(name):
+    dtypes = {
+        "float": ('f', 32),
+        "double": ('f', 64),
+        "size_t": ('u', 64),
+        "long long": ('i', 64),
+        "unsigned int": ('u', 32),
+        "int": ('i', 32),
+        "char": ('i', 8)
+    }
+    return dtypes[name]
+
+def scalar_type_str(dtype):
+    dtypes = {
+        ('f', 32): "float",
+        ('f', 64): "double",
+        ('u', 64): "size_t",
+        ('i', 64): "long long",
+        ('u', 32): "unsigned int",
+        ('i', 32): "int",
+        ('u', 8): "unsigned char",
+        ('i', 8): "char"
+    }
+    return dtypes[dtype]
+
+def add_dtypes(left, right):
+    # This is a hack - use minimum for kind and maximum for depth
+    return (min(left[0],right[0]), max(left[1], right[1]))
+
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, code, df, name):
@@ -91,20 +120,32 @@ class RDataFrame_Visit:
         implementation += ')'
         return {
             "implementation": implementation,
-            "type": left["type"]
+            "type": scalar_type(left["returnType"])
         }
 
     def visit_Num(self, node: ast.Num):
         # Kept for compatibility with old Python
+        node_type = ('f', 64)
+        if isinstance(node.value, int):
+            node_type = ('i', 64)
+        if isinstance(node.value, str):
+            node_type = ("o", 64)
         return {
             "implementation": str(node.n),
             "value": node.n,
+            "type": node_type
         }
 
-    def visit_Constant(self, node: ast.Num):
+    def visit_Constant(self, node: ast.Constant):
+        node_type = ('f', 64)
+        if isinstance(node.value, int):
+            node_type = ('i', 64)
+        if isinstance(node.value, str):
+            node_type = ("o", 64)
         return {
             "implementation": str(node.value),
             "value": node.value,
+            "type": node_type
         }
 
     def visit_Name(self, node: ast.Name):
@@ -150,7 +191,7 @@ class RDataFrame_Visit:
         return {
             "name": self.code,
             "implementation": implementation,
-            "type": "double"
+            "type": add_dtypes(left["type"], right["type"])
         }
 
     def visit_UnaryOp(self, node: ast.UnaryOp):
@@ -167,14 +208,16 @@ class RDataFrame_Visit:
                 new_value = -operand["value"]
                 return {
                     "value": new_value,
-                    "implementation":f"{new_value}"
+                    "implementation":f"{new_value}",
+                    "type": operand["type"]
                 }         
         else:
             operator_prefix = "!"
         implementation = f"{operator_prefix}({operand['implementation']})"
         return {
             "name": self.code,
-            "implementation": implementation
+            "implementation": implementation,
+            "type": operand["type"]
         }
 
     def visit_Compare(self, node:ast.Compare):
@@ -203,20 +246,20 @@ class RDataFrame_Visit:
         implementation = " && ".join(js_comparisons)
         return {
             "name": self.code,
-            "type": "char",
+            "type": ('i', 8),
             "implementation": implementation
         }
 
     def visit_BoolOp(self, node:ast.BoolOp):
-        js_values = [f"({self.visit(i)['implementation']})" for i in node.values]
+        values = [f"({self.visit(i)})" for i in node.values]
         if isinstance(node.op, ast.And):
             op_infix = " && "
         elif isinstance(node.op, ast.Or):
             op_infix = " || "
-        implementation = op_infix.join(js_values)
+        implementation = op_infix.join([i["implementation"] for i in values])
         return {
             "name": self.code,
-            "type": "char",
+            "type": values[-1]["type"],
             "implementation": implementation
         }
 
@@ -275,7 +318,7 @@ class RDataFrame_Visit:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
-        dtype = unpackScalarType(value["type"])
+        dtype = scalar_type(unpackScalarType(value["type"], len(n_iter_arr)))
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
             "type":dtype
@@ -283,7 +326,7 @@ class RDataFrame_Visit:
 
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
-        loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
+        loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
         input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
@@ -322,8 +365,8 @@ class RDataFrame_Visit:
     def visit_func_Name(self, node:ast.Name, args):
         if self.df:
             func = getGlobalFunction(node.id)
-            return {"type":"function", "implementation":node.id, "type":func["returnType"]}
-        return {"type":"function", "implementation":node.id, "type":"double"}
+            return {"type":"function", "implementation":node.id, "returnType":func["returnType"]}
+        return {"type":"function", "implementation":node.id, "returnType":"double"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
@@ -371,4 +414,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-# makeDefine("B","A[1:]-A[:-1]", None,3, True)
+# makeDefine("B","(A[:]>B[:])+10", None,3, True)
