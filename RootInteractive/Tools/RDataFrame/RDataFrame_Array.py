@@ -350,7 +350,7 @@ class RDataFrame_Visit:
         input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
-            "implementation":f"""{signature}){{
+            "implementation":f"""{signature}{{
     {loop}
     return result;
 }} """,
