@@ -74,6 +74,14 @@ def add_dtypes(left, right):
     # This is a hack - use minimum for kind and maximum for depth
     return (min(left[0],right[0]), max(left[1], right[1]))
 
+def truediv_dtype(left, right):
+    x = add_dtypes(left, right)
+    if x[0] == 'f':
+        return x
+    elif x[1] <= 16:
+        return ('f', 32)
+    return ('f', 64)
+
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, code, df, name):
@@ -157,8 +165,13 @@ class RDataFrame_Visit:
         self.dependencies[node.id] = {"type":"RVec<double>"}
         return {"implementation": node.id, "type":"RVec<double>"}
 
-    def visit_BinOp(self, node):
+    def visit_BinOp(self, node:ast.BinOp):
         op = node.op
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        merged_dtype = add_dtypes(left["type"], right["type"])
+        left_cast = ""
+        right_cast = ""
         if isinstance(op, ast.Add):
             operator_infix = " + "
         elif isinstance(op, ast.Sub):
@@ -166,6 +179,12 @@ class RDataFrame_Visit:
         elif isinstance(op, ast.Mult):
             operator_infix = " * "
         elif isinstance(op, ast.Div):
+            operator_infix = " / "
+            if left["type"] != merged_dtype:
+                left_cast = f"({scalar_type_str(merged_dtype)})"
+            if right["type"] != merged_dtype:
+                right_cast = f"({scalar_type_str(merged_dtype)})"
+        elif isinstance(op, ast.FloorDiv):
             operator_infix = " / "
         elif isinstance(op, ast.Mod):
             operator_infix = " % "
@@ -184,14 +203,14 @@ class RDataFrame_Visit:
         elif isinstance(op, ast.Pow):
             operator_infix = "**"
         else:
-            raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
-        left = self.visit(node.left)
-        right = self.visit(node.right)
-        implementation = f"({left['implementation']}){operator_infix}({right['implementation']})"
+            raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented")
+        implementation = f"{left_cast}({left['implementation']}){operator_infix}{right_cast}({right['implementation']})"
+        if isinstance(op, ast.FloorDiv) and merged_dtype[0] == 'f':
+            implementation = f"floor({implementation})"
         return {
             "name": self.code,
             "implementation": implementation,
-            "type": add_dtypes(left["type"], right["type"])
+            "type": merged_dtype
         }
 
     def visit_UnaryOp(self, node: ast.UnaryOp):
@@ -414,4 +433,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-# makeDefine("B","(A[:]>B[:])+10", None,3, True)
+# makeDefine("B","A[:]/(B[:])", None,3, True)
