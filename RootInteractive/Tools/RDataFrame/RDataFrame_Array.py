@@ -355,6 +355,7 @@ class RDataFrame_Visit:
     return result;
 }} """,
 "type": array_type,
+"name": self.name,
 "dependencies": [i[0] for i in dependencies_list]
         }
 
