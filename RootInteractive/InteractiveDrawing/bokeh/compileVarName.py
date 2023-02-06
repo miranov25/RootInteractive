@@ -362,8 +362,10 @@ class ColumnEvaluator:
             operator_prefix = "+"
         elif isinstance(op, ast.USub):
             operator_prefix = "-"
-        else:
+        elif isinstance(op, ast.Not):
             operator_prefix = "!"
+        elif isinstance(op, ast.Invert):
+            operator_prefix = "~"
         implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
         return {
             "name": self.code,
