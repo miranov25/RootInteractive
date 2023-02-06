@@ -49,6 +49,7 @@ def scalar_type(name):
     dtypes = {
         "float": ('f', 32),
         "double": ('f', 64),
+        "long double": ('f', 64),
         "size_t": ('u', 64),
         "long long": ('i', 64),
         "unsigned int": ('u', 32),
