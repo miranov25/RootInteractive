@@ -38,7 +38,7 @@ def getClassMethod(className, methodName, arguments=[]):
     import re
     try:
         docString= eval(f"ROOT.{className}.{methodName}.func_doc")
-        returnType = re.sub(f"{className}.*","",docString)
+        returnType = re.sub(f"\\s{className}.*","",docString)
         return (returnType,docString)
     except:
         pass
