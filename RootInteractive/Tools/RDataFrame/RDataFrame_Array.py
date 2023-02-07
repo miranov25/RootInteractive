@@ -404,6 +404,7 @@ class RDataFrame_Visit:
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
         x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.dims)]
+        print(str(x))
         return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}       
 
 def unpackScalarType(vecType:str, level:int=0):
