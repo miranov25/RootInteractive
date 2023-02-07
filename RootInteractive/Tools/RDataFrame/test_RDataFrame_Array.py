@@ -103,8 +103,10 @@ def test_define1D(rdf, name, expression,verbosity):
     rdf = makeDefineRDFv2("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
     #
+    parsed = makeDefine("arrayD2D", "array2D0[1:10,:]-array2D1[1:10,:]", rdf, 3, True)
+    rdf = makeDefineRDFv1("arrayD2D", parsed["name"], parsed, rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD2D.root")
     return rdf
-
 def getClassMethod(className, methodName):
     """
     TODO:  this is a hack - we should get return method description
