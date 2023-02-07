@@ -3,6 +3,7 @@ from RootInteractive.Tools.RDataFrame.RDataFrame_Array  import *
 import pprint
 import ROOT
 import ast
+import awkward as ak
 #import RDataFrame_Array
 
 import pprint
@@ -107,6 +108,7 @@ def test_define1D(rdf, name, expression,verbosity):
     rdf = makeDefineRDFv1("arrayD2D", parsed["name"], parsed, rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD2D.root")
     return rdf
+
 def getClassMethod(className, methodName):
     """
     TODO:  this is a hack - we should get return method description
