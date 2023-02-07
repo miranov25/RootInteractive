@@ -1,6 +1,6 @@
 # from RootInteractive.Tools.RDataFrame.test_RDataFrame_Array  import *
 from RootInteractive.Tools.RDataFrame.RDataFrame_Array  import *
-
+import pprint
 import ROOT
 import ast
 #import RDataFrame_Array
@@ -14,6 +14,7 @@ def makeTestDictionary():
        #include  "TParticle.h"
        #pragma link C++ class ROOT::RVec < ROOT::RVec < float>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < double>> + ;
+       #pragma link C++ class ROOT::RVec < ROOT::RVec < long double>> + ;
        #pragma link C++ class ROOT::VecOps::RVec<ROOT::VecOps::RVec<float>>+;
        #pragma link C++ class ROOT::VecOps::RVec <TParticle> + ;  
     """
@@ -81,22 +82,27 @@ def test_define1D(rdf, name, expression,verbosity):
     """
     makeTestDictionary()
     rdf=makeTestRDataFrame()
+    # test 0 -  1D delta fixed range -OK
+    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)  # working
+    rdf = makeDefineRDFv2("arrayD0", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD0.root")
+    # test 1 -  1D delta auto range -OK
+    parsed= makeDefine("arrayDAll","array1D0[:]-array1D2[:]", rdf,3, True)  # working
+    rdf = makeDefineRDFv2("arrayDAall", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameDAll.root")
+    # test 2 -  - 1D  function  fix range -OK
+    parsed = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, True);
+    rdf = makeDefineRDFv2("arrayCos0", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCos0.root");
+    # test 3 -  - 1D  function  full range -OK
+    parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, True);
+    rdf = makeDefineRDFv2("arrayCosAll", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCosAll.root");
+    # test 4  - 1D member function failing
+    parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
+    rdf = makeDefineRDFv2("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
     #
-    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)
-    #
-    rdf2 = makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True);
-    rdf2 = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, True);
-    #
-    rdf2 = makeDefine("arrayAbs","TMath.Abs(array1D0[1:10])", rdf,3, True);  # this is failing - has many possible return values
-    rdf2 = makeDefine("arrayCosA","cos(array1D0[:])", rdf,3, True);          # to check
-    rdf2 = makeDefine("arrayD","array1D0[:]-array1D2[:]", rdf,3, True);      # to test
-
-    rdf2 = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
-
-    #
-
-    #
-    #rdfNew=rdf
     return rdf
 
 def getClassMethod(className, methodName):
@@ -117,15 +123,59 @@ def getClassMethod(className, methodName):
         pass
     return ("","")
 
-def makeDefineRDF(parsed, rdf):
+
+def makeDefineRDFv1(parsed, rdf):
     ROOT.gInterpreter.Declare( parsed["implementation"])
-    ROOT.rdf=rdf
+    rdf.Describe();                            ## workimg
+    ROOT.gInterpreter.ProcessLine("arrayD")    ## prinintg implementation
+    ROOT.gInterpreter.ProcessLine("ROOT::RDF::RInterface<ROOT::Detail::RDF::RLoopManager, void>  *rdfgener_prdf=0;")            ## add to global space
+    ROOT.gInterpreter.ProcessLine("rdfgener_prdf");              # shows 0 points
+    ROOT.rdfgener_prdf=rdf
+    ROOT.gInterpreter.ProcessLine("rdfgener_prdf->Describe()");  ## print content of the rdf
+
     defineLine="""
-        auto rdfOut=rdf.Define("arrayDOut",arrayD,{"array1D0", "array1D2"}); 
-        rdfOut.Describe();
-        """
+        rdfgener_prdf->Describe().Print();
+        auto rdfOut=rdfgener_prdf->Define("arrayDOut1",arrayD,{"array1D0", "array1D2"});
+        rdfgener_prdf=&rdfOut;
+        rdfgener_prdf->Describe().Print();   
+    """
     print(defineLine)
-    ROOT.gInterpreter.Declare(defineLine)
+    ROOT.gInterpreter.ProcessLine(defineLine)
 
 
+
+
+def makeDefineRDFv2(columnName, funName, parsed,  rdf, verbose=1):
+    if verbose & 0x1:
+        print(f"{columnName}\t{funName}\t{parsed}")
+    # 0.) Define function if does not exist yet
+
+    try:
+        ROOT.gInterpreter.Declare( parsed["implementation"])
+    except:
+        pass
+    # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
+    try:
+         ROOT.rdfgener_rdf
+    except:
+        ROOT.gInterpreter.ProcessLine("ROOT::RDF::RInterface<ROOT::Detail::RDF::RLoopManager, void>  *rdfgener_rdf=0;")            ## add to global space
+    if ROOT.rdfgener_rdf!=rdf:
+        ROOT.rdfgener_rdf=rdf
+    # 2.) be verbose
+    if verbose&0x2:
+        rdf.Describe().Print();                                      ## workimg
+        ROOT.gInterpreter.ProcessLine("rdfgener_rdf->Describe()");  ## print content of the rdf
+    #
+    dependency="{"+f'{parsed["dependencies"]}'[1:-1]+"}".replace("'","\"")
+    dependency=dependency.replace("'","\"")
+
+    defineLine=f"""
+        auto rdfOut=rdfgener_rdf->Define("{columnName}",{funName},{dependency});
+        rdfgener_rdf=&rdfOut;   
+    """
+    if verbose>0:
+        print(defineLine)
+
+    ROOT.gInterpreter.ProcessLine(defineLine)
+    return  ROOT.rdfgener_rdf
 
