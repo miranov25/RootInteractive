@@ -411,7 +411,7 @@ class RDataFrame_Visit:
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
         return vecType
-    vecTypeNew = vecType.split('<',1)[1].split('>')[-2]
+    vecTypeNew = vecType.split('<',1)[1].rsplit('>',1)[-2]
     return unpackScalarType(vecTypeNew, level-1)
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
