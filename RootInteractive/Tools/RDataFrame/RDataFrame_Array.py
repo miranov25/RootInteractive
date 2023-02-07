@@ -115,6 +115,8 @@ class RDataFrame_Visit:
             return self.visit_Subscript(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
+        elif isinstance(node, ast.ExtSlice):
+            return self.visit_ExtSlice(node)
         elif isinstance(node, ast.Tuple):
             return self.visit_Tuple(node)
         elif isinstance(node, ast.Constant):
@@ -400,6 +402,10 @@ class RDataFrame_Visit:
         x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
         return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}
 
+    def visit_ExtSlice(self, node:ast.ExtSlice):
+        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.dims)]
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}       
+
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
         return vecType
@@ -437,4 +443,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-# makeDefine("B","A[:]/(B[:])", None,3, True)
+# makeDefine("B","array2D0[1:10,:]-array2D1[1:10,:]", None,3, True)
