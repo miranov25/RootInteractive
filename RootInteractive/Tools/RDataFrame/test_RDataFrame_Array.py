@@ -102,7 +102,13 @@ def test_define1D(rdf, name, expression,verbosity):
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDFv2("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
-    #
+    # Test of invarainces
+    # tt.Draw("arrayCosAll:cos(array1D0)","arrayCos0!=0","*")
+    # entries = tt.Draw("arrayCosAll-cos(array1D0)","","");
+    #  ROOT.TMath.RMS(entries,tt.GetV1())
+    # tt.GetHistogram().GetRms()  # should be 0 +- errror  cut e.g 10^-5
+    # tt.GetHistogram().GetRms()  # should be 0 +- errorr
+
     return rdf
 
 def getClassMethod(className, methodName):
