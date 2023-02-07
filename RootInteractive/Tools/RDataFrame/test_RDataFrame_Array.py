@@ -98,10 +98,18 @@ def test_define1D(rdf, name, expression,verbosity):
     parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, True);
     rdf = makeDefineRDFv2("arrayCosAll", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCosAll.root");
-    # test 4  - 1D member function failing
+    # test 4  - 1D member function OK
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDFv2("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
+    # test 5  - 2D delta auto range
+    parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);
+    rdf = makeDefineRDFv2("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD2D.root");
+    # test 6  - 2D delta against 1D
+    parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, True);
+    rdf = makeDefineRDFv2("arrayD1D2D", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     # Test of invarainces
     # tt.Draw("arrayCosAll:cos(array1D0)","arrayCos0!=0","*")
     # entries = tt.Draw("arrayCosAll-cos(array1D0)","","");
