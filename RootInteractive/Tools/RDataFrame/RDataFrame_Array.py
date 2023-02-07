@@ -56,7 +56,7 @@ def scalar_type(name):
         "int": ('i', 32),
         "char": ('i', 8)
     }
-    return dtypes[name]
+    return dtypes.get(name, name)
 
 def scalar_type_str(dtype):
     dtypes = {
@@ -261,7 +261,7 @@ class RDataFrame_Visit:
             elif isinstance(op, ast.GtE):
                 op_infix = " >= "
             else:
-                raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented")
+                raise NotImplementedError(f"Comparison operator {ast.dump(op)} not implemented")
             js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
         implementation = " && ".join(js_comparisons)
         return {
