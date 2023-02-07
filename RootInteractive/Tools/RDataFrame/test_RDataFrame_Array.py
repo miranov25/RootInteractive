@@ -103,7 +103,6 @@ def test_define1D(rdf, name, expression,verbosity):
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDFv2("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
-<<<<<<< HEAD
     # test 5  - 2D delta auto range
     parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);
     rdf = makeDefineRDFv2("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
@@ -119,12 +118,6 @@ def test_define1D(rdf, name, expression,verbosity):
     # tt.GetHistogram().GetRms()  # should be 0 +- errror  cut e.g 10^-5
     # tt.GetHistogram().GetRms()  # should be 0 +- errorr
 
-=======
-    #
-    parsed = makeDefine("arrayD2D", "array2D0[1:10,:]-array2D1[1:10,:]", rdf, 3, True)
-    rdf = makeDefineRDFv1("arrayD2D", parsed["name"], parsed, rdf, verbose=1)
-    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD2D.root")
->>>>>>> 5940ecca90b2618b39c9d670f2f797eccc29fc43
     return rdf
 
 def getClassMethod(className, methodName):
