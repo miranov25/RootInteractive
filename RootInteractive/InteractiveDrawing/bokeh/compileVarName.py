@@ -327,7 +327,7 @@ class ColumnEvaluator:
             operator_infix = " - "
         elif isinstance(op, ast.Mult):
             operator_infix = " * "
-        elif isinstance(op, ast.Div):
+        elif isinstance(op, ast.Div) or isinstance(op, ast.FloorDiv):
             operator_infix = " / "
         elif isinstance(op, ast.Mod):
             operator_infix = " % "
@@ -348,6 +348,8 @@ class ColumnEvaluator:
         else:
             raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
         implementation = f"({self.visit(node.left)['implementation']}){operator_infix}({self.visit(node.right)['implementation']})"
+        if isinstance(op, ast.FloorDiv):
+            implementation = f"(({implementation})|0)"
         return {
             "name": self.code,
             "type": "javascript",
@@ -360,8 +362,10 @@ class ColumnEvaluator:
             operator_prefix = "+"
         elif isinstance(op, ast.USub):
             operator_prefix = "-"
-        else:
+        elif isinstance(op, ast.Not):
             operator_prefix = "!"
+        elif isinstance(op, ast.Invert):
+            operator_prefix = "~"
         implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
         return {
             "name": self.code,

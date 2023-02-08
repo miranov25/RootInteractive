@@ -38,12 +38,50 @@ def getClassMethod(className, methodName, arguments=[]):
     import re
     try:
         docString= eval(f"ROOT.{className}.{methodName}.func_doc")
-        returnType = re.sub(f"{className}.*","",docString)
+        returnType = re.sub(f"\\s+{className}.*","",docString)
         return (returnType,docString)
     except:
         pass
     return ("","")
 
+
+def scalar_type(name):
+    dtypes = {
+        "float": ('f', 32),
+        "double": ('f', 64),
+        "long double": ('f', 64),
+        "size_t": ('u', 64),
+        "long long": ('i', 64),
+        "unsigned int": ('u', 32),
+        "int": ('i', 32),
+        "char": ('i', 8)
+    }
+    return dtypes.get(name, name)
+
+def scalar_type_str(dtype):
+    dtypes = {
+        ('f', 32): "float",
+        ('f', 64): "double",
+        ('u', 64): "size_t",
+        ('i', 64): "long long",
+        ('u', 32): "unsigned int",
+        ('i', 32): "int",
+        ('u', 8): "unsigned char",
+        ('i', 8): "char"
+    }
+    return dtypes[dtype]
+
+def add_dtypes(left, right):
+    # This is a hack - use minimum for kind and maximum for depth
+    return (min(left[0],right[0]), max(left[1], right[1]))
+
+def truediv_dtype(left, right):
+    x = add_dtypes(left, right)
+    if x[0] == 'f':
+        return x
+    elif x[1] <= 16:
+        return ('f', 32)
+    return ('f', 64)
 
 class RDataFrame_Visit:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
@@ -77,6 +115,8 @@ class RDataFrame_Visit:
             return self.visit_Subscript(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
+        elif isinstance(node, ast.ExtSlice):
+            return self.visit_ExtSlice(node)
         elif isinstance(node, ast.Tuple):
             return self.visit_Tuple(node)
         elif isinstance(node, ast.Constant):
@@ -91,20 +131,32 @@ class RDataFrame_Visit:
         implementation += ')'
         return {
             "implementation": implementation,
-            "type": left["type"]
+            "type": scalar_type(left["returnType"])
         }
 
     def visit_Num(self, node: ast.Num):
         # Kept for compatibility with old Python
+        node_type = ('f', 64)
+        if isinstance(node.value, int):
+            node_type = ('i', 64)
+        if isinstance(node.value, str):
+            node_type = ("o", 64)
         return {
             "implementation": str(node.n),
             "value": node.n,
+            "type": node_type
         }
 
-    def visit_Constant(self, node: ast.Num):
+    def visit_Constant(self, node: ast.Constant):
+        node_type = ('f', 64)
+        if isinstance(node.value, int):
+            node_type = ('i', 64)
+        if isinstance(node.value, str):
+            node_type = ("o", 64)
         return {
             "implementation": str(node.value),
             "value": node.value,
+            "type": node_type
         }
 
     def visit_Name(self, node: ast.Name):
@@ -116,8 +168,13 @@ class RDataFrame_Visit:
         self.dependencies[node.id] = {"type":"RVec<double>"}
         return {"implementation": node.id, "type":"RVec<double>"}
 
-    def visit_BinOp(self, node):
+    def visit_BinOp(self, node:ast.BinOp):
         op = node.op
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        merged_dtype = add_dtypes(left["type"], right["type"])
+        left_cast = ""
+        right_cast = ""
         if isinstance(op, ast.Add):
             operator_infix = " + "
         elif isinstance(op, ast.Sub):
@@ -125,6 +182,12 @@ class RDataFrame_Visit:
         elif isinstance(op, ast.Mult):
             operator_infix = " * "
         elif isinstance(op, ast.Div):
+            operator_infix = " / "
+            if left["type"] != merged_dtype:
+                left_cast = f"({scalar_type_str(merged_dtype)})"
+            if right["type"] != merged_dtype:
+                right_cast = f"({scalar_type_str(merged_dtype)})"
+        elif isinstance(op, ast.FloorDiv):
             operator_infix = " / "
         elif isinstance(op, ast.Mod):
             operator_infix = " % "
@@ -143,14 +206,14 @@ class RDataFrame_Visit:
         elif isinstance(op, ast.Pow):
             operator_infix = "**"
         else:
-            raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
-        left = self.visit(node.left)
-        right = self.visit(node.right)
-        implementation = f"({left['implementation']}){operator_infix}({right['implementation']})"
+            raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented")
+        implementation = f"{left_cast}({left['implementation']}){operator_infix}{right_cast}({right['implementation']})"
+        if isinstance(op, ast.FloorDiv) and merged_dtype[0] == 'f':
+            implementation = f"floor({implementation})"
         return {
             "name": self.code,
             "implementation": implementation,
-            "type": "double"
+            "type": merged_dtype
         }
 
     def visit_UnaryOp(self, node: ast.UnaryOp):
@@ -167,14 +230,16 @@ class RDataFrame_Visit:
                 new_value = -operand["value"]
                 return {
                     "value": new_value,
-                    "implementation":f"{new_value}"
+                    "implementation":f"{new_value}",
+                    "type": operand["type"]
                 }         
         else:
             operator_prefix = "!"
         implementation = f"{operator_prefix}({operand['implementation']})"
         return {
             "name": self.code,
-            "implementation": implementation
+            "implementation": implementation,
+            "type": operand["type"]
         }
 
     def visit_Compare(self, node:ast.Compare):
@@ -198,25 +263,25 @@ class RDataFrame_Visit:
             elif isinstance(op, ast.GtE):
                 op_infix = " >= "
             else:
-                raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented")
+                raise NotImplementedError(f"Comparison operator {ast.dump(op)} not implemented")
             js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
         implementation = " && ".join(js_comparisons)
         return {
             "name": self.code,
-            "type": "char",
+            "type": ('i', 8),
             "implementation": implementation
         }
 
     def visit_BoolOp(self, node:ast.BoolOp):
-        js_values = [f"({self.visit(i)['implementation']})" for i in node.values]
+        values = [f"({self.visit(i)})" for i in node.values]
         if isinstance(node.op, ast.And):
             op_infix = " && "
         elif isinstance(node.op, ast.Or):
             op_infix = " || "
-        implementation = op_infix.join(js_values)
+        implementation = op_infix.join([i["implementation"] for i in values])
         return {
             "name": self.code,
-            "type": "char",
+            "type": values[-1]["type"],
             "implementation": implementation
         }
 
@@ -272,10 +337,12 @@ class RDataFrame_Visit:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
             if n_iter <= 0:
-                self.n_iter[idx] = f"{value['implementation']}.size() - ({n_iter})"
+                self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
-        dtype = unpackScalarType(value["type"])
+        dtype_str = unpackScalarType(value["type"], len(n_iter_arr))
+        dtype = scalar_type(dtype_str)
+        print(dtype_str, dtype)
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
             "type":dtype
@@ -283,16 +350,17 @@ class RDataFrame_Visit:
 
     def visit_Expression(self, node:ast.Expression):
         body = self.visit(node.body)
-        loop, array_type = self.makeOuterLoop(0, body["implementation"], body["type"])
+        loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
         input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
-            "implementation":f"""{signature}){{
+            "implementation":f"""{signature}{{
     {loop}
     return result;
 }} """,
 "type": array_type,
+"name": self.name,
 "dependencies": [i[0] for i in dependencies_list]
         }
 
@@ -322,22 +390,28 @@ class RDataFrame_Visit:
     def visit_func_Name(self, node:ast.Name, args):
         if self.df:
             func = getGlobalFunction(node.id)
-            return {"type":"function", "implementation":node.id, "type":func["returnType"]}
-        return {"type":"function", "implementation":node.id, "type":"double"}
+            return {"type":"function", "implementation":node.id, "returnType":func["returnType"]}
+        return {"type":"function", "implementation":node.id, "returnType":"double"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
-        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}"}
+        className = left["type"]
+        (returnType, docstring) = getClassMethod(className, node.attr, args)
+        return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}", "returnType":returnType}
 
     def visit_Tuple(self, node:ast.Tuple):
         # So far, the only tuple supported is a slice tuple
         x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
         return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}
 
+    def visit_ExtSlice(self, node:ast.ExtSlice):
+        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.dims)]
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}       
+
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
         return vecType
-    vecTypeNew = vecType.split('<',1)[1][:-1]
+    vecTypeNew = vecType.split('<',1)[1].rsplit('>',1)[-2]
     return unpackScalarType(vecTypeNew, level-1)
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
@@ -371,4 +445,4 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
 
 # makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
 # makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-# makeDefine("B","A[1:]-A[:-1]", None,3, True)
+# makeDefine("B","array2D0[1:10,:]-array2D1[1:10,:]", None,3, True)
