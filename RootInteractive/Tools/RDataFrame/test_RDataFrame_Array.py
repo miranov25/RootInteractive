@@ -13,6 +13,7 @@ def makeTestDictionary():
        #include "ROOT/RVec.hxx"
        #include "ROOT/RDF/RInterface.hxx"
        #include  "TParticle.h"
+       #pragma link C++ class ROOT::RVec < ROOT::RVec < char>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < float>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < double>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < long double>> + ;
@@ -110,6 +111,10 @@ def test_define():
     # test 6  - 2D delta against 1D
     parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, True);
     rdf = makeDefineRDF("arrayD1D2D", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
+    # test 7   - 2D boolen test
+    parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0", rdf,3, True);
+    rdf = makeDefineRDF("arrayD20Bool", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     #
     rdf = makeDefine("arrayD1D2DP","array2D0[:,:]+array1D0[:]", rdf,3, False);
