@@ -414,6 +414,53 @@ def unpackScalarType(vecType:str, level:int=0):
     vecTypeNew = vecType.split('<',1)[1].rsplit('>',1)[-2]
     return unpackScalarType(vecTypeNew, level-1)
 
+
+def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
+    """
+    makeDefineRDF         this is internal function to create columns  column Name for fucnion funName
+
+    :param columnName:  output column name to append
+    :param funName:     function to use
+    :param parsed:      implementation + dependencies
+    :param rdf:         input RDF
+    :param verbose:     verbosity
+    :return:            data frame with new column - columns name
+    """
+    if verbose & 0x1:
+        print(f"{columnName}\t{funName}\t{parsed}")
+    # 0.) Define function if does not exist yet
+
+    try:
+        ROOT.gInterpreter.Declare( parsed["implementation"])
+    except:
+        pass
+    # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
+    try:
+         ROOT.rdfgener_rdf
+    except:
+        ROOT.gInterpreter.ProcessLine("ROOT::RDF::RInterface<ROOT::Detail::RDF::RLoopManager, void>  *rdfgener_rdf=0;")            ## add to global space
+    if ROOT.rdfgener_rdf!=rdf:
+        ROOT.rdfgener_rdf=rdf
+    # 2.) be verbose
+    if verbose&0x2:
+        rdf.Describe().Print();                                      ## workimg
+        ROOT.gInterpreter.ProcessLine("rdfgener_rdf->Describe()");  ## print content of the rdf
+    #
+    dependency="{"+f'{parsed["dependencies"]}'[1:-1]+"}".replace("'","\"")
+    dependency=dependency.replace("'","\"")
+
+    defineLine=f"""
+        auto rdfOut=rdfgener_rdf->Define("{columnName}",{funName},{dependency});
+        rdfgener_rdf=&rdfOut;   
+    """
+    if verbose>0:
+        print(defineLine)
+
+    ROOT.gInterpreter.ProcessLine(defineLine)
+    return  ROOT.rdfgener_rdf
+
+
+
 def makeDefine(name, code, df, verbose=3, isTest=False):
     t = ast.parse(code, "<string>", "eval")
     evaluator = RDataFrame_Visit(code, df, name)
@@ -429,20 +476,9 @@ def makeDefine(name, code, df, verbose=3, isTest=False):
     if verbose & 0x2:
         print("Dependencies\n", parsed["dependencies"])
     if df is not None and not isTest:
-        # TODO - if function not yet exist declare it
-        ROOT.gInterpreter.Declare( parsed["implementation"])
-        defineLine=f"""
-            auto rdfOut=rdf.Define(name,{name},{parsed["dependencies"]})
-        """
-        # print(defineLine)
-        # ROOT.gInterpreter.ProcessLine(defineLine)
-        # rdfOut=df.Define(name,"ROOT.{name}",parsed["dependencies"])
-        # return ROOT.rdfOut
-        return parsed
-    else:
-        return parsed
+        if df is not None:
+            rdf=makeDefineRDF(name,name,parsed,df,verbose)
+            return rdf
+    return parsed
 
 
-# makeDefine("C","cos(A[1:10])-B[:20:2]", None,3, True)
-# makeDefine("C","cos(A[1:10])-B[:20:2,1:3]", None,3, True)
-# makeDefine("B","array2D0[1:10,:]-array2D1[1:10,:]", None,3, True)
