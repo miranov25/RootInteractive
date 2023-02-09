@@ -1151,7 +1151,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if re.match(RE_VALID_NAME, columnKey):
                 if (cdsKey, columnKey) in sources:
                     weakAll.append(columnKey)
-                elif columnKey in aliasDict[cdsKey] and aliasDict[cdsKey][columnKey].get("fields", []) is not None:
+                elif cdsKey in aliasDict and columnKey in aliasDict[cdsKey] and aliasDict[cdsKey][columnKey].get("fields", []) is not None:
                     weakAll.append(columnKey)
         for key, value in memoized_columns[cdsKey].items():
             columnKey = value["name"]
