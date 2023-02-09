@@ -61,7 +61,6 @@ aliasArray = [
     },
     {
         "name": "custom_column",
-        "variables": ["A", "B", "C", "A_mul_paramX_plus_B"],
         "func": "CustomFunc"
     }
 ]
