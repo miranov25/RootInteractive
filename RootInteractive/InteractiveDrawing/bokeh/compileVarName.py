@@ -142,7 +142,7 @@ class ColumnEvaluator:
                     "implementation": node.attr,
                     "type": "alias"
                 }
-            elif "fields" in self.aliasDict[self.context][node.attr]:
+            elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
                 for i in self.aliasDict[self.context][node.attr]["fields"]:
                     self.dependencies.add((self.context, i))
             self.aliasDependencies.add(node.attr)
@@ -204,10 +204,15 @@ class ColumnEvaluator:
             #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
             #}           
         self.aliasDependencies.add(node.attr)
+        try:
+            is_boolean = "data" in self.cdsDict[self.context] and self.cdsDict[self.context]["data"][node.attr].dtype.kind == "b"
+        except AttributeError:
+            is_boolean = False
         return {
             "name": node.attr,
             "implementation": node.attr,
-            "type": "column"
+            "type": "column",
+            "is_boolean": is_boolean
         }
 
     def visit_Name(self, node: ast.Name):
@@ -321,12 +326,18 @@ class ColumnEvaluator:
 
     def visit_BinOp(self, node):
         op = node.op
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        is_boolean = False
         if isinstance(op, ast.Add):
             operator_infix = " + "
         elif isinstance(op, ast.Sub):
             operator_infix = " - "
         elif isinstance(op, ast.Mult):
-            operator_infix = " * "
+            left_boolean = left.get("is_boolean", False)
+            right_boolean = right.get("is_boolean", True)
+            is_boolean = left_boolean and right_boolean
+            operator_infix = " && " if left_boolean else " * "
         elif isinstance(op, ast.Div) or isinstance(op, ast.FloorDiv):
             operator_infix = " / "
         elif isinstance(op, ast.Mod):
@@ -347,13 +358,14 @@ class ColumnEvaluator:
             operator_infix = "**"
         else:
             raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
-        implementation = f"({self.visit(node.left)['implementation']}){operator_infix}({self.visit(node.right)['implementation']})"
+        implementation = f"({left['implementation']}){operator_infix}({right['implementation']})"
         if isinstance(op, ast.FloorDiv):
             implementation = f"(({implementation})|0)"
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "is_boolean": is_boolean
         }
         
     def visit_UnaryOp(self, node: ast.UnaryOp):
@@ -400,7 +412,8 @@ class ColumnEvaluator:
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "is_boolean": True
         }
     
     def visit_BoolOp(self, node:ast.BoolOp):
@@ -522,8 +535,9 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                                                     """)])
                     aliasDict[i_context][columnName] = {"transform": transform, "fields": variablesAlias}
                     newColumn = {
-                        "type": "alias",
-                        "name": columnName
+                        "type": "expr",
+                        "name": columnName,
+                        "is_boolean": column.get("is_boolean", False)
                     }
                     evaluator.dependencies.update({(evaluator.context, i) for i in evaluator.aliasDependencies})
                     column = newColumn

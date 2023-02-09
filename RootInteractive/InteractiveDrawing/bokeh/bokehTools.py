@@ -27,6 +27,7 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSJoin import CDSJoin
 from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSelectFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
+from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 import numpy as np
 import pandas as pd
 import re
@@ -57,6 +58,8 @@ BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "le
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
 
 RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
+
+RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
 def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     options = {
@@ -510,6 +513,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     aliasDict = {None:{}}
     aliasSet = set()
     for i in aliasArray:
+        variables = i.get("variables", [])
         customJsArgList = {}
         transform = None
         if not isinstance(i, dict):
@@ -523,24 +527,24 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if "context" in i:
                     if i["context"] not in aliasDict:
                         aliasDict[i["context"]] = {}
-                    aliasDict[i["context"]][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+                    aliasDict[i["context"]][i["name"]] = {"fields": variables, "transform": jsFunctionDict[i["transform"]]}
                 else:
-                    aliasDict[None][i["name"]] = {"fields": i["variables"], "transform": jsFunctionDict[i["transform"]]}
+                    aliasDict[None][i["name"]] = {"fields": variables, "transform": jsFunctionDict[i["transform"]]}
         else:
             if "parameters" in i:
                 for j in i["parameters"]:
                     customJsArgList[j] = paramDict[j]["value"]
             if "v_func" in i:
-                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], v_func=i["v_func"])
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, v_func=i["v_func"])
             elif "func" in i:
                 if i["func"] in paramDict:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=paramDict[i["func"]]["value"])
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=paramDict[i["func"]]["value"])
                     paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
             mapper.func = this.value
             mapper.update_func()
                     """)])
                 else:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=i["variables"], func=i["func"])
+                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=i["func"])
             if "expr" in i:
                 exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
                 context = i.get("context", None)
@@ -572,13 +576,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     break
             else:
                 parameters = i.get("parameters", None)
-                fields = i["variables"]
-            if "context" in i:
-                if i["context"] not in aliasDict:
-                    aliasDict[i["context"]] = {}
-                aliasDict[i["context"]][i["name"]] = {"fields": fields, "transform": transform}
-            else:
-                aliasDict[None][i["name"]] = {"fields": fields, "transform": transform}
+                fields = i.get("variables", None)
+            source = i.get("context", None)
+            if source not in aliasDict:
+                aliasDict[source] = {}
+            aliasDict[source][i["name"]] = {"fields": fields, "transform": transform}
             if parameters is not None:
                 for j in parameters:
                     paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
@@ -789,15 +791,23 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionWidget = {}
             if len(variables) >= 2:
                 optionWidget.update(variables[-1])
-            cds_used = None
+            cds_used = optionWidget.get("source", None)
             # By default, uses all named variables from the data source - but they can't be known at this point yet
             localWidget = TextAreaInput(**optionWidget)
+            widgetName = optionWidget.get("name", f"$widget_{len(plotArray)}")
             plotArray.append(localWidget)
-            if "name" in optionWidget:
-                plotDict[optionWidget["name"]] = localWidget
+            plotDict[widgetName] = localWidget
+            transform = CustomJSNAryFunction(parameters=customJsArgList, fields=[], func=optionWidget.get("value", "return true"))
+            localWidget.js_on_change("value", CustomJS(args={"mapper":transform}, code="""
+                mapper.func = this.value
+                mapper.update_func()
+                        """))
+            aliasDict[cds_used][widgetName] = {"fields": None, "transform": transform}
+            memoized_columns[cds_used][widgetName] = {"type":"alias", "name":widgetName}
+            widgetFilter = ColumnFilter(field=widgetName, name=widgetName)
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
-            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": None})
+            widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": widgetName, "filter": widgetFilter})
             continue
         if variables[0] == "text":
             optionWidget = {"title": variables[1][0]}
@@ -1155,15 +1165,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         # Add aliases
         aliasArrayLocal = set()
+        weakAll = []
+        for key, value in memoized_columns[cdsKey].items():
+            columnKey = value["name"]
+            if re.match(RE_VALID_NAME, columnKey):
+                if (cdsKey, columnKey) in sources:
+                    weakAll.append(columnKey)
+                elif columnKey in aliasDict[cdsKey] and aliasDict[cdsKey][columnKey].get("fields", []) is not None:
+                    weakAll.append(columnKey)
         for key, value in memoized_columns[cdsKey].items():
             columnKey = value["name"]
             if (cdsKey, columnKey) not in sources:
                 cdsFull = cdsValue["cdsFull"]
                 # User defined aliases
-                if value["type"] == "alias":
+                if value["type"] in ["alias", "expr"]:
                     cdsFull.mapping[columnKey] = aliasDict[cdsKey][columnKey]
                     if "transform" in aliasDict[cdsKey][columnKey]:
                         aliasArrayLocal.add(aliasDict[cdsKey][columnKey]["transform"])
+                    if "fields" in aliasDict[cdsKey][columnKey] and aliasDict[cdsKey][columnKey]["fields"] is None:
+                        aliasDict[cdsKey][columnKey]["fields"] = weakAll
+                        aliasDict[cdsKey][columnKey]["transform"].fields = weakAll
                 # Columns directly controlled by parameter
                 elif value["type"] == "parameter":
                     cdsFull.mapping[columnKey] = paramDict[value["name"]]["value"]
