@@ -119,23 +119,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             }
             continue;
         }
-        const widget = iWidget.widget;
-        const widgetType = iWidget.type;
-        const col = iWidget.key && cdsOrig.get_column(iWidget.key);
-        if(widgetType == "textQuery"){
-            const queryText = widget.value;
-            if(queryText == ""){
-                continue;
-            }
-            const pattern = /^[a-zA-Z_$][0-9a-zA-Z_$]*$/;
-            const variablesLocal = cdsOrig.columns().filter((x) => pattern.test(x))
-            const dataOrigArray = variablesLocal.map((x) => cdsOrig.get_column(x))
-            const f = new Function(...variablesLocal, "\\"use strict\\"\\n" + queryText);
-            for(let i=first; i<last; i++){
-                const result = f(...dataOrigArray.map(x => x[i]));
-                isSelected[i] &= result;
-            }
-        }
     }
    
     const t2 = performance.now();
