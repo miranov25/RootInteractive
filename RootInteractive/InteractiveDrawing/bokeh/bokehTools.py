@@ -112,12 +112,9 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     console.log(`Using index took ${t1 - t0} milliseconds.`);
     for (const iWidget of widgetList){
         if(iWidget.widget.disabled) continue;
-        if(iWidget.filter != null){
-            const widgetFilter = iWidget.filter.v_compute();
-            for(let i=first; i<last; i++){
-                isSelected[i] &= widgetFilter[i];
-            }
-            continue;
+        const widgetFilter = iWidget.filter.v_compute();
+        for(let i=first; i<last; i++){
+            isSelected[i] &= widgetFilter[i];
         }
     }
    
