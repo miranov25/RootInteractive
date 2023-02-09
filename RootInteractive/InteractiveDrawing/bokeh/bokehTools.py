@@ -71,7 +71,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     code = \
         """
     const t0 = performance.now();
-    const precision = 0.000001;
     const size = cdsOrig.length;
 
     let first = 0;
@@ -493,7 +492,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     aliasDict = {None:{}}
     aliasSet = set()
     for i in aliasArray:
-        variables = i.get("variables", [])
+        if isinstance(i, dict):
+            variables = i.get("variables", [])
         customJsArgList = {}
         transform = None
         if not isinstance(i, dict):
