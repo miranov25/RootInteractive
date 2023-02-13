@@ -1,11 +1,11 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {Model} from "model"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace MultiSelectFilter {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = Model.Props & {
+  export type Props = RIFilter.Props & {
     source: p.Property<ColumnarDataSource>
     selected: p.Property<string[]>
     mapping: p.Property<Record<string, number>>
@@ -17,7 +17,7 @@ export namespace MultiSelectFilter {
 
 export interface MultiSelectFilter extends MultiSelectFilter.Attrs {}
 
-export class MultiSelectFilter extends Model {
+export class MultiSelectFilter extends RIFilter {
   properties: MultiSelectFilter.Props
 
   constructor(attrs?: Partial<MultiSelectFilter.Attrs>) {

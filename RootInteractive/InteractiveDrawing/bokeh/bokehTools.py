@@ -110,10 +110,16 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     const t1 = performance.now();
     console.log(`Using index took ${t1 - t0} milliseconds.`);
     for (const iWidget of widgetList){
-        if(iWidget.widget.disabled) continue;
+        if(!iWidget.filter.active) continue;
         const widgetFilter = iWidget.filter.v_compute();
-        for(let i=first; i<last; i++){
-            isSelected[i] &= widgetFilter[i];
+        if(iWidget.filter.invert){
+            for(let i=first; i<last; i++){
+                isSelected[i] &= !widgetFilter[i];
+            }        
+        } else {
+            for(let i=first; i<last; i++){
+                isSelected[i] &= widgetFilter[i];
+            }
         }
     }
    
@@ -732,7 +738,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=True, width=70)
+                widgetFilter.active = False
                 if variables[0] == 'spinnerRange':
+                    localWidgetMin.disabled = True
+                    localWidgetMax.disabled = True
                     widgetToggle.js_on_change("active", CustomJS(args={"widgetMin":localWidgetMin, "widgetMax": localWidgetMax, "filter": widgetFilter}, code="""
                     widgetMin.disabled = this.active
                     widgetMax.disabled = this.active
@@ -746,6 +755,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """))
                 if widgetFilter is not None:
                     widgetToggle.js_on_change("active", CustomJS(args={"filter": widgetFilter}, code="""
+                    filter.active = !this.active
                     filter.change.emit()
                     """))
                 widgetFull = row([widgetFull, widgetToggle])
@@ -1421,6 +1431,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     newColumn = None
     js_callback_code="""
         target.selected = [this.value]
+        target.change.emit()
     """
     if options['callback'] == 'parameter':
         return widget_local, filterLocal, newColumn
