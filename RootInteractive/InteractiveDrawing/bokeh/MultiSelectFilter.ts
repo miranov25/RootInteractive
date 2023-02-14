@@ -67,7 +67,7 @@ export class MultiSelectFilter extends RIFilter {
     if (!dirty_source && !dirty_widget){
         return cached_vector
     }
-    let col = source.get_array(field)
+    let col = source.get_column(field) as number[]
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
         new_vector = Array(col.length)
