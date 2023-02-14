@@ -128,7 +128,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     console.log(`Filtering took ${t2 - t1} milliseconds.`);
     const view = options.view;
     const histogramList = options.histogramList
-    if(histogramList != []){
+    if(histogramList.length != 0){
         for (let i = 0; i < size; i++){
             if (isSelected[i]){
                 indicesAll.push(i);
