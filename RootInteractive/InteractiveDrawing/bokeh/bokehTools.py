@@ -28,7 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSele
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
-#from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
+from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 import numpy as np
 import pandas as pd
 import re
@@ -77,10 +77,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     let first = 0;
     let last = size;
 
-    let isSelected = new Array(size);
-    for(let i=0; i<size; ++i){
-        isSelected[i] = false;
-    }
     let indicesAll = [];
     if(index != null){
         const widget = index.widget;
@@ -104,26 +100,25 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             }
         }
     }
-    for(let i=first; i<last; ++i){
-        isSelected[i] = true;
-    }
-
     const t1 = performance.now();
     console.log(`Using index took ${t1 - t0} milliseconds.`);
-    for (const iWidget of widgetList){
-        if(!iWidget.filter.active) continue;
-        const widgetFilter = iWidget.filter.v_compute();
-        if(iWidget.filter.invert){
+    let isSelected;
+    if(widgetList.length === 1){
+        isSelected = widgetList[0].filter.v_compute()
+    } else {
+        isSelected = new Array(size).fill(False);
+        for(let i=first; i<last; ++i){
+            isSelected[i] = true;
+        }    
+        for (const iWidget of widgetList){
+            if(!iWidget.filter.active) continue;
+            const widgetFilter = iWidget.filter.v_compute();
+            const invert = iWidget.filter.invert
             for(let i=first; i<last; i++){
-                isSelected[i] &= !widgetFilter[i];
+                isSelected[i] &= widgetFilter[i] ^ invert;
             }        
-        } else {
-            for(let i=first; i<last; i++){
-                isSelected[i] &= widgetFilter[i];
-            }
         }
     }
-   
     const t2 = performance.now();
     console.log(`Filtering took ${t2 - t1} milliseconds.`);
     const view = options.view;
@@ -1200,7 +1195,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 continue
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
-        callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
+        intersectionFilter = LazyIntersectionFilter(filters=[])
+        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, index=index)
         columns_change_filters = False
         for iWidget in widgetList:
@@ -1211,6 +1207,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig    
+                intersectionFilter.filters.append(iWidget["filter"])
                 iWidget["filter"].js_on_change("change", callback)
         if index is not None:
             index["widget"].js_on_change("value", callback)
