@@ -1211,7 +1211,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig    
-                iWidget["widget"].js_on_change("change", callback)
+                iWidget["filter"].js_on_change("change", callback)
         if index is not None:
             index["widget"].js_on_change("value", callback)
         if columns_change_filters:
