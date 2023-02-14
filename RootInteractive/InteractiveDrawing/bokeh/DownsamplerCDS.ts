@@ -1,11 +1,12 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
+import {CDSAlias} from "./CDSAlias"
 import * as p from "core/properties"
 
 export namespace DownsamplerCDS {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnarDataSource.Props & {
-    source: p.Property<ColumnarDataSource>
+    source: p.Property<CDSAlias>
     nPoints: p.Property<number>
     watched: p.Property<boolean>
   }
@@ -24,7 +25,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   static init_DownsamplerCDS() {
     this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean})=>({
-      source:  [Ref(ColumnarDataSource)],
+      source:  [Ref(CDSAlias)],
       nPoints:    [ Int, 300 ],
       watched: [Boolean, true]
     }))
@@ -43,14 +44,13 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this.booleans = null
     this._indices = []
     this.data = {}
-    this.shuffle_indices()
     this.update()
   }
 
   shuffle_indices(){
     const {_indices, source} = this
     _indices.length = source.get_length()!
-    // Deck shuffling algorithm - for each card drawn, swap it with a random card in hand
+    // Fisher-Yates random permutation
     for(let i=0; i<_indices.length; ++i){
       let random_index = (Math.random()*(i+1)) | 0
       _indices[i] = i

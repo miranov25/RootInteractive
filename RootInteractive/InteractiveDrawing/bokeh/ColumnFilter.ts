@@ -1,11 +1,11 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {Model} from "model"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace ColumnFilter {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = Model.Props & {
+  export type Props = RIFilter.Props & {
     source: p.Property<ColumnarDataSource>
     field:p.Property<string>
   }
@@ -13,7 +13,7 @@ export namespace ColumnFilter {
 
 export interface ColumnFilter extends ColumnFilter.Attrs {}
 
-export class ColumnFilter extends Model {
+export class ColumnFilter extends RIFilter {
   properties: ColumnFilter.Props
 
   constructor(attrs?: Partial<ColumnFilter.Attrs>) {
@@ -53,7 +53,8 @@ export class ColumnFilter extends Model {
     if (!dirty_source){
         return cached_vector
     }
-    let col = source.get_array(field)
+    let col = source.get_column(field)
+    if(col == null) return []
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
         new_vector = Array(col.length)

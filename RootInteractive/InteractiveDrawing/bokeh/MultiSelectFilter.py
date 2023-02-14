@@ -1,8 +1,8 @@
-from bokeh.model import Model
+from RootInteractive.InteractiveDrawing.bokeh.RIFilter import RIFilter
 from bokeh.core.properties import Instance, String, Dict, List, Int
 from bokeh.models.sources import ColumnarDataSource
 
-class MultiSelectFilter(Model):
+class MultiSelectFilter(RIFilter):
     __implementation__ = "MultiSelectFilter.ts"
 
     source = Instance(ColumnarDataSource, help="Column data source to select from")

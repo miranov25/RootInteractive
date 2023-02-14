@@ -1,11 +1,11 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {Model} from "model"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace RangeFilter {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = Model.Props & {
+  export type Props = RIFilter.Props & {
     source: p.Property<ColumnarDataSource>
     field: p.Property<string>
     range: p.Property<number[]>
@@ -14,7 +14,7 @@ export namespace RangeFilter {
 
 export interface RangeFilter extends RangeFilter.Attrs {}
 
-export class RangeFilter extends Model {
+export class RangeFilter extends RIFilter {
   properties: RangeFilter.Props
 
   constructor(attrs?: Partial<RangeFilter.Attrs>) {
@@ -68,7 +68,7 @@ export class RangeFilter extends Model {
     if (!dirty_source && !dirty_widget){
         return cached_vector
     }
-    let col = source.get_array(field) as number[]
+    let col = source.get_column(field) as number[]
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
         new_vector = Array(col.length)

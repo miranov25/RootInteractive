@@ -1,6 +1,6 @@
-from bokeh.core.properties import Instance, String, Int, Bool
+from bokeh.core.properties import Instance, Int, Bool
 from bokeh.models import ColumnarDataSource
-
+from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 
 class DownsamplerCDS(ColumnarDataSource):
 
@@ -14,7 +14,7 @@ class DownsamplerCDS(ColumnarDataSource):
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
-    source = Instance(ColumnarDataSource)
+    source = Instance(CDSAlias)
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
     watched = Bool()
     print("Import ", __implementation__)

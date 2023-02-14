@@ -28,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSele
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
+from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 import numpy as np
 import pandas as pd
 import re
@@ -76,10 +77,6 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     let first = 0;
     let last = size;
 
-    let isSelected = new Array(size);
-    for(let i=0; i<size; ++i){
-        isSelected[i] = false;
-    }
     let indicesAll = [];
     if(index != null){
         const widget = index.widget;
@@ -103,25 +100,30 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
             }
         }
     }
-    for(let i=first; i<last; ++i){
-        isSelected[i] = true;
-    }
-
     const t1 = performance.now();
     console.log(`Using index took ${t1 - t0} milliseconds.`);
-    for (const iWidget of widgetList){
-        if(iWidget.widget.disabled) continue;
-        const widgetFilter = iWidget.filter.v_compute();
-        for(let i=first; i<last; i++){
-            isSelected[i] &= widgetFilter[i];
+    let isSelected;
+    if(widgetList.length === 1){
+        isSelected = widgetList[0].filter.v_compute()
+    } else {
+        isSelected = new Array(size).fill(False);
+        for(let i=first; i<last; ++i){
+            isSelected[i] = true;
+        }    
+        for (const iWidget of widgetList){
+            if(!iWidget.filter.active) continue;
+            const widgetFilter = iWidget.filter.v_compute();
+            const invert = iWidget.filter.invert
+            for(let i=first; i<last; i++){
+                isSelected[i] &= widgetFilter[i] ^ invert;
+            }        
         }
     }
-   
     const t2 = performance.now();
     console.log(`Filtering took ${t2 - t1} milliseconds.`);
     const view = options.view;
     const histogramList = options.histogramList
-    if(histogramList != []){
+    if(histogramList.length != 0){
         for (let i = 0; i < size; i++){
             if (isSelected[i]){
                 indicesAll.push(i);
@@ -732,7 +734,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=True, width=70)
+                widgetFilter.active = False
                 if variables[0] == 'spinnerRange':
+                    localWidgetMin.disabled = True
+                    localWidgetMax.disabled = True
                     widgetToggle.js_on_change("active", CustomJS(args={"widgetMin":localWidgetMin, "widgetMax": localWidgetMax, "filter": widgetFilter}, code="""
                     widgetMin.disabled = this.active
                     widgetMax.disabled = this.active
@@ -746,6 +751,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """))
                 if widgetFilter is not None:
                     widgetToggle.js_on_change("active", CustomJS(args={"filter": widgetFilter}, code="""
+                    filter.active = !this.active
                     filter.change.emit()
                     """))
                 widgetFull = row([widgetFull, widgetToggle])
@@ -1065,12 +1071,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         xAxisTitle = ", ".join(xAxisTitleBuilder)
         yAxisTitle = ", ".join(yAxisTitleBuilder)
-        plotTitle = yAxisTitle + " vs " + xAxisTitle
-        if color_axis_title is not None:
-            plotTitle = f"{plotTitle} vs {color_axis_title}"
 
         xAxisTitle = optionLocal.get("xAxisTitle", xAxisTitle)
         yAxisTitle = optionLocal.get("yAxisTitle", yAxisTitle)
+        plotTitle = yAxisTitle + " vs " + xAxisTitle
+        if color_axis_title is not None:
+            plotTitle = f"{plotTitle} vs {color_axis_title}"
         plotTitle = optionLocal.get("plotTitle", plotTitle)
 
         xAxisTitleModel = makeAxisLabelFromTemplate(xAxisTitle, paramDict, meta)
@@ -1189,20 +1195,24 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 continue
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
-        callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
+        intersectionFilter = LazyIntersectionFilter(filters=[])
+        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, index=index)
+        columns_change_filters = False
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
-                if memoized_columns[iCds][field]["type"] == "alias":
+                if memoized_columns[iCds][field]["type"] in ["alias", "expr"]:
+                    columns_change_filters = True
                     iWidget["filter"].source = cdsFull
                 else:
-                    iWidget["filter"].source = cdsOrig
+                    iWidget["filter"].source = cdsOrig    
+                intersectionFilter.filters.append(iWidget["filter"])
                 iWidget["filter"].js_on_change("change", callback)
-            else:
-                iWidget["widget"].js_on_change("value", callback)
         if index is not None:
             index["widget"].js_on_change("value", callback)
+        if columns_change_filters:
+            cdsDict[iCds]["cdsFull"].js_on_change("change", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
@@ -1421,6 +1431,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     newColumn = None
     js_callback_code="""
         target.selected = [this.value]
+        target.change.emit()
     """
     if options['callback'] == 'parameter':
         return widget_local, filterLocal, newColumn
