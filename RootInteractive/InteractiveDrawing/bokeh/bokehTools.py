@@ -28,7 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSele
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
-from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
+#from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 import numpy as np
 import pandas as pd
 import re
@@ -1210,8 +1210,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     columns_change_filters = True
                     iWidget["filter"].source = cdsFull
                 else:
-                    iWidget["filter"].source = cdsOrig
-                
+                    iWidget["filter"].source = cdsOrig    
             iWidget["widget"].js_on_change("value", callback)
         if index is not None:
             index["widget"].js_on_change("value", callback)
