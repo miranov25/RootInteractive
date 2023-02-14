@@ -28,6 +28,7 @@ from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSele
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
+from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 import numpy as np
 import pandas as pd
 import re
@@ -1075,12 +1076,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
         xAxisTitle = ", ".join(xAxisTitleBuilder)
         yAxisTitle = ", ".join(yAxisTitleBuilder)
-        plotTitle = yAxisTitle + " vs " + xAxisTitle
-        if color_axis_title is not None:
-            plotTitle = f"{plotTitle} vs {color_axis_title}"
 
         xAxisTitle = optionLocal.get("xAxisTitle", xAxisTitle)
         yAxisTitle = optionLocal.get("yAxisTitle", yAxisTitle)
+        plotTitle = yAxisTitle + " vs " + xAxisTitle
+        if color_axis_title is not None:
+            plotTitle = f"{plotTitle} vs {color_axis_title}"
         plotTitle = optionLocal.get("plotTitle", plotTitle)
 
         xAxisTitleModel = makeAxisLabelFromTemplate(xAxisTitle, paramDict, meta)
@@ -1201,18 +1202,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 histoList.append(cdsValue["cdsOrig"])
         callback = makeJScallback(widgetList, cdsFull, source, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, index=index)
+        columns_change_filters = False
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
-                if memoized_columns[iCds][field]["type"] == "alias":
+                if memoized_columns[iCds][field]["type"] in ["alias", "expr"]:
+                    columns_change_filters = True
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig
-                iWidget["filter"].js_on_change("change", callback)
-            else:
-                iWidget["widget"].js_on_change("value", callback)
+                
+            iWidget["widget"].js_on_change("value", callback)
         if index is not None:
             index["widget"].js_on_change("value", callback)
+        if columns_change_filters:
+            cdsDict[iCds]["cdsFull"].js_on_change("change", callback)
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
