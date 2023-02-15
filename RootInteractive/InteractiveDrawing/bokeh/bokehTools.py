@@ -124,7 +124,7 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     const view = options.view;
     const histogramList = options.histogramList
     if(histogramList.length != 0){
-        for (let i = 0; i < size; i++){
+        for (let i = first; i < last; i++){
             if (isSelected[i]){
                 indicesAll.push(i);
             }
