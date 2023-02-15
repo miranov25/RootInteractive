@@ -1,5 +1,6 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {CDSAlias} from "./CDSAlias"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace DownsamplerCDS {
@@ -9,6 +10,7 @@ export namespace DownsamplerCDS {
     source: p.Property<CDSAlias>
     nPoints: p.Property<number>
     watched: p.Property<boolean>
+    filter: p.Property<null|RIFilter>
   }
 }
 
@@ -24,14 +26,17 @@ export class DownsamplerCDS extends ColumnarDataSource {
   static __name__ = "DownsamplerCDS"
 
   static init_DownsamplerCDS() {
-    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean, Nullable})=>({
       source:  [Ref(CDSAlias)],
       nPoints:    [ Int, 300 ],
-      watched: [Boolean, true]
+      watched: [Boolean, true],
+      filter: [Nullable(Ref(RIFilter)), null]
     }))
   }
 
   public booleans: number[] | null// This is a hack to avoid expensive validation
+  public low: number
+  public high: number
 
   private _indices: number[]
 
@@ -44,7 +49,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this.booleans = null
     this._indices = []
     this.data = {}
-    this.update()
+    this.low = 0
+    this.high = -1
+    this._needs_update = true
+   // this.update()
   }
 
   shuffle_indices(){
@@ -63,22 +71,28 @@ export class DownsamplerCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.selected.change, () => this.update_selection())
-    // TODO: Add the use case when source grows in size
     this.connect(this.source.change, () => {this.invalidate()})
+    if(this.filter != null){
+      this.connect(this.filter.change, () => {this.invalidate()})
+    }
     this.connect(this.properties.watched.change, () => {this.toggle_watched()})
   }
 
   update(){
-    const {source, nPoints, selected, booleans, _indices} = this
+    const {source, nPoints, selected, _indices} = this
     const l = source.length
     if(this._indices.length < l){
       this.shuffle_indices()
     }
     // Maybe add different downsampling strategies for small or large nPoints?
     // This is only efficient if the downsampling isn't too aggressive.
+    const low = this.low
+    const high = this.high >= 0 && this.high < l ? this.high : l
+    const booleans = this.booleans
+    //const booleans = filter != null ? filter.v_compute() : null
     this._downsampled_indices = []
-    for(let i=0; i < this._indices.length && this._downsampled_indices.length < nPoints; i++){
-      if (_indices[i]<l && (booleans == null || booleans[_indices[i]])){
+    for(let i=0; i < _indices.length && this._downsampled_indices.length < nPoints; i++){
+      if (_indices[i] <= high && _indices[i] >= low && (booleans == null || booleans[_indices[i]])){
         this._downsampled_indices.push(_indices[i])
       }
     }

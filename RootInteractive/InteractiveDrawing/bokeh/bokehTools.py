@@ -138,6 +138,8 @@ def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
     console.log(`Histogramming took ${t3 - t2} milliseconds.`);
     if(cdsSel != null){
         console.log(isSelected.reduce((a,b)=>a+b, 0));
+        cdsSel.low = first
+        cdsSel.high = last
         cdsSel.booleans = isSelected
         cdsSel.invalidate()
         console.log(cdsSel._downsampled_indices.length);
