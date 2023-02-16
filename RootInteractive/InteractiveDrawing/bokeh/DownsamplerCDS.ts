@@ -44,6 +44,8 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   private _needs_update: boolean
 
+  private _is_trivial: boolean
+
   initialize(){
     super.initialize()
     this.booleans = null
@@ -52,7 +54,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this.low = 0
     this.high = -1
     this._needs_update = true
-   // this.update()
+    this._is_trivial = false
   }
 
   shuffle_indices(){
@@ -81,6 +83,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
   update(){
     const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
+    if(nPoints < 0 || nPoints >= l){
+      this._is_trivial = true
+      return
+    }
     if(this._indices.length < l){
       this.shuffle_indices()
     }
@@ -113,13 +119,13 @@ export class DownsamplerCDS extends ColumnarDataSource {
         j++
       }
     }
-//    change.emit()
     selected.indices = selected_indices
     this._needs_update = false
   }
 
 
   update_selection(){
+    if(this._is_trivial) return
     const downsampled_indices = this.data.index
     const selected_indices = this.selected.indices.map((x:number)=>downsampled_indices[x])
     selected_indices.sort((a,b)=>a-b)
@@ -162,7 +168,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
     if(this.watched && this._needs_update){
       this.update()
     }
-    const {data, source, _downsampled_indices} = this
+    const {data, source, _downsampled_indices, _is_trivial} = this
+    if(_is_trivial){
+      return source.get_column(columnName) 
+    }
     if (data[columnName] != undefined){
       return data[columnName]
     }
@@ -177,6 +186,9 @@ export class DownsamplerCDS extends ColumnarDataSource {
   get_length(){
     if(this.watched && this._needs_update){
       this.update()
+    }
+    if(this._is_trivial){
+      return this.source.get_length()
     }
     return this._downsampled_indices.length
   }
