@@ -671,7 +671,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = localWidget
             if variables[0] == 'range':
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
-                if optionWidget["callback"] == "selection" and "index" not in optionWidget:
+                if optionWidget["callback"] == "selection":
                     widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
                     localWidget.js_link("value", widgetFilter, "range")
                 widgetFull = localWidget
@@ -767,13 +767,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
                     widgetDict[cds_used] = {"widgetList":[]}
-                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
-                if widgetFilter is not None:
-                    widgetDictLocal["filter"] = widgetFilter
-                if "index" in optionWidget and optionWidget["index"]:
-                    widgetDict[cds_used]["index"] = widgetDictLocal
-                else:
-                    widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
+                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName, "filter": widgetFilter, "isIndex": optionWidget.get("index", False)}
+                widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
             continue
         if variables[0] == "textQuery":
             optionWidget = {}
@@ -1190,7 +1185,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             index = widgets["index"]
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
-        source = cdsDict[iCds]["cds"]
+        cdsSel = cdsDict[iCds]["cds"]
         histoList = []
         for cdsKey, cdsValue in cdsDict.items():
             if cdsKey not in memoized_columns:
@@ -1198,7 +1193,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
         intersectionFilter = LazyIntersectionFilter(filters=[])
-        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, source, histogramList=histoList,
+        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, cdsSel, histogramList=histoList,
                                     cdsHistoSummary=cdsHistoSummary, index=index)
         columns_change_filters = False
         for iWidget in widgetList:
@@ -1211,6 +1206,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     iWidget["filter"].source = cdsOrig    
                 intersectionFilter.filters.append(iWidget["filter"])
                 iWidget["filter"].js_on_change("change", callback)
+        if cdsSel is not None and len(intersectionFilter.filters)>0:
+            cdsSel.filter = intersectionFilter
         if index is not None:
             index["widget"].js_on_change("value", callback)
         if columns_change_filters:
@@ -1442,7 +1439,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     for i, val in enumerate(optionsPlot):
         mapping[val] = i
     print(len(optionsPlot))
-    filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+    filterLocal = MultiSelectFilter(selected=[optionsPlot[default_value]], field=params[0]+".factor()", how="whitelist", mapping=mapping)
     widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
     newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
