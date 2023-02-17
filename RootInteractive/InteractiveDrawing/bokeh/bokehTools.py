@@ -264,7 +264,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                     bin_centers.append("bin_center_"+str(i))
                     edges_left.append("bin_bottom_"+str(i))
                     edges_right.append("bin_top_"+str(i))
-                    sources.append(histoDict[iHisto]["cdsSel"])
+                    sources.append(histoDict[iHisto]["cdsFull"])
                     compute_quantile.append(False)
 
     quantiles = [*{*quantiles}]
@@ -339,7 +339,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'doDraw': False,
         "legend_field": None,
         "legendTitle": None,
-        'nPointRender': 10000,
         "nbins": 10,
         "range": None,
         "flip_histogram_axes": False,
@@ -378,7 +377,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     widgetArray = []
     widgetDict = {}
 
-    cdsDict = makeCDSDict(sourceArray, paramDict, options={"nPointRender":options["nPointRender"]})
+    cdsDict = makeCDSDict(sourceArray, paramDict, options=options)
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -809,7 +808,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        cdsDict[cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        makeCdsSel(cdsDict, paramDict, cds_name)
+                        cdsDict[cds_name]["cdsSel"].js_on_change('change', CustomJS(code="""
                         const col = this.get_column(field)
                         const isOK = this.get_column("isOK")
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
@@ -1736,10 +1736,6 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
-        if cdsType == "source":
-            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", -1))
-        else:
-            iSource["nPointRender"] = iSource.get("nPointRender", -1)
 
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
@@ -1758,7 +1754,10 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             name_full = cds_name+"_full"
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
-
+        if cdsType == "source":
+            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", -1))
+        else:
+            iSource["nPointRender"] = iSource.get("nPointRender", -1)
         if "tooltips" not in iSource:
             iSource["tooltips"] = []
     return cdsDict
@@ -1875,8 +1874,8 @@ def makeCdsSel(cdsDict, paramDict, key):
     if "cdsSel" in cds_used:
         return cds_used["cdsSel"]
     cds_name = key if key is not None else "default cds"
-    nPoints = cds_used["nPointRender"]
-    if cds_used["nPointRender"] in paramDict:
+    nPoints = cds_used.get("nPointRender",-1)
+    if nPoints in paramDict:
         nPoints = paramDict[cds_used["nPointRender"]]["value"]
     cdsSel = DownsamplerCDS(source=cds_used["cdsFull"], nPoints=nPoints, name=cds_name)
     if cds_used["nPointRender"] in paramDict:
