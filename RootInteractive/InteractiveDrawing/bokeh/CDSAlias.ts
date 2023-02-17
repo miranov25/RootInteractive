@@ -82,9 +82,9 @@ export class CDSAlias extends ColumnarDataSource {
       if(new_column == null){
         throw ReferenceError("Column not defined: "+ key + " in data source " + source.name)
       }
-      else if (!Array.isArray(new_column)){
+      /*else if (!Array.isArray(new_column)){
         data[key] = Array.from(new_column)
-      } else {
+      } */else {
         data[key] = new_column
       }
       cached_columns.add(key)
@@ -103,7 +103,7 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
-        const fields = column.fields.map((x: string) => isNaN(Number(x)) ? this.get_array(x) : Array(len).fill(Number(x)))
+        const fields = column.fields.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column){
             data[key] = new_column
@@ -119,11 +119,11 @@ export class CDSAlias extends ColumnarDataSource {
               new_column[i] = column.transform.compute(row)
             }            
         } else{
-            new_column = []
+            new_column = new Array(len).fill(.0)
             for (let i = 0; i < len; i++) {
                 const row = fields.map((x: any[]) => x[i])
                 // This will likely have very bad performance
-                new_column.push(column.transform.compute(row))
+                new_column[i] = column.transform.compute(row)
             }
             data[key] = new_column
         }
