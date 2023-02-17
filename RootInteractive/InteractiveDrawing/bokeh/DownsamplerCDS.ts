@@ -95,8 +95,8 @@ export class DownsamplerCDS extends ColumnarDataSource {
       const booleans = filter!.v_compute()
       this._downsampled_indices = []
       for(let i=0; i < l; i++){
-        if (booleans[_indices[i]]){
-          this._downsampled_indices.push(_indices[i])
+        if (booleans[i]){
+          this._downsampled_indices.push(i)
         }
       }      
     } else {
@@ -115,10 +115,8 @@ export class DownsamplerCDS extends ColumnarDataSource {
           this._downsampled_indices.push(_indices[i])
         }
       }
+      this._downsampled_indices.sort((a,b)=>a-b)
     }
-
-    this._downsampled_indices.sort((a,b)=>a-b)
-
     const selected_indices: number[] = []
     const original_indices = this.source.selected.indices
     let j=0

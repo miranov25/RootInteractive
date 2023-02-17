@@ -1755,7 +1755,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
         if cdsType == "source":
-            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", -1))
+            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", 1000))
         else:
             iSource["nPointRender"] = iSource.get("nPointRender", -1)
         if "tooltips" not in iSource:
