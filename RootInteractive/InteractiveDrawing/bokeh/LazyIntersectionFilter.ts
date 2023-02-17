@@ -30,6 +30,8 @@ export class LazyIntersectionFilter extends RIFilter {
   counts: number[]
   cached_vector: boolean[]
   old_values: boolean[][]
+  cached_indices: number[]
+  changed_indices: boolean
 
   initialize(){
     super.initialize()
@@ -37,6 +39,7 @@ export class LazyIntersectionFilter extends RIFilter {
     for(let i=0; i<this.filters.length; i++){
         this.changed.add(i)
     }
+    this.changed_indices = true
     this.old_values = []
   }
 
@@ -44,8 +47,14 @@ export class LazyIntersectionFilter extends RIFilter {
     super.connect_signals()
 
     for (let i=0; i<this.filters.length; i++) {
-        this.connect(this.filters[i].change, ()=>this.changed.add(i))
+        this.connect(this.filters[i].change, ()=>this.change_filter(i))
     }
+  }
+
+  change_filter(i: number){
+    this.changed.add(i)
+    this.changed_indices = true
+    this.change.emit()
   }
 
   public v_compute(): boolean[]{
@@ -97,5 +106,23 @@ export class LazyIntersectionFilter extends RIFilter {
     }
     this.cached_vector = new_vector
     return new_vector
+  }
+
+  public get_indices(): number[] {
+    if(!this.changed_indices){
+      return this.cached_indices
+    }
+    const first = 0
+    const isSelected = this.v_compute()
+    const last = isSelected.length
+    const indicesAll = this.cached_indices ?? []
+    indicesAll.length = 0
+    for (let i = first; i < last; i++){
+      if (isSelected[i]){
+          indicesAll.push(i);
+      }
+    }    
+    this.cached_indices = indicesAll
+    return indicesAll
   }
 }

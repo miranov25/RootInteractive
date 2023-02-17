@@ -1,5 +1,6 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
 from bokeh.models import ColumnarDataSource
+from RootInteractive.InteractiveDrawing.bokeh.RIFilter import RIFilter
 
 try:
     from bokeh.core.properties import Nullable
@@ -24,6 +25,7 @@ class HistoNdCDS(ColumnarDataSource):
     # TODO: Support auto nbins in the future - 2n-th root of total entries?
     nbins = List(Int, help="Number of bins")
     if nullable_available:
+        filter = Nullable(Instance(RIFilter))
         range = Nullable(List(Nullable((List(Float)))), help="Ranges in the same order as sample_variables")
         weights = Nullable(String(), default=None)
         histograms = Dict(String, Nullable(Dict(String, Any)), default={}, help="""
@@ -31,6 +33,7 @@ class HistoNdCDS(ColumnarDataSource):
         Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
             """)
     else:
+        filter = Instance(RIFilter)
         range = List(List(Float), help="Ranges in the same order as sample_variables")
         weights = String(default=None)
         histograms = Dict(String, Dict(String, Any), help="""

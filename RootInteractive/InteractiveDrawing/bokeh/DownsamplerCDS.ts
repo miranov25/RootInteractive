@@ -83,7 +83,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
   update(){
     const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
-    if(nPoints < 0 || nPoints >= l){
+    if(filter == null && (nPoints < 0 || nPoints >= l)){
       this._is_trivial = true
       return
     }

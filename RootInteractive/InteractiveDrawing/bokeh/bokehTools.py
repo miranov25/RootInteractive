@@ -62,102 +62,6 @@ RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
-def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
-    options = {
-        "verbose": 0,
-        "histogramList": []
-    }
-    options.update(kwargs)
-
-    code = \
-        """
-    const t0 = performance.now();
-    const size = cdsOrig.length;
-
-    let first = 0;
-    let last = size;
-
-    let indicesAll = [];
-    if(index != null){
-        const widget = index.widget;
-        const widgetType = index.type;
-        const col = index.key && cdsOrig.get_column(index.key);
-        // TODO: Add more widgets for index, not only range slider
-        if(widgetType == "range"){
-            const low = widget.value[0];
-            const high = widget.value[1];
-            for(let i=0; i<size; i++){
-                if(col[i] >= low){
-                    first = i;
-                    break;
-                }
-            }
-            for(let i=first; i<size; i++){
-                if(col[i] >= high){
-                    last = i;
-                    break;
-                }
-            }
-        }
-    }
-    const t1 = performance.now();
-    console.log(`Using index took ${t1 - t0} milliseconds.`);
-    let isSelected;
-    if(widgetList.length === 1){
-        isSelected = widgetList[0].filter.v_compute()
-    } else {
-        isSelected = new Array(size).fill(False);
-        for(let i=first; i<last; ++i){
-            isSelected[i] = true;
-        }    
-        for (const iWidget of widgetList){
-            if(!iWidget.filter.active) continue;
-            const widgetFilter = iWidget.filter.v_compute();
-            const invert = iWidget.filter.invert
-            for(let i=first; i<last; i++){
-                isSelected[i] &= widgetFilter[i] ^ invert;
-            }        
-        }
-    }
-    const t2 = performance.now();
-    console.log(`Filtering took ${t2 - t1} milliseconds.`);
-    const view = options.view;
-    const histogramList = options.histogramList
-    if(histogramList.length != 0){
-        for (let i = first; i < last; i++){
-            if (isSelected[i]){
-                indicesAll.push(i);
-            }
-        }
-        for (const histo of histogramList){
-            histo.view = indicesAll;
-            histo.change_selection();
-        }
-    }
-    const t3 = performance.now();
-    console.log(`Histogramming took ${t3 - t2} milliseconds.`);
-    if(cdsSel != null){
-        console.log(isSelected.reduce((a,b)=>a+b, 0));
-        cdsSel.low = first
-        cdsSel.high = last
-        cdsSel.booleans = isSelected
-        cdsSel.invalidate()
-        console.log(cdsSel._downsampled_indices.length);
-        console.log(cdsSel.nPoints)
-        const t4 = performance.now();
-        console.log(`Updating cds took ${t4 - t3} milliseconds.`);
-    }
-    if(options.cdsHistoSummary !== null){
-        options.cdsHistoSummary.update();
-    }
-    """
-    if options["verbose"] > 0:
-        logging.info("makeJScallback:\n", code)
-    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options, 'index':options["index"]},
-                        code=code)
-    return callback
-
-
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
@@ -1180,9 +1084,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     for iCds, widgets in widgetDict.items():
         widgetList = widgets["widgetList"]
-        index = None
-        if "index" in widgets:
-            index = widgets["index"]
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
         cdsSel = cdsDict[iCds]["cds"]
@@ -1193,25 +1094,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
         intersectionFilter = LazyIntersectionFilter(filters=[])
-        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, cdsSel, histogramList=histoList,
-                                    cdsHistoSummary=cdsHistoSummary, index=index)
-        columns_change_filters = False
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
                 if memoized_columns[iCds][field]["type"] in ["alias", "expr"]:
-                    columns_change_filters = True
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig    
                 intersectionFilter.filters.append(iWidget["filter"])
-                iWidget["filter"].js_on_change("change", callback)
         if cdsSel is not None and len(intersectionFilter.filters)>0:
             cdsSel.filter = intersectionFilter
-        if index is not None:
-            index["widget"].js_on_change("value", callback)
-        if columns_change_filters:
-            cdsDict[iCds]["cdsFull"].js_on_change("change", callback)
+        if len(intersectionFilter.filters)>0:
+            for i in histoList:
+                i.filter = intersectionFilter
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)

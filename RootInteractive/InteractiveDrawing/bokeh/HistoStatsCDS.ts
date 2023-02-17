@@ -57,7 +57,9 @@ export class HistoStatsCDS extends ColumnDataSource {
 
   connect_signals(): void {
     super.connect_signals()
-
+    for(const i of this.sources){
+      this.connect(i.change, ()=>this.update())
+    }
   }
 
   update(): void {
