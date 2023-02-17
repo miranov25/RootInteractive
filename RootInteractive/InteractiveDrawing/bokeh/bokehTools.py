@@ -264,7 +264,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                     bin_centers.append("bin_center_"+str(i))
                     edges_left.append("bin_bottom_"+str(i))
                     edges_right.append("bin_top_"+str(i))
-                    sources.append(histoDict[iHisto]["cds"])
+                    sources.append(histoDict[iHisto]["cdsSel"])
                     compute_quantile.append(False)
 
     quantiles = [*{*quantiles}]
@@ -754,7 +754,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
-            cds_used = cdsDict[cds_name]["cds"]
+            cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
@@ -843,10 +843,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             varY = variables[1][i % lengthY]
             cds_used = None
             if cds_name != "$IGNORE":
-                cds_used = cdsDict[cds_name]["cds"]
+                cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
 
             if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
+                makeCdsSel(cdsDict, paramDict, varY)
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
                     x_label = f"{{{histoHandle['variables'][0]}}}"
@@ -1086,7 +1087,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         widgetList = widgets["widgetList"]
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
-        cdsSel = cdsDict[iCds]["cds"]
+        cdsSel = cdsDict[iCds].get("cdsSel", None)
         histoList = []
         for cdsKey, cdsValue in cdsDict.items():
             if cdsKey not in memoized_columns:
@@ -1112,14 +1113,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
+    return pAll, makeCdsSel(cdsDict, paramDict, cds_name), plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
-    cdsHisto = histoHandle["cds"]
+    cdsHisto = histoHandle["cdsSel"]
 
     tooltips = None
     if "tooltips" in histoHandle:
@@ -1155,7 +1156,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
 
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
-    cdsHisto = histoHandle["cds"]
+    cdsHisto = histoHandle["cdsSel"]
     if 'color' in options:
         colorHisto = options['color']
     tooltips = None
@@ -1735,6 +1736,10 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
         else:
             raise NotImplementedError("Unrecognized CDS type: " + cdsType)
+        if cdsType == "source":
+            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", -1))
+        else:
+            iSource["nPointRender"] = iSource.get("nPointRender", -1)
 
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
@@ -1753,20 +1758,6 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             name_full = cds_name+"_full"
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
-
-        # Add downsampler
-        name_normal = "default source"
-        if cds_name is not None:
-            name_normal = cds_name
-        nPoints = options["nPointRender"]
-        if options["nPointRender"] in paramDict:
-            nPoints = paramDict[options["nPointRender"]]["value"]
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
-        if options["nPointRender"] in paramDict:
-            paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
-                            downsampler.nPoints = this.value | 0
-                            downsampler.update()
-                        """)])
 
         if "tooltips" not in iSource:
             iSource["tooltips"] = []
@@ -1878,3 +1869,20 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
         transform_new.args["options"] = options_new
         transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
         return transform_new
+
+def makeCdsSel(cdsDict, paramDict, key):
+    cds_used = cdsDict[key]
+    if "cdsSel" in cds_used:
+        return cds_used["cdsSel"]
+    cds_name = key if key is not None else "default cds"
+    nPoints = cds_used["nPointRender"]
+    if cds_used["nPointRender"] in paramDict:
+        nPoints = paramDict[cds_used["nPointRender"]]["value"]
+    cdsSel = DownsamplerCDS(source=cds_used["cdsFull"], nPoints=nPoints, name=cds_name)
+    if cds_used["nPointRender"] in paramDict:
+        paramDict[cds_used["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": cdsSel}, code="""
+                        downsampler.nPoints = this.value | 0
+                        downsampler.update()
+                    """)])
+    cds_used["cdsSel"] = cdsSel
+    return cdsSel
