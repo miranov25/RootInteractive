@@ -1754,7 +1754,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             name_full = cds_name+"_full"
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
-        if cdsType == "source":
+        if iSource["type"] == "source":
             iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", 1000))
         else:
             iSource["nPointRender"] = iSource.get("nPointRender", -1)
