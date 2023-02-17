@@ -166,7 +166,16 @@ def test_customJsFunctionBokehDrawArray_v():
             "name": "saxpy",
             "parameters": ["paramX"],
             "fields": ["a", "b"],
-            "v_func": "return a.map((el, idx) => paramX*a[idx]+b[idx])"
+            "v_func": """
+                if($output == null){
+                    $output = new Array(a.length).fill(0.0)
+                }
+                if($output.length != a.length) $output.length = a.length
+                for(let i=0; i<$output.length; i++){
+                    $output[i] = paramX*a[i]+b[i]
+                }
+                return $output
+            """ 
         }
     ]
     output_file("test_AliasBokehDraw_v.html")
