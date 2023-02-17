@@ -168,7 +168,7 @@ def test_customJsFunctionBokehDrawArray_v():
             "fields": ["a", "b"],
             "v_func": """
                 if($output == null){
-                    $output = new Array(a.length).fill(0.0)
+                    $output = new Float64Array(a.length)
                 }
                 if($output.length != a.length) $output.length = a.length
                 for(let i=0; i<$output.length; i++){
@@ -200,3 +200,5 @@ def test_makeColumns():
     print(memoized_columns)
     print(sources)
     print(aliasDict)
+
+test_customJsFunctionBokehDrawArray_v()
