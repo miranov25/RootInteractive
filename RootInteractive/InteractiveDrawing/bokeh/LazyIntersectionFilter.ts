@@ -123,6 +123,7 @@ export class LazyIntersectionFilter extends RIFilter {
       }
     }    
     this.cached_indices = indicesAll
+    this.changed_indices = false
     return indicesAll
   }
 }
