@@ -1,5 +1,6 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace HistogramCDS {
@@ -7,7 +8,7 @@ export namespace HistogramCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnDataSource>
-//    view: p.Property<number[] | null>
+    filter: p.Property<RIFilter | null>
     nbins:        p.Property<number>
     range:    p.Property<number[] | null>
     sample:      p.Property<string>
@@ -31,7 +32,7 @@ export class HistogramCDS extends ColumnarDataSource {
 
     this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable, String, Any})=>({
       source:  [Ref(ColumnDataSource)],
-//      view:         [Nullable(Array(Int)), null],
+      filter:         [Nullable(Ref(RIFilter)), null],
       nbins:        [Number],
       range:    [Nullable(Array(Number))],
       sample:      [String],
@@ -54,6 +55,9 @@ export class HistogramCDS extends ColumnarDataSource {
     this.connect(this.source.change, () => {this.change_selection()})
     this.connect(this.properties.nbins.change, () => {this.change_selection()})
     this.connect(this.properties.range.change, () => {this.change_selection()})
+    if(this.filter != null){
+      this.connect(this.filter.change, () => {this.change_selection()})
+    }
   }
 
   private _transform_origin: number
@@ -228,6 +232,11 @@ export class HistogramCDS extends ColumnarDataSource {
   public change_selection(){
     this._stale_range = true
     this.data = {}
+    if(this.filter != null && this.filter.active){
+      this.view = this.filter.get_indices()
+    } else {
+      this.view = null
+    }
     this.change.emit()
   }
 

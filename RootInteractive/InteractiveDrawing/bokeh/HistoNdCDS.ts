@@ -1,4 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
@@ -6,7 +7,7 @@ export namespace HistoNdCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnarDataSource>
-//    view: p.Property<number[] | null>
+    filter: p.Property<RIFilter | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
     sample_variables:      p.Property<string[]>
@@ -37,7 +38,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
     this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String, Any})=>({
       source:  [Ref(ColumnarDataSource)],
-//      view:         [Nullable(Array(Int)), null], - specifying this as a bokeh property causes a drastic drop in performance
+      filter:         [Nullable(Ref(RIFilter)), null], 
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
@@ -65,6 +66,9 @@ export class HistoNdCDS extends ColumnarDataSource {
       this.invalidate_cached_bins()
       this.change_selection()
     })
+    if(this.filter != null){
+      this.connect(this.filter.change, () => {this.change_selection()})
+    }
   }
 
   public view: number[] | null
@@ -433,6 +437,11 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._sorted_indices = null
     this._unweighted_histogram = null
     this.data = {}
+    if(this.filter != null && this.filter.active){
+      this.view = this.filter.get_indices()
+    } else {
+      this.view = null
+    }
     this.change.emit()
   }
 

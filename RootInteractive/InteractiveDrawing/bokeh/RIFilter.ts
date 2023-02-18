@@ -40,4 +40,9 @@ export class RIFilter extends Model {
   public v_compute(): boolean[]{
     return []
   }
+
+  public get_indices(): number[]{
+    return []
+  }
+
 }

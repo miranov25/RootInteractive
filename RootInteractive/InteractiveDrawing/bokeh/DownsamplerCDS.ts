@@ -1,5 +1,6 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {CDSAlias} from "./CDSAlias"
+import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
 
 export namespace DownsamplerCDS {
@@ -9,6 +10,7 @@ export namespace DownsamplerCDS {
     source: p.Property<CDSAlias>
     nPoints: p.Property<number>
     watched: p.Property<boolean>
+    filter: p.Property<null|RIFilter>
   }
 }
 
@@ -24,14 +26,17 @@ export class DownsamplerCDS extends ColumnarDataSource {
   static __name__ = "DownsamplerCDS"
 
   static init_DownsamplerCDS() {
-    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean, Nullable})=>({
       source:  [Ref(CDSAlias)],
       nPoints:    [ Int, 300 ],
-      watched: [Boolean, true]
+      watched: [Boolean, true],
+      filter: [Nullable(Ref(RIFilter)), null]
     }))
   }
 
   public booleans: number[] | null// This is a hack to avoid expensive validation
+  public low: number
+  public high: number
 
   private _indices: number[]
 
@@ -39,12 +44,20 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   private _needs_update: boolean
 
+  private _is_trivial: boolean
+
+  private _cached_columns: Set<string>
+
   initialize(){
     super.initialize()
     this.booleans = null
     this._indices = []
     this.data = {}
-    this.update()
+    this.low = 0
+    this.high = -1
+    this._needs_update = true
+    this._is_trivial = false
+    this._cached_columns = new Set()
   }
 
   shuffle_indices(){
@@ -63,29 +76,47 @@ export class DownsamplerCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.selected.change, () => this.update_selection())
-    // TODO: Add the use case when source grows in size
     this.connect(this.source.change, () => {this.invalidate()})
+    if(this.filter != null){
+      this.connect(this.filter.change, () => {this.invalidate()})
+    }
     this.connect(this.properties.watched.change, () => {this.toggle_watched()})
   }
 
   update(){
-    const {source, nPoints, selected, booleans, _indices} = this
+    const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
-    if(this._indices.length < l){
-      this.shuffle_indices()
+    if(filter == null && (nPoints < 0 || nPoints >= l)){
+      this._is_trivial = true
+      return
     }
-    // Maybe add different downsampling strategies for small or large nPoints?
-    // This is only efficient if the downsampling isn't too aggressive.
-    this._downsampled_indices = []
-    for(let i=0; i < this._indices.length && this._downsampled_indices.length < nPoints; i++){
-      if (_indices[i]<l && (booleans == null || booleans[_indices[i]])){
-        this._downsampled_indices.push(_indices[i])
+    if(nPoints < 0 || nPoints >= l){
+      this._downsampled_indices = []
+      const booleans = filter!.v_compute()
+      this._downsampled_indices = []
+      for(let i=0; i < l; i++){
+        if (booleans[i]){
+          this._downsampled_indices.push(i)
+        }
+      }      
+    } else {
+      if(this._indices.length < l){
+        this.shuffle_indices()
       }
+      // Maybe add different downsampling strategies for small or large nPoints?
+      // This is only efficient if the downsampling isn't too aggressive.
+      const low = this.low
+      const high = this.high >= 0 && this.high < l ? this.high : l
+      //const booleans = this.booleans
+      const booleans = filter != null ? filter.v_compute() : null
+      this._downsampled_indices = []
+      for(let i=0; i < _indices.length && this._downsampled_indices.length < nPoints; i++){
+        if (_indices[i] <= high && _indices[i] >= low && (booleans == null || booleans[_indices[i]])){
+          this._downsampled_indices.push(_indices[i])
+        }
+      }
+      this._downsampled_indices.sort((a,b)=>a-b)
     }
-
-    this._downsampled_indices.sort((a,b)=>a-b)
-    this.data = {}
-
     const selected_indices: number[] = []
     const original_indices = this.source.selected.indices
     let j=0
@@ -99,13 +130,13 @@ export class DownsamplerCDS extends ColumnarDataSource {
         j++
       }
     }
-//    change.emit()
     selected.indices = selected_indices
     this._needs_update = false
   }
 
 
   update_selection(){
+    if(this._is_trivial) return
     const downsampled_indices = this.data.index
     const selected_indices = this.selected.indices.map((x:number)=>downsampled_indices[x])
     selected_indices.sort((a,b)=>a-b)
@@ -148,15 +179,26 @@ export class DownsamplerCDS extends ColumnarDataSource {
     if(this.watched && this._needs_update){
       this.update()
     }
-    const {data, source, _downsampled_indices} = this
-    if (data[columnName] != undefined){
+    const {data, source, _downsampled_indices, _is_trivial, _cached_columns} = this
+    if(_is_trivial){
+      return source.get_column(columnName) 
+    }
+    if(_cached_columns.has(columnName)){
       return data[columnName]
     }
     const column_orig = source.get_column(columnName)
     if (column_orig == null){
       throw ReferenceError("Invalid column name " + columnName)
     }
-    data[columnName] = _downsampled_indices.map((x: number) => column_orig[x])
+    let new_column = data[columnName] as any[]
+    if(new_column == null){
+      new_column = Array(_downsampled_indices.length)
+    }
+    if(new_column.length < _downsampled_indices.length) new_column.length = _downsampled_indices.length
+    for(let i=0; i<_downsampled_indices.length; i++){
+      new_column[i] = column_orig[_downsampled_indices[i]]
+    }
+    data[columnName] = new_column
     return data[columnName]
   }
 
@@ -164,11 +206,15 @@ export class DownsamplerCDS extends ColumnarDataSource {
     if(this.watched && this._needs_update){
       this.update()
     }
+    if(this._is_trivial){
+      return this.source.get_length()
+    }
     return this._downsampled_indices.length
   }
 
   invalidate(){
     this._needs_update = true
+    this._cached_columns.clear()
     if(this.watched){
       this.change.emit()
     }

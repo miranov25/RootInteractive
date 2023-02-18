@@ -62,100 +62,6 @@ RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
-def makeJScallback(widgetList, cdsOrig, cdsSel, **kwargs):
-    options = {
-        "verbose": 0,
-        "histogramList": []
-    }
-    options.update(kwargs)
-
-    code = \
-        """
-    const t0 = performance.now();
-    const size = cdsOrig.length;
-
-    let first = 0;
-    let last = size;
-
-    let indicesAll = [];
-    if(index != null){
-        const widget = index.widget;
-        const widgetType = index.type;
-        const col = index.key && cdsOrig.get_column(index.key);
-        // TODO: Add more widgets for index, not only range slider
-        if(widgetType == "range"){
-            const low = widget.value[0];
-            const high = widget.value[1];
-            for(let i=0; i<size; i++){
-                if(col[i] >= low){
-                    first = i;
-                    break;
-                }
-            }
-            for(let i=first; i<size; i++){
-                if(col[i] >= high){
-                    last = i;
-                    break;
-                }
-            }
-        }
-    }
-    const t1 = performance.now();
-    console.log(`Using index took ${t1 - t0} milliseconds.`);
-    let isSelected;
-    if(widgetList.length === 1){
-        isSelected = widgetList[0].filter.v_compute()
-    } else {
-        isSelected = new Array(size).fill(False);
-        for(let i=first; i<last; ++i){
-            isSelected[i] = true;
-        }    
-        for (const iWidget of widgetList){
-            if(!iWidget.filter.active) continue;
-            const widgetFilter = iWidget.filter.v_compute();
-            const invert = iWidget.filter.invert
-            for(let i=first; i<last; i++){
-                isSelected[i] &= widgetFilter[i] ^ invert;
-            }        
-        }
-    }
-    const t2 = performance.now();
-    console.log(`Filtering took ${t2 - t1} milliseconds.`);
-    const view = options.view;
-    const histogramList = options.histogramList
-    if(histogramList.length != 0){
-        for (let i = 0; i < size; i++){
-            if (isSelected[i]){
-                indicesAll.push(i);
-            }
-        }
-        for (const histo of histogramList){
-            histo.view = indicesAll;
-            histo.change_selection();
-        }
-    }
-    const t3 = performance.now();
-    console.log(`Histogramming took ${t3 - t2} milliseconds.`);
-    if(cdsSel != null){
-        console.log(isSelected.reduce((a,b)=>a+b, 0));
-        cdsSel.booleans = isSelected
-        cdsSel.invalidate()
-        console.log(cdsSel._downsampled_indices.length);
-        console.log(cdsSel.nPoints)
-        const t4 = performance.now();
-        console.log(`Updating cds took ${t4 - t3} milliseconds.`);
-    }
-    if(options.cdsHistoSummary !== null){
-        options.cdsHistoSummary.update();
-    }
-    """
-    if options["verbose"] > 0:
-        logging.info("makeJScallback:\n", code)
-    callback = CustomJS(args={'widgetList': widgetList, 'cdsOrig': cdsOrig, 'cdsSel': cdsSel, 'options': options, 'index':options["index"]},
-                        code=code)
-    return callback
-
-
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
@@ -358,7 +264,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                     bin_centers.append("bin_center_"+str(i))
                     edges_left.append("bin_bottom_"+str(i))
                     edges_right.append("bin_top_"+str(i))
-                    sources.append(histoDict[iHisto]["cds"])
+                    sources.append(histoDict[iHisto]["cdsFull"])
                     compute_quantile.append(False)
 
     quantiles = [*{*quantiles}]
@@ -433,7 +339,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'doDraw': False,
         "legend_field": None,
         "legendTitle": None,
-        'nPointRender': 10000,
         "nbins": 10,
         "range": None,
         "flip_histogram_axes": False,
@@ -472,7 +377,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     widgetArray = []
     widgetDict = {}
 
-    cdsDict = makeCDSDict(sourceArray, paramDict, options={"nPointRender":options["nPointRender"]})
+    cdsDict = makeCDSDict(sourceArray, paramDict, options=options)
 
     jsFunctionDict = {}
     for i in jsFunctionArray:
@@ -669,7 +574,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetFull = localWidget
             if variables[0] == 'range':
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
-                if optionWidget["callback"] == "selection" and "index" not in optionWidget:
+                if optionWidget["callback"] == "selection":
                     widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
                     localWidget.js_link("value", widgetFilter, "range")
                 widgetFull = localWidget
@@ -765,13 +670,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 cds_used = cds_names[0]
                 if cds_used not in widgetDict:
                     widgetDict[cds_used] = {"widgetList":[]}
-                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName}
-                if widgetFilter is not None:
-                    widgetDictLocal["filter"] = widgetFilter
-                if "index" in optionWidget and optionWidget["index"]:
-                    widgetDict[cds_used]["index"] = widgetDictLocal
-                else:
-                    widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
+                widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName, "filter": widgetFilter, "isIndex": optionWidget.get("index", False)}
+                widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
             continue
         if variables[0] == "textQuery":
             optionWidget = {}
@@ -853,7 +753,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
-            cds_used = cdsDict[cds_name]["cds"]
+            cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
             plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
                                       data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
@@ -908,7 +808,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        cdsDict[cds_name]['cds'].js_on_change('change', CustomJS(code="""
+                        makeCdsSel(cdsDict, paramDict, cds_name)
+                        cdsDict[cds_name]["cdsSel"].js_on_change('change', CustomJS(code="""
                         const col = this.get_column(field)
                         const isOK = this.get_column("isOK")
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
@@ -942,10 +843,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             varY = variables[1][i % lengthY]
             cds_used = None
             if cds_name != "$IGNORE":
-                cds_used = cdsDict[cds_name]["cds"]
+                cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
 
             if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
+                makeCdsSel(cdsDict, paramDict, varY)
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
                     x_label = f"{{{histoHandle['variables'][0]}}}"
@@ -1183,12 +1085,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     for iCds, widgets in widgetDict.items():
         widgetList = widgets["widgetList"]
-        index = None
-        if "index" in widgets:
-            index = widgets["index"]
         cdsOrig = cdsDict[iCds]["cdsOrig"]
         cdsFull = cdsDict[iCds]["cdsFull"]
-        source = cdsDict[iCds]["cds"]
+        cdsSel = cdsDict[iCds].get("cdsSel", None)
         histoList = []
         for cdsKey, cdsValue in cdsDict.items():
             if cdsKey not in memoized_columns:
@@ -1196,36 +1095,32 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
                 histoList.append(cdsValue["cdsOrig"])
         intersectionFilter = LazyIntersectionFilter(filters=[])
-        callback = makeJScallback([{"filter":intersectionFilter}], cdsFull, source, histogramList=histoList,
-                                    cdsHistoSummary=cdsHistoSummary, index=index)
-        columns_change_filters = False
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
                 if memoized_columns[iCds][field]["type"] in ["alias", "expr"]:
-                    columns_change_filters = True
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig    
                 intersectionFilter.filters.append(iWidget["filter"])
-                iWidget["filter"].js_on_change("change", callback)
-        if index is not None:
-            index["widget"].js_on_change("value", callback)
-        if columns_change_filters:
-            cdsDict[iCds]["cdsFull"].js_on_change("change", callback)
+        if cdsSel is not None and len(intersectionFilter.filters)>0:
+            cdsSel.filter = intersectionFilter
+        if len(intersectionFilter.filters)>0:
+            for i in histoList:
+                i.filter = intersectionFilter
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, cdsDict[None]["cds"], plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
+    return pAll, makeCdsSel(cdsDict, paramDict, cds_name), plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
-    cdsHisto = histoHandle["cds"]
+    cdsHisto = histoHandle["cdsSel"]
 
     tooltips = None
     if "tooltips" in histoHandle:
@@ -1261,7 +1156,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
 
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
-    cdsHisto = histoHandle["cds"]
+    cdsHisto = histoHandle["cdsSel"]
     if 'color' in options:
         colorHisto = options['color']
     tooltips = None
@@ -1440,7 +1335,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     for i, val in enumerate(optionsPlot):
         mapping[val] = i
     print(len(optionsPlot))
-    filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
+    filterLocal = MultiSelectFilter(selected=[optionsPlot[default_value]], field=params[0]+".factor()", how="whitelist", mapping=mapping)
     widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
     newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
     return widget_local, filterLocal, newColumn
@@ -1859,21 +1754,10 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             name_full = cds_name+"_full"
         # Add middleware for aliases
         iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
-
-        # Add downsampler
-        name_normal = "default source"
-        if cds_name is not None:
-            name_normal = cds_name
-        nPoints = options["nPointRender"]
-        if options["nPointRender"] in paramDict:
-            nPoints = paramDict[options["nPointRender"]]["value"]
-        iSource["cds"] = DownsamplerCDS(source=iSource["cdsFull"], nPoints=nPoints, name=name_normal)
-        if options["nPointRender"] in paramDict:
-            paramDict[options["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": iSource["cds"]}, code="""
-                            downsampler.nPoints = this.value | 0
-                            downsampler.update()
-                        """)])
-
+        if iSource["type"] == "source":
+            iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", 1000))
+        else:
+            iSource["nPointRender"] = iSource.get("nPointRender", -1)
         if "tooltips" not in iSource:
             iSource["tooltips"] = []
     return cdsDict
@@ -1984,3 +1868,20 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
         transform_new.args["options"] = options_new
         transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
         return transform_new
+
+def makeCdsSel(cdsDict, paramDict, key):
+    cds_used = cdsDict[key]
+    if "cdsSel" in cds_used:
+        return cds_used["cdsSel"]
+    cds_name = key if key is not None else "default cds"
+    nPoints = cds_used.get("nPointRender",-1)
+    if nPoints in paramDict:
+        nPoints = paramDict[cds_used["nPointRender"]]["value"]
+    cdsSel = DownsamplerCDS(source=cds_used["cdsFull"], nPoints=nPoints, name=cds_name)
+    if cds_used["nPointRender"] in paramDict:
+        paramDict[cds_used["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": cdsSel}, code="""
+                        downsampler.nPoints = this.value | 0
+                        downsampler.update()
+                    """)])
+    cds_used["cdsSel"] = cdsSel
+    return cdsSel

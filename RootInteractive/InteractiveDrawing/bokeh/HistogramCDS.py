@@ -1,4 +1,5 @@
 from bokeh.core.properties import Instance, String, Float, Int, List, Dict, Any
+from RootInteractive.InteractiveDrawing.bokeh.RIFilter import RIFilter
 from bokeh.models import ColumnarDataSource
 
 try:
@@ -20,9 +21,9 @@ class HistogramCDS(ColumnarDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
     source = Instance(ColumnarDataSource, help="Source from which to take the data to histogram")
-    view = List(Int)
     sample = String()
     if nullable_available:
+        filter = Nullable(Instance(RIFilter))
         weights = Nullable(String(), default=None)
         range = Nullable(List(Float))
         histograms = Dict(String, Nullable(Dict(String, Any)), default={}, help="""
@@ -30,6 +31,7 @@ class HistogramCDS(ColumnarDataSource):
             Keys are the names of the resulting columns, values are dictionaries with the only option supported being weights, the value of which is the column name with weights.
         """)
     else:
+        filter = Instance(RIFilter)
         weights = String(default=None)
         range = List(Float)
         histograms = Dict(String, Dict(String, Any), help="""
