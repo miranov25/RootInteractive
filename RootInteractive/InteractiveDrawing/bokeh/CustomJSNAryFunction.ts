@@ -26,7 +26,7 @@ export class CustomJSNAryFunction extends Model {
   static init_CustomJSNAryFunction() {
     this.define<CustomJSNAryFunction.Props>(({Array, String})=>({
       parameters:  [p.Instance, {}],
-      fields: [Array(String)],
+      fields: [Array(String), []],
       func:    [ String ],
       v_func:  [String]
     }))
