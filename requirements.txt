@@ -13,6 +13,6 @@ runtime
 requests
 jupyter
 # ---------------------    machine learning dependencies
-sklearn
+scikit-learn
 xgboost
 
