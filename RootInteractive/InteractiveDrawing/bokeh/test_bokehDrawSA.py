@@ -91,7 +91,7 @@ widgetParams=[
     ['slider', ['AA'], {'bins': 10, "toggleable":True, "name": "widgetAA"}],
     ['multiSelect', ["DDC", "A2", "A3", "A4", "A0", "A1"]],
     ['multiSelectBitmask', ["maskAC"], {"mapping": {"A": 2, "C": 1}, "how":"all", "title": "maskAC(all)"}],
-    ['select',["CC", 0, 1, 2, 3], {"default": 1, "toggleable":True}],
+    ['select',["CC", 0, 1, 2, 3], {"default": 1}],
     ['multiSelect',["BoolB"]],
     ['textQuery', {"title": "selection", "name":"selectionText"}],
     #['slider','F', ['@min()','@max()','@med','@min()','@median()+3*#tlm()']], # to be implmneted
@@ -103,7 +103,8 @@ widgetParams=[
     ['spinner', ['nPoints'], {"name": "nPointsRender"}],
     ['select', ['transformX'], {"name": "transformX"}],
     ['select', ['transformY'], {"name": "transformY"}],
-    ['slider', ['paramX'], {"name":"paramX"}]
+    ['slider', ['paramX'], {"name":"paramX"}],
+    ['div', "Test description, insert description here", {"name":"description"}]
 ]
 
 widgetLayoutDesc={
@@ -119,7 +120,8 @@ figureLayoutDesc={
     "B": [
         [3, 4, {'commonX': 1, 'y_visible': 3, 'x_visible':1, 'plot_height': 100}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
-        ]
+        ],
+    "Description": ["description"]
 }
 
 def test_record(record_property: ty.Callable[[str, ty.Any], None]):

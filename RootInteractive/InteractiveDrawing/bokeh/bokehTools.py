@@ -3,6 +3,7 @@ from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
+from bokeh.models.widgets.markups import Div
 from bokeh.models.plots import Plot
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
@@ -509,6 +510,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 optionGroup = options
             continue
+        optionLocal = optionGroup.copy()
+        nvars = len(variables)
+        if isinstance(variables[-1], dict):
+            logging.info("Option %s", variables[-1])
+            optionLocal.update(variables[-1])
+            nvars -= 1
+        if variables[0] == 'div':
+            text_content = variables[-1].get("text", variables[1])
+            widget = Div(text=text_content)
+            plotArray.append(widget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = widget           
+            continue
         if variables[0] == 'table':
             TOptions = {
                 'include': '',
@@ -707,13 +721,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetArray.append(localWidget)
             widgetParams.append(variables)
             continue
-
-        optionLocal = optionGroup.copy()
-        nvars = len(variables)
-        if isinstance(variables[-1], dict):
-            logging.info("Option %s", variables[-1])
-            optionLocal.update(variables[-1])
-            nvars -= 1
 
         x_transform = optionLocal.get("x_transform", None)
         x_transform_parsed, x_transform_customjs = make_transform(x_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
