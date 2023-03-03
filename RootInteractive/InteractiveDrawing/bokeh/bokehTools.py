@@ -3,6 +3,7 @@ from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
 from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
+from bokeh.models.widgets.markups import Div
 from bokeh.models.plots import Plot
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
@@ -509,6 +510,33 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 optionGroup = options
             continue
+        optionLocal = optionGroup.copy()
+        nvars = len(variables)
+        if isinstance(variables[-1], dict):
+            logging.info("Option %s", variables[-1])
+            optionLocal.update(variables[-1])
+            nvars -= 1
+        if variables[0] == 'div':
+            text_content = optionLocal.get("text", variables[1])
+            widget = Div(text=text_content)
+            plotArray.append(widget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = widget           
+            continue
+        if variables[0] == 'descriptionTable':
+            data_source = optionLocal.get("source", None)
+            meta_fields = optionLocal.get("meta_fields", ["AxisTitle", "Description"])
+            if "variables" in optionLocal:
+                used_variables = optionLocal["variables"]
+            else:
+                meta = cdsDict[data_source]["meta"]
+                used_variables = [*{i.split(".")[0] for i in meta.keys()}]
+            text_content = makeDescriptionTable(cdsDict, data_source, used_variables, meta_fields)
+            widget = Div(text=text_content)
+            plotArray.append(widget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = widget           
+            continue
         if variables[0] == 'table':
             TOptions = {
                 'include': '',
@@ -707,13 +735,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetArray.append(localWidget)
             widgetParams.append(variables)
             continue
-
-        optionLocal = optionGroup.copy()
-        nvars = len(variables)
-        if isinstance(variables[-1], dict):
-            logging.info("Option %s", variables[-1])
-            optionLocal.update(variables[-1])
-            nvars -= 1
 
         x_transform = optionLocal.get("x_transform", None)
         x_transform_parsed, x_transform_customjs = make_transform(x_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
@@ -1608,6 +1629,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
         if cds_name in cdsDict:
             raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
         cdsDict[cds_name] = iSource
+        iSource["meta"] = {}
 
         # Detect the type
         if "type" not in iSource:
@@ -1638,6 +1660,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
 
         # Create cdsOrig
         if cdsType == "source":
+            iSource["meta"] = iSource["data"].meta.metaData.copy()
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
@@ -1885,3 +1908,17 @@ def makeCdsSel(cdsDict, paramDict, key):
                     """)])
     cds_used["cdsSel"] = cdsSel
     return cdsSel
+
+def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
+    th = '</td>\n<td>'.join(meta_fields)
+    rows = []
+    for i in fields:
+        current_row = []
+        for j in meta_fields:
+            value = cdsDict[cdsName]["meta"].get(f"{i}.{j}", "")
+            current_row.append(f"<td>{value}</td>")
+        current_row = '\t'.join(current_row)
+        rows.append(f"<tr><th>{i}</th>{current_row}</tr>")
+    rows = '\n'.join(rows)
+    text = f"<table><tr><th></th><td>{th}</td></tr> { rows} </table>"
+    return text
