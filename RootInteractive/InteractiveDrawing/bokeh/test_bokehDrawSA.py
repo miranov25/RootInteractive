@@ -24,6 +24,8 @@ if "ROOT" in sys.modules:
         AddMetadata(tree, "B.AxisTitle", "B (cm/s)")
         AddMetadata(tree, "C.AxisTitle", "B (s)")
         AddMetadata(tree, "D.AxisTitle", "D (a.u.)")
+        AddMetadata(tree, "A.Description", "Lorem ipsum")
+        AddMetadata(tree, "B.Description", "The velocity B")
     except:
         pass
 
@@ -52,7 +54,7 @@ df["EE"]=(df.E*4).round(0)
 df['errY']=df.A*0.02+0.02
 df['maskAC']=2*(df['A']>.5)|1*(df['C']>.5)
 df.head(10)
-df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half", 'E.AxisTitle': "Category"}
+df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'E.AxisTitle': "Category", "A.Description": "The distance A"}
 
 parameterArray = [
     {"name": "colorZ", "value":"A", "options":["A", "B", "EE"]},
@@ -104,7 +106,7 @@ widgetParams=[
     ['select', ['transformX'], {"name": "transformX"}],
     ['select', ['transformY'], {"name": "transformY"}],
     ['slider', ['paramX'], {"name":"paramX"}],
-    ['div', "Test description, insert description here", {"name":"description"}]
+    ['descriptionTable', {"name":"description"}]
 ]
 
 widgetLayoutDesc={
