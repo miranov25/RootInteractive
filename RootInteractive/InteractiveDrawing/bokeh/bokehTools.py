@@ -1920,5 +1920,5 @@ def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
         current_row = '\t'.join(current_row)
         rows.append(f"<tr><th>{i}</th>{current_row}</tr>")
     rows = '\n'.join(rows)
-    text = f"<table><tr><th></th><td>{th}</td></tr> { rows} </table>"
+    text = f"<table><thead><th></th><td>{th}</td></thead> { rows} </table>"
     return text
