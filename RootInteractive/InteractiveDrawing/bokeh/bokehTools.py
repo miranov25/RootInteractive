@@ -378,6 +378,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     widgetArray = []
     widgetDict = {}
 
+    selectionTables = []
+
     cdsDict = makeCDSDict(sourceArray, paramDict, options=options)
 
     jsFunctionDict = {}
@@ -646,8 +648,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 start, end, step = makeSliderParameters(fakeDf, variables[1], **optionWidget)
                 formatter = optionWidget.get("format", "0.[0000]")
                 relativeStep = optionWidget.get("relativeStep", .05)
+                zero_step = False
+                if step == 0:
+                    zero_step = True
+                    step = 1
                 localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
                 localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
+                if zero_step:
+                    localWidgetMin.disabled = True
+                    localWidgetMax.disabled = True
                 if optionWidget["callback"] == "parameter":
                     pass
                 else:
@@ -1130,6 +1139,22 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             for i in histoList:
                 i.filter = intersectionFilter
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
+    if selectionTables:
+        selectionTableData = {"name":[], "type":[], "value": []}
+        widgetNames = []
+        widgetTypes = []
+        widgetValues = []
+        i=0
+        for iCds, widgets in widgetDict.items():
+            widgetList = widgets["widgetList"]
+            for iWidget in widgetList:
+                widgetNames.append(iWidget["name"])
+                if isinstance(iWidget["filter"], RangeFilter):
+                    widgetTypes.append("range")
+                i += 1
+        selectionCDS = ColumnDataSource()
+    for i in selectionTables:
+        selectionTables[i].source = selectionCDS
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
