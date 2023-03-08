@@ -53,6 +53,7 @@ df["DDC"]=((df.D*4).round(0)).astype(int).map(mapDDC)
 df["EE"]=(df.E*4).round(0)
 df['errY']=df.A*0.02+0.02
 df['maskAC']=2*(df['A']>.5)|1*(df['C']>.5)
+df['ones']=1
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'E.AxisTitle': "Category", "A.Description": "The distance A"}
 
@@ -106,11 +107,12 @@ widgetParams=[
     ['select', ['transformX'], {"name": "transformX"}],
     ['select', ['transformY'], {"name": "transformY"}],
     ['slider', ['paramX'], {"name":"paramX"}],
-    ['descriptionTable', {"name":"description"}]
+    ['descriptionTable', {"name":"description"}],
+    ['spinnerRange', ['ones'], {"name":"ones"}]
 ]
 
 widgetLayoutDesc={
-    "Selection": [[0, 1, "widgetC"], [3, 4], ["widgetAA", 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
+    "Selection": [[0, 1, "widgetC"], [3, 4, 'ones'], ["widgetAA", 6],[7,8, "selectionText"], {'sizing_mode': 'scale_width'}],
     "Graphics": [["colorZ", "X", "markerSize"], ["legendFontSize", "legendVisible", "nPointsRender"], ["transformX", "transformY", "paramX"], {'sizing_mode': 'scale_width'}]
     }
 
