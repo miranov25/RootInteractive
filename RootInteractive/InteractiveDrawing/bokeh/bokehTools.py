@@ -663,6 +663,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     pass
                 else:
                     widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
+                    if zero_step:
+                        widgetFilter.active = False
                     localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
                         other.step = this.step = (other.value - this.value) * relative_step
                         filter.range[0] = this.value
