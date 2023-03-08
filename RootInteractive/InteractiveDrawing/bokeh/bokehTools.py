@@ -518,6 +518,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             logging.info("Option %s", variables[-1])
             optionLocal.update(variables[-1])
             nvars -= 1
+        if variables[0] == 'selectionTable':
+            DataTable(columns="")
         if variables[0] == 'div':
             text_content = optionLocal.get("text", variables[1])
             widget = Div(text=text_content)
@@ -1685,7 +1687,10 @@ def makeCDSDict(sourceArray, paramDict, options={}):
 
         # Create cdsOrig
         if cdsType == "source":
-            iSource["meta"] = iSource["data"].meta.metaData.copy()
+            try:
+                iSource["meta"] = iSource["data"].meta.metaData.copy()
+            except AttributeError:
+                iSource["meta"] = {}
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
