@@ -1,5 +1,6 @@
 from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, ColorBar, HoverTool, VBar, HBar, Quad
+from bokeh.models import ColorBar, HoverTool, VBar, HBar, Quad
+from bokeh.models.sources import ColumnDataSource, CDSView
 from bokeh.models.transforms import CustomJSTransform
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
@@ -12,7 +13,7 @@ from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import DataTable, Select, Slider, RangeSlider, MultiSelect, Panel, TableColumn, TextAreaInput, Toggle, Spinner
+from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, Panel, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
@@ -103,7 +104,6 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
         options = {
             'commonX': -1, 'commonY': -1,
             'x_visible': 1, 'y_visible': 1,
-            'plot_width': -1, 'plot_height': -1,
             'sizing_mode': 'scale_width',
             'legend_visible': True
         }
@@ -152,20 +152,16 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
             if optionLocal['y_visible'] == 2:
                 if i > 0: figure.yaxis.visible = False
         if hasattr(figure, 'plot_width'):
-            if optionLocal["plot_width"] > 0:
-                plot_width = int(optionLocal["plot_width"] / nRows)
-                figure.plot_width = plot_width
-            if optionLocal["plot_height"] > 0:
+            if "plot_width" in optionLocal:
+                figure.plot_width = int(optionLocal["plot_width"] / nRows)
+            if "plot_height" in optionLocal:
                 figure.plot_height = optionLocal["plot_height"]
             if figure.legend:
                 figure.legend.visible = optionLocal["legend_visible"]
-        if type(figure).__name__ == "DataTable":
-            figure.height = int(optionLocal["plot_height"])
-        if type(figure).__name__ == "BokehVisJSGraph3D":
-            if optionLocal["plot_width"] > 0:
-                plot_width = int(optionLocal["plot_width"] / nRows)
-                figure.width = plot_width
-            if optionLocal["plot_height"] > 0:
+        else:
+            if "plot_width" in optionLocal:
+                figure.width = int(optionLocal["plot_width"] / nRows)
+            if "plot_height" in optionLocal:
                 figure.height = optionLocal["plot_height"]
         if isinstance(figure, Plot):
             renderers += [i.data_source for i in figure.renderers if isinstance(i.data_source, DownsamplerCDS)]
@@ -519,7 +515,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             optionLocal.update(variables[-1])
             nvars -= 1
         if variables[0] == 'selectionTable':
-            DataTable(columns="")
+            columns = [
+                TableColumn(title="Name", field="name"),
+                TableColumn(title="Field", field="field"),
+                TableColumn(title="Widget type", field="type"),
+                TableColumn(title="Value", field="value"),
+                TableColumn(title="Is active", field="active"),
+            ]
+            widget = DataTable(columns=columns)
+            selectionTables.append(widget)
+            plotArray.append(widget)
+            if "name" in optionLocal:
+                plotDict[optionLocal["name"]] = widget       
+            continue
         if variables[0] == 'div':
             text_content = optionLocal.get("text", variables[1])
             widget = Div(text=text_content)
@@ -663,6 +671,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     pass
                 else:
                     widgetFilter = RangeFilter(range=[start, end], field=variables[1][0], name=variables[1][0])
+                    if zero_step:
+                        widgetFilter.active = False
                     localWidgetMin.js_on_change("value", CustomJS(args={"other":localWidgetMax, "filter": widgetFilter, "relative_step":relativeStep}, code="""
                         other.step = this.step = (other.value - this.value) * relative_step
                         filter.range[0] = this.value
@@ -1142,21 +1152,41 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 i.filter = intersectionFilter
     connectWidgetCallbacks(widgetParams, widgetArray, paramDict, None)
     if selectionTables:
-        selectionTableData = {"name":[], "type":[], "value": []}
         widgetNames = []
+        widgetFields = []
         widgetTypes = []
+        widgetActive = []
         widgetValues = []
         i=0
+        selectionCDS = ColumnDataSource()
         for iCds, widgets in widgetDict.items():
             widgetList = widgets["widgetList"]
             for iWidget in widgetList:
-                widgetNames.append(iWidget["name"])
-                if isinstance(iWidget["filter"], RangeFilter):
+                widgetActive.append(iWidget["filter"].active)
+                widgetNames.append(iWidget.get("name", ""))
+                widgetFields.append(iWidget["filter"].field)
+                iFilter = iWidget["filter"]
+                if isinstance(iFilter, RangeFilter):
                     widgetTypes.append("range")
+                    widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
+                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                        target.patch({"value": [[i, "["+this.range[0]+", "+this.range[1] + "]" ]]},null);
+                    """))
+                elif isinstance(iWidget["filter"], MultiSelectFilter):
+                    widgetTypes.append(f"multiselect ({iFilter.how})")
+                    widgetValues.append(f"{{{', '.join(iFilter.selected)}}}")
+                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                        target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},null);
+                    """))
+                elif isinstance(iWidget["filter"], ColumnFilter):
+                    widgetTypes.append("expression")
+                    widgetValues.append("expr")
                 i += 1
-        selectionCDS = ColumnDataSource()
+        selectionTableData={"type":widgetTypes, "name":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
+        selectionCDS.data = selectionTableData
     for i in selectionTables:
-        selectionTables[i].source = selectionCDS
+        i.source = selectionCDS
+        i.view = CDSView(source=selectionCDS)
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
