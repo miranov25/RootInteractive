@@ -126,7 +126,8 @@ figureLayoutDesc={
         [3, 4, {'commonX': 1, 'y_visible': 3, 'x_visible':1, 'plot_height': 100}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
         ],
-    "Description": [["description", "selection"],{'plot_height': 100, 'sizing_mode': 'scale_width'} ]
+    "Description": [["description"],{'plot_height': 300, 'sizing_mode': 'scale_width'} ],
+    "selectionTable": [["selection"],{'plot_height': 100, 'sizing_mode': 'scale_width'}]
 }
 
 def test_record(record_property: ty.Callable[[str, ty.Any], None]):
@@ -161,5 +162,5 @@ def testBokehDrawArrayQuery(record_property: ty.Callable[[str, ty.Any], None]):
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
     assert (df0.keys() == df.keys()).all()
 
-output_file("test_BokehDrawArrayWidget.html")
-fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")
+# output_file("test_BokehDrawArrayWidget.html")
+# fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", parameterArray=parameterArray, nPointRender="nPoints")

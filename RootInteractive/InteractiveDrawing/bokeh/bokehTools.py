@@ -1171,11 +1171,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
                     iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
                         target.patch({"value": [[i, "["+this.range[0]+", "+this.range[1] + "]" ]]},null);
-                        console.log("patching")
                     """))
                 elif isinstance(iWidget["filter"], MultiSelectFilter):
-                    widgetTypes.append("multiselect")
-                    widgetValues.append(f"{{}}")
+                    widgetTypes.append(f"multiselect ({iFilter.how})")
+                    widgetValues.append(f"{{{', '.join(iFilter.selected)}}}")
+                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                        target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},null);
+                    """))
                 elif isinstance(iWidget["filter"], ColumnFilter):
                     widgetTypes.append("expression")
                     widgetValues.append("expr")
