@@ -1170,7 +1170,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     widgetTypes.append("range")
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
                     iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, "["+this.range[0]+", "+this.range[1] + "]" ]]},null);
+                        target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},null);
                     """))
                 elif isinstance(iWidget["filter"], MultiSelectFilter):
                     widgetTypes.append(f"multiselect ({iFilter.how})")
@@ -1180,7 +1180,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """))
                 elif isinstance(iWidget["filter"], ColumnFilter):
                     widgetTypes.append("expression")
-                    widgetValues.append("expr")
+                    if iFilter.field in aliasDict[iCds]:
+                        widgetValues.append(aliasDict[iCds][iFilter.field]["transform"].func)
+                        aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, this.func ]]},null);
+                        """))
+                    else:
+                        widgetValues.append("true")
                 i += 1
         selectionTableData={"type":widgetTypes, "name":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
         selectionCDS.data = selectionTableData
