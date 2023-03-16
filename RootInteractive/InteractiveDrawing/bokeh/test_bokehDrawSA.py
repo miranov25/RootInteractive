@@ -126,7 +126,7 @@ figureLayoutDesc={
         [3, 4, {'commonX': 1, 'y_visible': 3, 'x_visible':1, 'plot_height': 100}],
         {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
         ],
-    "Description": [["description"],{'plot_height': 300, 'sizing_mode': 'scale_width'} ],
+    "Description": [["description"],{'plot_height': 100, 'sizing_mode': 'scale_width'} ],
     "selectionTable": [["selection"],{'plot_height': 100, 'sizing_mode': 'scale_width'}]
 }
 
