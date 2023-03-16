@@ -516,7 +516,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             nvars -= 1
         if variables[0] == 'selectionTable':
             columns = [
-                TableColumn(title="Name", field="name"),
+                TableColumn(title="Affected source", field="cdsName"),
                 TableColumn(title="Field", field="field"),
                 TableColumn(title="Widget type", field="type"),
                 TableColumn(title="Value", field="value"),
@@ -543,8 +543,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 meta = cdsDict[data_source]["meta"]
                 used_variables = [*{i.split(".")[0] for i in meta.keys()}]
-            text_content = makeDescriptionTable(cdsDict, data_source, used_variables, meta_fields)
-            widget = Div(text=text_content)
+            widget = makeDescriptionTable(cdsDict, data_source, used_variables, meta_fields)
             plotArray.append(widget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
@@ -1163,14 +1162,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetList = widgets["widgetList"]
             for iWidget in widgetList:
                 widgetActive.append(iWidget["filter"].active)
-                widgetNames.append(iWidget.get("name", ""))
+                widgetNames.append(iCds if iCds is not None else "")
                 widgetFields.append(iWidget["filter"].field)
                 iFilter = iWidget["filter"]
                 if isinstance(iFilter, RangeFilter):
                     widgetTypes.append("range")
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
                     iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, "["+this.range[0]+", "+this.range[1] + "]" ]]},null);
+                        target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},null);
                     """))
                 elif isinstance(iWidget["filter"], MultiSelectFilter):
                     widgetTypes.append(f"multiselect ({iFilter.how})")
@@ -1180,9 +1179,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     """))
                 elif isinstance(iWidget["filter"], ColumnFilter):
                     widgetTypes.append("expression")
-                    widgetValues.append("expr")
+                    if iFilter.field in aliasDict[iCds]:
+                        widgetValues.append(aliasDict[iCds][iFilter.field]["transform"].func)
+                        aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, this.func ]]},null);
+                        """))
+                    else:
+                        widgetValues.append("true")
                 i += 1
-        selectionTableData={"type":widgetTypes, "name":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
+        selectionTableData={"type":widgetTypes, "cdsName":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
         selectionCDS.data = selectionTableData
     for i in selectionTables:
         i.source = selectionCDS
@@ -1970,15 +1975,15 @@ def makeCdsSel(cdsDict, paramDict, key):
     return cdsSel
 
 def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
-    th = '</td>\n<td>'.join(meta_fields)
-    rows = []
-    for i in fields:
-        current_row = []
-        for j in meta_fields:
-            value = cdsDict[cdsName]["meta"].get(f"{i}.{j}", "")
-            current_row.append(f"<td>{value}</td>")
-        current_row = '\t'.join(current_row)
-        rows.append(f"<tr><th>{i}</th>{current_row}</tr>")
-    rows = '\n'.join(rows)
-    text = f"<table><thead><th></th><td>{th}</td></thead> { rows} </table>"
-    return text
+    cds = ColumnDataSource()
+    new_dict = {}
+    columns = []
+    for i in meta_fields:
+        column = []
+        for j in fields:
+            value = cdsDict[cdsName]["meta"].get(f"{j}.{i}", "")
+            column.append(value)
+        new_dict[i] = column
+        columns.append(TableColumn(field=i, title=i))
+    cds.data = new_dict
+    return DataTable(source=cds, columns=columns)
