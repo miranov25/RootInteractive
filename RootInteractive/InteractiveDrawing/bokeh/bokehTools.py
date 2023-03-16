@@ -516,7 +516,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             nvars -= 1
         if variables[0] == 'selectionTable':
             columns = [
-                TableColumn(title="Name", field="name"),
+                TableColumn(title="Affected source", field="cdsName"),
                 TableColumn(title="Field", field="field"),
                 TableColumn(title="Widget type", field="type"),
                 TableColumn(title="Value", field="value"),
@@ -1163,7 +1163,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetList = widgets["widgetList"]
             for iWidget in widgetList:
                 widgetActive.append(iWidget["filter"].active)
-                widgetNames.append(iWidget.get("name", ""))
+                widgetNames.append(iCds if iCds is not None else "")
                 widgetFields.append(iWidget["filter"].field)
                 iFilter = iWidget["filter"]
                 if isinstance(iFilter, RangeFilter):
@@ -1188,7 +1188,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         widgetValues.append("true")
                 i += 1
-        selectionTableData={"type":widgetTypes, "name":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
+        selectionTableData={"type":widgetTypes, "cdsName":widgetNames, "field":widgetFields, "value":widgetValues, "active":widgetActive}
         selectionCDS.data = selectionTableData
     for i in selectionTables:
         i.source = selectionCDS
