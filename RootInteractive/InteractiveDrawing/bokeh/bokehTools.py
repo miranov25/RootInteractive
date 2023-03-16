@@ -543,8 +543,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 meta = cdsDict[data_source]["meta"]
                 used_variables = [*{i.split(".")[0] for i in meta.keys()}]
-            text_content = makeDescriptionTable(cdsDict, data_source, used_variables, meta_fields)
-            widget = Div(text=text_content)
+            widget = makeDescriptionTable(cdsDict, data_source, used_variables, meta_fields)
             plotArray.append(widget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
@@ -1976,15 +1975,15 @@ def makeCdsSel(cdsDict, paramDict, key):
     return cdsSel
 
 def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
-    th = '</td>\n<td>'.join(meta_fields)
-    rows = []
-    for i in fields:
-        current_row = []
-        for j in meta_fields:
-            value = cdsDict[cdsName]["meta"].get(f"{i}.{j}", "")
-            current_row.append(f"<td>{value}</td>")
-        current_row = '\t'.join(current_row)
-        rows.append(f"<tr><th>{i}</th>{current_row}</tr>")
-    rows = '\n'.join(rows)
-    text = f"<table><thead><th></th><td>{th}</td></thead> { rows} </table>"
-    return text
+    cds = ColumnDataSource()
+    new_dict = {}
+    columns = []
+    for i in meta_fields:
+        column = []
+        for j in fields:
+            value = cdsDict[cdsName]["meta"].get(f"{j}.{i}", "")
+            column.append(value)
+        new_dict[i] = column
+        columns.append(TableColumn(field=i, title=i))
+    cds.data = new_dict
+    return DataTable(source=cds, columns=columns)
