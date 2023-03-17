@@ -1978,6 +1978,10 @@ def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
     cds = ColumnDataSource()
     new_dict = {}
     columns = []
+    new_dict["name"] = [] 
+    for j in fields:
+        new_dict["name"].append(str(j))
+    columns.append(TableColumn(field="name", title="name"))
     for i in meta_fields:
         column = []
         for j in fields:
