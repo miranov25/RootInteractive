@@ -123,12 +123,12 @@ def getDefaultVarsDiff():
         [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
         # histoXYZ
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["quantile_0"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
+        [["bin_center_0"], ["bin_count"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         # histoXYNormZ
         [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
-        [["bin_center_0"], ["quantile_0"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
+        [["bin_center_0"], ["bin_count"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         # histoXYNormZMedian
@@ -138,6 +138,8 @@ def getDefaultVarsDiff():
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZData_2"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZNormData_2"}],
         #
+        ['descriptionTable', {"name":"description"}],
+        ['selectionTable', {"name":"selection"}],
         figureGlobalOption
     ]
     figureLayoutDesc={
@@ -148,6 +150,8 @@ def getDefaultVarsDiff():
         "histoXYNormZMedian":[[16,17],{"plot_height":350}],
         "histoXYNormZMean":[[18,19],{"plot_height":350}],
     }
+    figureLayoutDesc["selection"] = ["selection", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["description"] = ["description", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -273,12 +277,12 @@ def getDefaultVarsRatio():
         [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
         # histoXYZ
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["quantile_0"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
+        [["bin_center_0"], ["bin_count"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         # histoXYNormZ
         [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
-        [["bin_center_0"], ["quantile_0"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
+        [["bin_center_0"], ["bin_count"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
         # histoXYNormZMedian
@@ -288,6 +292,8 @@ def getDefaultVarsRatio():
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZData_2"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZNormData_2"}],
         #
+        ['descriptionTable', {"name":"description"}],
+        ['selectionTable', {"name":"selection"}],
         figureGlobalOption
     ]
     figureLayoutDesc={
@@ -298,6 +304,9 @@ def getDefaultVarsRatio():
         "histoXYNormZMedian":[[16,17],{"plot_height":350}],
         "histoXYNormZMean":[[18,19],{"plot_height":350}],
     }
+
+    figureLayoutDesc["selection"] = ["selection", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["description"] = ["description", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
