@@ -50,22 +50,23 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     allRF = np.zeros((len(rf.estimators_), X.shape[0]))
     lock = threading.Lock()
     statOut={}
-    Parallel(n_jobs=n_jobs, verbose=rf.verbose,**_joblib_parallel_args(require="sharedmem"),)(
+    Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
             delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
             for col,e in enumerate(rf.estimators_)
     )
     #
-    if "median" in statDictionary: statOut["median"]=np.median(allRF, 0)
-    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRF, 0)
-    if "std"  in statDictionary: statOut["std"]=np.std(allRF, 0)
+    allRFTranspose = allRF.T
+    if "median" in statDictionary: statOut["median"]=np.median(allRFTranspose, 1)
+    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, 1)
+    if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, 1)
     if "quantile" in   statDictionary:
-        statOut["quantiles"]={}
-        for quant in statDictionary["quantile"]:
-            statOut["quantiles"][quant]=np.quantile(allRF,quant,axis=0)
+        statOut["quantile"]={}
+        for quant in statDictionary["quantil"]:
+            statOut["quantile"][quant]=np.quantile(allRF,quant,axis=1)
     if "trim_mean" in   statDictionary:
         statOut["trim_mean"]={}
         for quant in statDictionary["trim_mean"]:
-            statOut["trim_mean"][quant]=stats.trim_mean(allRF,quant,axis=0)
+            statOut["trim_mean"][quant]=stats.trim_mean(allRF,quant,axis=1)
     return statOut
 def predictRFStatNew(rf, X, statDictionary,n_jobs):
     """
