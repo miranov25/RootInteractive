@@ -55,13 +55,13 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
             for col,e in enumerate(rf.estimators_)
     )
     #
-    allRFTranspose = allRF.T.ascontiguousarray()
+    allRFTranspose = allRF.T.copy(order='C')
     if "median" in statDictionary: statOut["median"]=np.median(allRFTranspose, 1)
     if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, 1)
     if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, 1)
     if "quantile" in   statDictionary:
         statOut["quantile"]={}
-        for quant in statDictionary["quantil"]:
+        for quant in statDictionary["quantile"]:
             statOut["quantile"][quant]=np.quantile(allRF,quant,axis=1)
     if "trim_mean" in   statDictionary:
         statOut["trim_mean"]={}
