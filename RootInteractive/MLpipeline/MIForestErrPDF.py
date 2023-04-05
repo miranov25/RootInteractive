@@ -55,7 +55,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
             for col,e in enumerate(rf.estimators_)
     )
     #
-    allRFTranspose = allRF.T
+    allRFTranspose = allRF.T.ascontiguousarray()
     if "median" in statDictionary: statOut["median"]=np.median(allRFTranspose, 1)
     if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, 1)
     if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, 1)
