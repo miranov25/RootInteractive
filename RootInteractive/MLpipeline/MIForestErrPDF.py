@@ -68,7 +68,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
         Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
                 delayed(partitionBlock)(allRFTranspose, nEstimators // 2, first, last)
                 for first, last in zip(block_begin, block_end)
-
+                )
         statOut["median"]= allRFTranspose[:,nEstimators//2]
     if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, -1)
     if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, -1)
