@@ -58,7 +58,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     #
     allRFTranspose = allRF.T.copy(order='C')
     if "median" in statDictionary:
-        allRFTranspose = allRFTranspose.partition(nEstimators//2, -1)
+        allRFTranspose.partition(nEstimators//2, -1)
         statOut["median"]= allRFTranspose[:,nEstimators//2]
     if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, -1)
     if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, -1)
