@@ -47,7 +47,8 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     :param n_jobs:              number of parallel jobs for prediction
     :return:                    dictionary with requested output statistics
     """
-    allRF = np.zeros((len(rf.estimators_), X.shape[0]))
+    nEstimators = len(rf.estimators_)
+    allRF = np.zeros((nEstimators, X.shape[0]))
     lock = threading.Lock()
     statOut={}
     Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
@@ -56,9 +57,11 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     )
     #
     allRFTranspose = allRF.T.copy(order='C')
-    if "median" in statDictionary: statOut["median"]=np.median(allRFTranspose, 1)
-    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, 1)
-    if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, 1)
+    if "median" in statDictionary:
+        allRFTranspose = allRFTranspose.partition(nEstimators//2, -1)
+        statOut["median"]= allRFTranspose[:,nEstimators//2]
+    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, -1)
+    if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, -1)
     if "quantile" in   statDictionary:
         statOut["quantile"]={}
         for quant in statDictionary["quantile"]:
