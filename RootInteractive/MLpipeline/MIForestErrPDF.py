@@ -62,7 +62,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     allRFTranspose = allRF.T.copy(order='C')
     if "median" in statDictionary:
         blockSize = X.shape[0] // n_jobs + 1
-        block_begin = arange(0, X.shape[0], blockSize)
+        block_begin = list(range(0, X.shape[0], blockSize))
         block_end = block_begin[1:]
         block_end.append(X.shape[0])
         Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
