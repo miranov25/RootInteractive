@@ -7,3 +7,6 @@ pytest-regressions
 pytest-datadir
 pytest-parallel
 jq
+pyparsing
+#
+uproot
