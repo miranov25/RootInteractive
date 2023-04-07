@@ -359,11 +359,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     if sourceArray is not None:
         sourceArray = histogramArray + sourceArray
-    
     else:
         sourceArray = histogramArray
 
-    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"]}] + sourceArray
+    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"], "meta":options.get("meta", None)}] + sourceArray
 
     paramDict = {}
     for param in parameterArray:
@@ -1691,7 +1690,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
         if cds_name in cdsDict:
             raise ValueError("Column data source IDs must be unique. Multiple data sources with name: "+ str(cds_name)+ " detected.")
         cdsDict[cds_name] = iSource
-        iSource["meta"] = {}
+        iSource["meta"] = iSource.get("meta", None)
 
         # Detect the type
         if "type" not in iSource:
@@ -1722,10 +1721,11 @@ def makeCDSDict(sourceArray, paramDict, options={}):
 
         # Create cdsOrig
         if cdsType == "source":
-            try:
-                iSource["meta"] = iSource["data"].meta.metaData.copy()
-            except AttributeError:
-                iSource["meta"] = {}
+            if iSource["meta"] is None:
+                try:
+                    iSource["meta"] = iSource["data"].meta.metaData.copy()
+                except AttributeError:
+                    iSource["meta"] = {}
             if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
                 iSource["cdsOrig"] = CDSCompress(name=name_orig)
             else:
