@@ -40,6 +40,12 @@ def _accumulate_predictionNL(predict, X, out,col):
 def partitionBlock(allRF, k, begin, end):
     allRF[begin:end].partition(k)
 
+def blockMean(allRF, out, begin, end):
+    np.mean(allRF[begin:end], -1, out=out[begin:end])
+
+def blockStd(allRF, out, begin, end):
+    np.std(allRF[begin:end], -1, out=out[begin:end])
+
 def predictRFStat(rf, X, statDictionary,n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
@@ -60,18 +66,30 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
     )
     #
     allRFTranspose = allRF.T.copy(order='C')
+    blockSize = X.shape[0] // n_jobs + 1
+    block_begin = list(range(0, X.shape[0], blockSize))
+    block_end = block_begin[1:]
+    block_end.append(X.shape[0])
     if "median" in statDictionary:
-        blockSize = X.shape[0] // n_jobs + 1
-        block_begin = list(range(0, X.shape[0], blockSize))
-        block_end = block_begin[1:]
-        block_end.append(X.shape[0])
         Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
                 delayed(partitionBlock)(allRFTranspose, nEstimators // 2, first, last)
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["median"]= allRFTranspose[:,nEstimators//2]
-    if "mean"  in statDictionary: statOut["mean"]=np.mean(allRFTranspose, -1)
-    if "std"  in statDictionary: statOut["std"]=np.std(allRFTranspose, -1)
+    if "mean"  in statDictionary:
+        mean_out = np.empty(X.shape[0])
+        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+                delayed(blockMean)(allRFTranspose, mean_out, first, last)
+                for first, last in zip(block_begin, block_end)
+                )
+        statOut["mean"]=mean_out
+    if "std"  in statDictionary: 
+        std_out = np.empty(X.shape[0])
+        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+                delayed(blockStd)(allRFTranspose, std_out, first, last)
+                for first, last in zip(block_begin, block_end)
+                )
+        statOut["std"]=std_out
     if "quantile" in   statDictionary:
         statOut["quantile"]={}
         for quant in statDictionary["quantile"]:
