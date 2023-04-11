@@ -60,7 +60,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     :return:                    dictionary with requested output statistics
     """
     nEstimators = len(rf.estimators_)
-    allRF = np.zeros((nEstimators, X.shape[0]))
+    allRF = np.empty((nEstimators, X.shape[0]))
     statOut={}
     Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
             delayed(simple_predict)(e.predict, X, allRF, col)
@@ -107,7 +107,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
             statOut["trim_mean"][quant]=stats.trim_mean(allRFTranspose,quant,axis=1)
     return statOut
 
-def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=100000):
+def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
