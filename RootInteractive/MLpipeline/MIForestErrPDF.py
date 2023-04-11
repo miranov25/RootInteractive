@@ -105,7 +105,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
             statOut["trim_mean"][quant]=stats.trim_mean(allRFTranspose,quant,axis=1)
     return statOut
 
-def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=-1):
+def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=100000):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
