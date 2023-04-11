@@ -37,6 +37,9 @@ def _accumulate_predictionNL(predict, X, out,col):
     prediction = predict(X, check_input=False)
     out[col] += prediction
 
+def simple_predict(predict, X, out, col):
+    out[col] = predict(X, check_input=False)
+
 def partitionBlock(allRF, k, begin, end):
     allRF[begin:end].partition(k)
 
@@ -58,10 +61,9 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     """
     nEstimators = len(rf.estimators_)
     allRF = np.zeros((nEstimators, X.shape[0]))
-    lock = threading.Lock()
     statOut={}
     Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
-            delayed(_accumulate_prediction)(e.predict, X, allRF, col,lock)
+            delayed(simple_predict)(e.predict, X, allRF, col)
             for col,e in enumerate(rf.estimators_)
     )
     #
