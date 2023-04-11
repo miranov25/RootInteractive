@@ -46,7 +46,7 @@ def blockMean(allRF, out, begin, end):
 def blockStd(allRF, out, begin, end):
     np.std(allRF[begin:end], -1, out=out[begin:end])
 
-def predictRFStat(rf, X, statDictionary,n_jobs):
+def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
@@ -90,15 +90,46 @@ def predictRFStat(rf, X, statDictionary,n_jobs):
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["std"]=std_out
-    if "quantile" in   statDictionary:
+    if "quantile" in statDictionary:
         statOut["quantile"]={}
-        for quant in statDictionary["quantile"]:
-            statOut["quantile"][quant]=np.quantile(allRF,quant,axis=1)
+        quantiles = np.array(statDictionary["quantile"]) * nEstimators
+        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+            delayed(partitionBlock)(allRFTranspose, quantiles, first, last)
+            for first, last in zip(block_begin, block_end)
+        )
+        for iQuant, quant in enumerate(statDictionary["quantile"]):
+            statOut["quantile"][quant]=allRFTranspose[:,quantiles[iQuant]]
     if "trim_mean" in   statDictionary:
         statOut["trim_mean"]={}
         for quant in statDictionary["trim_mean"]:
-            statOut["trim_mean"][quant]=stats.trim_mean(allRF,quant,axis=1)
+            statOut["trim_mean"][quant]=stats.trim_mean(allRFTranspose,quant,axis=1)
     return statOut
+
+def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=-1):
+    """
+    inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
+    predict statistics from random forest
+    :param rf:                  random forest object
+    :param X:                   input vector
+    :param statDictionary:      dictionary of statistics to predict
+    :param n_jobs:              number of parallel jobs for prediction
+    :return:                    dictionary with requested output statistics
+    """
+    if(max_rows < 0):
+        return predictRFStatChunk(rf, X, statDictionary, n_jobs)
+    block_begin = list(range(0, X.shape[0], max_rows))
+    block_end = block_begin[1:]
+    block_end.append(X.shape[0])    
+    answers = []
+    for (a,b) in zip(block_begin, block_end):
+        answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, n_jobs))
+    if not answers:
+        return {}
+    merged = {}
+    for key in answers[0].keys:
+        merged[key] = np.concatenate([i[key] for i in answers])
+    return merged
+
 def predictRFStatNew(rf, X, statDictionary,n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
