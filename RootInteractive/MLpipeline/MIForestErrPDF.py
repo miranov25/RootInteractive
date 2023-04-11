@@ -126,7 +126,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=100000):
     if not answers:
         return {}
     merged = {}
-    for key in answers[0].keys:
+    for key in answers[0].keys():
         merged[key] = np.concatenate([i[key] for i in answers])
     return merged
 
