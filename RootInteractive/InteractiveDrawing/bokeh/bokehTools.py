@@ -1388,7 +1388,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
         else:
             dfCategorical = df[params[0]]
-        codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+        codes, optionsPlot = pd.factorize(dfCategorical, sort=True)
         optionsPlot = optionsPlot.dropna().to_list()
     optionsPlot = [str(i) for i in optionsPlot]
     default_value = 0
@@ -1432,7 +1432,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
     else:
         dfCategorical = df[params[0]]
-    codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+    codes, optionsPlot = pd.factorize(dfCategorical, sort=True)
     optionsPlot = optionsPlot.to_list()
     for i, val in enumerate(optionsPlot):
         optionsPlot[i] = str(val)
