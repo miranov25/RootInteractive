@@ -37,13 +37,6 @@ def _accumulate_predictionNL(predict, X, out,col):
     prediction = predict(X, check_input=False)
     out[col] += prediction
 
-def _predict_accumulate_square(predict, X, out, outSq, lock):
-    prediction = predict(X, check_input=False)
-    predictionSq = prediction*prediction
-    with lock:
-        out += prediction
-        outSq += predictionSq
-
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
 
