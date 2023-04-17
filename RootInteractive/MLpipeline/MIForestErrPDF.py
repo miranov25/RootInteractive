@@ -37,8 +37,34 @@ def _accumulate_predictionNL(predict, X, out,col):
     prediction = predict(X, check_input=False)
     out[col] += prediction
 
+def _predict_accumulate_square(predict, X, out, outSq, lock):
+    prediction = predict(X, check_input=False)
+    predictionSq = prediction*prediction
+    with lock:
+        out += prediction
+        outSq += predictionSq
+
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
+
+def predictRFStatTrivial(rf, X, statDictionary, n_jobs):
+    nEstimators = len(rf.estimators_)
+    rfSum = np.zeros(X.shape[0])
+    rfSumSq = np.zeros(X.shape[0])
+    statOut = {}
+    lock = threading.Lock()
+    Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+            delayed(_predict_accumulate_square)(e.predict, X, rfSum, rfSumSq, lock) for e in rf.estimators_
+            )
+    rfSum /= nEstimators
+    if "mean" in statDictionary:
+        statOut["mean"] = rfSum
+    if "std" in statDictionary:
+        # Somehow apply stream fusion?
+        rfSumSq /= nEstimators
+        rfSumSq -= rfSum*rfSum
+        statOut["std"] = np.sqrt(rfSumSq) 
+    return statOut
 
 def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     """
@@ -79,7 +105,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     if "std"  in statDictionary: 
         std_out = np.empty(X.shape[0])
         Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-                delayed(blockStd)(allRFTranspose[first:last], -1, out=std_out[first:last])
+                delayed(np.std)(allRFTranspose[first:last], -1, out=std_out[first:last])
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["std"]=std_out
@@ -110,6 +136,12 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     """
     if(max_rows < 0):
         return predictRFStatChunk(rf, X, statDictionary, n_jobs)
+    is_trivial = True
+    for key in statDictionary.keys():
+        if key not in ["mean", "std"]:
+            is_trivial = False
+    if is_trivial:
+        return predictRFStatTrivial(rf, X, statDictionary, n_jobs)
     block_begin = list(range(0, X.shape[0], max_rows))
     block_end = block_begin[1:]
     block_end.append(X.shape[0])    
