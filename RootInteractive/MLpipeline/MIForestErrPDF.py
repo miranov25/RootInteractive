@@ -66,7 +66,7 @@ def predictRFStatTrivial(rf, X, statDictionary, n_jobs):
         statOut["std"] = np.sqrt(rfSumSq) 
     return statOut
 
-def predictRFStatChunk(rf, X, statDictionary, parallel):
+def predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
@@ -132,11 +132,12 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     :param X:                   input vector
     :param statDictionary:      dictionary of statistics to predict
     :param n_jobs:              number of parallel jobs for prediction
+    :param max_rows:
     :return:                    dictionary with requested output statistics
     """
     if(max_rows < 0):
        with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
-           return predictRFStatChunk(rf, X, statDictionary, parallel)
+           return predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs)
     is_trivial = True
     for key in statDictionary.keys():
         if key not in ["mean", "std"]:
@@ -149,7 +150,7 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     answers = []
     with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
         for (a,b) in zip(block_begin, block_end):
-             answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, parallel))
+             answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, parallel, n_jobs))
     if not answers:
         return {}
     merged = {}
