@@ -66,7 +66,7 @@ def predictRFStatTrivial(rf, X, statDictionary, n_jobs):
         statOut["std"] = np.sqrt(rfSumSq) 
     return statOut
 
-def predictRFStatChunk(rf, X, statDictionary,n_jobs):
+def predictRFStatChunk(rf, X, statDictionary, parallel):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
@@ -79,7 +79,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     nEstimators = len(rf.estimators_)
     allRF = np.empty((nEstimators, X.shape[0]))
     statOut={}
-    Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
+    parallel(
             delayed(simple_predict)(e.predict, X, allRF, col)
             for col,e in enumerate(rf.estimators_)
     )
@@ -90,21 +90,21 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     block_end = block_begin[1:]
     block_end.append(X.shape[0])
     if "median" in statDictionary:
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+        parallel(
                 delayed(allRF[first:last].partition)(nEstimators // 2)
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["median"]= allRFTranspose[:,nEstimators//2]
     if "mean"  in statDictionary:
         mean_out = np.empty(X.shape[0])
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+        parallel(
                 delayed(np.mean)(allRFTranspose[first:last], -1, out=mean_out[first:last])
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["mean"]=mean_out
     if "std"  in statDictionary: 
         std_out = np.empty(X.shape[0])
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+        parallel(
                 delayed(np.std)(allRFTranspose[first:last], -1, out=std_out[first:last])
                 for first, last in zip(block_begin, block_end)
                 )
@@ -112,7 +112,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     if "quantile" in statDictionary:
         statOut["quantile"]={}
         quantiles = np.array(statDictionary["quantile"]) * nEstimators
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
+        parallel(
                 delayed(allRF[first:last].partition)(quantiles)
             for first, last in zip(block_begin, block_end)
         )
@@ -135,7 +135,8 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     :return:                    dictionary with requested output statistics
     """
     if(max_rows < 0):
-        return predictRFStatChunk(rf, X, statDictionary, n_jobs)
+       with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
+           return predictRFStatChunk(rf, X, statDictionary, parallel)
     is_trivial = True
     for key in statDictionary.keys():
         if key not in ["mean", "std"]:
@@ -146,8 +147,9 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     block_end = block_begin[1:]
     block_end.append(X.shape[0])    
     answers = []
-    for (a,b) in zip(block_begin, block_end):
-        answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, n_jobs))
+    with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
+        for (a,b) in zip(block_begin, block_end):
+             answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, parallel))
     if not answers:
         return {}
     merged = {}
