@@ -47,25 +47,6 @@ def _predict_accumulate_square(predict, X, out, outSq, lock):
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
 
-def predictRFStatTrivial(rf, X, statDictionary, n_jobs):
-    nEstimators = len(rf.estimators_)
-    rfSum = np.zeros(X.shape[0])
-    rfSumSq = np.zeros(X.shape[0])
-    statOut = {}
-    lock = threading.Lock()
-    Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-            delayed(_predict_accumulate_square)(e.predict, X, rfSum, rfSumSq, lock) for e in rf.estimators_
-            )
-    rfSum /= nEstimators
-    if "mean" in statDictionary:
-        statOut["mean"] = rfSum
-    if "std" in statDictionary:
-        # Somehow apply stream fusion?
-        rfSumSq /= nEstimators
-        rfSumSq -= rfSum*rfSum
-        statOut["std"] = np.sqrt(rfSumSq) 
-    return statOut
-
 def predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
@@ -138,12 +119,6 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     if(max_rows < 0):
        with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
            return predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs)
-    is_trivial = True
-    for key in statDictionary.keys():
-        if key not in ["mean", "std"]:
-            is_trivial = False
-    if is_trivial:
-        return predictRFStatTrivial(rf, X, statDictionary, n_jobs)
     block_begin = list(range(0, X.shape[0], max_rows))
     block_end = block_begin[1:]
     block_end.append(X.shape[0])    
