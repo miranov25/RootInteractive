@@ -10,10 +10,14 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="PWGPP-517,PWGPP-534 -interactive histograms and projections">
+    <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="adding new development package">
       <change beforePath="$PROJECT_DIR$/.idea/RootInteractive.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RootInteractive.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveTemplate.py" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveTemplate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RootInteractive/Tools/RDataFrame/test_RDataFrame_Array.py" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/Tools/RDataFrame/test_RDataFrame_Array.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/bokehTreeDrawSA.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/bokehTreeDrawSA.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/standAlone.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/standAlone.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,19 +43,12 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.cidr.known.project.marker" value="true" />
-    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="cf.first.check.clang-format" value="false" />
-    <property name="cidr.known.project.marker" value="true" />
-    <property name="node.js.detected.package.eslint" value="true" />
-    <property name="node.js.detected.package.tslint" value="true" />
-    <property name="node.js.path.for.package.eslint" value="project" />
-    <property name="node.js.selected.package.eslint" value="(autodetect)" />
-    <property name="node.js.selected.package.tslint" value="(autodetect)" />
-    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
-  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  }
+}</component>
   <component name="RunManager">
     <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
@@ -158,7 +155,28 @@
       <option name="project" value="LOCAL" />
       <updated>1562247646783</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Adding selection and description table to template">
+      <created>1679128707889</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1679128707889</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Adding selection and description table to template + use statistics">
+      <created>1679321460813</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1679321460813</updated>
+    </task>
+    <task id="LOCAL-00007" summary="adding new development package">
+      <created>1680873874140</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1680873874140</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -190,7 +208,10 @@
     <MESSAGE value="PWGPP-517,PWGPP-534 -interactive histograms and projections&#10;NOT WORKING YET" />
     <MESSAGE value="PWGPP-517,PWGPP-534 -interactive histograms and projections" />
     <MESSAGE value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
-    <option name="LAST_COMMIT_MESSAGE" value="PWGPP-517,PWGPP-534 - projection string parsing and adding ToyMC tp Tools/BetheBloch" />
+    <MESSAGE value="Adding selection and description table to template" />
+    <MESSAGE value="Adding selection and description table to template + use statistics" />
+    <MESSAGE value="adding new development package" />
+    <option name="LAST_COMMIT_MESSAGE" value="adding new development package" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
