@@ -28,7 +28,6 @@ function chol(X: number[], nRows: number){
 	X[k+jRow] -= pivotRow*X[i+kRow]
 	kRow += k+1
       }
-      kRow = jRow+j+1
       for(let k=j+1; k<nRows; ++k) {
 	X[j+kRow] -= pivotRow*X[i+kRow]
 	kRow += k+1
@@ -80,11 +79,11 @@ export class ClientLinearFitter extends Model {
   static __name__ = "ClientLinearFitter"
 
   static init_ClientLinearFitter() {
-    this.define<ClientLinearFitter.Props>(({Array, String})=>({
-      parameters:  [p.Instance, {}],
+    this.define<ClientLinearFitter.Props>(({Array, String, Number})=>({
+      parameters:  [Array(Number), []],
       fields: [Array(String), []],
-      func:    [ String ],
-      v_func:  [String]
+      eps: [Number, 1e-4],
+      varY: [String]
     }))
   }
 
@@ -97,29 +96,38 @@ export class ClientLinearFitter extends Model {
   args_keys: Array<string>
   args_values: Array<any>
 
-  scalar_func: Function
-  vector_func: Function
+  _lock: bool
 
   connect_signals(): void {
     super.connect_signals()
   }
 
-  update_func(){
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
-    this.scalar_func = new Function(...this.args_keys, ...this.fields, '"use strict";\n'+this.func)
-    this.change.emit()
-  }
-
-  compute(x: any[]){
-    return this.scalar_func!(...this.args_values, ...x)
-  }
-
-  update_vfunc(){
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
-    this.vector_func = new Function(...this.args_keys, ...this.fields, "data_source", "$output",'"use strict";\n'+this.v_func)
-    this.change.emit()
+  fit(){
+    let x = []
+    for(let i=0; i<this.fields.length; ++i){
+      let iField = this.source.get_column(fields[i])
+      for(let j=0; j<=i; ++j){
+	let acc = 0
+	let jField = this.source.get_column(this.fields[j])
+	// for some reason ES6 reduce eats too much memory
+	for(let k=0; k<iField.length; ++k){
+	  acc += iField[k]*jField[k]
+	}
+	x.push(acc)
+      }
+    }
+    this.parameters = []
+    const colY = this.source.get_column(this.varY)
+    for(let i=0; i<this.fields.length; ++i){
+      let col = this.source.get_column(iField)
+      x.push(col.reduce((acc, cur) => acc+cur, 0))
+      let acc = 0
+      for(let k=0; k<col.length; k++){
+	acc += col[k]*varY[k]
+      }
+      this.parameters.push(acc)
+    }
+    solve(x,this.parameters)
   }
 
   update_args(){
@@ -129,11 +137,19 @@ export class ClientLinearFitter extends Model {
   }
 
   v_compute(xs: any[], data_source: any, output: any[] | null =null){
-      if(this.vector_func){
-          return this.vector_func(...this.args_values, ...xs, data_source, output)
-      } else {
-          return null
-      }
+    if(xs.length + 1 !== this.parameters.length){
+      throw Exception("Invalid number of parameters, expected " + this.parameters.length + " got " + xs.length)
+    }
+    if(output != null && output.length === data_source.get_length()){
+      output.fill(this.parameters[xs.length])
+      for(let i=0; i<xs.length; i++){
+	let x = xs[i]
+	for(let j=0; j<x.length; ++j){
+	  output[j] += x[j]*this.parameters[i]
+	}
+      } 
+    } 
+    return output
   }
 
 }
