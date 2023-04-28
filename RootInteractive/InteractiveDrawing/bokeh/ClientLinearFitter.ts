@@ -127,6 +127,8 @@ export class ClientLinearFitter extends Model {
       }
       this.parameters.push(acc)
     }
+    x.push(this.source.get_length())
+    this.parameters.push(colY.reduce((acc, cur)=>acc+cur,0))
     solve(x,this.parameters)
   }
 
