@@ -1,14 +1,16 @@
 import {Model} from "model"
+import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
 
 export namespace ClientLinearFitter {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = Model.Props & {
-    parameters: p.Property<Record<string, any>>
     fields: p.Property<Array<string>>
-    func: p.Property<string>
-    v_func: p.Property<string>
+    source: p.Property<ColumnarDataSource>
+    varY: p.Property<string>
+    weights: p.Property<string|null>
+    eps: p.Property<number>
   }
 }
 
@@ -80,17 +82,18 @@ export class ClientLinearFitter extends Model {
 
   static init_ClientLinearFitter() {
     this.define<ClientLinearFitter.Props>(({Array, String, Number})=>({
-      parameters:  [Array(Number), []],
       fields: [Array(String), []],
-      eps: [Number, 1e-4],
-      varY: [String]
+      source: [Ref(ColumnarDataSource)],
+      eps: [Number, 0],
+      varY: [String],
+      weights: [String, null]
     }))
   }
 
   initialize(){
     super.initialize()
-    this.update_func()
-    this.update_vfunc()
+    this._lock = false
+    this.fit()
   }
 
   args_keys: Array<string>
@@ -98,8 +101,21 @@ export class ClientLinearFitter extends Model {
 
   _lock: bool
 
+  parameters: Array<number>
+
   connect_signals(): void {
     super.connect_signals()
+    this.connect(this.source.change, this.onChange)
+  }
+
+  onChange(){
+    if(this._lock){
+      return
+    }
+    this._lock = true
+    this.fit()
+    this.change.emit()
+    this._lock = false
   }
 
   fit(){
@@ -109,7 +125,7 @@ export class ClientLinearFitter extends Model {
       for(let j=0; j<=i; ++j){
 	let acc = 0
 	let jField = this.source.get_column(this.fields[j])
-	// for some reason ES6 reduce eats too much memory
+	// HACK: for some reason ES6 reduce eats too much memory
 	for(let k=0; k<iField.length; ++k){
 	  acc += iField[k]*jField[k]
 	}
@@ -130,12 +146,6 @@ export class ClientLinearFitter extends Model {
     x.push(this.source.get_length())
     this.parameters.push(colY.reduce((acc, cur)=>acc+cur,0))
     solve(x,this.parameters)
-  }
-
-  update_args(){
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
-    this.change.emit()
   }
 
   v_compute(xs: any[], data_source: any, output: any[] | null =null){

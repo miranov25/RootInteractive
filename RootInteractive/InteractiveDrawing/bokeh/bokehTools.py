@@ -31,6 +31,7 @@ from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
+from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 import numpy as np
 import pandas as pd
 import re
