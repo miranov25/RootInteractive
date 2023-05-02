@@ -25,6 +25,8 @@ export class CDSAlias extends ColumnarDataSource {
 
   cached_columns: Set<string>
 
+  _locked_columns: Set<string>
+
   static init_CDSAlias() {
     this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref})=>({
       source:  [Ref(ColumnarDataSource)],
@@ -37,6 +39,7 @@ export class CDSAlias extends ColumnarDataSource {
   initialize(){
     super.initialize()
     this.cached_columns = new Set()
+    this._locked_columns = new Set()
     this.data = {}
    // this.compute_functions()
   }
@@ -73,7 +76,11 @@ export class CDSAlias extends ColumnarDataSource {
   }
 
   compute_function(key: string){
-    const {source, mapping, data, cached_columns} = this
+    const {source, mapping, data, cached_columns, _locked_columns} = this
+    if(_locked_columns.has(key)){
+      return
+    }
+    _locked_columns.add(key)
     const column = mapping[key]
     const len = this.get_length()
     if(len == null) return
@@ -113,7 +120,7 @@ export class CDSAlias extends ColumnarDataSource {
             const nvars = fields.length
             let row = new Array(nvars)
             for (let i = 0; i < len; i++) {
-              for(let j=0; j<nvars; j++){
+              for(let j=0; j < nvars; j++){
                 row[j] = fields[j][i]
               }
               new_column[i] = column.transform.compute(row)
@@ -139,6 +146,7 @@ export class CDSAlias extends ColumnarDataSource {
       }
     }
     cached_columns.add(key)
+    _locked_columns.delete(key)
   }
 
   get_array(key: string) {
