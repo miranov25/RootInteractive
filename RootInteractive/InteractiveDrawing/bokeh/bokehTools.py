@@ -383,7 +383,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         customJsArgList = {}
         transformType = i.get("type", "customJS")
         if transformType == "linearFit":
-            jsFunctionDict[i["name"]] = ClientLinearFitter(fields=i["varX"], varY=i["varY"], source=i["source"])
+            jsFunctionDict[i["name"]] = ClientLinearFitter(fields=i["varX"], varY=i["varY"], source=cdsDict[i.get("source", None)]["cdsFull"])
             break
         if isinstance(i["parameters"], list):
             for j in i["parameters"]:

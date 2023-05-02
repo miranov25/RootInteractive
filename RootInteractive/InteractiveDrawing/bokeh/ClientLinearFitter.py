@@ -1,5 +1,6 @@
 from bokeh.model import Model
-from bokeh.core.properties import String, List, Float
+from bokeh.core.properties import String, List, Float, Instance, Nullable
+from bokeh.models.sources import ColumnarDataSource
 
 class ClientLinearFitter(Model):
     __implementation__ = "ClientLinearFitter.ts"
