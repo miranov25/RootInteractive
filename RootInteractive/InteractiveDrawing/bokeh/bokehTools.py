@@ -383,7 +383,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         customJsArgList = {}
         transformType = i.get("type", "customJS")
         if transformType == "linearFit":
-            jsFunctionDict[i["name"]] = ClientLinearFitter(fields=i["varX"], varY=i["varY"], source=cdsDict[i.get("source", None)]["cdsFull"])
+            iFitter = jsFunctionDict[i["name"]] = ClientLinearFitter(varY=i["varY"], source=cdsDict[i.get("source", None)]["cdsFull"])
+            if isinstance(i["varX"], str):
+                if i["varX"] in paramDict:
+                    varX = paramDict[i["varX"]]["value"]
+                    paramDict[i["varX"]]["subscribed_events"].append(["value", CustomJS(args={"fitter":iFitter}, code="""
+        fitter.varX = this.value
+        fitter.onChange()
+                """)])
+                else:
+                    varX = [i["varX"]]
+            else:
+                varX = i["varX"]
+            iFitter.varX = varX
             break
         if isinstance(i["parameters"], list):
             for j in i["parameters"]:
@@ -412,72 +424,70 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(i) == 3:
                 i = {"name":i[0], "expr":i[1], "context": i[2]}
         aliasSet.add(i["name"])
-        if "transform" in i:
-            if i["transform"] in jsFunctionDict:
-                if "context" in i:
-                    if i["context"] not in aliasDict:
-                        aliasDict[i["context"]] = {}
-                    aliasDict[i["context"]][i["name"]] = {"fields": variables, "transform": jsFunctionDict[i["transform"]]}
-                else:
-                    aliasDict[None][i["name"]] = {"fields": variables, "transform": jsFunctionDict[i["transform"]]}
-        else:
-            if "parameters" in i:
-                for j in i["parameters"]:
-                    customJsArgList[j] = paramDict[j]["value"]
-            if "v_func" in i:
-                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, v_func=i["v_func"])
-            elif "func" in i:
-                if i["func"] in paramDict:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=paramDict[i["func"]]["value"])
-                    paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
-            mapper.func = this.value
-            mapper.update_func()
-                    """)])
-                else:
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=i["func"])
-            if "expr" in i:
-                exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
-                context = i.get("context", None)
-                evaluator = ColumnEvaluator(context, cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
-                result = evaluator.visit(exprTree.body)
-                if result["type"] == "javascript":
-                    func = "return "+result["implementation"]
-                    fields = list(evaluator.aliasDependencies)
-                    parameters = list(evaluator.paramDependencies)
-                    parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
-                    variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
-                    customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
-                    nvars_local = len(fields)
-                    variablesAlias = fields.copy()
-                    for j in variablesParam:
-                        if "subscribed_events" not in paramDict[j]:
-                            paramDict[j]["subscribed_events"] = []
-                        paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
-                                            table.mapping[column_name].fields[idx] = this.value
-                                            table.invalidate_column(column_name)
-                                                    """)])
-                        variablesAlias.append(paramDict[j]["value"])
-                        fields.append(j)
-                        nvars_local = nvars_local+1
-                    transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), func=func)
-                    fields = variablesAlias
-                else:
-                    aliasDict[i["name"]] = result["name"]
-                    break
+        if "parameters" in i:
+            for j in i["parameters"]:
+                customJsArgList[j] = paramDict[j]["value"]
+        if "transform" in i and i["transform"] in jsFunctionDict:
+            transform = jsFunctionDict[i["transform"]]
+        elif "v_func" in i:
+            transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, v_func=i["v_func"])
+        elif "func" in i:
+            if i["func"] in paramDict:
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=paramDict[i["func"]]["value"])
+                paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
+        mapper.func = this.value
+        mapper.update_func()
+                """)])
             else:
-                parameters = i.get("parameters", None)
-                fields = i.get("variables", None)
-            source = i.get("context", None)
-            if source not in aliasDict:
-                aliasDict[source] = {}
-            aliasDict[source][i["name"]] = {"fields": fields, "transform": transform}
-            if parameters is not None:
-                for j in parameters:
-                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
-            mapper.parameters[param] = this.value
-            mapper.update_args()
-                    """)])
-
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=i["func"])
+        if "expr" in i:
+            exprTree = ast.parse(i["expr"], filename="<unknown>", mode="eval")
+            context = i.get("context", None)
+            evaluator = ColumnEvaluator(context, cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
+            result = evaluator.visit(exprTree.body)
+            if result["type"] == "javascript":
+                func = "return "+result["implementation"]
+                fields = list(evaluator.aliasDependencies)
+                parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
+                variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
+                customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+                nvars_local = len(fields)
+                variablesAlias = fields.copy()
+                for j in variablesParam:
+                    if "subscribed_events" not in paramDict[j]:
+                        paramDict[j]["subscribed_events"] = []
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
+                                        table.mapping[column_name].fields[idx] = this.value
+                                        table.invalidate_column(column_name)
+                                                """)])
+                    variablesAlias.append(paramDict[j]["value"])
+                    fields.append(j)
+                    nvars_local = nvars_local+1
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), func=func)
+                fields = variablesAlias
+            else:
+                aliasDict[i["name"]] = result["name"]
+                break
+        else:
+            parameters = i.get("parameters", None)
+            fields = i.get("variables", None)
+            if isinstance(fields, str):
+                if fields in paramDict:
+                    paramDict[fields]["subscribed_events"].append(["value", CustomJS(args={"column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
+                        table.mapping[column_name].fields = this.value
+                        table.invalidate_column(column_name)
+                        """)])
+                    fields = paramDict[fields]["value"]
+        source = i.get("context", None)
+        if source not in aliasDict:
+            aliasDict[source] = {}
+        aliasDict[source][i["name"]] = {"fields": fields, "transform": transform}
+        if parameters is not None:
+            for j in parameters:
+                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+        mapper.parameters[param] = this.value
+        mapper.update_args()
+                """)])
 
     plotArray = []
     colorAll = all_palettes[options['colors']] if isinstance(options['colors'], str) else options['colors']
@@ -1433,15 +1443,22 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
     options = {'size': 4}
     options.update(kwargs)
     # optionsPlot = []
-    if len(params) > 1:
-        dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
+    if options['callback'] == 'parameter':
+        optionsPlot = paramDict[params[0]]["options"]
+        optionsSelected = paramDict[params[0]]["value"]
     else:
-        dfCategorical = df[params[0]]
-    codes, optionsPlot = pd.factorize(dfCategorical, sort=True)
-    optionsPlot = optionsPlot.to_list()
-    for i, val in enumerate(optionsPlot):
-        optionsPlot[i] = str(val)
-    widget_local = MultiSelect(title=params[0], value=optionsPlot, options=optionsPlot, size=options['size'])
+        if len(params) > 1:
+            dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
+        else:
+            dfCategorical = df[params[0]]
+        codes, optionsPlot = pd.factorize(dfCategorical, sort=True)
+        optionsPlot = optionsPlot.to_list()
+        for i, val in enumerate(optionsPlot):
+            optionsPlot[i] = str(val)
+        optionsSelected = optionsPlot
+    widget_local = MultiSelect(title=params[0], value=optionsSelected, options=optionsPlot, size=options['size'])
+    if options['callback'] == 'parameter':
+        return widget_local, None, None
     filterLocal = None
     newColumn = None
     if len(optionsPlot) < 31:

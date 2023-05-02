@@ -6,7 +6,7 @@ export namespace ClientLinearFitter {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = Model.Props & {
-    fields: p.Property<Array<string>>
+    varX: p.Property<Array<string>>
     source: p.Property<ColumnarDataSource>
     varY: p.Property<string>
     weights: p.Property<string|null>
@@ -20,11 +20,10 @@ function chol(X: number[], nRows: number){
   let iRow = 0
   let jRow, kRow
   for(let i=0; i<nRows; ++i){
-    iPivot = i
-    pivotDiag = 1/X[i+iRow]
+    const pivotDiag = 1/X[i+iRow]
     jRow = iRow+i+1
     for(let j=i+1; j<nRows; ++j) {
-      pivotRow = pivotDiag*X[i+jRow]
+      const pivotRow = pivotDiag*X[i+jRow]
       kRow = iRow+i+1
       for(let k=i+1; k<=j; ++k){
 	X[k+jRow] -= pivotRow*X[i+kRow]
@@ -46,7 +45,7 @@ function chol(X: number[], nRows: number){
 function solve(x:number[], y:number[]){
   let nRows = y.length
   chol(x,nRows)
-  iRow = 0
+  let iRow = 0
   for(let i=0; i<nRows; ++i){
     for(let j=0; j<i; ++j){
       y[i] -= y[j]*x[iRow+j]
@@ -60,7 +59,7 @@ function solve(x:number[], y:number[]){
   }
   let jRow = 0
   for(let i=nRows-1; i>=0; --i){
-    jRow = 1+((x*(x+5))>>1)
+    jRow = 1+((i*(i+5))>>1)
     for(let j=i+1; j<nRows; ++j){
       y[i] -= y[j]*x[jRow]
       jRow += j+1
@@ -81,25 +80,26 @@ export class ClientLinearFitter extends Model {
   static __name__ = "ClientLinearFitter"
 
   static init_ClientLinearFitter() {
-    this.define<ClientLinearFitter.Props>(({Array, String, Number})=>({
-      fields: [Array(String), []],
+    this.define<ClientLinearFitter.Props>(({Array, String, Number, Ref, Nullable})=>({
+      varX: [Array(String), []],
       source: [Ref(ColumnarDataSource)],
       eps: [Number, 0],
       varY: [String],
-      weights: [String, null]
+      weights: [Nullable(String), null]
     }))
   }
 
   initialize(){
     super.initialize()
     this._lock = false
-    this.fit()
+    this._is_fresh =  false
   }
 
   args_keys: Array<string>
   args_values: Array<any>
 
-  _lock: bool
+  _lock: boolean
+  _is_fresh: boolean
 
   parameters: Array<number>
 
@@ -113,18 +113,22 @@ export class ClientLinearFitter extends Model {
       return
     }
     this._lock = true
-    this.fit()
+    this._is_fresh = false
     this.change.emit()
     this._lock = false
   }
 
   fit(){
-    let x = []
-    for(let i=0; i<this.fields.length; ++i){
-      let iField = this.source.get_column(fields[i])
+    let x: number[] = []
+    for(let i=0; i<this.varX.length; ++i){
+      let iField = this.source.get_column(this.varX[i])
+      if(iField == null){
+	throw ReferenceError("Column not defined: " + iField)
+      }
       for(let j=0; j<=i; ++j){
 	let acc = 0
-	let jField = this.source.get_column(this.fields[j])
+	let jField = this.source.get_column(this.varX[j])
+	if(jField == null) continue
 	// HACK: for some reason ES6 reduce eats too much memory
 	for(let k=0; k<iField.length; ++k){
 	  acc += iField[k]*jField[k]
@@ -134,23 +138,48 @@ export class ClientLinearFitter extends Model {
     }
     this.parameters = []
     const colY = this.source.get_column(this.varY)
-    for(let i=0; i<this.fields.length; ++i){
+    if(colY == null){
+      throw ReferenceError("Column not defined: " + this.varY)
+    }
+    for(let i=0; i<this.varX.length; ++i){
+      const iField = this.varX[i]
       let col = this.source.get_column(iField)
-      x.push(col.reduce((acc, cur) => acc+cur, 0))
+      if(col == null){
+	throw ReferenceError("Column not defined: " + iField)
+      }
       let acc = 0
       for(let k=0; k<col.length; k++){
-	acc += col[k]*varY[k]
+	acc += col[k]
+      }
+      x.push(acc)
+      acc=0
+      for(let k=0; k<col.length; k++){
+	acc += col[k]*colY[k]
       }
       this.parameters.push(acc)
     }
-    x.push(this.source.get_length())
-    this.parameters.push(colY.reduce((acc, cur)=>acc+cur,0))
+    let len = this.source.get_length()
+    if(len == null){
+      x.push(1)
+    } else {
+      x.push(len)
+    }
+    let acc=0
+    for(let k=0; k<colY.length; k++){
+      acc += colY[k]
+    }
+    this.parameters.push(acc)
     solve(x,this.parameters)
+    this._is_fresh = true
   }
 
   v_compute(xs: any[], data_source: any, output: any[] | null =null){
+    if(!this._is_fresh){
+	this.fit()
+    }
     if(xs.length + 1 !== this.parameters.length){
-      throw Exception("Invalid number of parameters, expected " + this.parameters.length + " got " + xs.length)
+      return output
+      throw Error("Invalid number of parameters, expected " + (this.parameters.length-1) + " got " + xs.length)
     }
     if(output != null && output.length === data_source.get_length()){
       output.fill(this.parameters[xs.length])
@@ -162,6 +191,17 @@ export class ClientLinearFitter extends Model {
       } 
     } 
     return output
+  }
+
+  compute(xs: any[]){
+    if(!this._is_fresh){
+      this.fit()
+    }
+    let acc = this.parameters.at(-1)!
+    for(let i=0; i<xs.length && i<this.parameters.length; i++){
+	 acc += xs[i]*this.parameters[i]
+     }
+    return acc     
   }
 
 }
