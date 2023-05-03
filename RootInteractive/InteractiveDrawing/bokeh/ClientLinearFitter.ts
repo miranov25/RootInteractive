@@ -83,7 +83,7 @@ export class ClientLinearFitter extends Model {
     this.define<ClientLinearFitter.Props>(({Array, String, Number, Ref, Nullable})=>({
       varX: [Array(String), []],
       source: [Ref(ColumnarDataSource)],
-      eps: [Number, 0],
+      alpha: [Number, 0],
       varY: [String],
       weights: [Nullable(String), null]
     }))

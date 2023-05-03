@@ -39,7 +39,9 @@ jsFunctionArray = [
         "name": "linearFit",
         "type": "linearFit",
         "varX": "predictors",
-        "varY": "A_mul_paramX_plus_B"
+        "varY": "A_mul_paramX_plus_B",
+        "alpha": 1e-4,
+        "weights": "C"
     }
 ]
 
