@@ -119,8 +119,9 @@ export class ClientLinearFitter extends Model {
   }
 
   fit(){
-    const {alpha, source, varX, varY} = this
+    const {alpha, source, varX, varY, weights} = this
     let x: number[] = []
+    if(weights == null){
     for(let i=0; i < varX.length; ++i){
       let iField = source.get_column(varX[i])
       if(iField == null){
@@ -170,6 +171,63 @@ export class ClientLinearFitter extends Model {
       acc += colY[k]
     }
     this.parameters.push(acc)
+    } else {
+      const weightsCol = source.get_column(weights)
+      if(weightsCol == null){
+        throw ReferenceError("Column not defined: " + weights)
+      }
+      const colY = source.get_column(varY)
+      if(colY == null) {
+	throw ReferenceError("Column not defined: " + varY)
+      }
+      let len = source.get_length()
+      if(len == null){
+	len = 0
+      }
+      for(let i=0; i < varX.length; ++i){
+	let iField = source.get_column(varX[i])
+	if(iField == null){
+	  throw ReferenceError("Column not defined: " + iField)
+	}
+	for(let j=0; j <= i; ++j){
+	  let jField = source.get_column(varX[j])
+	  if(jField == null) {
+	    break
+	  }
+	  let acc = 0
+	  for(let k=0; k < len; ++k){
+	    acc += iField[k] * jField[k] * weightsCol[k]
+	  }
+	  x.push(acc)
+	}
+      }
+      for(let i=0; i < varX.length; ++i){
+	let col = source.get_column(varX[i])
+	if(col == null){
+	  throw ReferenceError("Column not defined: " + col)
+	}
+        let acc=0
+	for(let k=0; k < len; ++k){
+	  acc += col[k] * weightsCol[k]
+	}
+        x.push(acc)
+	acc = 0
+	for(let k=0; k < len; ++k){
+	  acc += col[k] * colY[k] * weightsCol[k]
+	}
+	this.parameters.push(acc)
+      } 
+      let acc = 0
+      for(let k=0; k < len; ++k){
+	acc += weightsCol[k]
+      }
+      x.push(acc)
+      acc = 0
+      for(let k=0; k < len; ++k){
+	acc += colY[k] * weightsCol[k]
+      }
+      this.parameters.push(acc)      
+    }
     if(alpha > 0){
       let iRow = 0
       for(let i=0; i < this.parameters.length; ++i){
