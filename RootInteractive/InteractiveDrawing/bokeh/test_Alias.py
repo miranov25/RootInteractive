@@ -24,7 +24,7 @@ parameterArray = [
     {"name": "paramX", "value":10, "range": [-20, 20]},
     {"name": "C_cut", "value": 1, "range": [0, 1]},
     {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"},
-    {"name": "predictors", "value":["A","A_mul_paramX_plus_B"], "options":["A", "A_mul_paramX_plus_B", "B", "C"]}
+    {"name": "predictors", "value":["A","A_mul_paramX_plus_B"], "options":["A", "A_mul_paramX_plus_B", "B", "C", "custom_column"]}
 ]
 
 # This interface with two arrays is only for the case when functions are reused with different columns as target
@@ -39,7 +39,7 @@ jsFunctionArray = [
         "name": "linearFit",
         "type": "linearFit",
         "varX": "predictors",
-        "varY": "B"
+        "varY": "A_mul_paramX_plus_B"
     }
 ]
 

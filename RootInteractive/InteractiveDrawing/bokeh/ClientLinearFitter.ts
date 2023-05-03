@@ -10,7 +10,7 @@ export namespace ClientLinearFitter {
     source: p.Property<ColumnarDataSource>
     varY: p.Property<string>
     weights: p.Property<string|null>
-    eps: p.Property<number>
+    alpha: p.Property<number>
   }
 }
 
@@ -19,17 +19,17 @@ export namespace ClientLinearFitter {
 function chol(X: number[], nRows: number){
   let iRow = 0
   let jRow, kRow
-  for(let i=0; i<nRows; ++i){
+  for(let i=0; i < nRows; ++i){
     const pivotDiag = 1/X[i+iRow]
     jRow = iRow+i+1
-    for(let j=i+1; j<nRows; ++j) {
+    for(let j=i+1; j < nRows; ++j) {
       const pivotRow = pivotDiag*X[i+jRow]
       kRow = iRow+i+1
-      for(let k=i+1; k<=j; ++k){
+      for(let k=i+1; k <= j; ++k){
 	X[k+jRow] -= pivotRow*X[i+kRow]
 	kRow += k+1
       }
-      for(let k=j+1; k<nRows; ++k) {
+      for(let k=j+1; k < nRows; ++k) {
 	X[j+kRow] -= pivotRow*X[i+kRow]
 	kRow += k+1
       }
@@ -46,21 +46,21 @@ function solve(x:number[], y:number[]){
   let nRows = y.length
   chol(x,nRows)
   let iRow = 0
-  for(let i=0; i<nRows; ++i){
-    for(let j=0; j<i; ++j){
+  for(let i=0; i < nRows; ++i){
+    for(let j=0; j < i; ++j){
       y[i] -= y[j]*x[iRow+j]
     }
     iRow += i+1
   }
   let iDiag=0
-  for(let i=0; i<nRows; i++){
+  for(let i=0; i < nRows; i++){
     y[i] /= x[iDiag]
     iDiag += i+2
   }
   let jRow = 0
-  for(let i=nRows-1; i>=0; --i){
+  for(let i=nRows-1; i >= 0; --i){
     jRow = 1+((i*(i+5))>>1)
-    for(let j=i+1; j<nRows; ++j){
+    for(let j=i+1; j < nRows; ++j){
       y[i] -= y[j]*x[jRow]
       jRow += j+1
     }
@@ -119,56 +119,64 @@ export class ClientLinearFitter extends Model {
   }
 
   fit(){
+    const {alpha, source, varX, varY} = this
     let x: number[] = []
-    for(let i=0; i<this.varX.length; ++i){
-      let iField = this.source.get_column(this.varX[i])
+    for(let i=0; i < varX.length; ++i){
+      let iField = source.get_column(varX[i])
       if(iField == null){
 	throw ReferenceError("Column not defined: " + iField)
       }
-      for(let j=0; j<=i; ++j){
+      for(let j=0; j <= i; ++j){
 	let acc = 0
-	let jField = this.source.get_column(this.varX[j])
+	let jField = source.get_column(varX[j])
 	if(jField == null) continue
 	// HACK: for some reason ES6 reduce eats too much memory
-	for(let k=0; k<iField.length; ++k){
+	for(let k=0; k < iField.length; ++k){
 	  acc += iField[k]*jField[k]
 	}
 	x.push(acc)
       }
     }
     this.parameters = []
-    const colY = this.source.get_column(this.varY)
+    const colY = source.get_column(varY)
     if(colY == null){
       throw ReferenceError("Column not defined: " + this.varY)
     }
-    for(let i=0; i<this.varX.length; ++i){
-      const iField = this.varX[i]
-      let col = this.source.get_column(iField)
+    for(let i=0; i < varX.length; ++i){
+      const iField = varX[i]
+      let col = source.get_column(iField)
       if(col == null){
 	throw ReferenceError("Column not defined: " + iField)
       }
       let acc = 0
-      for(let k=0; k<col.length; k++){
+      for(let k=0; k < col.length; k++){
 	acc += col[k]
       }
       x.push(acc)
       acc=0
-      for(let k=0; k<col.length; k++){
+      for(let k=0; k < col.length; k++){
 	acc += col[k]*colY[k]
       }
       this.parameters.push(acc)
     }
-    let len = this.source.get_length()
+    let len = source.get_length()
     if(len == null){
       x.push(1)
     } else {
       x.push(len)
     }
     let acc=0
-    for(let k=0; k<colY.length; k++){
+    for(let k=0; k < colY.length; k++){
       acc += colY[k]
     }
     this.parameters.push(acc)
+    if(alpha > 0){
+      let iRow = 0
+      for(let i=0; i < this.parameters.length; ++i){
+	x[iRow] += alpha
+	iRow += i+2
+      }
+    }
     solve(x,this.parameters)
     this._is_fresh = true
   }
@@ -179,13 +187,14 @@ export class ClientLinearFitter extends Model {
     }
     if(xs.length + 1 !== this.parameters.length){
       return output
-      throw Error("Invalid number of parameters, expected " + (this.parameters.length-1) + " got " + xs.length)
+      // Workaround for a bug caused by this being recomputed as varX is changed, the alias receiving the wrong number of parameters
+      // throw Error("Invalid number of parameters, expected " + (this.parameters.length-1) + " got " + xs.length)
     }
     if(output != null && output.length === data_source.get_length()){
       output.fill(this.parameters[xs.length])
-      for(let i=0; i<xs.length; i++){
+      for(let i=0; i < xs.length; i++){
 	let x = xs[i]
-	for(let j=0; j<x.length; ++j){
+	for(let j=0; j < x.length; ++j){
 	  output[j] += x[j]*this.parameters[i]
 	}
       } 
@@ -198,7 +207,7 @@ export class ClientLinearFitter extends Model {
       this.fit()
     }
     let acc = this.parameters.at(-1)!
-    for(let i=0; i<xs.length && i<this.parameters.length; i++){
+    for(let i=0; i < xs.length && i < this.parameters.length; i++){
 	 acc += xs[i]*this.parameters[i]
      }
     return acc     
