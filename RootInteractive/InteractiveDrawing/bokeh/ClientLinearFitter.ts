@@ -121,6 +121,7 @@ export class ClientLinearFitter extends Model {
   fit(){
     const {alpha, source, varX, varY, weights} = this
     let x: number[] = []
+    this.parameters = []
     if(weights == null){
     for(let i=0; i < varX.length; ++i){
       let iField = source.get_column(varX[i])
@@ -138,7 +139,6 @@ export class ClientLinearFitter extends Model {
 	x.push(acc)
       }
     }
-    this.parameters = []
     const colY = source.get_column(varY)
     if(colY == null){
       throw ReferenceError("Column not defined: " + this.varY)
