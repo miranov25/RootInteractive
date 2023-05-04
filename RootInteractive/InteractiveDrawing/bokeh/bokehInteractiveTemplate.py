@@ -143,15 +143,15 @@ def getDefaultVarsDiff():
         figureGlobalOption
     ]
     figureLayoutDesc={
-        "histoXY":[[0,1],[2,3],{"plot_height":200}],
-        "histoXYNorm":[[4,5],[6,7],{"plot_height":200}],
-        "histoXYZ":[[8,9],[10,11],{"plot_height":200}],
-        "histoXYNormZ":[[12,13],[14,15],{"plot_height":200}],
+        "histoXY":[[0,1],[2,3],{"plot_height":250}],
+        "histoXYNorm":[[4,5],[6,7],{"plot_height":250}],
+        "histoXYZ":[[8,9],[10,11],{"plot_height":250}],
+        "histoXYNormZ":[[12,13],[14,15],{"plot_height":250}],
         "histoXYNormZMedian":[[16,17],{"plot_height":350}],
         "histoXYNormZMean":[[18,19],{"plot_height":350}],
     }
-    figureLayoutDesc["selection"] = ["selection", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
-    figureLayoutDesc["description"] = ["description", {'plot_height': 100, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
