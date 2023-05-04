@@ -10,14 +10,10 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="adding new development package">
-      <change beforePath="$PROJECT_DIR$/.idea/RootInteractive.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RootInteractive.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="d7af0207-3d79-4f8b-af25-bb133df9a58e" name="Default Changelist" comment="using newer bokeh version (Marian, Tuba)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveTemplate.py" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/InteractiveDrawing/bokeh/bokehInteractiveTemplate.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/RootInteractive/Tools/RDataFrame/test_RDataFrame_Array.py" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/Tools/RDataFrame/test_RDataFrame_Array.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/bokehTreeDrawSA.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/bokehTreeDrawSA.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/standAlone.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/RootInteractive/tutorial/bokehDraw/standAlone.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -176,7 +172,14 @@
       <option name="project" value="LOCAL" />
       <updated>1680873874140</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="using newer bokeh version (Marian, Tuba)">
+      <created>1683014715084</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1683014715084</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -211,7 +214,8 @@
     <MESSAGE value="Adding selection and description table to template" />
     <MESSAGE value="Adding selection and description table to template + use statistics" />
     <MESSAGE value="adding new development package" />
-    <option name="LAST_COMMIT_MESSAGE" value="adding new development package" />
+    <MESSAGE value="using newer bokeh version (Marian, Tuba)" />
+    <option name="LAST_COMMIT_MESSAGE" value="using newer bokeh version (Marian, Tuba)" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
