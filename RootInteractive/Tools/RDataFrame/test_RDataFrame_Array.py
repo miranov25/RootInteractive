@@ -19,6 +19,7 @@ def makeTestDictionary():
        #pragma link C++ class ROOT::RVec < ROOT::RVec < long double>> + ;
        #pragma link C++ class ROOT::VecOps::RVec<ROOT::VecOps::RVec<float>>+;
        #pragma link C++ class ROOT::VecOps::RVec <TParticle> + ;  
+       #pragma link C++ class ROOT::VecOps::RVec <o2::tpc::TrackTPC> + ;
     """
     print(dictData,  file=open('dict.C', 'w'))
     ROOT.gInterpreter.ProcessLine(".L dict.C+")
@@ -50,6 +51,12 @@ def makeTestRDataFrame():
             //for (size_t i=0; i<n; i++) array=i;
             return array;
         ;};
+        auto makeUnitRVec1DTPCTrack = [](int n){
+            auto array = ROOT::RVec<o2::tpc::TrackTPC>(n);
+            array.resize(n);
+            //for (size_t i=0; i<n; i++) array=i;
+            return array;
+        ;};
     """)
     #
     nTracks=100
@@ -62,6 +69,7 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array2D0","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
+    rdf = rdf.Define('array1DTPCTrack', "makeUnitRVec1DTPCTrack(nPoints)")
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrame.root")
     return rdf
 
