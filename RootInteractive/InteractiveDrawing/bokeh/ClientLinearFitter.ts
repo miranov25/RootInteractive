@@ -251,10 +251,10 @@ export class ClientLinearFitter extends Model {
     if(output != null && output.length === data_source.get_length()){
       output.fill(this.parameters[xs.length])
       for(let i=0; i < xs.length; i++){
-	let x = xs[i]
-	for(let j=0; j < x.length; ++j){
-	  output[j] += x[j]*this.parameters[i]
-	}
+        let x = xs[i]
+        for(let j=0; j < x.length; ++j){
+          output[j] += x[j]*this.parameters[i]
+        }
       } 
     } 
     return output
@@ -264,7 +264,7 @@ export class ClientLinearFitter extends Model {
     if(!this._is_fresh){
       this.fit()
     }
-    let acc = this.parameters.at(-1)!
+    let acc = this.parameters[this.parameters.length-1]!
     for(let i=0; i < xs.length && i < this.parameters.length; i++){
 	 acc += xs[i]*this.parameters[i]
      }
