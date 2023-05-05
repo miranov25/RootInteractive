@@ -77,10 +77,6 @@ export class CDSAlias extends ColumnarDataSource {
 
   compute_function(key: string){
     const {source, mapping, data, cached_columns, _locked_columns} = this
-    if(_locked_columns.has(key)){
-      return
-    }
-    _locked_columns.add(key)
     const column = mapping[key]
     const len = this.get_length()
     if(len == null) return
@@ -99,17 +95,24 @@ export class CDSAlias extends ColumnarDataSource {
     }
     if(column.hasOwnProperty("field")){
         if(column.hasOwnProperty("transform")){
-            let field = this.get_array(column.field)
+            let field = this.get_column(column.field)
+            if(field == null){
+              throw ReferenceError("Column not defined: "+ column.field + " in data source " + this.name)
+            }
             const new_column = column.transform.v_compute(field)
             if(new_column){
                 data[key] = new_column
             } else {
-                data[key] = field.map(column.transform.compute)
+                data[key] = Array.from(field).map(column.transform.compute)
             }
         } else {
             data[key] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
+        if(_locked_columns.has(key)){
+          return
+        }
+        _locked_columns.add(key)
         const fields = column.fields.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column){
@@ -137,6 +140,7 @@ export class CDSAlias extends ColumnarDataSource {
     } else if(Object.prototype.toString.call(column) === '[object String]'){
       let new_column = this.get_column(column)
       if(new_column == null){
+        _locked_columns.delete(key)
         throw ReferenceError("Column not defined: "+ column)
       }
       else if (!Array.isArray(new_column)){
