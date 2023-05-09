@@ -65,6 +65,8 @@ RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
+IS_PANDAS_1 = pd.__version__.split('.')[0] == '1'
+
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
@@ -1403,7 +1405,10 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
             dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
         else:
             dfCategorical = df[params[0]]
-        codes, optionsPlot = pd.factorize(dfCategorical, sort=True, use_na_sentinel=False)
+        if IS_PANDAS_1:
+            codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+        else:
+            codes, optionsPlot = pd.factorize(dfCategorical, sort=True, use_na_sentinel=False)
         optionsPlot = optionsPlot.dropna().to_list()
     optionsPlot = [str(i) for i in optionsPlot]
     default_value = 0
@@ -1451,7 +1456,10 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
             dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
         else:
             dfCategorical = df[params[0]]
-        codes, optionsPlot = pd.factorize(dfCategorical, sort=True, use_na_sentinel=False)
+        if IS_PANDAS_1:
+            codes, optionsPlot = pd.factorize(dfCategorical, sort=True, na_sentinel=None)
+        else:
+            codes, optionsPlot = pd.factorize(dfCategorical, sort=True, use_na_sentinel=False)
         optionsPlot = optionsPlot.to_list()
         for i, val in enumerate(optionsPlot):
             optionsPlot[i] = str(val)
