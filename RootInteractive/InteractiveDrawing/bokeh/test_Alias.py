@@ -206,4 +206,3 @@ def test_makeColumns():
     print(sources)
     print(aliasDict)
 
-test_customJsFunctionBokehDrawArray_v()
