@@ -40,16 +40,7 @@ def _accumulate_predictionNL(predict, X, out,col):
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
 
-def partitionBlock(allRF, k, begin, end):
-    allRF[begin:end].partition(k)
-
-def blockMean(allRF, out, begin, end):
-    np.mean(allRF[begin:end], -1, out=out[begin:end])
-
-def blockStd(allRF, out, begin, end):
-    np.std(allRF[begin:end], -1, out=out[begin:end])
-
-def predictRFStatChunk(rf, X, statDictionary,n_jobs):
+def predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     predict statistics from random forest
@@ -62,7 +53,7 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     nEstimators = len(rf.estimators_)
     allRF = np.empty((nEstimators, X.shape[0]))
     statOut={}
-    Parallel(n_jobs=n_jobs, verbose=rf.verbose,require="sharedmem")(
+    parallel(
             delayed(simple_predict)(e.predict, X, allRF, col)
             for col,e in enumerate(rf.estimators_)
     )
@@ -73,30 +64,30 @@ def predictRFStatChunk(rf, X, statDictionary,n_jobs):
     block_end = block_begin[1:]
     block_end.append(X.shape[0])
     if "median" in statDictionary:
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-                delayed(partitionBlock)(allRFTranspose, nEstimators // 2, first, last)
+        parallel(
+                delayed(allRF[first:last].partition)(nEstimators // 2)
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["median"]= allRFTranspose[:,nEstimators//2]
     if "mean"  in statDictionary:
         mean_out = np.empty(X.shape[0])
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-                delayed(blockMean)(allRFTranspose, mean_out, first, last)
+        parallel(
+                delayed(np.mean)(allRFTranspose[first:last], -1, out=mean_out[first:last])
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["mean"]=mean_out
     if "std"  in statDictionary: 
         std_out = np.empty(X.shape[0])
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-                delayed(blockStd)(allRFTranspose, std_out, first, last)
+        parallel(
+                delayed(np.std)(allRFTranspose[first:last], -1, out=std_out[first:last])
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["std"]=std_out
     if "quantile" in statDictionary:
         statOut["quantile"]={}
         quantiles = np.array(statDictionary["quantile"]) * nEstimators
-        Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem")(
-            delayed(partitionBlock)(allRFTranspose, quantiles, first, last)
+        parallel(
+            delayed(allRF[first:last].partition)(quantiles)
             for first, last in zip(block_begin, block_end)
         )
         for iQuant, quant in enumerate(statDictionary["quantile"]):
@@ -115,16 +106,19 @@ def predictRFStat(rf, X, statDictionary,n_jobs, max_rows=1000000):
     :param X:                   input vector
     :param statDictionary:      dictionary of statistics to predict
     :param n_jobs:              number of parallel jobs for prediction
+    :param max_rows:
     :return:                    dictionary with requested output statistics
     """
     if(max_rows < 0):
-        return predictRFStatChunk(rf, X, statDictionary, n_jobs)
+       with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
+           return predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs)
     block_begin = list(range(0, X.shape[0], max_rows))
     block_end = block_begin[1:]
     block_end.append(X.shape[0])    
     answers = []
-    for (a,b) in zip(block_begin, block_end):
-        answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, n_jobs))
+    with Parallel(n_jobs=n_jobs, verbose=rf.verbose, require="sharedmem") as parallel:
+        for (a,b) in zip(block_begin, block_end):
+             answers.append(predictRFStatChunk(rf, X[a:b], statDictionary, parallel, n_jobs))
     if not answers:
         return {}
     merged = {}

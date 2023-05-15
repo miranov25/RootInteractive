@@ -23,7 +23,8 @@ parameterArray = [
     {"name": "legendFontSize", "value":"13px", "options":["9px", "11px", "13px", "15px"]},
     {"name": "paramX", "value":10, "range": [-20, 20]},
     {"name": "C_cut", "value": 1, "range": [0, 1]},
-    {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"}
+    {"name": "CustomFunc", "value":"return Math.sin(A_mul_paramX_plus_B)"},
+    {"name": "predictors", "value":["A","A_mul_paramX_plus_B"], "options":["A", "A_mul_paramX_plus_B", "B", "C", "custom_column"]}
 ]
 
 # This interface with two arrays is only for the case when functions are reused with different columns as target
@@ -33,6 +34,14 @@ jsFunctionArray = [
         "parameters": ["paramX"],
         "fields": ["x", "y"],
         "func": "return paramX*x+y"
+    },
+    {
+        "name": "linearFit",
+        "type": "linearFit",
+        "varX": "predictors",
+        "varY": "A_mul_paramX_plus_B",
+        "alpha": 1e-4,
+        "weights": "C"
     }
 ]
 
@@ -62,11 +71,16 @@ aliasArray = [
     {
         "name": "custom_column",
         "func": "CustomFunc"
+    },
+    {
+        "name": "BPred",
+        "variables": "predictors",
+        "transform": "linearFit"
     }
 ]
 
 figureArray = [
-    [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B', "custom_column"], {"size":"size"}],
+    [['A'], ['B', '4*A+B', 'A_mul_paramX_plus_B', "custom_column", "BPred"], {"size":"size"}],
     [['bin_center'], ['efficiency_A', 'entries_C_cut / bin_count', "C_accepted/bin_count"], {"source":"histoA", "size":"size"}],
     [['bin_center'], ['bin_count', 'entries_C_cut', "C_accepted"], {"source":"histoA", "size":"size", "errY":["sqrt(bin_count)","sqrt(entries_C_cut)","sqrt(C_accepted)"]}],
     [['bin_center_0'], ['efficiency_AC'], {"source":"histoAC", "size":"size", "colorZvar": "bin_center_1"}],
@@ -108,13 +122,14 @@ widgetParams=[
     ['select',["legendFontSize"]],
     ['slider',["C_cut"]],
     ['slider',["paramX"]],
+    ['multiSelect', ["predictors"]],
     ['text', ["CustomFunc"], {"name": "CustomFunc"}]
 ]
 
 widgetLayoutDesc={
     "Selection": [[0, 1, 2], [3, 4], {'sizing_mode': 'scale_width'}],
     "Graphics": [[5, 6], {'sizing_mode': 'scale_width'}],
-    "CustomJS functions": [[7, 8],["CustomFunc"]]
+    "CustomJS functions": [[7, 8, 9],["CustomFunc"]]
     }
 
 figureLayoutDesc=[
@@ -147,37 +162,27 @@ def test_customJsFunction():
     show(Column(fig, sliderWidget))
 
 def test_customJsFunctionBokehDrawArray():
-    jsFunctionArray = [
-        {
-            "name": "saxpy",
-            "parameters": ["paramX"],
-            "fields": ["x", "y"],
-            "func": "return paramX*x+y"
-        }
-    ]
     output_file("test_AliasBokehDraw.html")
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
 
 def test_customJsFunctionBokehDrawArray_v():
-    jsFunctionArray = [
-        {
+    jsFunctionArray[0] = {
             "name": "saxpy",
             "parameters": ["paramX"],
             "fields": ["a", "b"],
             "v_func": """
-                if($output == null){
+                if($output == null || $output.length !== a.length){
                     $output = new Float64Array(a.length)
                 }
-                if($output.length != a.length) $output.length = a.length
                 for(let i=0; i<$output.length; i++){
                     $output[i] = paramX*a[i]+b[i]
                 }
                 return $output
             """ 
         }
-    ]
+    
     output_file("test_AliasBokehDraw_v.html")
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
@@ -201,4 +206,3 @@ def test_makeColumns():
     print(sources)
     print(aliasDict)
 
-test_customJsFunctionBokehDrawArray_v()
