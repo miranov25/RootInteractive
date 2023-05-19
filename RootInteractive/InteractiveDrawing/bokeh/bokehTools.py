@@ -32,6 +32,7 @@ from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
+from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
 import numpy as np
 import pandas as pd
 import re
@@ -1659,7 +1660,7 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return f"{{{varName}}}"
     if cdsName in cdsDict:
-        if cdsDict[cdsName]["type"] == "join":
+        if cdsDict[cdsName]["type"] in ["join", "stack"]:
             return f"{{{varName}}}"
         prefix = ""
         if not removeCdsName:
@@ -1738,6 +1739,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     cdsType = "histoNd"
             elif "left" in iSource or "right" in iSource:
                 cdsType = "join"
+            elif "sources" in iSource:
+                cdsType = "stack"
             else:
                 # Cannot determine type automatically
                 raise ValueError(iSource)
@@ -1846,6 +1849,13 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 on_right = iSource["right_on"]
             how  = iSource["how"] if "how" in iSource else "inner"
             iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
+        elif cdsType == "stack":
+            sources = iSource["sources"]
+            if isinstance(sources, str):
+                if sources in paramDict:
+                    iSource["sources"] = paramDict[sources]["options"]
+                    iSource["active"] = paramDict[sources]["value"]
+            iSource["cdsOrig"] = CDSStack(mapping={value:i for (i, value) in enumerate(iSource["sources"])}, activeSources=iSource["active"])
         elif cdsType == "projection":
             axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
             quantiles = iSource["quantiles"] if "quantiles" in iSource else []
@@ -1867,6 +1877,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
+        elif iSource["type"] == "stack":
+            cdsOrig.sources = [cdsDict[i]["cdsFull"] for i in iSource["sources"]]
         name_full = "cdsFull"
         if cds_name is not None:
             name_full = cds_name+"_full"
