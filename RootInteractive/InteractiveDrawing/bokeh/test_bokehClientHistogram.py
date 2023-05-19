@@ -30,7 +30,8 @@ parameterArray=[
     {'name':"histoRangeA", "value": [0, 1], "range": [0, 1]},
     {'name':"nBinsB", "value": 20, "options":[5, 10, 20, 40]},
     {'name':"transformY", "value":None, "options":[None, "sqrt", "lambda x: log(x+eps)"]},
-    {'name':"eps", "value":1, "range": [.1, 5]}
+    {'name':"eps", "value":1, "range": [.1, 5]},
+    {'name':"histo1Ds", "value":["histoA"], "options":["histoA", "histoB"]}
 ]
 
 widgetParams=[
@@ -43,11 +44,12 @@ widgetParams=[
     ['range', ['histoRangeA']],
     ['select', ['nBinsB']],
     ['select', ['transformY']],
-    ['slider', ['eps'], {"name": "eps"}]
+    ['slider', ['eps'], {"name": "eps"}],
+    ['multiSelect', ['histo1Ds'], {"name": "histo1Ds"}],
   #  ['select',["CC", 0, 1, 2, 3]],
   #  ['multiSelect',["BoolB"]],
 ]
-widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8, "eps"], {'sizing_mode': 'scale_width'}]
+widgetLayoutDesc=[[0, 1, 2], [3, 4], [5, 6], [7, 8, "eps", "histo1Ds"], {'sizing_mode': 'scale_width'}]
 
 figureLayoutDesc=[
     [0, 1, 2, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 300}],
@@ -63,6 +65,7 @@ histoArray = [
     {"name": "histoB", "variables": ["B"], "nbins":"nBinsB", "range": [0, 1]},
     {"name": "histoABC", "variables": ["A", "B", "C"], "nbins":[10, "nBinsB", 10], "range": ["histoRangeA", None, None], "quantiles": [.5], "sumRange": [[.25, .75]], "axis": [0, 2]},
     {"name": "histoAB", "variables": ["A", "(A+B)/2"], "nbins": [20, "nBinsB"], "range": ["histoRangeA", None], "unbinned_projections":True, "weights": "D", "quantiles": [.25, .5, .75], "axis": [0, 1]},
+    {"name": "histo1Ds", "sources": "histo1Ds"}
 ]
 
 def testBokehClientHistogram():
@@ -82,7 +85,7 @@ def testBokehClientHistogram():
 def testBokehClientHistogramOnlyHisto():
     output_file("test_BokehClientHistogramOnlyHisto.html")
     figureArray = [
-        [['bin_center'], ['bin_count'], {"source": "histoA", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "yAxisTitle":"{transformY}(N)"}],
+        [['bin_center'], ['bin_count'], {"source": "histo1Ds", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "yAxisTitle":"{transformY}(N)"}],
         [['bin_center_0'], ['bin_count'], {"colorZvar":"bin_center_1", "errY": [("sqrt(bin_count)", "sqrt(bin_count+1)")], "source":"histoAB"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "log(bin_count+1)", "source":"histoAB"}],
         [['bin_count'], ['bin_center'], {"source": "histoB"}],

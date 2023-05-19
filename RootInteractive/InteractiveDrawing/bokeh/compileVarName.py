@@ -191,6 +191,10 @@ class ColumnEvaluator:
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             self.context = node.value.id
+        if self.cdsDict[self.context]["type"] == "stack":
+            self.isSource = False
+            for i in self.cdsDict[self.context]["sources"]:
+                self.dependencies.add((i, node.attr))
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
         if self.cdsDict[self.context]["type"] == "projection":
@@ -311,7 +315,7 @@ class ColumnEvaluator:
 
     def eval_fallback(self, node):
         if "data" not in self.cdsDict[self.context]:
-            raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
+            raise NotImplementedError("Feature not implemented for tables on client: " + self.code + ' ' + ast.dump(node))
         if self.isSource:
             column_id = self.code
         else:
