@@ -126,7 +126,7 @@ export class CDSStack extends ColumnarDataSource {
     if(this._cached_offsets.length === 0){
       return 0
     }
-    return this._cached_offsets[this._cached_offsets.length-1]
+    return this._cached_offsets[this._cached_offsets.length-1] + this._cached_lengths[this._cached_lengths.length-1]
   }
 
 }

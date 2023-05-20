@@ -1856,6 +1856,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     iSource["sources"] = paramDict[sources]["options"]
                     iSource["active"] = paramDict[sources]["value"]
             iSource["cdsOrig"] = CDSStack(mapping={value:i for (i, value) in enumerate(iSource["sources"])}, activeSources=iSource["active"])
+            if sources in paramDict:
+                paramDict[sources]["subscribed_events"].append(("value", iSource["cdsOrig"], "activeSources"))
         elif cdsType == "projection":
             axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
             quantiles = iSource["quantiles"] if "quantiles" in iSource else []
