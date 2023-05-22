@@ -58,13 +58,24 @@ export class CDSStack extends ColumnarDataSource {
     }
     const {sources, mapping, activeSources,  _cached_offsets} = this
     let col = Array(this.get_length()) 
-    for(let i=0; i < activeSources.length; i++){
-      const j = mapping[activeSources[i]] 
-      const colSmall = sources[i].get_column(key)
-      if(colSmall != null) {
-	for(let k=0; k < colSmall.length; k++){
-          col[k+_cached_offsets[j]] = colSmall[k]
-	}
+    if(key === "$source_index"){
+      for(let i=0; i < activeSources.length; i++){
+        const j = mapping[activeSources[i]] 
+        if(j < sources.length-1){
+          col.fill(activeSources[i], _cached_offsets[j], _cached_offsets[j+1])
+        } else {
+          col.fill(activeSources[i], _cached_offsets[j])
+        }
+      }     
+    } else {
+      for(let i=0; i < activeSources.length; i++){
+        const j = mapping[activeSources[i]] 
+        const colSmall = sources[j].get_column(key)
+        if(colSmall != null) {
+          for(let k=0; k < colSmall.length; k++){
+            col[k+_cached_offsets[j]] = colSmall[k]
+          }
+        }
       }
     }
     return col
