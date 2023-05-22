@@ -979,7 +979,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     y_transform_modified = modify_2d_transform(y_transform_parsed, y_transform_customjs, variables_dict["X"]["name"], cds_used) if y_transform else None
                     dataSpecX = {"field":varNameX, "transform":x_transform_modified} if x_transform else varNameX
                     dataSpecY = {"field":varNameY, "transform":y_transform_modified} if y_transform else varNameY
-                    if optionLocal["legend_field"] is None:
+                    if optionLocal["legend_field"] is not None:
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                    elif cdsDict[cds_name]["type"] == "stack":
+                        #TODO: Use more reasonable axis labels
+                        x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        if x_transform:
+                            x_label = f"{{{x_transform}}} {x_label}"
+                        y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field="$source_index")                        
+                    else:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
                             x_label = f"{{{x_transform}}} {x_label}"
@@ -993,9 +1006,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         else:
                             drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=''.join(legend_label.components))
-                    else:
-                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
-                                    color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
