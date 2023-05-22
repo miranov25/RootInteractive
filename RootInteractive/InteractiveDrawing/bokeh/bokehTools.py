@@ -44,7 +44,7 @@ import base64
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
-                "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
+                "dash", "hex", "inverted_triangle", "asterisk", "square_x", "x"]
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
@@ -888,10 +888,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 color=optionLocal['color']
             else:
                 color = colorAll[max(length, 4)][i]
-            try:
-                marker = optionLocal['markers'][i]
-            except:
-                marker = optionLocal['markers']
             markerSize = optionLocal['size']
             if markerSize in paramDict:
                 markerSize = paramDict[markerSize]['value']
@@ -902,6 +898,28 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cds_used = None
             if cds_name != "$IGNORE":
                 cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
+            markersAll = optionLocal["markers"]
+            markerField = variables_dict.get("marker_field", None)
+            if markerField is not None:
+                # TODO: Also support marker fields created on the client
+                if markerField["type"] == "column":
+                    uniq_values = np.unique(dfQuery[varName])
+                elif markerField["type"] == "server_derived_column":
+                    uniq_values = np.unique(column[0]["value"])
+                else:
+                    raise NotImplementedError("Marker field not implemented for aliases yet")
+                marker = factor_mark(markerField["name"], markersAll, uniq_values)
+            elif isinstance(cds_used.source.source, CDSStack):
+                marker = factor_mark("$source_index", markersAll, cds_used.source.source.activeSources)
+                stack_sources = cdsDict[cds_name]["sources"]
+                if isinstance(stack_sources, str):
+                    if stack_sources in paramDict:
+                        paramDict[stack_sources]["subscribed_events"].append(("value", marker["transform"], "factors"))
+            else:
+                try:
+                    marker = optionLocal['markers'][i]
+                except:
+                    marker = optionLocal['markers']
 
             if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
@@ -1853,9 +1871,11 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             sources = iSource["sources"]
             if isinstance(sources, str):
                 if sources in paramDict:
-                    iSource["sources"] = paramDict[sources]["options"]
+                    iSource["sources_all"] = paramDict[sources]["options"]
                     iSource["active"] = paramDict[sources]["value"]
-            iSource["cdsOrig"] = CDSStack(mapping={value:i for (i, value) in enumerate(iSource["sources"])}, activeSources=iSource["active"])
+            else:
+                iSource["sources_all"] = sources
+            iSource["cdsOrig"] = CDSStack(mapping={value:i for (i, value) in enumerate(iSource["sources_all"])}, activeSources=iSource["active"])
             if sources in paramDict:
                 paramDict[sources]["subscribed_events"].append(("value", iSource["cdsOrig"], "activeSources"))
         elif cdsType == "projection":
@@ -1880,7 +1900,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
         elif iSource["type"] == "stack":
-            cdsOrig.sources = [cdsDict[i]["cdsFull"] for i in iSource["sources"]]
+            cdsOrig.sources = [cdsDict[i]["cdsFull"] for i in iSource["sources_all"]]
         name_full = "cdsFull"
         if cds_name is not None:
             name_full = cds_name+"_full"

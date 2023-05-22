@@ -193,7 +193,7 @@ class ColumnEvaluator:
             self.context = node.value.id
         if self.cdsDict[self.context]["type"] == "stack":
             self.isSource = False
-            for i in self.cdsDict[self.context]["sources"]:
+            for i in self.cdsDict[self.context]["sources_all"]:
                 self.dependencies.add((i, node.attr))
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
