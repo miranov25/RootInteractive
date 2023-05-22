@@ -886,6 +886,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
+            elif isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
+                color = factor_cmap("$source_index", colorAll[10], cdsDict[cds_name]["cdsOrig"].activeSources)
+                stack_sources = cdsDict[cds_name]["sources"]
+                if isinstance(stack_sources, str):
+                    if stack_sources in paramDict:
+                        paramDict[stack_sources]["subscribed_events"].append(("value", color["transform"], "factors"))
             else:
                 color = colorAll[max(length, 4)][i]
             markerSize = optionLocal['size']
