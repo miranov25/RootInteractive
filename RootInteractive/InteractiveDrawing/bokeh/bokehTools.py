@@ -886,7 +886,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
-            elif isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
+            elif cds_name in cdsDict and isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
                 color = factor_cmap("$source_index", colorAll[10], cdsDict[cds_name]["cdsOrig"].activeSources)
                 stack_sources = cdsDict[cds_name]["sources"]
                 if isinstance(stack_sources, str):
@@ -915,7 +915,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 else:
                     raise NotImplementedError("Marker field not implemented for aliases yet")
                 marker = factor_mark(markerField["name"], markersAll, uniq_values)
-            elif isinstance(cds_used.source.source, CDSStack):
+            elif cds_name in cdsDict and isinstance(cds_used.source.source, CDSStack):
                 marker = factor_mark("$source_index", markersAll, cds_used.source.source.activeSources)
                 stack_sources = cdsDict[cds_name]["sources"]
                 if isinstance(stack_sources, str):
