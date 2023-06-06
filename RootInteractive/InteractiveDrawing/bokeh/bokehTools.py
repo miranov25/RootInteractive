@@ -1799,29 +1799,71 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
         elif cdsType == "histogram":
             weights = iSource.get("weights", None)
-            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
+            sample = iSource["variables"][0]
+            multi_axis = None 
+            sample_value = sample if sample not in paramDict else paramDict[sample]["value"]
+            weights_value = weights if weights is None or weights not in paramDict else paramDict[weights]["value"]
+            nbins = iSource.get("nbins", 10)
+            nbins_value = nbins if isinstance(nbins, int) else paramDict[nbins]["value"] 
+            histoRange = iSource.get("range", None)
+            range_value = histoRange if not isinstance(histoRange, str) else paramDict[histoRange]["value"]
+            if weights in paramDict:
+                if isinstance(paramDict["weights"]["value"], list):
+                    if multi_axis is not None:
+                        raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                    else:
+                       multi_axis = ("weights",)
+            if sample in paramDict:
+                if isinstance(paramDict[sample]["value"], list):
+                    if multi_axis is not None:
+                        raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                    else:
+                        multi_axis = ("variables",0)
+            if multi_axis is None:
+                cdsOrig = HistogramCDS(sample=sample_value, weights=weights_value, name=name_orig, nbins=nbins_value, range=range_value)
+                iSource["cdsOrig"] =cdsOrig 
+                histogramsLocal = [cdsOrig]
+            else:
+                histogramsLocal = []
+                acc = iSource
+                for i in multi_axis:
+                    acc = acc[i]
+                histoOptions = paramDict[acc]["options"]
+                for i in histoOptions:
+                    if multi_axis[0] == "weights":
+                        weights_value = i
+                    else:
+                        sample_value = i
+                    cdsOrig = HistogramCDS(sample=sample_value, weights=weights_value, name=f"{name_orig}_{i}", nbins=nbins_value, range=range_value)
+                    histogramsLocal.append(cdsOrig)
+                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
+                iSource["cdsOrig"] = cdsOrig
             if "source" not in iSource:
                 iSource["source"] = None
             if "tooltips" not in iSource:
                 iSource["tooltips"] = defaultHistoTooltips
-            nbins = 10
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
             if nbins in paramDict:
-                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
+                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal}, code="""
+                        for (histogram of histograms){
                             histogram.nbins = this.value | 0;
                             histogram.change_selection();
+                            }
                         """)])
-                nbins = paramDict[nbins]["value"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"]
             if isinstance(histoRange, str) and histoRange in paramDict:
-                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
-                histoRange = paramDict[histoRange]["value"]
-            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
+                for i in histogramsLocal:
+                    paramDict[histoRange]["subscribed_events"].append(["value", histogramsLocal[i], "range"])
+            if multi_axis != ("weights",) and weights in paramDict:
+                for i in histogramsLocal:
+                    paramDict[weights]["subscribed_events"].append(["value", histogramsLocal[i], "weights"])
+            if multi_axis[0] != "variables" and sample in paramDict:
+                for i in histogramsLocal:
+                    paramDict[sample]["subscribed_events"].append(["value", histogramsLocal[i], "sample"])
         elif cdsType in ["histo2d", "histoNd"]:
+            # TODO: If an axis is multiselect, create multiple histograms and make a join for the "exposed" CDS
+            # For now, only one axis will be supported
             weights = iSource.get("weights", None)
+            sample_variables = iSource["variables"]
             if "source" not in iSource:
                 iSource["source"] = None
             iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
