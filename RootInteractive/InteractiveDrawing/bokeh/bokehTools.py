@@ -1852,13 +1852,13 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                         """)])
             if isinstance(histoRange, str) and histoRange in paramDict:
                 for i in histogramsLocal:
-                    paramDict[histoRange]["subscribed_events"].append(["value", histogramsLocal[i], "range"])
+                    paramDict[histoRange]["subscribed_events"].append(["value", i, "range"])
             if multi_axis != ("weights",) and weights in paramDict:
                 for i in histogramsLocal:
-                    paramDict[weights]["subscribed_events"].append(["value", histogramsLocal[i], "weights"])
-            if multi_axis[0] != "variables" and sample in paramDict:
+                    paramDict[weights]["subscribed_events"].append(["value", i, "weights"])
+            if sample in paramDict and multi_axis != ("variables", 0):
                 for i in histogramsLocal:
-                    paramDict[sample]["subscribed_events"].append(["value", histogramsLocal[i], "sample"])
+                    paramDict[sample]["subscribed_events"].append(["value", i, "sample"])
         elif cdsType in ["histo2d", "histoNd"]:
             # TODO: If an axis is multiselect, create multiple histograms and make a join for the "exposed" CDS
             # For now, only one axis will be supported

@@ -45,7 +45,9 @@ export class CDSStack extends ColumnarDataSource {
   connect_signals(): void {
     super.connect_signals()
     for (let i=0; i < this.sources.length; i++){
-        this.connect(this.sources[i].change, () => this.compute_indices(i))
+        this.connect(this.sources[i].change, () => {
+		    this._selected_invalid = true
+		    this.change.emit()})
     }
     this.connect(this.properties.activeSources.change, () => {
 		this._selected_invalid = true
@@ -79,26 +81,6 @@ export class CDSStack extends ColumnarDataSource {
       }
     }
     return col
-  }
-
-  compute_indices(key: number): void{
-    const {mapping, sources, _selected} = this
-    if(_selected.has(key)) {
-      return 
-    }
-    this.data = {}
-    const new_length = sources[mapping[key]].get_length() ?? 0 
-    if(new_length !== this._cached_lengths[key]){
-      this._cached_lengths[key] = new_length
-      for(let i=key; i < this.sources.length; i++){
-        if(i === 0){
-	  this._cached_offsets[i] = new_length
-	} else {
-	  this._cached_offsets[i] = this._cached_offsets[i-1]+this._cached_lengths[i]
-	}
-      }
-    }
-    this.change.emit()
   }
 
   change_active(): void{
