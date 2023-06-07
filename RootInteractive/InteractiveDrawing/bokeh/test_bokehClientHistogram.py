@@ -1,5 +1,7 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from pandas import CategoricalDtype
 
 df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
@@ -389,3 +391,17 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
+def test_interactieTemplate():
+    output_file("test_histogramTemplate.html")
+    aliasArray, funCustom, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff()
+    variables = ["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"] + funCustom
+    parameterArray = parameterArray + [
+                {"name":"varX", "value":"A", "options":variables},
+                {"name":"varY", "value":"B", "options":variables},
+                {"name":"varYNorm", "value":"C", "options":variables},
+                {"name":"varZ", "value":"D", "options":variables},
+                {"name":"varZNorm", "value": "A*A+B", "options":variables}
+            ]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray)

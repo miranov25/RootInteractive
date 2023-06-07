@@ -115,7 +115,7 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
-    if isinstance(widgetLayoutDesc[-1], dict):
+    if len(widgetLayoutDesc) > 0 and isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
         optionLocal = options.copy()
         optionLocal.update(widgetLayoutDesc[-1])
