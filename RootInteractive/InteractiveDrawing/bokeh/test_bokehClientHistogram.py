@@ -414,5 +414,16 @@ def test_interactieTemplate():
             ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsExtra)
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    widgetLayoutDesc["Histograms"][0].append("varXMulti")
+    histoArray = histoArray + [
+            {"name":"histo1D", "variables":["varX"]},
+            {"name":"histo1DMulti", "variables":["varXMulti"]}
+            ]
+    figureArray1D = [
+            [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
+            [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}]
+            ]
+    figureArray = mergeFigureArrays(figureArray, figureArray1D)
+    figureLayoutDesc["Histo1D"] = [["histo1D", "histo1DMulti"], {"plot_height":350}]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray)

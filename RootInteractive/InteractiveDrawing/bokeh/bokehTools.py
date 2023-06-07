@@ -1201,7 +1201,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if cdsKey not in memoized_columns:
                 continue
             if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
-                histoList.append(cdsValue["cdsOrig"])
+                if isinstance(cdsValue["cdsOrig"], CDSStack):
+                    for i in cdsValue["cdsOrig"].sources:
+                        histoList.append(i)
+                else:
+                    histoList.append(cdsValue["cdsOrig"])
         intersectionFilter = LazyIntersectionFilter(filters=[])
         for iWidget in widgetList:
             if "filter" in iWidget:
@@ -1844,6 +1848,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 acc = iSource
                 for i in multi_axis:
                     acc = acc[i]
+                iSource["sources"] = acc
                 histoOptions = paramDict[acc]["options"]
                 for i in histoOptions:
                     if multi_axis[0] == "weights":
@@ -1964,7 +1969,11 @@ def makeCDSDict(sourceArray, paramDict, options={}):
     for cds_name, iSource in cdsDict.items():
         cdsOrig = iSource["cdsOrig"]
         if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
+            if isinstance(cdsOrig, CDSStack):
+                for i in cdsOrig.sources:
+                    i.source = cdsDict[iSource["source"]]["cdsFull"]
+            else:
+                cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
         elif iSource["type"] == "join":
             cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
             cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
