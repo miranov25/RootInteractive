@@ -1,7 +1,7 @@
 # from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 # from RootInteractive.Tools.compressArray import arrayCompressionRelative16, arrayCompressionRelative8
 # from bokeh.plotting import output_file
-from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
 def getDefaultVarsDiff():
     """
     TODO make diff parameterizable

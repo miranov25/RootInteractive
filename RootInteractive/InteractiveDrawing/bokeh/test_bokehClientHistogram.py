@@ -1,5 +1,6 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from pandas import CategoricalDtype
@@ -401,7 +402,17 @@ def test_interactieTemplate():
                 {"name":"varY", "value":"B", "options":variables},
                 {"name":"varYNorm", "value":"C", "options":variables},
                 {"name":"varZ", "value":"D", "options":variables},
-                {"name":"varZNorm", "value": "A*A+B", "options":variables}
+                {"name":"varZNorm", "value": "A*A+B", "options":variables},
+                {"name":"varXMulti", "value":["A", "B"], "options":variables}
             ]
+    widgetsExtra = [
+            ['range', ['A'], {"name":"A"}],
+            ['range', ['B'], {"name":"B"}],
+            ['range', ['C'], {"name":"C"}],
+            ['range', ['D'], {"name":"D"}],
+            ['multiSelect', ['varXMulti'], {"name":"varXMulti"}]
+            ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsExtra)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray)

@@ -68,6 +68,22 @@ RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
 IS_PANDAS_1 = pd.__version__.split('.')[0] == '1'
 
+def mergeFigureArrays(figureArrayOld, figureArrayNew):
+    if len(figureArrayOld) == 0:
+        return figureArrayNew
+    if len(figureArrayNew) == 0:
+        return figureArrayOld
+    figureArrayMerged = figureArrayOld.copy()
+    if isinstance(figureArrayMerged[-1], dict):
+        optionsOld = figureArrayMerged.pop().copy()
+        figureArrayMerged = figureArrayMerged + figureArrayNew
+        if isinstance(figureArrayNew[-1], dict):
+            optionsNew = figureArrayMerged.pop()
+            optionsOld.update(optionsNew)
+        figureArrayMerged.append(optionsOld)
+        return figureArrayMerged
+    return figureArrayMerged + figureArrayNew
+
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
     apply layout on plain array of bokeh figures, resp. interactive widgets
