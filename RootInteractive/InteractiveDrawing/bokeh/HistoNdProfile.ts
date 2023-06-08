@@ -173,7 +173,7 @@ export class HistoNdProfile extends ColumnarDataSource {
     this.connect(this.properties.weights.change, () => {
       this._stale = true
       this.change.emit()
-    }
+    })
   }
 
   update(): void {
