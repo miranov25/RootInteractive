@@ -393,7 +393,7 @@ def test_StableQuantile():
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
 
-def test_interactieTemplate():
+def test_interactiveTemplate():
     output_file("test_histogramTemplate.html")
     aliasArray, funCustom, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff()
     variables = ["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"] + funCustom
