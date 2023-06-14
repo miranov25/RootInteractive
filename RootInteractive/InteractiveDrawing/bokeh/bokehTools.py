@@ -1729,36 +1729,46 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 if "variables" in cdsDict[cdsName]:
                     variables = cdsDict[cdsName]["variables"]
                 else:
-                    variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
+                    variables = cdsDict[cdsDict[cdsName]["source"]]["variables"]
                 if len(x) == 2:
                     return f"{{{variables[0]}}}"
                 return f"{{{variables[int(x[2])]}}}"
             if x[0] == "quantile" and len(x) == 2:
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
-                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                    cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                    cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                    histogramOrig = cdsOrig.source
+                    projectionIdx = cdsOrig.axis_idx
                     return f"quantile {quantile} {{{ histogramOrig.sample_variables[projectionIdx] }}}"
                 return f"quantile {{{quantile}}}"
             if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if cdsDict[cdsName]["type"] == "projection":
-                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                        cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                        histogramOrig = cdsOrig.source
+                        projectionIdx = cdsOrig.axis_idx
                         return f"sum {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"sum in [{range[0]}, {range[1]}]"
                 elif len(x) == 3:
                     if cdsDict[cdsName]["type"] == "projection":
-                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                        cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                        histogramOrig = cdsOrig.source
+                        projectionIdx = cdsOrig.axis_idx
                         return f"p {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"p in [{range[0]}, {range[1]}]"
         else:
             if cdsDict[cdsName]["type"] == "projection":
-                histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
+                cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                if isinstance(cdsOrig, HistoNdProfile):
+                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                    return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
+                else:
+                    return f"{varName}"
     return prefix+varName
 
 def makeCDSDict(sourceArray, paramDict, options={}):
@@ -1892,7 +1902,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 iSource["tooltips"] = defaultHisto2DTooltips
             nbins = iSource.get("nbins", 10)
             if isinstance(nbins, int):
-                nbins = [nbins]*len(variables)
+                nbins = [nbins]*len(sample_variables)
             if isinstance(nbins, str):
                 raise NotImplemented("Using ND binning as one parameter is not supported yet, please provide an array of parameters instead")
             nbins_value = [paramDict[i]["value"] if i in paramDict else i for i in nbins]
@@ -1914,7 +1924,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                         else:
                             multi_axis = ("variables", i)
             if multi_axis is None:
-                cdsOrig = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig, nbins=nbins_value, range=range_value)
+                cdsOrig = HistoNdCDS(sample_variables=sample_value, weights=weights, name=name_orig, nbins=nbins_value, range=range_value)
                 iSource["cdsOrig"] = cdsOrig
                 histogramsLocal = [cdsOrig]
             else:
@@ -1929,9 +1939,11 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                         weights_value = i
                     else:
                         sample_value[multi_axis[1]] = i
-                    cdsOrig = HistoNdCDS(sample=sample_value.copy(), weights=weights_value, name=f"{name_orig}_{i}", nbins=nbins_value, range=range_value)
+                    cdsOrig = HistoNdCDS(sample_variables=sample_value.copy(), weights=weights_value, name=f"{name_orig}_{i}", nbins=nbins_value, range=range_value)
                     histogramsLocal.append(cdsOrig)
                 cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                iSource["cdsOrig"] = cdsOrig
+                paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
             for binsIdx, iBins in enumerate(nbins):
                 if isinstance(iBins, str) and iBins in paramDict:
                     paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal, "i": binsIdx}, code="""
@@ -1957,7 +1969,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     paramDict[weights]["subscribed_events"].append(["value", i, "weights"])
             for j in range(len(sample_variables)):
                 cdsDict[f"{cds_name}_{str(j)}"] = {"type": "projection", "name": f"{cds_name}_{str(j)}", "source":cds_name, "weights":weights, 
-                        "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j}
+                        "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j, "sources":iSource.get("sources", None)}
         elif cdsType == "join":
             left = None
             if "left" in iSource:
@@ -2000,10 +2012,12 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
             cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
         elif iSource["type"] == "projection":
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
-            cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
             if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
+                if isinstance(cdsOrig, CDSStack) and len(cdsOrig.sources) > 0:
+                    cdsTooltips = cdsOrig.sources[0]
+                else:
+                    cdsTooltips = cdsOrig
+                iSource["tooltips"] = defaultNDProfileTooltips(cdsTooltips.source.sample_variables, cdsTooltips.axis_idx, cdsTooltips.quantiles, cdsTooltips.sum_range)
         elif iSource["type"] == "stack":
             cdsOrig.sources = [cdsDict[i]["cdsFull"] for i in iSource["sources_all"]]
         name_full = "cdsFull"

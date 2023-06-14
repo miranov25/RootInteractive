@@ -417,13 +417,19 @@ def test_interactiveTemplate():
     widgetLayoutDesc["Histograms"][0].append("varXMulti")
     histoArray = histoArray + [
             {"name":"histo1D", "variables":["varX"]},
-            {"name":"histo1DMulti", "variables":["varXMulti"]}
+            {"name":"histo1DMulti", "variables":["varXMulti"]},
+            {"name":"histoNDMulti", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True}
             ]
     figureArray1D = [
             [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
-            [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}]
+            [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}],
+            [["bin_center_0"], ["mean"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Mean", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["std"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Median", "errY": "std/sqrt(entries)"}],
+            [["mean"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Mean", "errX": "std/sqrt(entries)"}],
+            [["std"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Median", "errX": "std/sqrt(entries)"}],
             ]
     figureArray = mergeFigureArrays(figureArray, figureArray1D)
     figureLayoutDesc["Histo1D"] = [["histo1D", "histo1DMulti"], {"plot_height":350}]
+    figureLayoutDesc["HistoMulti"] = [["histoNDMulti_1_Mean", "histoNDMulti_1_Median"], ["histoNDMulti_0_Mean", "histoNDMulti_0_Median"], {"plot_height":250}]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray)
