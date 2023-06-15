@@ -6,21 +6,21 @@ function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number,
   // TODO: Use a smarter algorithm
   // This algorithm should be linear average case, but worst case is quadratic
   if(end < 0) end += sample.length + 1
-  if(!(k>=begin && k<end)) {
+  if(!(k>=begin && k < end)) {
     throw Error("Element out of range: " + (k-begin))
   }
-  while(begin<end){
+  while(begin < end){
     //debugger;
     let pivot = sample[k]
     let pivot_idx = begin
-    for(let i=begin; i<end; i++){
+    for(let i=begin; i < end; i++){
       pivot_idx += isNaN(sample[i]) || compare(sample[i], pivot) < 0 ? 1 : 0
     }
     if(pivot_idx >= end && isNaN(pivot)) return
     let pointer_mid = pivot_idx
     let pointer_high = end-1
     let pointer_low=begin
-    while(pointer_low<pivot_idx){
+    while(pointer_low < pivot_idx){
       let x = sample[pointer_low]
       let cmp = compare(x, pivot)
       if(cmp>0){
@@ -66,7 +66,7 @@ function weighted_kth_value(sample:number[], weights: number[], k:number, begin=
     let pivot_idx = begin
     let pivot_cumsum_lower = 0
     let pivot_cumsum_upper = 0
-    for(let i=begin; i<end; i++){
+    for(let i=begin; i < end; i++){
       pivot_idx += sample[i] < pivot ? 1 : 0
       pivot_cumsum_lower += sample[i] < pivot ? weights[i] : 0
       pivot_cumsum_upper += sample[i] <= pivot ? weights[i] : 0
@@ -74,7 +74,7 @@ function weighted_kth_value(sample:number[], weights: number[], k:number, begin=
     let pointer_mid = pivot_idx
     let pointer_high = end-1
     let pointer_low=begin
-    while(pointer_low<pivot_idx){
+    while(pointer_low < pivot_idx){
       let x = sample[pointer_low]
       let tmp = weights[pointer_low]
       if(x>pivot){
@@ -170,6 +170,10 @@ export class HistoNdProfile extends ColumnarDataSource {
       this._stale = true
       this.change.emit()
     })
+    this.connect(this.properties.weights.change, () => {
+      this._stale = true
+      this.change.emit()
+    })
   }
 
   update(): void {
@@ -195,7 +199,7 @@ export class HistoNdProfile extends ColumnarDataSource {
         const stride_low = source.get_stride(axis_idx)
         const stride_high = source.get_stride(axis_idx+1)
 
-        for(let i=0; i<source.dim; i++){
+        for(let i=0; i < source.dim; i++){
           if(i != axis_idx){
               this.data["bin_bottom_"+i] = []
               this.data["bin_center_"+i] =[]
@@ -238,7 +242,7 @@ export class HistoNdProfile extends ColumnarDataSource {
           for(let z = 0; z < stride_low; z ++){
       //      console.log(x)
       //      console.log(z)
-            for(let i=0; i<source.dim; i++){
+            for(let i=0; i < source.dim; i++){
               if(i != axis_idx){
                   bin_bottom_filtered[i].push(bin_bottom_all[i][x+z])
                   bin_centers_filtered[i].push(bin_centers_all[i][x+z])
@@ -268,12 +272,12 @@ export class HistoNdProfile extends ColumnarDataSource {
                   const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
                   const index_high = global_cumulative_histogram![x+y+z]
                   if(sorted_weights == null){
-                    for(let i=index_low; i<index_high; ++i){
+                    for(let i=index_low; i < index_high; ++i){
                       if (isFinite(sorted_entries![i]))
                       mean += sorted_entries![i]
                     }
                   } else {
-                    for(let i=index_low; i<index_high; ++i){
+                    for(let i=index_low; i < index_high; ++i){
                       if (isFinite(sorted_entries![i]))
                       mean += sorted_entries![i] * sorted_weights[i]
                     }
@@ -292,12 +296,12 @@ export class HistoNdProfile extends ColumnarDataSource {
                   const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
                   const index_high = global_cumulative_histogram![x+y+z]
                   if(sorted_weights == null){
-                    for(let i=index_low; i<index_high; ++i){
+                    for(let i=index_low; i < index_high; ++i){
                       if (isFinite(sorted_entries![i]))
                       std += sorted_entries![i] * sorted_entries![i]
                     }
                   } else {
-                    for(let i=index_low; i<index_high; ++i){
+                    for(let i=index_low; i < index_high; ++i){
                       if (isFinite(sorted_entries![i]))
                       std += sorted_entries![i] * sorted_entries![i] * sorted_weights[i]
                     }

@@ -1,8 +1,12 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
+from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
 
-df = pd.DataFrame(np.random.random_sample(size=(2000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )
@@ -287,10 +291,10 @@ def test_StableQuantile():
         {"name": "histoABWeight", "variables": ["A", "A*A*B"], "nbins": ["nBinsA", "nBinsAAB"], "weights":"1+A", "axis": [1], "quantiles": [.05, .5, .95]},
         {"name": "histo3D", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsAAB"], "axis": [2], "quantiles": [.05, .5, .95]},
         {"name": "histo3D_weight", "variables": ["A", "B", "A*A*B"], "nbins": ["nBinsA", "nBinsB", "nBinsAAB"], "weights":"1+A", "axis": [2], "quantiles": [.05, .5, .95]},
-        {"name": "projectionA", "axis_idx":[1], "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
-        {"name": "projectionAWeight", "axis_idx":[1], "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"},
-        {"name": "projection3D", "axis_idx":[2], "source": "histo3D", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
-        {"name": "projection3D_weight", "axis_idx":[2], "source": "histo3D_weight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
+        {"name": "projectionA", "axis_idx":1, "source": "histoAB", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
+        {"name": "projectionAWeight", "axis_idx":1, "source": "histoABWeight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"},
+        {"name": "projection3D", "axis_idx":2, "source": "histo3D", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95]},
+        {"name": "projection3D_weight", "axis_idx":2, "source": "histo3D_weight", "unbinned":True, "type":"projection", "quantiles": [.05, .5, .95], "weights":"1+A"}
     ]
     aliasArray = [
         (f"{i}_normed", f"{i} / bin_center_0**2", j) for i in ["mean", "std", "quantile_0",  "quantile_1", "quantile_2"] for j in ["histoAB_1", "histoABWeight_1", "projectionA", "projectionAWeight"]
@@ -389,3 +393,44 @@ def test_StableQuantile():
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+
+def test_interactiveTemplate():
+    output_file("test_histogramTemplate.html")
+    aliasArray, funCustom, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff()
+    variables = ["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"] + funCustom
+    parameterArray = parameterArray + [
+                {"name":"varX", "value":"A", "options":variables},
+                {"name":"varY", "value":"B", "options":variables},
+                {"name":"varYNorm", "value":"C", "options":variables},
+                {"name":"varZ", "value":"D", "options":variables},
+                {"name":"varZNorm", "value": "A*A+B", "options":variables},
+                {"name":"varXMulti", "value":["A", "B"], "options":variables}
+            ]
+    widgetsExtra = [
+            ['range', ['A'], {"name":"A"}],
+            ['range', ['B'], {"name":"B"}],
+            ['range', ['C'], {"name":"C"}],
+            ['range', ['D'], {"name":"D"}],
+            ['multiSelect', ['varXMulti'], {"name":"varXMulti"}]
+            ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsExtra)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    widgetLayoutDesc["Histograms"][0].append("varXMulti")
+    histoArray = histoArray + [
+            {"name":"histo1D", "variables":["varX"]},
+            {"name":"histo1DMulti", "variables":["varXMulti"]},
+            {"name":"histoNDMulti", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True}
+            ]
+    figureArray1D = [
+            [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
+            [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}],
+            [["bin_center_0"], ["mean"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Mean", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["std"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Median", "errY": "std/sqrt(entries)"}],
+            [["mean"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Mean", "errX": "std/sqrt(entries)"}],
+            [["std"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Median", "errX": "std/sqrt(entries)"}],
+            ]
+    figureArray = mergeFigureArrays(figureArray, figureArray1D)
+    figureLayoutDesc["Histo1D"] = [["histo1D", "histo1DMulti"], {"plot_height":350}]
+    figureLayoutDesc["HistoMulti"] = [["histoNDMulti_1_Mean", "histoNDMulti_1_Median"], ["histoNDMulti_0_Mean", "histoNDMulti_0_Median"], {"plot_height":250}]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)

@@ -53,6 +53,8 @@ export class HistogramCDS extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => {this.change_selection()})
+    this.connect(this.properties.weights.change, () => {this.change_selection()})
+    this.connect(this.properties.sample.change, () => {this.change_selection()})
     this.connect(this.properties.nbins.change, () => {this.change_selection()})
     this.connect(this.properties.range.change, () => {this.change_selection()})
     if(this.filter != null){

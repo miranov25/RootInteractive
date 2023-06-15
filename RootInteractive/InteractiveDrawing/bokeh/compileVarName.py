@@ -191,10 +191,11 @@ class ColumnEvaluator:
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             self.context = node.value.id
-        if self.cdsDict[self.context]["type"] == "stack":
+        if self.context in self.cdsDict and self.cdsDict[self.context]["type"] == "stack":
             self.isSource = False
-            for i in self.cdsDict[self.context]["sources_all"]:
-                self.dependencies.add((i, node.attr))
+            if node.attr != "$source_index":
+                for i in self.cdsDict[self.context]["sources_all"]:
+                    self.dependencies.add((i, node.attr))
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
         if self.cdsDict[self.context]["type"] == "projection":
