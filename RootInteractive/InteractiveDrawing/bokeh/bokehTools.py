@@ -1905,7 +1905,7 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 raise NotImplemented("Using ND binning as one parameter is not supported yet, please provide an array of parameters instead")
             nbins_value = [paramDict[i]["value"] if i in paramDict else i for i in nbins]
             histoRange = iSource.get("range", None)
-            range_value = [paramDict[i]["value"] if i in paramDict else i for i in histoRange] if histoRange is not None else None
+            range_value = [paramDict[i]["value"] if isinstance(i, str) and i in paramDict else i for i in histoRange] if histoRange is not None else None
             sample_value = [sample if sample not in paramDict else paramDict[sample]["value"] for sample in sample_variables]
             weights_value = weights if weights is None or weights not in paramDict else paramDict[weights]["value"]
             if weights in paramDict:
