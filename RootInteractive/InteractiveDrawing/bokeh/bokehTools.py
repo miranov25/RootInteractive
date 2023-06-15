@@ -998,7 +998,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal["legend_field"] is not None:
                         drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
-                    elif cdsDict[cds_name]["type"] == "stack":
+                    elif isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
                         #TODO: Use more reasonable axis labels
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
@@ -1891,8 +1891,6 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 for i in histogramsLocal:
                     paramDict[sample]["subscribed_events"].append(["value", i, "sample"])
         elif cdsType in ["histo2d", "histoNd"]:
-            # TODO: If an axis is multiselect, create multiple histograms and make a join for the "exposed" CDS
-            # For now, only one axis will be supported
             multi_axis = None
             weights = iSource.get("weights", None)
             sample_variables = iSource["variables"]
