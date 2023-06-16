@@ -196,29 +196,6 @@ def testBokehClientHistogram3d():
     xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                               widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
 
-def testBokehClientHistogram3d_colormap():
-    output_file("test_BokehClientHistogram_colormap.html")
-    histoArray = [
-        {"name": "histoABC", "variables": ["(A+C)/2", "B", "C"], "nbins": [8, "nBinsB", 12], "weights": "D", "axis": [0], "sum_range": [[.25, .75]],
-        "range": [[0,1],[0,1],[0,1]]},
-    ]
-    figureArray = [
-        [['histoABC_0.bin_center_1'], ['histoABC_0.mean'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.sum_normed_0'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        [['histoABC_0.bin_center_1'], ['histoABC_0.std'], {"colorZvar": "histoABC_0.bin_center_2" }],
-        {"size": "size", "rescaleColorMapper": True, "y_transform":"transformY"}
-    ]
-    figureLayoutDesc=[
-        [0, 1, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        [2, 3, {'commonX': 1, 'y_visible': 1, 'x_visible':1, 'plot_height': 200}],
-        {'plot_height': 100, 'sizing_mode': 'scale_width', 'y_visible' : 2}
-    ]
-    widgetLayoutDesc = [[0, 1, 2], [3, 4], [5], [7], {'sizing_mode': 'scale_width'}]
-    
-    xxx=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray)
-
 def testBokehClientHistogram3d_colormap_noscale():
     output_file("test_BokehClientHistogram_colormap_noscale.html")
     histoArray = [
@@ -392,7 +369,7 @@ def test_StableQuantile():
     }
     
     xxx=bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
-                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray)
+                              widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=3000, histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
 
 def test_interactiveTemplate():
     output_file("test_histogramTemplate.html")
@@ -404,33 +381,41 @@ def test_interactiveTemplate():
                 {"name":"varYNorm", "value":"C", "options":variables},
                 {"name":"varZ", "value":"D", "options":variables},
                 {"name":"varZNorm", "value": "A*A+B", "options":variables},
-                {"name":"varXMulti", "value":["A", "B"], "options":variables}
+                {"name":"varXMulti", "value":["A", "B"], "options":variables},
+                {"name":"varYMulti", "value":["A", "B"], "options":variables}
             ]
     widgetsExtra = [
             ['range', ['A'], {"name":"A"}],
             ['range', ['B'], {"name":"B"}],
             ['range', ['C'], {"name":"C"}],
             ['range', ['D'], {"name":"D"}],
-            ['multiSelect', ['varXMulti'], {"name":"varXMulti"}]
+            ['multiSelect', ['varXMulti'], {"name":"varXMulti"}],
+            ['multiSelect', ['varYMulti'], {"name":"varYMulti"}],
             ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsExtra)
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
-    widgetLayoutDesc["Histograms"][0].append("varXMulti")
+    widgetLayoutDesc["Histograms"].append(["varXMulti", "varYMulti"])
     histoArray = histoArray + [
             {"name":"histo1D", "variables":["varX"]},
             {"name":"histo1DMulti", "variables":["varXMulti"]},
-            {"name":"histoNDMulti", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True}
+            {"name":"histoNDMultiX", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True},
+            {"name":"histoNDMultiY", "variables":["varX", "varYMulti"], "quantiles":[0.35, 0.5], "unbinned_projections":True},
             ]
     figureArray1D = [
             [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
             [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}],
-            [["bin_center_0"], ["mean"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Mean", "errY": "std/sqrt(entries)"}],
-            [["bin_center_0"], ["std"], {"source":"histoNDMulti_1", "name":"histoNDMulti_1_Median", "errY": "std/sqrt(entries)"}],
-            [["mean"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Mean", "errX": "std/sqrt(entries)"}],
-            [["std"], ["bin_center_1"], {"source":"histoNDMulti_0", "name":"histoNDMulti_0_Median", "errX": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["mean"], {"source":"histoNDMultiX_1", "name":"histoNDMultiX_1_Mean", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["std"], {"source":"histoNDMultiX_1", "name":"histoNDMultiX_1_Median", "errY": "std/sqrt(entries)"}],
+            [["mean"], ["bin_center_1"], {"source":"histoNDMultiX_0", "name":"histoNDMultiX_0_Mean", "errX": "std/sqrt(entries)"}],
+            [["std"], ["bin_center_1"], {"source":"histoNDMultiX_0", "name":"histoNDMultiX_0_Median", "errX": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["mean"], {"source":"histoNDMultiY_1", "name":"histoNDMultiY_1_Mean", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["std"], {"source":"histoNDMultiY_1", "name":"histoNDMultiY_1_Median", "errY": "std/sqrt(entries)"}],
+            [["mean"], ["bin_center_1"], {"source":"histoNDMultiY_0", "name":"histoNDMultiY_0_Mean", "errX": "std/sqrt(entries)"}],
+            [["std"], ["bin_center_1"], {"source":"histoNDMultiY_0", "name":"histoNDMultiY_0_Median", "errX": "std/sqrt(entries)"}],
             ]
     figureArray = mergeFigureArrays(figureArray, figureArray1D)
     figureLayoutDesc["Histo1D"] = [["histo1D", "histo1DMulti"], {"plot_height":350}]
-    figureLayoutDesc["HistoMulti"] = [["histoNDMulti_1_Mean", "histoNDMulti_1_Median"], ["histoNDMulti_0_Mean", "histoNDMulti_0_Median"], {"plot_height":250}]
+    figureLayoutDesc["HistoMultiX"] = [["histoNDMultiX_1_Mean", "histoNDMultiX_1_Median"], ["histoNDMultiX_0_Mean", "histoNDMultiX_0_Median"], {"plot_height":240}]
+    figureLayoutDesc["HistoMultiY"] = [["histoNDMultiY_1_Mean", "histoNDMultiY_1_Median"], ["histoNDMultiY_0_Mean", "histoNDMultiY_0_Median"], {"plot_height":240}]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
