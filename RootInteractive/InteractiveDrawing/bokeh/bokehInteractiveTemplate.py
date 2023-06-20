@@ -2,14 +2,16 @@
 # from RootInteractive.Tools.compressArray import arrayCompressionRelative16, arrayCompressionRelative8
 # from bokeh.plotting import output_file
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
-def getDefaultVarsDiff():
+
+def getDefaultVars(normalization=None, variables=None, multiY=False, defaultParameters={}):
     """
-    TODO make diff parameterizable
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
     """
     # defining custom java script function to query  (used later in variable list)
-    variables=["funCustom0","funCustom1","funCustom2"]
+    if variables is None:
+        variables = []
+    variables.extend(["funCustom0","funCustom1","funCustom2"])
 
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0",},
@@ -37,6 +39,13 @@ def getDefaultVarsDiff():
 
     parameterArray.extend(figureParameters["legend"]['parameterArray'])
     parameterArray.extend(figureParameters["markers"]['parameterArray'])
+    parameterVars = ["varX", "varY", "varZ"] if normalization is None else ["varX", "varY", "varYNorm", "varZ", "varZNorm"]
+
+    for i, iVar in enumerate(parameterVars):
+        defaultValue = defaultParameters.get(iVar, variables[i % len(variables)])
+        if multiY and isinstance(defaultValue, str):
+            defaultValue = [defaultValue]
+        parameterArray.append({"name": iVar, "value": defaultValue, "options":variables}) 
 
     widgetParams=[
         # custom selection
@@ -48,10 +57,8 @@ def getDefaultVarsDiff():
         ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
         # histogram selection
         ['select', ['varX'], {"name": "varX"}],
-        ['select', ['varY'], {"name": "varY"}],
-        ['select', ['varYNorm'], {"name": "varYNorm"}],
+        ['multiSelect' if multiY else 'select', ['varY'], {"name": "varY"}],
         ['select', ['varZ'], {"name": "varZ"}],
-        ['select', ['varZNorm'], {"name": "varZNorm"}],
         ['spinner', ['nbinsY'], {"name": "nbinsY"}],
         ['spinner', ['nbinsX'], {"name": "nbinsX"}],
         ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
@@ -63,17 +70,24 @@ def getDefaultVarsDiff():
         ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
     ]
 
+    if normalization is not None:
+        widgetParams.append(['select', ['varYNorm'], {"name":"varYNorm"}])
+        widgetParams.append(['select', ['varZNorm'], {"name":"varZNorm"}])
+
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
 
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "varX","varY","varYNorm","varZ","varZNorm"], {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "varX","varY","varZ"], {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
     }
+
+    if normalization is not None:
+        widgetLayoutDesc["Histograms"][0].extend(["varYNorm", "varZNorm"])
 
     figureGlobalOption={}
     figureGlobalOption=figureParameters["legend"]["figureOptions"]
@@ -89,14 +103,18 @@ def getDefaultVarsDiff():
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
-            "name": "histoXYNormData",
-            "variables": ["varX","varY-varYNorm"],
-            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        {
             "name": "histoXYZData",
             "variables": ["varX","varY","varZ"],
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+        },
+    ]
+
+    if normalization in {"diff", "-"}:
+        histoArray.extend([
+        {
+            "name": "histoXYNormData",
+            "variables": ["varX","varY-varYNorm"],
+            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYNormZData",
@@ -108,7 +126,31 @@ def getDefaultVarsDiff():
             "variables": ["varX","varY","varZ-varZNorm"],
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
-    ]
+        ])
+    elif normalization in {"ratio", "/"}:
+        histoArray.extend([
+        {
+            "name": "histoXYNormData",
+            "variables": ["varX","varY/varYNorm"],
+            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
+        },
+        {
+            "name": "histoXYNormZData",
+            "variables": ["varX","varY/varYNorm","varZ"],
+            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+        },
+        {
+            "name": "histoXYZNormData",
+            "variables": ["varX","varY","varZ/varZNorm"],
+            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+        },
+        ])
+
+    yAxisTitleNorm = {
+            "diff":"{varY}-{varYNorm}",
+            "ratio":"{varY}/{varYNorm}",
+            "logRatio":"log(varY)/log(varYNorm)"
+            }[normalization]
 
     figureArray=[
         # histo XY
@@ -127,10 +169,10 @@ def getDefaultVarsDiff():
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         # histoXYNormZ
-        [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
-        [["bin_center_0"], ["entries"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
-        [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
-        [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":"{varY}-{varYNorm}"}],
+        [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_0"], ["entries"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
         # histoXYNormZMedian
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZData_2"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZNormData_2"}],
@@ -155,6 +197,9 @@ def getDefaultVarsDiff():
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
+
+def getDefaultVarsDiff(*args, **kwargs):
+    return getDefaultVars("diff", *args, **kwargs)
 
 def getDefaultVarsRatio():
     """
