@@ -373,14 +373,8 @@ def test_StableQuantile():
 
 def test_interactiveTemplate():
     output_file("test_histogramTemplate.html")
-    aliasArray, funCustom, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff()
-    variables = ["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"] + funCustom
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"])
     parameterArray = parameterArray + [
-                {"name":"varX", "value":"A", "options":variables},
-                {"name":"varY", "value":"B", "options":variables},
-                {"name":"varYNorm", "value":"C", "options":variables},
-                {"name":"varZ", "value":"D", "options":variables},
-                {"name":"varZNorm", "value": "A*A+B", "options":variables},
                 {"name":"varXMulti", "value":["A", "B"], "options":variables},
                 {"name":"varYMulti", "value":["A", "B"], "options":variables}
             ]
@@ -396,10 +390,10 @@ def test_interactiveTemplate():
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
     widgetLayoutDesc["Histograms"][0].append(["varXMulti", "varYMulti"])
     histoArray = histoArray + [
-            {"name":"histo1D", "variables":["varX"]},
-            {"name":"histo1DMulti", "variables":["varXMulti"]},
-            {"name":"histoNDMultiX", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True},
-            {"name":"histoNDMultiY", "variables":["varX", "varYMulti"], "quantiles":[0.35, 0.5], "unbinned_projections":True},
+            {"name":"histo1D", "variables":["varX"], "nbins":"nbinsX"},
+            {"name":"histo1DMulti", "variables":["varXMulti"], "nbins":"nbinsX"},
+            {"name":"histoNDMultiX", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True, "nbins":["nbinsX", "nbinsY"]},
+            {"name":"histoNDMultiY", "variables":["varX", "varYMulti"], "quantiles":[0.35, 0.5], "unbinned_projections":True, "nbinb":["nbinsX", "nbinsY"]},
             ]
     figureArray1D = [
             [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
