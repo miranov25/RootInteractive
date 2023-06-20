@@ -394,7 +394,7 @@ def test_interactiveTemplate():
             ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsExtra)
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
-    widgetLayoutDesc["Histograms"].append(["varXMulti", "varYMulti"])
+    widgetLayoutDesc["Histograms"][0].append(["varXMulti", "varYMulti"])
     histoArray = histoArray + [
             {"name":"histo1D", "variables":["varX"]},
             {"name":"histo1DMulti", "variables":["varXMulti"]},
