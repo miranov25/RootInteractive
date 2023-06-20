@@ -373,7 +373,7 @@ def test_StableQuantile():
 
 def test_interactiveTemplate():
     output_file("test_histogramTemplate.html")
-    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"])
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"])
     parameterArray = parameterArray + [
                 {"name":"varXMulti", "value":["A", "B"], "options":variables},
                 {"name":"varYMulti", "value":["A", "B"], "options":variables}
@@ -393,7 +393,7 @@ def test_interactiveTemplate():
             {"name":"histo1D", "variables":["varX"], "nbins":"nbinsX"},
             {"name":"histo1DMulti", "variables":["varXMulti"], "nbins":"nbinsX"},
             {"name":"histoNDMultiX", "variables":["varXMulti", "varY"], "quantiles":[0.35, 0.5], "unbinned_projections":True, "nbins":["nbinsX", "nbinsY"]},
-            {"name":"histoNDMultiY", "variables":["varX", "varYMulti"], "quantiles":[0.35, 0.5], "unbinned_projections":True, "nbinb":["nbinsX", "nbinsY"]},
+            {"name":"histoNDMultiY", "variables":["varX", "varYMulti"], "quantiles":[0.35, 0.5], "unbinned_projections":True, "nbins":["nbinsX", "nbinsY"]},
             ]
     figureArray1D = [
             [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],

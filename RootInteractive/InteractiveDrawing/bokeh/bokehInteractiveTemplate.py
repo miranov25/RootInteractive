@@ -3,7 +3,7 @@
 # from bokeh.plotting import output_file
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
 
-def getDefaultVars(normalization=None, variables=None, multiY=False, defaultParameters={}):
+def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -12,7 +12,7 @@ def getDefaultVars(normalization=None, variables=None, multiY=False, defaultPara
     if variables is None:
         variables = []
     variables.extend(["funCustom0","funCustom1","funCustom2"])
-
+    multiY = False
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0",},
         {"name": "funCustom1",  "func":"funCustomForm1",},
@@ -42,7 +42,7 @@ def getDefaultVars(normalization=None, variables=None, multiY=False, defaultPara
     parameterVars = ["varX", "varY", "varZ"] if normalization is None else ["varX", "varY", "varYNorm", "varZ", "varZNorm"]
 
     for i, iVar in enumerate(parameterVars):
-        defaultValue = defaultParameters.get(iVar, variables[i % len(variables)])
+        defaultValue = defaultVariables.get(iVar, variables[i % len(variables)])
         if multiY and isinstance(defaultValue, str):
             defaultValue = [defaultValue]
         parameterArray.append({"name": iVar, "value": defaultValue, "options":variables}) 
