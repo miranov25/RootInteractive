@@ -3,7 +3,7 @@
 # from bokeh.plotting import output_file
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
 
-def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
+def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -57,7 +57,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
         ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
         # histogram selection
         ['select', ['varX'], {"name": "varX"}],
-        ['multiSelect' if multiY else 'select', ['varY'], {"name": "varY"}],
+        ['select', ['varY'], {"name": "varY"}],
         ['select', ['varZ'], {"name": "varZ"}],
         ['spinner', ['nbinsY'], {"name": "nbinsY"}],
         ['spinner', ['nbinsX'], {"name": "nbinsX"}],
@@ -74,20 +74,29 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
         widgetParams.append(['select', ['varYNorm'], {"name":"varYNorm"}])
         widgetParams.append(['select', ['varZNorm'], {"name":"varZNorm"}])
 
+    defaultWeights=None
+    if isinstance(weights, list):
+        defaultWeights = defaultVariables.get("weights", weights[0])
+        parameterArray.append({"name": "weights", "value": defaultWeights, "options":weights}) 
+        widgetParams.append(['multiSelect', ['weights'], {"name":"weights"}])
+
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
+
+    parameterVarsLayout = ["varX", "varY", "varZ"]
+    if normalization:
+        parameterVarsLayout.extend(["varYNorm", "varZNorm"])
+    if weights:
+        parameterVarsLayout.append("weights")
 
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "varX","varY","varZ"], {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ"], parameterVarsLayout, {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
     }
-
-    if normalization is not None:
-        widgetLayoutDesc["Histograms"][0].extend(["varYNorm", "varZNorm"])
 
     figureGlobalOption={}
     figureGlobalOption=figureParameters["legend"]["figureOptions"]
@@ -100,11 +109,13 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
         {
             "name": "histoXYData",
             "variables": ["varX","varY"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYZData",
             "variables": ["varX","varY","varZ"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
     ]
@@ -114,16 +125,19 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
         {
             "name": "histoXYNormData",
             "variables": ["varX","varY-varYNorm"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYNormZData",
             "variables": ["varX","varY-varYNorm","varZ"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYZNormData",
             "variables": ["varX","varY","varZ-varZNorm"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         ])
@@ -132,16 +146,19 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}):
         {
             "name": "histoXYNormData",
             "variables": ["varX","varY/varYNorm"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYNormZData",
             "variables": ["varX","varY/varYNorm","varZ"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYZNormData",
             "variables": ["varX","varY","varZ/varZNorm"],
+            "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         ])
