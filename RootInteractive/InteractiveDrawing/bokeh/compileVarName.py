@@ -261,7 +261,7 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "type": "parameter"
+                "type": "paramTensor" if isinstance(self.paramDict[node.id]["value"], list) else "parameter"
             }
         if node.id in [self.context, "self"]:
             return {
