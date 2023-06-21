@@ -83,9 +83,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
 
-    parameterVarsLayout = ["varX", "varY", "varZ"]
-    if normalization:
-        parameterVarsLayout.extend(["varYNorm", "varZNorm"])
+    parameterVarsLayout = ["varX", "varY", "varZ"] if not normalization else ["varX", "varY", "varYNorm", "varZ", "varZNorm"]
     if weights:
         parameterVarsLayout.append("weights")
 
