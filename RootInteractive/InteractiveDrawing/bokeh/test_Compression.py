@@ -234,8 +234,7 @@ def testCompressionDecompressionInt8(stop=10, step=1):
     print("t4", t4)
     print("t5", t5)
     diffSum = (t5 - t0).sum()
-    if diffSum > 0:
-        raise ValueError("testCompressionDecompressionInt8 error")
+    assert diffSum == 0
 
 
 def testCompressionDecompressionInt16(stop=10, step=1):
@@ -254,8 +253,8 @@ def testCompressionDecompressionInt16(stop=10, step=1):
     print("t4", t4)
     print("t5", t5)
     diffSum = (t5 - t0).sum()
-    if diffSum > 0:
-        raise ValueError("testCompressionDecompressionInt16 error")
+    assert diffSum == 0
+
 
 def test_compressCDSPipe():
     df = simulatePandaDCA(True)
@@ -265,7 +264,6 @@ def test_compressCDSPipe():
     arrayCompression=[ (".*Center",actionArrayDelta), (".*MeanD",actionArrayRel4),(".*",actionArrayRel)]
     #
     outputMap=compressCDSPipe(df,arrayCompression,1)
-    return outputMap
 
 def test_CompressionCDSPipeDraw():
     df = pd.DataFrame(np.random.random_sample(size=(1000000, 4)), columns=list('ABCD'))
@@ -302,6 +300,5 @@ def test_CompressionCDSPipeDraw():
     #size8=getSize(xComp8)
     #sizeNo=getSize(xCompNo)
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
-    return df
 
 #test_CompressionCDSPipeDraw()

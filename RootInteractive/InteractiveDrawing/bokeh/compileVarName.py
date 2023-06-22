@@ -282,12 +282,13 @@ class ColumnEvaluator:
     def visit_Name_histogram(self, id: str):
         self.isSource = False
         histogram = self.cdsDict[self.context]
+        histoSource = histogram.get("source", None)
         for i in histogram["variables"]:
-            self.dependencies.add((histogram["source"], i))
+            self.dependencies.add((histoSource, i))
         if "weights" in histogram:
-            self.dependencies.add((histogram["source"], histogram["weights"]))
+            self.dependencies.add((histoSource, histogram["weights"]))
         if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
-            self.dependencies.add((histogram["source"], histogram["histograms"][id]["weights"]))
+            self.dependencies.add((histoSource, histogram["histograms"][id]["weights"]))
         isOK = (id == "bin_count")
         if self.cdsDict[self.context]["type"] == "histogram":
             if id in ["bin_bottom", "bin_center", "bin_top"]:
