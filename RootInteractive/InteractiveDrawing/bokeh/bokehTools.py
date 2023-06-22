@@ -1898,6 +1898,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                 cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
                 cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
                 iCds["cdsOrig"] = cdsMultiProfile
+                iCds["sources"] = cdsDict[source]["sources"]
             else:
                 cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsNew,
                                             sum_range=sum_range, name=cdsName, unbinned=unbinned)
@@ -1908,10 +1909,6 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             sample_variables = iCds["variables"]
             name_orig = f"{cdsName}_orig"
             source = getOrMakeCdsFull(cdsDict, paramDict, iCds.get("source", None))
-            print(cdsName)
-            print(iCds.get("source", None))
-            print(cdsDict[None])
-            print(source)
             if "source" not in iCds:
                 iCds["source"] = None
             if "tooltips" not in iCds:
