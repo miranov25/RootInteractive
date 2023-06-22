@@ -78,7 +78,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     if isinstance(weights, list):
         defaultWeights = defaultVariables.get("weights", weights[0])
         parameterArray.append({"name": "weights", "value": defaultWeights, "options":weights}) 
-        widgetParams.append(['multiSelect', ['weights'], {"name":"weights"}])
+        widgetParams.append(['select', ['weights'], {"name":"weights"}])
 
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
