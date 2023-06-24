@@ -1900,7 +1900,8 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                 iCds["cdsOrig"] = cdsMultiProfile
                 iCds["sources"] = cdsDict[source]["sources"]
             else:
-                cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsNew,
+                weightsValue = weightsNew if weightsNew not in paramDict else paramDit[weightsNew]["value"]
+                cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
                                             sum_range=sum_range, name=cdsName, unbinned=unbinned)
                 iCds["cdsOrig"] = cdsProfile
         elif cdsType in ["histo2d", "histoNd"]:
@@ -2057,7 +2058,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                 iSource["tooltips"] = defaultHistoTooltips
             if nbins in paramDict:
                 paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal}, code="""
-                        for (histogram of histograms){
+                        for (const histogram of histograms){
                             histogram.nbins = this.value | 0;
                             histogram.change_selection();
                             }
