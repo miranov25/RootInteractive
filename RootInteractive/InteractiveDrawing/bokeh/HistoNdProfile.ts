@@ -167,6 +167,7 @@ export class HistoNdProfile extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => {
+      if(!this.source.changed_histogram) return
       this._stale = true
       this.change.emit()
     })

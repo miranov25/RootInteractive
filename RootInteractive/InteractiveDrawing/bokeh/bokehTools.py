@@ -1894,15 +1894,19 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                     weights = i.weights if weightsOrig == weightsNew else weightsNew
                     cdsProfile = HistoNdProfile(source=i, axis_idx=axis_idx, quantiles=quantiles, weights=weights,
                                                 sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned)
+                    if weightsOrig == weightsNew:
+                        i.js_link("weights", cdsProfile, "weights")
                     projections.append(cdsProfile)
                 cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
                 cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
                 iCds["cdsOrig"] = cdsMultiProfile
                 iCds["sources"] = cdsDict[source]["sources"]
             else:
-                weightsValue = weightsNew if weightsNew not in paramDict else paramDit[weightsNew]["value"]
+                weightsValue = weightsNew if weightsNew not in paramDict else paramDict[weightsNew]["value"]
                 cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
                                             sum_range=sum_range, name=cdsName, unbinned=unbinned)
+                if weightsNew in paramDict:
+                    paramDict[weightsNew]["subscribed_events"].append(("value", cdsProfile, "weights"))
                 iCds["cdsOrig"] = cdsProfile
         elif cdsType in ["histo2d", "histoNd"]:
             multi_axis = None
