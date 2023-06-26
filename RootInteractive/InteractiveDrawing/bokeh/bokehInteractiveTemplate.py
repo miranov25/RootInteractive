@@ -3,7 +3,7 @@
 # from bokeh.plotting import output_file
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
 
-def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None):
+def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -12,7 +12,6 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     if variables is None:
         variables = []
     variables.extend(["funCustom0","funCustom1","funCustom2"])
-    multiY = False
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0",},
         {"name": "funCustom1",  "func":"funCustomForm1",},
@@ -40,12 +39,8 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     parameterArray.extend(figureParameters["legend"]['parameterArray'])
     parameterArray.extend(figureParameters["markers"]['parameterArray'])
     parameterVars = ["varX", "varY", "varZ"] if normalization is None else ["varX", "varY", "varYNorm", "varZ", "varZNorm"]
-
-    for i, iVar in enumerate(parameterVars):
-        defaultValue = defaultVariables.get(iVar, variables[i % len(variables)])
-        if multiY and isinstance(defaultValue, str):
-            defaultValue = [defaultValue]
-        parameterArray.append({"name": iVar, "value": defaultValue, "options":variables}) 
+    if isinstance(weights, list):
+        parameterVars.append("weights")
 
     widgetParams=[
         # custom selection
@@ -55,10 +50,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
         ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
         ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
-        # histogram selection
-        ['select', ['varX'], {"name": "varX"}],
-        ['select', ['varY'], {"name": "varY"}],
-        ['select', ['varZ'], {"name": "varZ"}],
+        # histogram bins 
         ['spinner', ['nbinsY'], {"name": "nbinsY"}],
         ['spinner', ['nbinsX'], {"name": "nbinsX"}],
         ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
@@ -70,9 +62,13 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
     ]
 
-    if normalization is not None:
-        widgetParams.append(['select', ['varYNorm'], {"name":"varYNorm"}])
-        widgetParams.append(['select', ['varZNorm'], {"name":"varZNorm"}])
+    # histogram selection
+    for i, iVar in enumerate(parameterVars):
+        defaultValue = defaultVariables.get(iVar, variables[i % len(variables)])
+        if iVar == multiAxis and isinstance(defaultValue, str):
+            defaultValue = [defaultValue]
+        parameterArray.append({"name": iVar, "value": defaultValue, "options":variables}) 
+        widgetParams.append(['multiSelect' if iVar == multiAxis else 'select', [iVar], {"name":iVar}])
 
     defaultWeights=None
     if isinstance(weights, list):
@@ -83,14 +79,11 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
 
-    parameterVarsLayout = ["varX", "varY", "varZ"] if not normalization else ["varX", "varY", "varYNorm", "varZ", "varZNorm"]
-    if weights:
-        parameterVarsLayout.append("weights")
 
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ"], parameterVarsLayout, {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ"], parameterVars, {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
