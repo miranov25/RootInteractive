@@ -209,6 +209,6 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
 def getDefaultVarsDiff(*args, **kwargs):
     return getDefaultVars("diff", *args, **kwargs)
 
-def getDefaultVarsRatio():
+def getDefaultVarsRatio(*args, **kwargs):
     return getDefaultVars("ratio", *args, **kwargs)
 
