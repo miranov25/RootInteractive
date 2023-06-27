@@ -65,16 +65,16 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     # histogram selection
     for i, iVar in enumerate(parameterVars):
         defaultValue = defaultVariables.get(iVar, variables[i % len(variables)])
+        if iVar == "weights":
+            defaultValue = defaultVariables.get("weights", weights[0])
         if iVar == multiAxis and isinstance(defaultValue, str):
             defaultValue = [defaultValue]
-        parameterArray.append({"name": iVar, "value": defaultValue, "options":variables}) 
+        parameterArray.append({"name": iVar, "value": defaultValue, "options":weights if iVar == "weights" else variables}) 
         widgetParams.append(['multiSelect' if iVar == multiAxis else 'select', [iVar], {"name":iVar}])
 
     defaultWeights=None
     if isinstance(weights, list):
         defaultWeights = defaultVariables.get("weights", weights[0])
-        parameterArray.append({"name": "weights", "value": defaultWeights, "options":weights}) 
-        widgetParams.append(['select', ['weights'], {"name":"weights"}])
 
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
