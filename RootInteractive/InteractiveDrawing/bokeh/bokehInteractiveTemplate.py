@@ -96,6 +96,18 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     figureGlobalOption["y_transform"]="yAxisTransform"
     figureGlobalOption["z_transform"]="zAxisTransform"
 
+    formulaYNorm = {
+            "diff":"varY-varYNorm",
+            "ratio":"varY/varYNorm",
+            "logRatio":"log(varY)/log(varYNorm)"
+            }[normalization]
+    
+    formulaZNorm = {
+            "diff":"varZ-varZNorm",
+            "ratio":"varZ/varZNorm",
+            "logRatio":"log(varZ)/log(varZNorm)"
+            }[normalization]
+
     histoArray=[
         {
             "name": "histoXYData",
@@ -111,44 +123,23 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         },
     ]
 
-    if normalization in {"diff", "-"}:
+    if normalization is not None:
         histoArray.extend([
         {
             "name": "histoXYNormData",
-            "variables": ["varX","varY-varYNorm"],
+            "variables": ["varX",formulaYNorm],
             "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYNormZData",
-            "variables": ["varX","varY-varYNorm","varZ"],
+            "variables": ["varX",formulaYNorm,"varZ"],
             "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYZNormData",
-            "variables": ["varX","varY","varZ-varZNorm"],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        ])
-    elif normalization in {"ratio", "/"}:
-        histoArray.extend([
-        {
-            "name": "histoXYNormData",
-            "variables": ["varX","varY/varYNorm"],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        {
-            "name": "histoXYNormZData",
-            "variables": ["varX","varY/varYNorm","varZ"],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        {
-            "name": "histoXYZNormData",
-            "variables": ["varX","varY","varZ/varZNorm"],
+            "variables": ["varX","varY",formulaZNorm],
             "weights": "weights" if weights else defaultWeights,
             "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
         },
@@ -157,7 +148,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     yAxisTitleNorm = {
             "diff":"{varY}-{varYNorm}",
             "ratio":"{varY}/{varYNorm}",
-            "logRatio":"log(varY)/log(varYNorm)"
+            "logRatio":"log({varY})/log({varYNorm})"
             }[normalization]
 
     figureArray=[
