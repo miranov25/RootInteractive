@@ -189,8 +189,9 @@ export class CDSAlias extends ColumnarDataSource {
 
   invalidate_column(key: string, emit_change=true){
     if(!this.cached_columns.has(key)){
+      // Seems like a bogus change, but might be there for some reason
       if(emit_change){
-        this.change.emit()
+        // this.change.emit()
       }
       return
     }

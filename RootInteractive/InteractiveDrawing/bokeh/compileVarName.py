@@ -191,6 +191,11 @@ class ColumnEvaluator:
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             self.context = node.value.id
+        if self.context in self.cdsDict and self.cdsDict[self.context]["type"] == "stack":
+            self.isSource = False
+            if node.attr != "$source_index":
+                for i in self.cdsDict[self.context]["sources_all"]:
+                    self.dependencies.add((i, node.attr))
         if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
         if self.cdsDict[self.context]["type"] == "projection":
@@ -256,7 +261,7 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "type": "parameter"
+                "type": "paramTensor" if isinstance(self.paramDict[node.id]["value"], list) else "parameter"
             }
         if node.id in [self.context, "self"]:
             return {
@@ -277,12 +282,13 @@ class ColumnEvaluator:
     def visit_Name_histogram(self, id: str):
         self.isSource = False
         histogram = self.cdsDict[self.context]
+        histoSource = histogram.get("source", None)
         for i in histogram["variables"]:
-            self.dependencies.add((histogram["source"], i))
+            self.dependencies.add((histoSource, i))
         if "weights" in histogram:
-            self.dependencies.add((histogram["source"], histogram["weights"]))
+            self.dependencies.add((histoSource, histogram["weights"]))
         if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
-            self.dependencies.add((histogram["source"], histogram["histograms"][id]["weights"]))
+            self.dependencies.add((histoSource, histogram["histograms"][id]["weights"]))
         isOK = (id == "bin_count")
         if self.cdsDict[self.context]["type"] == "histogram":
             if id in ["bin_bottom", "bin_center", "bin_top"]:
@@ -311,7 +317,7 @@ class ColumnEvaluator:
 
     def eval_fallback(self, node):
         if "data" not in self.cdsDict[self.context]:
-            raise NotImplementedError("Feature not implemented for tables on client: " + self.code)
+            raise NotImplementedError("Feature not implemented for tables on client: " + self.code + ' ' + ast.dump(node))
         if self.isSource:
             column_id = self.code
         else:

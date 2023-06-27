@@ -147,7 +147,7 @@ def testBokehDrawArrayWidgetNoScale(record_property: ty.Callable[[str, ty.Any], 
     record_property("html_size",os.stat("test_BokehDrawArrayWidgetNoScale.html").st_size)
     record_property("cdsOrig_size",len(fig.cdsOrig.column_names))
 
-def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], None], data_regression):
+def testBokehDrawArrayDownsample(record_property: ty.Callable[[str, ty.Any], None]):
     output_file("test_BokehDrawArrayDownsample.html")
     fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, widgetLayout=widgetLayoutDesc, parameterArray=parameterArray, nPointRender="nPoints")
     record_property("html_size",os.stat("test_BokehDrawArrayWidget.html").st_size)

@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, Int, Bool, Nullable
+from bokeh.core.properties import Instance, Int, Bool, Nullable, List, String
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.RIFilter import RIFilter
@@ -19,4 +19,6 @@ class DownsamplerCDS(ColumnarDataSource):
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
     watched = Bool()
     filter = Nullable(Instance(RIFilter))
+    #HACK: Added to bypass a validation bug in bokeh with legend field
+    column_names = List(String)
     print("Import ", __implementation__)

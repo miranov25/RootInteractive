@@ -57,6 +57,8 @@ export class HistoNdCDS extends ColumnarDataSource {
     this.invalidate_cached_bins()
     this.update_nbins()
     this._stale_range = true
+    this.changed_histogram = false
+    this.cached_columns = new Set()
   }
 
   connect_signals(): void {
@@ -65,6 +67,9 @@ export class HistoNdCDS extends ColumnarDataSource {
     this.connect(this.source.change, () => {
       this.invalidate_cached_bins()
       this.change_selection()
+    })
+    this.connect(this.properties.weights.change, () => {
+      this.change_weights()
     })
     if(this.filter != null){
       this.connect(this.filter.change, () => {this.change_selection()})
@@ -91,6 +96,10 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _unweighted_histogram: number[] | null
 
   private _sorted_column_pool: number[][]
+
+  public changed_histogram: boolean
+
+  private cached_columns: Set<string>
 
   update_range(): void {
     this._nbins = this.nbins;
@@ -174,6 +183,9 @@ export class HistoNdCDS extends ColumnarDataSource {
         this.data["bin_bottom_"+i] = bin_bottom
         this.data["bin_center_"+i]  = bin_center
         this.data["bin_top_"+i]  = bin_top
+	this.cached_columns.add("bin_bottom_"+i)
+	this.cached_columns.add("bin_center_"+i)
+	this.cached_columns.add("bin_top_"+i)
       }
 
       this.dim = dim
@@ -345,11 +357,11 @@ export class HistoNdCDS extends ColumnarDataSource {
     if(this._stale_range){
       this.update_range()
     }
-    if(this.data[key] != null){
+    if(this.cached_columns.has(key)){
       return this.data[key]
     }
     this.compute_function(key)
-    if(this.data[key] != null){
+    if(this.cached_columns.has(key)){
       return this.data[key]
     }
     return null
@@ -381,7 +393,8 @@ export class HistoNdCDS extends ColumnarDataSource {
       } else {
         data[key] = this.histogram(histograms[key].weights)
       }
-    } 
+    }
+   this.cached_columns.add(key) 
   }
 
   auto_range(column: ArrayLike<number>, axis_idx: number){
@@ -436,12 +449,19 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._stale_range = true
     this._sorted_indices = null
     this._unweighted_histogram = null
-    this.data = {}
+    this.cached_columns.clear()
     if(this.filter != null && this.filter.active){
       this.view = this.filter.get_indices()
     } else {
       this.view = null
     }
+    this.changed_histogram = true
+    this.change.emit()
+    this.changed_histogram = false
+  }
+
+  public change_weights(){
+    this.cached_columns.delete("bin_count")
     this.change.emit()
   }
 

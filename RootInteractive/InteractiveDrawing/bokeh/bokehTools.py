@@ -32,6 +32,7 @@ from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
+from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
 import numpy as np
 import pandas as pd
 import re
@@ -43,7 +44,7 @@ import base64
 
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
-                "dash", "hex", "invertedtriangle", "asterisk", "square_x", "x"]
+                "dash", "hex", "inverted_triangle", "asterisk", "square_x", "x"]
 
 # default tooltips for 1D and 2D histograms
 defaultHistoTooltips = [
@@ -66,6 +67,22 @@ RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
 IS_PANDAS_1 = pd.__version__.split('.')[0] == '1'
+
+def mergeFigureArrays(figureArrayOld, figureArrayNew):
+    if len(figureArrayOld) == 0:
+        return figureArrayNew
+    if len(figureArrayNew) == 0:
+        return figureArrayOld
+    figureArrayMerged = figureArrayOld.copy()
+    if isinstance(figureArrayMerged[-1], dict):
+        optionsOld = figureArrayMerged.pop().copy()
+        figureArrayMerged = figureArrayMerged + figureArrayNew
+        if isinstance(figureArrayNew[-1], dict):
+            optionsNew = figureArrayMerged.pop()
+            optionsOld.update(optionsNew)
+        figureArrayMerged.append(optionsOld)
+        return figureArrayMerged
+    return figureArrayMerged + figureArrayNew
 
 def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
     """
@@ -114,7 +131,7 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
-    if isinstance(widgetLayoutDesc[-1], dict):
+    if len(widgetLayoutDesc) > 0 and isinstance(widgetLayoutDesc[-1], dict):
         nRows -= 1
         optionLocal = options.copy()
         optionLocal.update(widgetLayoutDesc[-1])
@@ -218,7 +235,7 @@ def makeBokehDataTable(dataFrame, source, include, exclude, **kwargs):
     return data_table
 
 
-def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=False, **kwargs):
+def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=False, paramDict=None, **kwargs):
     histo_names = []
     histo_columns = []
     bin_centers = []
@@ -234,8 +251,13 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
     else:
         formatter = ScientificFormatter(precision=3)
 
+    if paramDict is None:
+        paramDict = {}
+
     for iHisto in histoDict:
         # We are only interested in histograms so we filter the dict for histograms
+        if histoDict[iHisto]["type"] not in ["histogram", "histo2d", "histoNd"]:
+            continue
         isOK = True
         if include:
             isOK = False
@@ -251,7 +273,7 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                 bin_centers.append("bin_center")
                 edges_left.append("bin_bottom")
                 edges_right.append("bin_top")
-                sources.append(histoDict[iHisto]["cdsOrig"])
+                sources.append(getOrMakeCdsOrig(histoDict, paramDict, iHisto))
                 compute_quantile.append(True)
                 if "quantiles" in histoDict[iHisto]:
                     quantiles += histoDict[iHisto]["quantiles"]
@@ -264,9 +286,8 @@ def makeBokehHistoTable(histoDict: dict, include: str, exclude: str, rowwise=Fal
                     bin_centers.append("bin_center_"+str(i))
                     edges_left.append("bin_bottom_"+str(i))
                     edges_right.append("bin_top_"+str(i))
-                    sources.append(histoDict[iHisto]["cdsFull"])
+                    sources.append(getOrMakeCdsOrig(histoDict, paramDict, iHisto))
                     compute_quantile.append(False)
-
     quantiles = [*{*quantiles}]
     sum_range_uniq = []
     for i in sum_range:
@@ -385,7 +406,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         customJsArgList = {}
         transformType = i.get("type", "customJS")
         if transformType == "linearFit":
-            iFitter = jsFunctionDict[i["name"]] = ClientLinearFitter(varY=i["varY"], source=cdsDict[i.get("source", None)]["cdsFull"], alpha=i.get("alpha", 0), weights=i.get("weights", None))
+            iFitter = jsFunctionDict[i["name"]] = ClientLinearFitter(varY=i["varY"], source=getOrMakeCdsFull(cdsDict, paramDict, i.get("source", None)), alpha=i.get("alpha", 0), weights=i.get("weights", None))
             if isinstance(i["varX"], str):
                 if i["varX"] in paramDict:
                     varX = paramDict[i["varX"]]["value"]
@@ -593,7 +614,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 1:
                 TOptions.update(variables[1])
             histoDict = {i: cdsDict[i] for i in histoListLocal}
-            cdsHistoSummary, tableHisto = makeBokehHistoTable(histoDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"])
+            cdsHistoSummary, tableHisto = makeBokehHistoTable(cdsDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"], paramDict=paramDict)
             plotArray.append(tableHisto)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = tableHisto
@@ -844,6 +865,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(variables_dict[axis_name], list):
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_names[i]
+            cds_used = None
+            if cds_name != "$IGNORE":
+                cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
             varColor = variables_dict["colorZvar"]
             if varColor is not None:
                 if mapperC is not None:
@@ -885,12 +909,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
+            elif cds_name in cdsDict and isinstance(cds_used.source.source, CDSStack):
+                color = factor_cmap("$source_index", colorAll[10], cdsDict[cds_name]["cdsOrig"].activeSources)
+                stack_sources = cdsDict[cds_name]["sources"]
+                if isinstance(stack_sources, str):
+                    if stack_sources in paramDict:
+                        paramDict[stack_sources]["subscribed_events"].append(("value", color["transform"], "factors"))
             else:
                 color = colorAll[max(length, 4)][i]
-            try:
-                marker = optionLocal['markers'][i]
-            except:
-                marker = optionLocal['markers']
             markerSize = optionLocal['size']
             if markerSize in paramDict:
                 markerSize = paramDict[markerSize]['value']
@@ -898,9 +924,28 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 logging.info("Option %s", variables[2])
                 optionLocal.update(variables[2])
             varY = variables[1][i % lengthY]
-            cds_used = None
-            if cds_name != "$IGNORE":
-                cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
+            markersAll = optionLocal["markers"]
+            markerField = variables_dict.get("marker_field", None)
+            if markerField is not None:
+                # TODO: Also support marker fields created on the client
+                if markerField["type"] == "column":
+                    uniq_values = np.unique(dfQuery[varName])
+                elif markerField["type"] == "server_derived_column":
+                    uniq_values = np.unique(column[0]["value"])
+                else:
+                    raise NotImplementedError("Marker field not implemented for aliases yet")
+                marker = factor_mark(markerField["name"], markersAll, uniq_values)
+            elif cds_name in cdsDict and isinstance(cds_used.source.source, CDSStack):
+                marker = factor_mark("$source_index", markersAll, cds_used.source.source.activeSources)
+                stack_sources = cdsDict[cds_name]["sources"]
+                if isinstance(stack_sources, str):
+                    if stack_sources in paramDict:
+                        paramDict[stack_sources]["subscribed_events"].append(("value", marker["transform"], "factors"))
+            else:
+                try:
+                    marker = optionLocal['markers'][i]
+                except:
+                    marker = optionLocal['markers']
 
             if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
@@ -954,7 +999,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     y_transform_modified = modify_2d_transform(y_transform_parsed, y_transform_customjs, variables_dict["X"]["name"], cds_used) if y_transform else None
                     dataSpecX = {"field":varNameX, "transform":x_transform_modified} if x_transform else varNameX
                     dataSpecY = {"field":varNameY, "transform":y_transform_modified} if y_transform else varNameY
-                    if optionLocal["legend_field"] is None:
+                    if optionLocal["legend_field"] is not None:
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field=optionLocal["legend_field"])
+                    elif isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
+                        #TODO: Use more reasonable axis labels
+                        x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        if x_transform:
+                            x_label = f"{{{x_transform}}} {x_label}"
+                        y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field="$source_index")                        
+                    else:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
                             x_label = f"{{{x_transform}}} {x_label}"
@@ -968,9 +1026,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         else:
                             drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                 color=color, marker=marker, legend_label=''.join(legend_label.components))
-                    else:
-                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
-                                    color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
@@ -1073,7 +1128,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     histoList = []
     for cdsKey, cdsValue in cdsDict.items():
         # Ignore unused data sources
-        if cdsKey not in memoized_columns:
+        if cdsKey not in memoized_columns or "cdsOrig" not in cdsValue:
             continue
         # Populate the data sources - original columns
         if cdsValue["type"] == "source":
@@ -1109,6 +1164,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         # In future an option can be added for creating them from array
 
         # Add aliases
+        if "cdsFull" not in cdsValue:
+            continue
         aliasArrayLocal = set()
         weakAll = []
         for key, value in memoized_columns[cdsKey].items():
@@ -1147,10 +1204,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         cdsSel = cdsDict[iCds].get("cdsSel", None)
         histoList = []
         for cdsKey, cdsValue in cdsDict.items():
-            if cdsKey not in memoized_columns:
+            if cdsKey not in memoized_columns or "cdsOrig" not in cdsValue:
                 continue
-            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue["source"] == iCds:
-                histoList.append(cdsValue["cdsOrig"])
+            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue.get("source", None) == iCds:
+                if isinstance(cdsValue["cdsOrig"], CDSStack):
+                    for i in cdsValue["cdsOrig"].sources:
+                        histoList.append(i)
+                else:
+                    histoList.append(cdsValue["cdsOrig"])
         intersectionFilter = LazyIntersectionFilter(filters=[])
         for iWidget in widgetList:
             if "filter" in iWidget:
@@ -1534,7 +1595,10 @@ def connectWidgetCallbacks(widgetParams: list, widgetArray: list, paramDict: dic
             iWidget.js_on_event("value", callback)
 
 
-def defaultNDProfileTooltips(varNames, axis_idx, quantiles, sumRanges):
+def defaultNDProfileTooltips(profDescription, varNames):
+    axis_idx = profDescription.get("axis", profDescription.get("axis_idx", 0))
+    quantiles = profDescription.get("quantiles", [])
+    sumRanges = profDescription.get("sumRanges", [])
     tooltips = []
     for i, iAxis in enumerate(varNames):
         if i != axis_idx:
@@ -1659,7 +1723,7 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
     if cdsName is None:
         return f"{{{varName}}}"
     if cdsName in cdsDict:
-        if cdsDict[cdsName]["type"] == "join":
+        if cdsDict[cdsName]["type"] in ["join", "stack"]:
             return f"{{{varName}}}"
         prefix = ""
         if not removeCdsName:
@@ -1674,36 +1738,46 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 if "variables" in cdsDict[cdsName]:
                     variables = cdsDict[cdsName]["variables"]
                 else:
-                    variables = cdsDict[cdsName]["cdsOrig"].source.sample_variables
+                    variables = cdsDict[cdsDict[cdsName]["source"]]["variables"]
                 if len(x) == 2:
                     return f"{{{variables[0]}}}"
                 return f"{{{variables[int(x[2])]}}}"
             if x[0] == "quantile" and len(x) == 2:
                 quantile = cdsDict[cdsName]["quantiles"][int(x[-1])]
                 if cdsDict[cdsName]["type"] == "projection":
-                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                    cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                    cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                    histogramOrig = cdsOrig.source
+                    projectionIdx = cdsOrig.axis_idx
                     return f"quantile {quantile} {{{ histogramOrig.sample_variables[projectionIdx] }}}"
                 return f"quantile {{{quantile}}}"
             if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
                 if len(x) == 2:
                     if cdsDict[cdsName]["type"] == "projection":
-                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                        cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                        histogramOrig = cdsOrig.source
+                        projectionIdx = cdsOrig.axis_idx
                         return f"sum {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"sum in [{range[0]}, {range[1]}]"
                 elif len(x) == 3:
                     if cdsDict[cdsName]["type"] == "projection":
-                        histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                        projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                        cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                        cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                        histogramOrig = cdsOrig.source
+                        projectionIdx = cdsOrig.axis_idx
                         return f"p {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"p in [{range[0]}, {range[1]}]"
         else:
             if cdsDict[cdsName]["type"] == "projection":
-                histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
+                cdsOrig = cdsDict[cdsName]["cdsOrig"]
+                if isinstance(cdsOrig, HistoNdProfile):
+                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
+                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
+                    return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
+                else:
+                    return f"{varName}"
     return prefix+varName
 
 def makeCDSDict(sourceArray, paramDict, options={}):
@@ -1738,6 +1812,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     cdsType = "histoNd"
             elif "left" in iSource or "right" in iSource:
                 cdsType = "join"
+            elif "sources" in iSource:
+                cdsType = "stack"
             else:
                 # Cannot determine type automatically
                 raise ValueError(iSource)
@@ -1756,129 +1832,261 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     iSource["meta"] = iSource["data"].meta.metaData.copy()
                 except AttributeError:
                     iSource["meta"] = {}
-            if "arrayCompression" in iSource and iSource["arrayCompression"] is not None:
-                iSource["cdsOrig"] = CDSCompress(name=name_orig)
+        elif cdsType == "stack":
+            sources = iSource["sources"]
+            if isinstance(sources, str):
+                if sources in paramDict:
+                    iSource["sources_all"] = paramDict[sources]["options"]
+                    iSource["active"] = paramDict[sources]["value"]
             else:
-                iSource["cdsOrig"] = ColumnDataSource(name=name_orig)
-        elif cdsType == "histogram":
-            weights = iSource.get("weights", None)
-            iSource["cdsOrig"] = HistogramCDS(sample=iSource["variables"][0], weights=weights, name=name_orig)
-            if "source" not in iSource:
-                iSource["source"] = None
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHistoTooltips
-            nbins = 10
-            if "nbins" in iSource:
-                nbins = iSource["nbins"]
-            if nbins in paramDict:
-                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"]}, code="""
-                            histogram.nbins = this.value | 0;
-                            histogram.change_selection();
-                        """)])
-                nbins = paramDict[nbins]["value"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"]
-            if isinstance(histoRange, str) and histoRange in paramDict:
-                paramDict[histoRange]["subscribed_events"].append(["value", iSource["cdsOrig"], "range"])
-                histoRange = paramDict[histoRange]["value"]
-            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
-        elif cdsType in ["histo2d", "histoNd"]:
-            weights = iSource.get("weights", None)
-            if "source" not in iSource:
-                iSource["source"] = None
-            iSource["cdsOrig"] = HistoNdCDS(sample_variables=iSource["variables"], weights=weights, name=name_orig)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultHisto2DTooltips
-            nbins = [10]*len(iSource["variables"])
-            if "nbins" in iSource:
-                nbins = iSource["nbins"].copy()
-            for binsIdx, iBins in enumerate(nbins):
-                if isinstance(iBins, str) and iBins in paramDict:
-                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": binsIdx}, code="""
-                        histogram.nbins[i] = this.value | 0;
-                        histogram.update_nbins();
-                        histogram.invalidate_cached_bins();
-                        histogram.change_selection();
-                    """)])
-                    nbins[binsIdx] = paramDict[iBins]["value"]
-            histoRange = None
-            if "range" in iSource:
-                histoRange = iSource["range"].copy()
-            if histoRange is not None:
-                for rangeIdx, iRange in enumerate(histoRange):
-                    if isinstance(iRange, str) and iRange in paramDict:
-                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histogram":iSource["cdsOrig"], "i": rangeIdx}, code="""
-                            histogram.range[i] = this.value;
-                            histogram.invalidate_cached_bins();
-                            histogram.change_selection();
-                        """)])
-                        histoRange[rangeIdx] = paramDict[iRange]["value"]
-            iSource["cdsOrig"].update(nbins=nbins, range=histoRange)
-            if "axis" in iSource:
-                axisIndices = iSource["axis"]
-                projectionsLocal = {}
-                sum_range = []
-                if "sum_range" in iSource:
-                    sum_range = iSource["sum_range"]
-                quantiles = []
-                if "quantiles" in iSource:
-                    quantiles = iSource["quantiles"]
-                unbinned = iSource.get("unbinned_projections", False)
-                for j in axisIndices:
-                    cdsProfile = HistoNdProfile(source=iSource["cdsOrig"], axis_idx=j, quantiles=quantiles, weights=weights,
-                                                sum_range=sum_range, name=cds_name+"_"+str(j)+"_orig", unbinned=unbinned)
-                    projectionsLocal[i] = cdsProfile
-                    cdsDict[cds_name+"_"+str(j)] = {"cdsOrig": cdsProfile, "type": "projection", "name": cds_name+"_"+str(j), "variables": iSource["variables"],
-                    "quantiles": quantiles, "sum_range": sum_range, "axis": j, "source": cds_name} 
-                iSource["profiles"] = projectionsLocal
-        elif cdsType == "join":
-            left = None
-            if "left" in iSource:
-                left = iSource["left"]
-            right = None
-            if "left" in iSource:
-                right = iSource["left"]
-            if "left_on" in iSource:
-                on_left = iSource["left_on"]
-            on_right = []
-            if "right_on" in iSource:
-                on_right = iSource["right_on"]
-            how  = iSource["how"] if "how" in iSource else "inner"
-            iSource["cdsOrig"] = CDSJoin(prefix_left=left, prefix_right=right, on_left=on_left, on_right=on_right, how=how, name=name_orig)
-        elif cdsType == "projection":
-            axis_idx = iSource["axis_idx"][0] # Maybe support more than 1 projection axis
-            quantiles = iSource["quantiles"] if "quantiles" in iSource else []
-            sum_range = iSource["sum_range"] if "sum_range" in iSource else []
-            unbinned = iSource["unbinned"] if "unbinned" in iSource else False
-            iSource["cdsOrig"] = HistoNdProfile(axis_idx=axis_idx, quantiles=quantiles, sum_range=sum_range, name=cds_name, unbinned=unbinned)
-        else:
-            raise NotImplementedError("Unrecognized CDS type: " + cdsType)
+                iSource["sources_all"] = sources
+        if cdsType in ["histo2d", "histoNd"]:
+            sample_variables = iSource["variables"]
+            for j in range(len(sample_variables)):
+                cdsDict[f"{cds_name}_{str(j)}"] = {"type": "projection", "name": f"{cds_name}_{str(j)}", "source":cds_name, "weights":iSource.get("weights", None), 
+                        "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j,
+                        "sources":iSource.get("sources", None), "unbinned":iSource.get("unbinned_projections", False)}
 
     for cds_name, iSource in cdsDict.items():
-        cdsOrig = iSource["cdsOrig"]
-        if iSource["type"] in ["histogram", "histo2d", "histoNd"]:
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsFull"]
-        elif iSource["type"] == "join":
-            cdsOrig.left = cdsDict[iSource["left"]]["cdsFull"]
-            cdsOrig.right = cdsDict[iSource["right"]]["cdsFull"]
-        elif iSource["type"] == "projection":
-            cdsOrig.source = cdsDict[iSource["source"]]["cdsOrig"]
-            cdsOrig.weights = iSource.get("weights", cdsOrig.source.weights)
-            if "tooltips" not in iSource:
-                iSource["tooltips"] = defaultNDProfileTooltips(cdsOrig.source.sample_variables, cdsOrig.axis_idx, cdsOrig.quantiles, cdsOrig.sum_range)
-        name_full = "cdsFull"
-        if cds_name is not None:
-            name_full = cds_name+"_full"
-        # Add middleware for aliases
-        iSource["cdsFull"] = CDSAlias(source=cdsOrig, mapping={}, name=name_full)
         if iSource["type"] == "source":
             iSource["nPointRender"] = iSource.get("nPointRender", options.get("nPointRender", 1000))
         else:
             iSource["nPointRender"] = iSource.get("nPointRender", -1)
         if "tooltips" not in iSource:
-            iSource["tooltips"] = []
+            if iSource["type"] == "projection":
+                iSource["tooltips"] = defaultNDProfileTooltips(iSource, cdsDict[iSource["source"]]["variables"])
+            elif iSource["type"] == "histogram":
+                iSource["tooltips"] = defaultHistoTooltips
+            elif iSource["type"] in ["histo2d", "histoNd"]:
+                iSource["tooltips"] = defaultHisto2DTooltips
+            else:
+                iSource["tooltips"] = []
     return cdsDict
+
+def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
+    if key in cdsDict:
+        iCds = cdsDict[key]
+        if "cdsOrig" in iCds:
+            return iCds["cdsOrig"]
+        cdsName = iCds.get("name", key)
+        if cdsName is None:
+            cdsName = "cdsOrig"
+        cdsType = iCds["type"]
+        if cdsType == "source":
+            if iCds.get("arrayCompression", None) is not None:
+                iCds["cdsOrig"] = CDSCompress(name=cdsName)
+            else:
+                iCds["cdsOrig"] = ColumnDataSource(name=cdsName)
+        elif cdsType == "projection":
+            source = iCds.get("source", None)
+            weightsOrig = cdsDict[source].get("weights", None)
+            weightsNew = iCds.get("weights", None)
+            unbinned = iCds.get("unbinned", False)
+            quantiles = iCds.get("quantiles", [])
+            sum_range = iCds.get("sum_range", [])
+            axis_idx = iCds.get("axis", iCds.get("axis_idx", 0))
+            if isinstance(axis_idx, list):
+                axis_idx = axis_idx[0]
+            cdsOrig = getOrMakeCdsOrig(cdsDict, paramDict, source)
+            if isinstance(cdsOrig, CDSStack):
+                projections = []
+                for i in cdsOrig.sources:
+                    weights = i.weights if weightsOrig == weightsNew else weightsNew
+                    cdsProfile = HistoNdProfile(source=i, axis_idx=axis_idx, quantiles=quantiles, weights=weights,
+                                                sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned)
+                    if weightsOrig == weightsNew:
+                        i.js_link("weights", cdsProfile, "weights")
+                    projections.append(cdsProfile)
+                cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
+                cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
+                iCds["cdsOrig"] = cdsMultiProfile
+                iCds["sources"] = cdsDict[source]["sources"]
+            else:
+                weightsValue = weightsNew if weightsNew not in paramDict else paramDict[weightsNew]["value"]
+                cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
+                                            sum_range=sum_range, name=cdsName, unbinned=unbinned)
+                if weightsNew in paramDict:
+                    paramDict[weightsNew]["subscribed_events"].append(("value", cdsProfile, "weights"))
+                iCds["cdsOrig"] = cdsProfile
+        elif cdsType in ["histo2d", "histoNd"]:
+            multi_axis = None
+            weights = iCds.get("weights", None)
+            sample_variables = iCds["variables"]
+            name_orig = f"{cdsName}_orig"
+            source = getOrMakeCdsFull(cdsDict, paramDict, iCds.get("source", None))
+            if "source" not in iCds:
+                iCds["source"] = None
+            if "tooltips" not in iCds:
+                iCds["tooltips"] = defaultHisto2DTooltips
+            nbins = iCds.get("nbins", 10)
+            if isinstance(nbins, int):
+                nbins = [nbins]*len(sample_variables)
+            if isinstance(nbins, str):
+                raise NotImplemented("Using ND binning as one parameter is not supported yet, please provide an array of parameters instead")
+            nbins_value = [paramDict[i]["value"] if i in paramDict else i for i in nbins]
+            histoRange = iCds.get("range", None)
+            range_value = [paramDict[i]["value"] if isinstance(i, str) and i in paramDict else i for i in histoRange] if histoRange is not None else None
+            sample_value = [sample if sample not in paramDict else paramDict[sample]["value"] for sample in sample_variables]
+            weights_value = weights if weights is None or weights not in paramDict else paramDict[weights]["value"]
+            if weights in paramDict:
+                if isinstance(paramDict[weights]["value"], list):
+                    if multi_axis is not None:
+                        raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                    else:
+                       multi_axis = ("weights",)
+            for i, iVar in enumerate(sample_variables):
+                if iVar in paramDict:
+                    if isinstance(paramDict[iVar]["value"], list):
+                        if multi_axis is not None:
+                            raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                        else:
+                            multi_axis = ("variables", i)
+            if multi_axis is None:
+                cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value, weights=weights, name=cdsName, nbins=nbins_value, range=range_value)
+                iCds["cdsOrig"] = cdsOrig
+                histogramsLocal = [cdsOrig]
+            else:
+                histogramsLocal = []
+                acc = iCds
+                for i in multi_axis:
+                    acc = acc[i]
+                iCds["sources"] = acc
+                histoOptions = paramDict[acc]["options"]
+                for i in histoOptions:
+                    if multi_axis[0] == "weights":
+                        weights_value = i
+                    else:
+                        sample_value[multi_axis[1]] = i
+                    cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value.copy(), weights=weights_value, name=f"{cdsName}[{i}]", nbins=nbins_value, range=range_value)
+                    histogramsLocal.append(cdsOrig)
+                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                iCds["cdsOrig"] = cdsOrig
+                paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
+            for binsIdx, iBins in enumerate(nbins):
+                if isinstance(iBins, str) and iBins in paramDict:
+                    paramDict[iBins]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal, "i": binsIdx}, code="""
+                    for (const histogram of histograms){
+                        histogram.nbins[i] = this.value | 0;
+                        histogram.update_nbins();
+                        histogram.invalidate_cached_bins();
+                        histogram.change_selection();
+                        }
+                    """)])
+            if histoRange is not None:
+                for rangeIdx, iRange in enumerate(histoRange):
+                    if isinstance(iRange, str) and iRange in paramDict:
+                        paramDict[iRange]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal, "i": rangeIdx}, code="""
+                        for (const histogram of histograms){
+                            histogram.range[i] = this.value;
+                            histogram.invalidate_cached_bins();
+                            histogram.change_selection();
+                            }
+                        """)])
+            if multi_axis != ("weights",) and weights in paramDict:
+                for i in histogramsLocal:
+                    paramDict[weights]["subscribed_events"].append(["value", i, "weights"])
+            for i, sample in enumerate(sample_variables):
+                if sample in paramDict and multi_axis != ("variables", i):
+                    paramDict[sample]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal, "i":i}, code="""
+                    for (const histogram of histograms){
+                        histogram.sample_variables[i] = this.value;
+                        histogram.invalidate_cached_bins();
+                        histogram.change_selection();
+                        }
+                        """)])
+        elif cdsType == "stack":
+            iSource = iCds
+            sources = iSource["sources"]
+            sourcesObjs = [getOrMakeCdsFull(cdsDict, paramDict, i) for i in iSource["sources_all"]]
+            iSource["cdsOrig"] = CDSStack(sources=sourcesObjs, mapping={value:i for (i, value) in enumerate(iSource["sources_all"])}, activeSources=iSource["active"])
+            if sources in paramDict:
+                paramDict[sources]["subscribed_events"].append(("value", iSource["cdsOrig"], "activeSources"))
+        elif cdsType == "join":
+            iSource = iCds
+            left = iSource.get("left", None)
+            right = iSource.get("right", None)
+            on_left = iSource.get("left_on", [])
+            on_right = iSource.get("right_on", [])
+            how = iSource.get("how", "inner")
+            sourceLeft = getOrMakeCdsFull(cdsDict, paramDict, left)
+            sourceRight = getOrMakeCdsFull(cdsDict, paramDict, right)
+            iSource["cdsOrig"] = CDSJoin(left=sourceLeft, right=sourceRight, prefix_left=left or "cdsFull", prefix_right=right or "csFull", on_left=on_left, on_right=on_right, how=how, name=cdsName)
+        elif cdsType == "histogram":
+            iSource = iCds
+            weights = iSource.get("weights", None)
+            sample = iSource["variables"][0]
+            multi_axis = None 
+            sample_value = sample if sample not in paramDict else paramDict[sample]["value"]
+            weights_value = weights if weights is None or weights not in paramDict else paramDict[weights]["value"]
+            nbins = iSource.get("nbins", 10)
+            nbins_value = nbins if isinstance(nbins, int) else paramDict[nbins]["value"] 
+            histoRange = iSource.get("range", None)
+            range_value = histoRange if not isinstance(histoRange, str) else paramDict[histoRange]["value"]
+            source = getOrMakeCdsFull(cdsDict, paramDict, iSource.get("source", None))
+            if weights in paramDict:
+                if isinstance(paramDict[weights]["value"], list):
+                    if multi_axis is not None:
+                        raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                    else:
+                       multi_axis = ("weights",)
+            if sample in paramDict:
+                if isinstance(paramDict[sample]["value"], list):
+                    if multi_axis is not None:
+                        raise NotImplementedError("Multiple multiselect axes for histogram not supported yet")
+                    else:
+                        multi_axis = ("variables",0)
+            if multi_axis is None:
+                cdsOrig = HistogramCDS(source=source, sample=sample_value, weights=weights_value, name=cdsName, nbins=nbins_value, range=range_value)
+                iSource["cdsOrig"] =cdsOrig 
+                histogramsLocal = [cdsOrig]
+            else:
+                histogramsLocal = []
+                acc = iSource
+                for i in multi_axis:
+                    acc = acc[i]
+                iSource["sources"] = acc
+                histoOptions = paramDict[acc]["options"]
+                for i in histoOptions:
+                    if multi_axis[0] == "weights":
+                        weights_value = i
+                    else:
+                        sample_value = i
+                    cdsOrig = HistogramCDS(source=source, sample=sample_value, weights=weights_value, name=f"{cdsName}_{i}", nbins=nbins_value, range=range_value)
+                    histogramsLocal.append(cdsOrig)
+                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
+                iSource["cdsOrig"] = cdsOrig
+            if "source" not in iSource:
+                iSource["source"] = None
+            if "tooltips" not in iSource:
+                iSource["tooltips"] = defaultHistoTooltips
+            if nbins in paramDict:
+                paramDict[nbins]["subscribed_events"].append(["value", CustomJS(args={"histograms":histogramsLocal}, code="""
+                        for (const histogram of histograms){
+                            histogram.nbins = this.value | 0;
+                            histogram.change_selection();
+                            }
+                        """)])
+            if isinstance(histoRange, str) and histoRange in paramDict:
+                for i in histogramsLocal:
+                    paramDict[histoRange]["subscribed_events"].append(["value", i, "range"])
+            if multi_axis != ("weights",) and weights in paramDict:
+                for i in histogramsLocal:
+                    paramDict[weights]["subscribed_events"].append(["value", i, "weights"])
+            if sample in paramDict and multi_axis != ("variables", 0):
+                for i in histogramsLocal:
+                    paramDict[sample]["subscribed_events"].append(["value", i, "sample"])
+        return iCds["cdsOrig"]
+
+def getOrMakeCdsFull(cdsDict: dict, paramDict: dict, key: str):
+    if key in cdsDict:
+        if "cdsFull" in cdsDict[key]:
+            return cdsDict[key]["cdsFull"]
+        name_full = "cdsFull"
+        if key is not None:
+            name_full = f"{key}_full"
+        cdsDict[key]["cdsFull"] = CDSAlias(source=getOrMakeCdsOrig(cdsDict, paramDict, key), mapping={}, name=name_full)
+        return cdsDict[key]["cdsFull"]
 
 def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     components = re.split(RE_CURLY_BRACE, template)
@@ -1995,7 +2203,7 @@ def makeCdsSel(cdsDict, paramDict, key):
     nPoints = cds_used.get("nPointRender",-1)
     if nPoints in paramDict:
         nPoints = paramDict[cds_used["nPointRender"]]["value"]
-    cdsSel = DownsamplerCDS(source=cds_used["cdsFull"], nPoints=nPoints, name=cds_name)
+    cdsSel = DownsamplerCDS(source=getOrMakeCdsFull(cdsDict, paramDict, key), nPoints=nPoints, name=cds_name)
     if cds_used["nPointRender"] in paramDict:
         paramDict[cds_used["nPointRender"]]["subscribed_events"].append(["value", CustomJS(args={"downsampler": cdsSel}, code="""
                         downsampler.nPoints = this.value | 0
