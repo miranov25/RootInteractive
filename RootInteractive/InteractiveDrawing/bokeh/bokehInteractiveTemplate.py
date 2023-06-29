@@ -67,6 +67,11 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         defaultValue = defaultVariables.get(iVar, variables[i % len(variables)])
         if iVar == "weights":
             defaultValue = defaultVariables.get("weights", weights[0])
+        if isinstance(defaultValue, list):
+            if multiAxis is None:
+                multiAxis = iVar
+            else:
+                raise NotImplementedError("Multiple multiselect axes not implemented")
         if iVar == multiAxis and isinstance(defaultValue, str):
             defaultValue = [defaultValue]
         parameterArray.append({"name": iVar, "value": defaultValue, "options":weights if iVar == "weights" else variables}) 
