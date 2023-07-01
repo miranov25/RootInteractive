@@ -1912,7 +1912,6 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             multi_axis = None
             weights = iCds.get("weights", None)
             sample_variables = iCds["variables"]
-            name_orig = f"{cdsName}_orig"
             source = getOrMakeCdsFull(cdsDict, paramDict, iCds.get("source", None))
             if "source" not in iCds:
                 iCds["source"] = None
@@ -1942,7 +1941,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         else:
                             multi_axis = ("variables", i)
             if multi_axis is None:
-                cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value, weights=weights, name=cdsName, nbins=nbins_value, range=range_value)
+                cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value, weights=weights_value, name=cdsName, nbins=nbins_value, range=range_value)
                 iCds["cdsOrig"] = cdsOrig
                 histogramsLocal = [cdsOrig]
             else:
