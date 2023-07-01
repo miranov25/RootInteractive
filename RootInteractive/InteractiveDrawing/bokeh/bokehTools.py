@@ -1510,8 +1510,8 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
     options.update(kwargs)
     # optionsPlot = []
     if options['callback'] == 'parameter':
-        optionsPlot = paramDict[params[0]]["options"]
-        optionsSelected = paramDict[params[0]]["value"]
+        optionsPlot = [str(i) for i in paramDict[params[0]]["options"]]
+        optionsSelected = [str(i) for i in paramDict[params[0]]["value"]]
     else:
         if len(params) > 1:
             dfCategorical = df[params[0]].astype(pd.CategoricalDtype(ordered=True, categories=params[1:]))
@@ -1958,7 +1958,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         sample_value[multi_axis[1]] = i
                     cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value.copy(), weights=weights_value, name=f"{cdsName}[{i}]", nbins=nbins_value, range=range_value)
                     histogramsLocal.append(cdsOrig)
-                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=[str(i) for i in paramDict[acc]["value"]], mapping={str(value):i for (i, value) in enumerate(histoOptions)})
                 iCds["cdsOrig"] = cdsOrig
                 paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
             for binsIdx, iBins in enumerate(nbins):

@@ -72,7 +72,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
                 multiAxis = iVar
             else:
                 raise NotImplementedError("Multiple multiselect axes not implemented")
-        if iVar == multiAxis and isinstance(defaultValue, str):
+        if iVar == multiAxis and not isinstance(defaultValue, list):
             defaultValue = [defaultValue]
         parameterArray.append({"name": iVar, "value": defaultValue, "options":weights if iVar == "weights" else variables}) 
         widgetParams.append(['multiSelect' if iVar == multiAxis else 'select', [iVar], {"name":iVar}])
