@@ -1067,7 +1067,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if 'tooltips' in optionLocal and cds_names[i] is None:
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                 else:
-                    tooltipColumns = getTooltipColumns(cdsDict[cds_name]["tooltips"])
+                    tooltipColumns = getTooltipColumns(cdsDict[cds_name].get("tooltips", []))
                 _, _, memoized_columns, tooltip_sources = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
                 sources.update(tooltip_sources)
             if cds_name == "$IGNORE":
@@ -1101,7 +1101,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if color_bar is not None:
             figureI.add_layout(color_bar, 'right')
         for iCds, iRenderers in hover_tool_renderers.items():
-            figureI.add_tools(HoverTool(tooltips=cdsDict[iCds]["tooltips"], renderers=iRenderers))
+            if cdsDict[iCds].get("tooltips", None) is not None:
+                figureI.add_tools(HoverTool(tooltips=cdsDict[iCds]["tooltips"], renderers=iRenderers))
         if figureI.legend:
             figureI.legend.click_policy = "hide"
             if optionLocal["legendTitle"] is not None:
