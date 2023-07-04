@@ -427,3 +427,18 @@ def test_interactiveTemplateMultiX():
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
+    
+def test_interactiveTemplateMultiY():
+    output_file("test_histogramTemplateMultiY.html")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"], defaultVariables={"varY":["B", "A*A+B"]})
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
+    

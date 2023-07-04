@@ -84,7 +84,6 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     widgetParams.extend(figureParameters["legend"]["widgets"])
     widgetParams.extend(figureParameters["markers"]["widgets"])
 
-
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
@@ -118,37 +117,116 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
             "name": "histoXYData",
             "variables": ["varX","varY"],
             "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
+            "nbins":["nbinsX","nbinsY"], "quantiles": [0.35,0.5],"unbinned_projections":True,
         },
         {
             "name": "histoXYZData",
             "variables": ["varX","varY","varZ"],
             "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+            "nbins":["nbinsX","nbinsY","nbinsZ"], "quantiles": [0.35,0.5],"unbinned_projections":True,
         },
     ]
 
     if normalization is not None:
-        histoArray.extend([
-        {
-            "name": "histoXYNormData",
-            "variables": ["varX",formulaYNorm],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        {
-            "name": "histoXYNormZData",
-            "variables": ["varX",formulaYNorm,"varZ"],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        {
-            "name": "histoXYZNormData",
-            "variables": ["varX","varY",formulaZNorm],
-            "weights": "weights" if weights else defaultWeights,
-            "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
-        },
-        ])
+        if multiAxis in ["varY", "varYNorm"]:
+            histoXYNames = {i:f"histoXYNormData[{i}]" for i in variables}
+            histoXY1Names = {i:f"histoXYNormData_1[{i}]" for i in variables}
+            histoXYZNames = {i:f"histoXYNormZData[{i}]" for i in variables}
+            histoXYZ1Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
+            histoXYZ2Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
+            varNorm = {
+                "diff": lambda x,y: f"{x}-{y}",
+                "ratio": lambda x,y: f"{x}/{y}",
+                "logRatio":lambda x,y: f"log({x})/log({y})"
+            }[normalization]
+            histoArray.extend([{
+                "name": f"histoXYNormData[{i}]",
+                "variables": ["varX", varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i)],
+                "weights": "weights" if weights else defaultWeights,   
+                "nbins": ["nbinsX", "nbinsY"]        
+            } for i in variables])
+            histoArray.extend([{
+                "name": f"histoXYNormData_1[{i}]",
+                "type": "projection",
+                "source": f"histoXYNormData[{i}]",
+                "axis_idx": 1,
+                "weights": "weights" if weights else defaultWeights,
+                "quantiles": [0.35,0.5],"unbinned":True,                
+            } for i in variables])
+            histoArray.extend([{
+                "name": f"histoXYNormZData[{i}]",
+                "variables": ["varX", varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i), "varZ"],
+                "weights": "weights" if weights else defaultWeights,
+                "nbins":["nbinsX","nbinsY", "nbinsZ"],                
+            } for i in variables])
+            histoArray.extend([{
+                "name": f"histoXYNormZData_1[{i}]",
+                "type": "projection",
+                "source": f"histoXYNormZData[{i}]",
+                "axis_idx": 1,
+                "weights": "weights" if weights else defaultWeights,
+                "quantiles": [0.35,0.5],"unbinned":True,                
+            } for i in variables])
+            histoArray.extend([{
+                "name": f"histoXYNormZData_2[{i}]",
+                "type": "projection",
+                "source": f"histoXYNormZData[{i}]",
+                "axis_idx": 2,
+                "weights": "weights" if weights else defaultWeights,
+                "quantiles": [0.35,0.5],"unbinned":True,                
+            } for i in variables])
+            histoArray.extend([
+            {
+                "name": "histoXYNormData",
+                "sources": multiAxis,
+                "mapping": histoXYNames
+            },
+            {
+                "name": "histoXYNormData_1",
+                "sources": multiAxis,
+                "mapping": histoXY1Names
+            },
+            {
+                "name": "histoXYNormZData",
+                "sources": multiAxis,
+                "mapping": histoXYZNames
+            },
+            {
+                "name": "histoXYNormZData_1",
+                "sources": multiAxis,
+                "mapping": histoXYZ1Names
+            },
+            {
+                "name": "histoXYNormZData_2",
+                "sources": multiAxis,
+                "mapping": histoXYZ2Names
+            }
+            ])
+        else:
+            histoArray.extend([
+            {
+                "name": "histoXYNormData",
+                "variables": ["varX",formulaYNorm],
+                "weights": "weights" if weights else defaultWeights,
+                "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
+            },
+            {
+                "name": "histoXYNormZData",
+                "variables": ["varX",formulaYNorm,"varZ"],
+                "weights": "weights" if weights else defaultWeights,
+                "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+            },
+            ])
+        if multiAxis in ["varZ", "varZNorm"]:
+            pass
+        else:
+            histoArray.append(            
+                {
+                    "name": "histoXYZNormData",
+                    "variables": ["varX","varY",formulaZNorm],
+                    "weights": "weights" if weights else defaultWeights,
+                    "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
+                })
 
     yAxisTitleNorm = {
             "diff":"{varY}-{varYNorm}",
@@ -163,10 +241,10 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
         # histoXYNorm
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData"}],
-        [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0"}],
-        [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
+        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
         # histoXYZ
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["entries"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
@@ -177,10 +255,10 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         [["bin_center_0"], ["entries"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        # histoXYNormZMedian
+        # histoXYZNormMedian
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZData_2"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZNormData_2"}],
-        # histoXYNormZMean
+        # histoXYZNormMean
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZData_2"}],
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZNormData_2"}],
         #

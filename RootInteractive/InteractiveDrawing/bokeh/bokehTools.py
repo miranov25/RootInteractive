@@ -613,7 +613,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             sources.update(used_names_local)
             if len(variables) > 1:
                 TOptions.update(variables[1])
-            histoDict = {i: cdsDict[i] for i in histoListLocal}
             cdsHistoSummary, tableHisto = makeBokehHistoTable(cdsDict, include=TOptions["include"], exclude=TOptions["exclude"], rowwise=TOptions["rowwise"], paramDict=paramDict)
             plotArray.append(tableHisto)
             if "name" in optionLocal:
@@ -844,7 +843,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                              tools=options['tools'], x_axis_type=options['x_axis_type'],
                              y_axis_type=options['y_axis_type'])
 
-        lengthX = len(variables[0])
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
         color_bar = None
@@ -1820,11 +1818,6 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             iSource["type"] = cdsType
         cdsType = iSource["type"]
 
-        # Create the name for cdsOrig
-        name_orig = "cdsOrig"
-        if cds_name is not None:
-            name_orig = cds_name+"_orig"
-
         # Create cdsOrig
         if cdsType == "source":
             if iSource["meta"] is None:
@@ -1836,16 +1829,21 @@ def makeCDSDict(sourceArray, paramDict, options={}):
             sources = iSource["sources"]
             if isinstance(sources, str):
                 if sources in paramDict:
-                    iSource["sources_all"] = paramDict[sources]["options"]
-                    iSource["active"] = paramDict[sources]["value"]
+                    if "mapping" in iSource:
+                        iSource["sources_all"] = list(iSource["mapping"].values())
+                        iSource["active"] = paramDict[sources]["value"]
+                    else:
+                        iSource["sources_all"] = paramDict[sources]["options"]
+                        iSource["active"] = paramDict[sources]["value"]
             else:
                 iSource["sources_all"] = sources
         if cdsType in ["histo2d", "histoNd"]:
             sample_variables = iSource["variables"]
             for j in range(len(sample_variables)):
-                cdsDict[f"{cds_name}_{str(j)}"] = {"type": "projection", "name": f"{cds_name}_{str(j)}", "source":cds_name, "weights":iSource.get("weights", None), 
-                        "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j,
-                        "sources":iSource.get("sources", None), "unbinned":iSource.get("unbinned_projections", False)}
+                if f"{cds_name}_{str(j)}" not in cdsDict:
+                    cdsDict[f"{cds_name}_{str(j)}"] = {"type": "projection", "name": f"{cds_name}_{str(j)}", "source":cds_name, "weights":iSource.get("weights", None), 
+                            "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j,
+                            "sources":iSource.get("sources", None), "unbinned":iSource.get("unbinned_projections", False)}
 
     for cds_name, iSource in cdsDict.items():
         if iSource["type"] == "source":
@@ -1859,8 +1857,6 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 iSource["tooltips"] = defaultHistoTooltips
             elif iSource["type"] in ["histo2d", "histoNd"]:
                 iSource["tooltips"] = defaultHisto2DTooltips
-            else:
-                iSource["tooltips"] = []
     return cdsDict
 
 def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
@@ -1997,7 +1993,17 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             iSource = iCds
             sources = iSource["sources"]
             sourcesObjs = [getOrMakeCdsFull(cdsDict, paramDict, i) for i in iSource["sources_all"]]
-            iSource["cdsOrig"] = CDSStack(sources=sourcesObjs, mapping={value:i for (i, value) in enumerate(iSource["sources_all"])}, activeSources=iSource["active"])
+            mapping = iSource.get("mapping", None)
+            if mapping is None:
+                mappingNew = {value:i for (i, value) in enumerate(iSource["sources_all"])}
+            elif isinstance(mapping, dict):
+                sourcesInverse = {value:i for i,value in enumerate(iSource["sources_all"])}
+                mappingNew = {i:sourcesInverse[value] for (i, value) in mapping.items()}
+            iSource["cdsOrig"] = CDSStack(sources=sourcesObjs, mapping=mappingNew, activeSources=iSource["active"])
+            if "tooltips" not in iSource:
+                tooltipsOrig = cdsDict[iSource["sources_all"][0]].get("tooltips", None)
+                if tooltipsOrig is not None:
+                    iSource["tooltips"] = tooltipsOrig
             if sources in paramDict:
                 paramDict[sources]["subscribed_events"].append(("value", iSource["cdsOrig"], "activeSources"))
         elif cdsType == "join":
