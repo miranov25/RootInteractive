@@ -1746,9 +1746,8 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                 if cdsDict[cdsName]["type"] == "projection":
                     cdsOrig = cdsDict[cdsName]["cdsOrig"]
                     cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
-                    histogramOrig = cdsOrig.source
                     projectionIdx = cdsOrig.axis_idx
-                    return f"quantile {quantile} {{{ histogramOrig.sample_variables[projectionIdx] }}}"
+                    return f"quantile {quantile} {{{cdsDict[cdsDict[cdsName]['source']]['variables'][projectionIdx] }}}"
                 return f"quantile {{{quantile}}}"
             if x[0] == "sum":
                 range = cdsDict[cdsName]["sum_range"][int(x[-1])]
@@ -1756,27 +1755,22 @@ def getHistogramAxisTitle(cdsDict, varName, cdsName, removeCdsName=True):
                     if cdsDict[cdsName]["type"] == "projection":
                         cdsOrig = cdsDict[cdsName]["cdsOrig"]
                         cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
-                        histogramOrig = cdsOrig.source
                         projectionIdx = cdsOrig.axis_idx
-                        return f"sum {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                        return f"sum {{{cdsDict[cdsDict[cdsName]['source']]['variables'][projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"sum in [{range[0]}, {range[1]}]"
                 elif len(x) == 3:
                     if cdsDict[cdsName]["type"] == "projection":
                         cdsOrig = cdsDict[cdsName]["cdsOrig"]
                         cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
-                        histogramOrig = cdsOrig.source
                         projectionIdx = cdsOrig.axis_idx
-                        return f"p {{{histogramOrig.sample_variables[projectionIdx]}}} in [{range[0]}, {range[1]}]"
+                        return f"p {{{cdsDict[cdsDict[cdsName]['source']]['variables'][projectionIdx]}}} in [{range[0]}, {range[1]}]"
                     return f"p in [{range[0]}, {range[1]}]"
         else:
             if cdsDict[cdsName]["type"] == "projection":
                 cdsOrig = cdsDict[cdsName]["cdsOrig"]
-                if isinstance(cdsOrig, HistoNdProfile):
-                    histogramOrig = cdsDict[cdsName]["cdsOrig"].source
-                    projectionIdx = cdsDict[cdsName]["cdsOrig"].axis_idx
-                    return f"{varName} {{{histogramOrig.sample_variables[projectionIdx]}}}"
-                else:
-                    return f"{varName}"
+                cdsOrig = cdsOrig if isinstance(cdsOrig, HistoNdProfile) else cdsOrig.sources[0]
+                projectionIdx = cdsOrig.axis_idx
+                return f"{varName} {{{cdsDict[cdsDict[cdsName]['source']]['variables'][projectionIdx]}}}"
     return prefix+varName
 
 def makeCDSDict(sourceArray, paramDict, options={}):
