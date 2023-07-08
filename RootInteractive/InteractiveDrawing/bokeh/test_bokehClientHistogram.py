@@ -1,7 +1,7 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
-from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
@@ -373,7 +373,7 @@ def test_StableQuantile():
 
 def test_interactiveTemplateWeights():
     output_file("test_histogramTemplate.html")
-    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"], weights=["A>.5", "B>C"])
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
     parameterArray = parameterArray + [
                 {"name":"varXMulti", "value":["A", "B"], "options":variables},
                 {"name":"varYMulti", "value":["A", "B"], "options":variables}
@@ -413,3 +413,32 @@ def test_interactiveTemplateWeights():
     figureLayoutDesc["HistoMultiY"] = [["histoNDMultiY_1_Mean", "histoNDMultiY_1_Median"], ["histoNDMultiY_0_Mean", "histoNDMultiY_0_Median"], {"plot_height":240}]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
+
+def test_interactiveTemplateMultiX():
+    output_file("test_histogramTemplateMultiX.html")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsRatio(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"], defaultVariables={"varX":["A"]})
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
+    
+def test_interactiveTemplateMultiY():
+    output_file("test_histogramTemplateMultiY.html")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"], defaultVariables={"varY":["B", "A*A+B"]})
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
+    

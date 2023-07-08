@@ -50,7 +50,7 @@ export class CDSAlias extends ColumnarDataSource {
     this.connect(this.source.change, () => {this.cached_columns.clear(); this.change.emit()})
     for( const key in this.mapping){
       const column = this.mapping[key]
-      if(column.hasOwnProperty("transform")){
+      if(column != null && column.hasOwnProperty("transform")){
         this.connect(column.transform.change, () => {
           this.invalidate_column(key)
         })
