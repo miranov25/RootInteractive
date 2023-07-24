@@ -60,7 +60,7 @@ export class CDSStack extends ColumnarDataSource {
     }
     const {sources, mapping, activeSources,  _cached_offsets} = this
     let col = Array(this.get_length()) 
-    if(key === "$source_index"){
+    if(key === "_source_index"){
       for(let i=0; i < activeSources.length; i++){
         const j = mapping[activeSources[i]] 
         if(j < sources.length-1){
