@@ -903,16 +903,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         color_axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
                     color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-                    color_axis_title_model = makeAxisLabelFromTemplate(color_axis_title, paramDict, meta)
-                    applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
+                    if optionLocal.get("showColorAxisTitle", False):
+                        color_axis_title_model = makeAxisLabelFromTemplate(color_axis_title, paramDict, meta)
+                        applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
                 color=optionLocal['color']
             elif cds_name in cdsDict and isinstance(cds_used.source.source, CDSStack):
-                color = factor_cmap("$source_index", colorAll[10], cdsDict[cds_name]["cdsOrig"].activeSources)
+                color = factor_cmap("_source_index", colorAll[10], cdsDict[cds_name]["cdsOrig"].activeSources)
                 stack_sources = cdsDict[cds_name]["sources"]
                 if isinstance(stack_sources, str):
                     if stack_sources in paramDict:
                         paramDict[stack_sources]["subscribed_events"].append(("value", color["transform"], "factors"))
+            elif cds_name in cdsDict and isinstance(cds_used.source.source, HistoNdProfile) and isinstance(cds_used.source.source.weights, list):
+                weights = cdsDict[cds_name]["weights"]
+                color = factor_cmap("weights", colorAll[10], [str(i) for i in paramDict["weights"]["value"]])
+                paramDict[weights]["subscribed_events"].append(("value", color["transform"], "factors"))    
             else:
                 color = colorAll[max(length, 4)][i]
             markerSize = optionLocal['size']
@@ -934,11 +939,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     raise NotImplementedError("Marker field not implemented for aliases yet")
                 marker = factor_mark(markerField["name"], markersAll, uniq_values)
             elif cds_name in cdsDict and isinstance(cds_used.source.source, CDSStack):
-                marker = factor_mark("$source_index", markersAll, cds_used.source.source.activeSources)
+                marker = factor_mark("_source_index", markersAll, cds_used.source.source.activeSources)
                 stack_sources = cdsDict[cds_name]["sources"]
                 if isinstance(stack_sources, str):
                     if stack_sources in paramDict:
                         paramDict[stack_sources]["subscribed_events"].append(("value", marker["transform"], "factors"))
+            elif cds_name in cdsDict and isinstance(cds_used.source.source, HistoNdProfile) and isinstance(cds_used.source.source.weights, list):
+                weights = cdsDict[cds_name]["weights"]
+                marker = factor_mark("weights", markersAll, [str(i) for i in paramDict["weights"]["value"]])
+                paramDict[weights]["subscribed_events"].append(("value", marker["transform"], "factors"))            
             else:
                 try:
                     marker = optionLocal['markers'][i]
@@ -1009,7 +1018,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         if y_transform:
                             y_label = f"{{{y_transform}}} {y_label}"
                         drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
-                                    color=color, marker=marker, legend_field="$source_index")                        
+                                    color=color, marker=marker, legend_field="_source_index")
+                    elif isinstance(cdsDict[cds_name]["cdsOrig"], HistoNdProfile) and isinstance(cdsDict[cds_name]["cdsOrig"].weights, list):
+                        x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        if x_transform:
+                            x_label = f"{{{x_transform}}} {x_label}"
+                        y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
+                        drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
+                                    color=color, marker=marker, legend_field="weights")                                        
                     else:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
@@ -1803,6 +1821,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                     cdsType = "histo2d"
                 else:
                     cdsType = "histoNd"
+            elif "axis_idx" in iSource:
+                cdsType = "projection"
             elif "left" in iSource or "right" in iSource:
                 cdsType = "join"
             elif "sources" in iSource:
@@ -1881,17 +1901,33 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             cdsOrig = getOrMakeCdsOrig(cdsDict, paramDict, source)
             if isinstance(cdsOrig, CDSStack):
                 projections = []
-                for i in cdsOrig.sources:
-                    weights = i.weights if weightsOrig == weightsNew else weightsNew
-                    cdsProfile = HistoNdProfile(source=i, axis_idx=axis_idx, quantiles=quantiles, weights=weights,
-                                                sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned)
-                    if weightsOrig == weightsNew:
-                        i.js_link("weights", cdsProfile, "weights")
-                    projections.append(cdsProfile)
-                cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
-                cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
-                iCds["cdsOrig"] = cdsMultiProfile
-                iCds["sources"] = cdsDict[source]["sources"]
+                # Query optimizer - eliminate join if not needed
+                if weightsOrig in paramDict and isinstance(paramDict[weightsOrig]["value"], list):
+                    weightsValue = paramDict[weightsOrig]["value"]
+                    cdsProfile = HistoNdProfile(source=cdsOrig.sources[0], axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
+                            sum_range=sum_range, name=cdsName, unbinned=unbinned)
+                    paramDict[weightsOrig]["subscribed_events"].append(["value", CustomJS(args={"cds":cdsProfile}, code="""
+                        cds.weights=this.value.map(x => x === "None" ? null : x)
+                                                                                          """)])
+                    iCds["cdsOrig"] = cdsProfile
+                    iCds["legend_field"] = "weights"
+                    iCds["marker"] = "weights"
+                    iCds["colorZvar"] = "weights"
+                else:
+                    for i in cdsOrig.sources:
+                        weights = i.weights if weightsOrig == weightsNew else weightsNew
+                        cdsProfile = HistoNdProfile(source=i, axis_idx=axis_idx, quantiles=quantiles, weights=weights,
+                                                    sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned)
+                        if weightsOrig == weightsNew:
+                            i.js_link("weights", cdsProfile, "weights")
+                        projections.append(cdsProfile)
+                    cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
+                    cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
+                    iCds["cdsOrig"] = cdsMultiProfile
+                    iCds["sources"] = cdsDict[source]["sources"]
+                    iCds["legend_field"] = "_source_index"
+                    iCds["marker"] = "weights"
+                    iCds["colorZvar"] = "weights"
             else:
                 weightsValue = weightsNew if weightsNew not in paramDict else paramDict[weightsNew]["value"]
                 cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,

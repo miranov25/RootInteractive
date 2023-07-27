@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, List, Float, Int, Bool, String
+from bokeh.core.properties import Instance, List, Float, Int, Bool, String, Either
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 
@@ -26,6 +26,6 @@ class HistoNdProfile(ColumnarDataSource):
     sum_range = List(List(Float))
     unbinned = Bool(default=False)
     if nullable_available:
-        weights = Nullable(String(), default=None)
+        weights = Nullable(Either(List(Nullable(String())), String()), default=None)
     else:
-        weights = String(default=None)
+        weights = Either(List(String), String(), default=None)
