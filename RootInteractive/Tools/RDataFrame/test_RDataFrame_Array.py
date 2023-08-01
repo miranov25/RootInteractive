@@ -13,6 +13,7 @@ def makeTestDictionary():
        #include "ROOT/RVec.hxx"
        #include "ROOT/RDF/RInterface.hxx"
        #include  "TParticle.h"
+       #include "DataFormatsTPC/TrackTPC.h"
        #pragma link C++ class ROOT::RVec < ROOT::RVec < char>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < float>> + ;
        #pragma link C++ class ROOT::RVec < ROOT::RVec < double>> + ;
@@ -30,6 +31,8 @@ def makeTestRDataFrame():
     ROOT.gInterpreter.ProcessLine(".L dict.C+")
 
     ROOT.gInterpreter.Declare("""
+        
+        o2::tpc::TrackTPC t;
         auto makeUnitRVec1D = [](int n){
             auto array = ROOT::RVecF(n);
             array.resize(n);
@@ -111,6 +114,9 @@ def test_define():
     # test 4  - 1D member function OK
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDF("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
+    parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, True);
+    rdf = makeDefineRDF("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
     # test 5  - 2D delta auto range
     parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);

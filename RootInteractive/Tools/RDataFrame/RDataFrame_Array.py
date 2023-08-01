@@ -36,11 +36,13 @@ def getClassMethod(className, methodName, arguments=[]):
     className = "AliExternalTrackParam" ; methodName="GetX"
     """
     import re
+    className2=className.replace("::",".")
     try:
-        docString= eval(f"ROOT.{className}.{methodName}.func_doc")
-        returnType = re.sub(f"\\s+{className}.*","",docString)
+        docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
+        returnType = re.sub(f"\\s+{className2}.*","",docString)
         return (returnType,docString)
     except:
+        print(f"Non supported {className2}.{methodName}")
         pass
     return ("","")
 
