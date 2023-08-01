@@ -115,6 +115,7 @@ def test_define():
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDF("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
+    # test 4.b  - 1D member function  FAILING
     parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, True);
     rdf = makeDefineRDF("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");

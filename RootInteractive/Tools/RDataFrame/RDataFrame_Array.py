@@ -37,6 +37,8 @@ def getClassMethod(className, methodName, arguments=[]):
     """
     import re
     className2=className.replace("::",".")
+    className2 =className2.replace("<", '("')
+    className2 =className2.replace(">", '")')
     try:
         docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
         returnType = re.sub(f"\\s+{className2}.*","",docString)
