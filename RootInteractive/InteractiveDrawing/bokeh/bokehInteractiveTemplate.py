@@ -25,9 +25,10 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         {"name": "nbinsZ", "value":5, "range":[1,10]},
         # transformation
         {"name": "exponentX", "value":1, "range":[-5, 5]},
-        {'name': "xAxisTransform", "value":None, "options":[None, "sqrt", "lambda x: log(1+x)","lambda x: 1/sqrt(x)", "lambda x: x**exponentX","lambda x,y: x/y" ]},
-        {'name': "yAxisTransform", "value":None, "options":[None, "sqrt", "lambda x: log(1+x)","lambda x: 1/sqrt(x)", "lambda x: x**exponentX","lambda x,y: y/x" ]},
-        {'name': "zAxisTransform", "value":None, "options":[None, "sqrt", "lambda x: log(1+x)","lambda x: 1/sqrt(x)", "lambda x: x**exponentX" ]},
+        {"name": "epsilonLog", "value": 0.1, "range": [0.00, 100000]},
+        {'name': "xAxisTransform", "value":None, "options":[None, "sqrt","log", "lambda x: log(1+x)","lambda x: log(1+epsilonLog*x)/epsilonLog","lambda x: 1/sqrt(x)", "lambda x: x**exponentX","lambda x,y: x/y" ]},
+        {'name': "yAxisTransform", "value":None, "options":[None, "sqrt", "log", "lambda x: log(1+x)","lambda x: log(1+epsilonLog*x)/epsilonLog","lambda x: 1/sqrt(x)", "lambda x: x**exponentX","lambda x,y: y/x" ]},
+        {'name': "zAxisTransform", "value":None, "options":[None, "sqrt", "log","lambda x: log(1+x)","lambda x: log(1+epsilonLog*x)/epsilonLog","lambda x: 1/sqrt(x)", "lambda x: x**exponentX" ]},
         # custom selection
         {'name': 'funCustomForm0', "value":"return 1"},
         {'name': 'funCustomForm1', "value":"return 1"},
@@ -56,6 +57,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
         # transformation
         ['spinner', ['exponentX'],{"name": "exponentX"}],
+        ['spinner', ['epsilonLog'], {"name": "epsilonLog"}],
         ['spinner', ['sigmaNRel'],{"name": "sigmaNRel"}],
         ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
         ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
@@ -88,7 +90,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
         "Histograms":[["nbinsX","nbinsY", "nbinsZ"], parameterVars, {'sizing_mode': 'scale_width'}],
-        "Transform":[["exponentX","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
+        "Transform":[["exponentX","epsilonLog","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
     }
