@@ -62,6 +62,9 @@ def getClassProperty(className, propertyName):
         className="TParticle"
         methodName="fPdgCode"
         In [11]: getClassProperty("TParticle","fPdgCode")
+        className="o2::tpc::TrackTPC"
+        methodName="mAlpha"
+        getClassProperty("o2::tpc::TrackTPC","mAlpha")
 Out[11]: ('int', 40)
     """
     clT = ROOT.gROOT.FindSTLClass(className, True)
@@ -71,7 +74,9 @@ Out[11]: ('int', 40)
     except:
         print(f"Non supported {className}.{propertyName}")
         pass
-
+        clT=None
+        return "",0
+    clT=None
     return type,offset
 
 
@@ -429,7 +434,7 @@ class RDataFrame_Visit:
         left = self.visit(node.value)
         className = left["type"]
         (fieldType, offset) = getClassProperty(className, node.attr)
-        return {"type":fieldType, "implementation": f"{left['implementation']}.{node.attr}"}
+        return {"type":scalar_type(fieldType), "implementation": f"{left['implementation']}.{node.attr}"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)

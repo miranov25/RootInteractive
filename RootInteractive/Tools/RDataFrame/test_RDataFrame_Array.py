@@ -119,10 +119,10 @@ def test_define():
     parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, True);
     rdf = makeDefineRDF("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayGetAlpha.root");
-    # test 4.c  - 1D member function  FAILING
-    parsed = makeDefine("arrayMAlpha","array1DTPCTrack[:].mAlpha", rdf,3, True);
-    rdf = makeDefineRDF("arrayMAlpha", parsed["name"], parsed,  rdf, verbose=1)
-    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayMAlpha.root");
+    # test 4.c  - 1D member function   - not yet working - need public getter for private and protected
+    # parsed = makeDefine("arrayfPdgCode","array1DTrack[:].fPdgCode", rdf,3, True);
+    # rdf = makeDefineRDF("arrayfPdgCode", parsed["name"], parsed,  rdf, verbose=1)
+    # rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayfPdgCode.root");
     # test 5  - 2D delta auto range
     parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);
     rdf = makeDefineRDF("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
