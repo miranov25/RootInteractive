@@ -42,7 +42,8 @@ def getClassMethod(className, methodName, arguments=[]):
     className2 =className2.replace(">", '")')
     try:
         docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
-        returnType = re.sub(f"\\s+{className2}.*","",docString)
+        #returnType = re.sub(f"\\s+{className2}.*","",docString)
+        returnType=docString.split(" ", 1)[0]
         return (returnType,docString)
     except:
         print(f"Non supported {className2}.{methodName}")
