@@ -115,10 +115,14 @@ def test_define():
     parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
     rdf = makeDefineRDF("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
-    # test 4.b  - 1D member function  FAILING
+    # test 4.b  - 1D member function  OK
     parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, True);
     rdf = makeDefineRDF("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
-    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayGetAlpha.root");
+    # test 4.c  - 1D member function  FAILING
+    parsed = makeDefine("arrayMAlpha","array1DTPCTrack[:].mAlpha", rdf,3, True);
+    rdf = makeDefineRDF("arrayMAlpha", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayMAlpha.root");
     # test 5  - 2D delta auto range
     parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);
     rdf = makeDefineRDF("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
