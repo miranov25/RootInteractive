@@ -151,6 +151,8 @@ class RDataFrame_Visit:
             return self.visit_Tuple(node)
         elif isinstance(node, ast.Constant):
             return self.visit_Constant(node)
+        elif isinstance(node, ast.Attribute):
+            return self.visit_Attribute(node)
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
@@ -422,6 +424,12 @@ class RDataFrame_Visit:
             func = getGlobalFunction(node.id)
             return {"type":"function", "implementation":node.id, "returnType":func["returnType"]}
         return {"type":"function", "implementation":node.id, "returnType":"double"}
+    
+    def visit_Attribute(self, node:ast.Attribute):
+        left = self.visit(node.value)
+        className = left["type"]
+        (fieldType, offset) = getClassProperty(className, node.attr)
+        return {"type":fieldType, "implementation": f"{left['implementation']}.{node.attr}"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
