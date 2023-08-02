@@ -50,6 +50,30 @@ def getClassMethod(className, methodName, arguments=[]):
         pass
     return ("","")
 
+def getClassProperty(className, propertyName):
+    """
+    return type of the property (or empty if not exist) and the data offset - using TClass interface
+    Error handling
+        * class not in the list yet  - the includes should be called in ROOT before
+    :param className:  ROOT classname
+    :param propertyName:
+    :return:
+    Example:
+        className="TParticle"
+        methodName="fPdgCode"
+        In [11]: getClassProperty("TParticle","fPdgCode")
+Out[11]: ('int', 40)
+    """
+    clT = ROOT.gROOT.FindSTLClass(className, True)
+    try:
+        type=clT.GetRealData(propertyName).GetDataMember().GetTypeName()
+        offset=clT.GetRealData(propertyName).GetDataMember().GetOffset()
+    except:
+        print(f"Non supported {className}.{propertyName}")
+        pass
+
+    return type,offset
+
 
 def scalar_type(name):
     dtypes = {
