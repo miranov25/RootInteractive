@@ -33,6 +33,7 @@ def getClassMethod(className, methodName, arguments=[]):
     :param className:
     :param methodName:
     :return:  type of the method if exist
+    in some classes more than on function exist - the function with proper arguments to be used
     className = "AliExternalTrackParam" ; methodName="GetX"
     """
     import re
