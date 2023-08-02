@@ -468,8 +468,14 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
 
 
 def makeDefine(name, code, df, verbose=3, isTest=False):
+    if verbose & 0x4:
+        print("makeDefine - Begin", name,code)
     t = ast.parse(code, "<string>", "eval")
+    if verbose & 0x8:
+        print("makeDefine - ast parse", name, code)
     evaluator = RDataFrame_Visit(code, df, name)
+    if verbose & 0x8:
+        print("makeDefine - evaluator",evaluator)
     parsed = evaluator.visit(t)
     if verbose>0:
         print("====================================\n")
