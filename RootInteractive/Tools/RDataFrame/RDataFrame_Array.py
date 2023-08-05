@@ -67,13 +67,22 @@ def getClassProperty(className, propertyName):
         getClassProperty("o2::tpc::TrackTPC","mAlpha")
 Out[11]: ('int', 40)
     """
-    clT = ROOT.gROOT.FindSTLClass(className, True)
-    tobjectNull = cppyy.bind_object(cppyy.nullptr, 'TObject')
+    tclassNull   = cppyy.bind_object(cppyy.nullptr, 'TClass')
+    tobjectNull  = cppyy.bind_object(cppyy.nullptr, 'TObject')
+    realDataNull = cppyy.bind_object(cppyy.nullptr, 'TRealData')  # https://cppyy.readthedocs.io/en/latest/lowlevel.html
+
+    clT=  ROOT.TClass.GetClass(className)
+    if clT==tclassNull:
+        clT = ROOT.gROOT.FindSTLClass(className, True)
+
+    if clT==tclassNull:
+        clT = None
+        raise NotImplementedError(f"Non supported {className}")
+
     if clT.GetListOfAllPublicDataMembers(True).FindObject(propertyName)==tobjectNull:
         clT = None
         raise NotImplementedError(f"Non supported property {className}.{propertyName}")
 
-    realDataNull = cppyy.bind_object(cppyy.nullptr, 'TRealData')  # https://cppyy.readthedocs.io/en/latest/lowlevel.html
     realData=clT.GetRealData(propertyName)
     if (realData==realDataNull):
         clT=None
