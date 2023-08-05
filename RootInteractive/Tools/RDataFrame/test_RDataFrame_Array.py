@@ -158,8 +158,10 @@ def test_exception(rdf):
     rdf = makeDefine("arrayAlpha1", "array1DTPCTrack[:].getAlpha()", rdf, 1)
     # raising properly exception
     rdf = makeDefine("arrayAlphaT1", "array1DTPCTrack[:].getAlpha1()", rdf, 1)
-    # this is crashing with seg fault
-    rdf = makeDefine("arrayAlpha11", "array1DTPCTrack[:].mAlpha", rdf, 1)
+    # this is crashing with seg fault - private attributes should be tested
+    rdf = makeDefine("arrayPdgCode", "array1DTrack[:].fPdgCode", rdf, 1)
+    # this is crashing with seg fault - private attributes should be tested
+    rdf = makeDefine("arraymAlphaT1", "array1DTPCTrack[:].mAlpha", rdf, 1)
 
 
 def makeDefineRDFv2(columnName, funName, parsed,  rdf, verbose=1):

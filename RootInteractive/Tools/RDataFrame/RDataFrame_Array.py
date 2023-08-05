@@ -68,6 +68,11 @@ def getClassProperty(className, propertyName):
 Out[11]: ('int', 40)
     """
     clT = ROOT.gROOT.FindSTLClass(className, True)
+    tobjectNull = cppyy.bind_object(cppyy.nullptr, 'TObject')
+    if clT.GetListOfAllPublicDataMembers(True).FindObject(propertyName)==tobjectNull:
+        clT = None
+        raise NotImplementedError(f"Non supported property {className}.{propertyName}")
+
     realDataNull = cppyy.bind_object(cppyy.nullptr, 'TRealData')  # https://cppyy.readthedocs.io/en/latest/lowlevel.html
     realData=clT.GetRealData(propertyName)
     if (realData==realDataNull):
@@ -79,6 +84,7 @@ Out[11]: ('int', 40)
     type=realData.GetDataMember().GetTypeName()
     offset=realData.GetDataMember().GetOffset()
     if type=='':
+        clT=None
         logging.error(f"Non supported property {className}.{propertyName}")
         raise NotImplementedError(f"Non supported property {className}.{propertyName}")
     clT=None
