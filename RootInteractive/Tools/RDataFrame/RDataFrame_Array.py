@@ -1,6 +1,7 @@
 import ast
 import ROOT
 import logging
+import cppyy.ll
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -41,27 +42,25 @@ def getClassMethod(className, methodName, arguments=[]):
     className2=className.replace("::",".")
     className2 =className2.replace("<", '("')
     className2 =className2.replace(">", '")')
-    try:
-        docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
-        #returnType = re.sub(f"\\s+{className2}.*","",docString)
-        returnType=docString.split(" ", 1)[0]
-        return (returnType,docString)
-    except:
-        logging.error(f"Non supported {className2}.{methodName}")
-        pass
-    return ("","")
+
+    docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
+    returnType=docString.split(" ", 1)[0]
+    if returnType=="":
+        logging.error(f"Non supported function {className2}.{methodName}")
+        raise NotImplementedError(f"Non supported function {className2}.{methodName}")
+    return (returnType,docString)
+
 
 def getClassProperty(className, propertyName):
     """
     return type of the property (or empty if not exist) and the data offset - using TClass interface
-    Error handling
-        * class not in the list yet  - the includes should be called in ROOT before
+    Error handling - https://cppyy.readthedocs.io/en/latest/lowlevel.html
     :param className:  ROOT classname
     :param propertyName:
     :return:
     Example:
         className="TParticle"
-        methodName="fPdgCode"
+        propertyName="fPdgCode"
         In [11]: getClassProperty("TParticle","fPdgCode")
         className="o2::tpc::TrackTPC"
         methodName="mAlpha"
@@ -69,15 +68,21 @@ def getClassProperty(className, propertyName):
 Out[11]: ('int', 40)
     """
     clT = ROOT.gROOT.FindSTLClass(className, True)
-    try:
-        type=clT.GetRealData(propertyName).GetDataMember().GetTypeName()
-        offset=clT.GetRealData(propertyName).GetDataMember().GetOffset()
-    except:
-        logging.error(f"Non supported {className}.{propertyName}")
-        pass
+    realDataNull = cppyy.bind_object(cppyy.nullptr, 'TRealData')  # https://cppyy.readthedocs.io/en/latest/lowlevel.html
+    realData=clT.GetRealData(propertyName)
+    if (realData==realDataNull):
         clT=None
-        return "",0
+        raise NotImplementedError(f"Non supported property {className}.{propertyName}")
+    if (realData.GetDataMember()==realDataNull):
+        clT=None
+        raise NotImplementedError(f"Non supported property {className}.{propertyName}")
+    type=realData.GetDataMember().GetTypeName()
+    offset=realData.GetDataMember().GetOffset()
+    if type=='':
+        logging.error(f"Non supported property {className}.{propertyName}")
+        raise NotImplementedError(f"Non supported property {className}.{propertyName}")
     clT=None
+    realData=None
     return type,offset
 
 

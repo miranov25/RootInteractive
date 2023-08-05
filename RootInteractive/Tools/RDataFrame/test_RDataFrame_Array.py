@@ -152,6 +152,15 @@ def test_define(logLevel=logging.DEBUG):
 
     return rdf
 
+def test_exception(rdf):
+    # here we should test that the code is not crashing but showing error message and continue
+    # this is OK
+    rdf = makeDefine("arrayAlpha1", "array1DTPCTrack[:].getAlpha()", rdf, 1)
+    # raising properly exception
+    rdf = makeDefine("arrayAlphaT1", "array1DTPCTrack[:].getAlpha1()", rdf, 1)
+    # this is crashing with seg fault
+    rdf = makeDefine("arrayAlpha11", "array1DTPCTrack[:].mAlpha", rdf, 1)
+
 
 def makeDefineRDFv2(columnName, funName, parsed,  rdf, verbose=1):
     if verbose & 0x1:
