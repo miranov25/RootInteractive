@@ -1,5 +1,6 @@
 import ast
 import ROOT
+import logging
 
 def getGlobalFunction(name="cos", verbose=0):
     info={"fun":0, "returnType":"", "nArgs":0}
@@ -11,7 +12,7 @@ def getGlobalFunction(name="cos", verbose=0):
     # fun.GetReturnTypeName()   -> 'long double'
     # fun.GetNargs()            ->  1
     if verbose:
-        print("GetGlobalFunction",name, info)
+        logging.info(f"GetGlobalFunction {name} {info}")
     return info
 
 def getClass(name="TParticle", verbose=0):
@@ -22,7 +23,7 @@ def getClass(name="TParticle", verbose=0):
         info["publicMethods"]=rClass.GetListOfAllPublicMethods()
         info["publicData"]=rClass.GetListOfAllPublicDataMembers()
     if verbose:
-        print("GetGlobalFunction",name, info)
+        logging.info(f"GetGlobalFunction {name} {info}")
     return info
 
 def getClassMethod(className, methodName, arguments=[]):
@@ -46,7 +47,7 @@ def getClassMethod(className, methodName, arguments=[]):
         returnType=docString.split(" ", 1)[0]
         return (returnType,docString)
     except:
-        print(f"Non supported {className2}.{methodName}")
+        logging.error(f"Non supported {className2}.{methodName}")
         pass
     return ("","")
 
@@ -72,7 +73,7 @@ Out[11]: ('int', 40)
         type=clT.GetRealData(propertyName).GetDataMember().GetTypeName()
         offset=clT.GetRealData(propertyName).GetDataMember().GetOffset()
     except:
-        print(f"Non supported {className}.{propertyName}")
+        logging.error(f"Non supported {className}.{propertyName}")
         pass
         clT=None
         return "",0
@@ -379,7 +380,7 @@ class RDataFrame_Visit:
                 self.n_iter[idx] = n_iter
         dtype_str = unpackScalarType(value["type"], len(n_iter_arr))
         dtype = scalar_type(dtype_str)
-        print(dtype_str, dtype)
+        logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
             "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
             "type":dtype
@@ -458,7 +459,7 @@ def unpackScalarType(vecType:str, level:int=0):
     return unpackScalarType(vecTypeNew, level-1)
 
 
-def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
+def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     """
     makeDefineRDF         this is internal function to create columns  column Name for fucnion funName
 
@@ -467,15 +468,18 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
     :param parsed:      implementation + dependencies
     :param rdf:         input RDF
     :param verbose:     verbosity
+    :param flag            - 0x1-makeDefine / do nothing if column exist, 0x2- force bit to redefine if exist
     :return:            data frame with new column - columns name
     """
     if verbose & 0x1:
-        print(f"{columnName}\t{funName}\t{parsed}")
+        logging.info(f"{columnName}\t{funName}\t{parsed}")
     # 0.) Define function if does not exist yet
 
     try:
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
+        logging.error(f'makeDefineRDF compilation of {funName} failed Implementation in {parsed["implemntation"]}')
+        return rdf
         pass
     # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
     try:
@@ -485,7 +489,7 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
     if ROOT.rdfgener_rdf!=rdf:
         ROOT.rdfgener_rdf=rdf
     # 2.) be verbose
-    if verbose&0x2:
+    if verbose&0x4:
         rdf.Describe().Print();                                      ## workimg
         ROOT.gInterpreter.ProcessLine("rdfgener_rdf->Describe()");  ## print content of the rdf
     #
@@ -496,38 +500,54 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1):
         auto rdfOut=rdfgener_rdf->Define("{columnName}",{funName},{dependency});
         rdfgener_rdf=&rdfOut;   
     """
+    if (rdf.HasColumn(columnName) & ((flag&0x2)==0)):
+        defineLine = f"""
+            auto rdfOut=rdfgener_rdf->Redefine("{columnName}",{funName},{dependency});
+            rdfgener_rdf=&rdfOut;   
+        """
+
     if verbose>0:
-        print(defineLine)
+        logging.info(defineLine)
 
     ROOT.gInterpreter.ProcessLine(defineLine)
     return  ROOT.rdfgener_rdf
 
 
 
-def makeDefine(name, code, df, verbose=3, isTest=False):
+def makeDefine(name, code, df, verbose=3, flag=0x1):
+    """
+
+    :param name:           - name of the new column
+    :param code:           - source code string
+    :param df:             - data frame to add new imlementation and to define input varaible list
+    :param verbose:        - verbosity
+    :param flag            - 0x1-makeDefine / do nothing if column exist, 0x2- force bit to redefine if exist 0x4 - test only
+    :return:
+    """
+    if (df.HasColumn(name) & ((flag&0x2)==0)):
+        logging.error(f'Column {name} already exist, please use redefine bit (0x2) in flag variable')
+        return df
+
     if verbose & 0x4:
-        print("makeDefine - Begin", name,code)
+        logging.info(f"makeDefine - Begin  {name} {code}")
     t = ast.parse(code, "<string>", "eval")
     if verbose & 0x8:
-        print("makeDefine - ast parse", name, code)
+        logging.info("makeDefine - ast parse", name, code)
     evaluator = RDataFrame_Visit(code, df, name)
     if verbose & 0x8:
-        print("makeDefine - evaluator",evaluator)
+        logging.info("makeDefine - evaluator",evaluator)
     parsed = evaluator.visit(t)
     if verbose>0:
-        print("====================================\n")
-        print(f"{name}\n", f"{code}")
-        print("====================================\n")
+        logging.info(f"{name} \n{code}")
 
     if verbose & 0x1:
-        print("Implementation:\n", parsed["implementation"])
+        logging.info(f'Implementation:\n {parsed["implementation"]}')
 
     if verbose & 0x2:
-        print("Dependencies\n", parsed["dependencies"])
-    if df is not None and not isTest:
+        logging.info(f'Dependencies\n  {parsed["dependencies"]}')
+    if df is not None and (flag&0x4)==0:
         if df is not None:
             rdf=makeDefineRDF(name,name,parsed,df,verbose)
             return rdf
     return parsed
-
 

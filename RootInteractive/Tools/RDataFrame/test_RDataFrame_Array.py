@@ -84,7 +84,7 @@ def dumpAST(expression):
     print(ast.dump(astOut,True,False))
 
 
-def test_define():
+def test_define(logLevel=logging.DEBUG):
     """
     :param rdf:
     :param expression:
@@ -93,46 +93,51 @@ def test_define():
     2.) check get data
 
     """
+    # from RootInteractive.Tools.RDataFrame.test_RDataFrame_Array  import *
+    log = logging.getLogger('')
+    log.setLevel(logLevel)
     makeTestDictionary()
     rdf=makeTestRDataFrame()
     # test 0 -  1D delta fixed range -OK
-    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, True)  # working
+    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, 0x4)  # working
     rdf = makeDefineRDF("arrayD0", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD0.root")
     # test 1 -  1D delta auto range -OK
-    parsed= makeDefine("arrayDAll","array1D0[:]-array1D2[:]", rdf,3, True)  # working
+    parsed= makeDefine("arrayDAll","array1D0[:]-array1D2[:]", rdf,3, 0x4)  # working
     rdf = makeDefineRDF("arrayDAall", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameDAll.root")
     # test 2 -  - 1D  function  fix range -OK
-    parsed = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, True);
+    parsed = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayCos0", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCos0.root");
     # test 3 -  - 1D  function  full range -OK
-    parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, True);
+    parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayCosAll", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCosAll.root");
     # test 4  - 1D member function OK
-    parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, True);
+    parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
     # test 4.b  - 1D member function  OK
-    parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, True);
+    parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayGetAlpha.root");
-    # test 4.c  - 1D member function   - not yet working - need public getter for private and protected
-    # parsed = makeDefine("arrayfPdgCode","array1DTrack[:].fPdgCode", rdf,3, True);
+    # test 4.c  - 1D member function  OK
+    rdf=makeDefine("arrayAlpha3","array1DTPCTrack[:].getAlpha()", rdf,3);
+    # test 4.d  - 1D member function   - not yet working - need public getter for private and protected
+    # parsed = makeDefine("arrayfPdgCode","array1DTrack[:].fPdgCode", rdf,3, 0x4);
     # rdf = makeDefineRDF("arrayfPdgCode", parsed["name"], parsed,  rdf, verbose=1)
     # rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayfPdgCode.root");
     # test 5  - 2D delta auto range
-    parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, True);
+    parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD2D.root");
     # test 6  - 2D delta against 1D
-    parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, True);
+    parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayD1D2D", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     # test 7   - 2D boolen test
-    parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0", rdf,3, True);
+    parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0", rdf,3, 0x4);
     rdf = makeDefineRDF("arrayD20Bool", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     #
