@@ -84,7 +84,7 @@ def dumpAST(expression):
     print(ast.dump(astOut,True,False))
 
 
-def test_define(logLevel=logging.DEBUG):
+def test_define(logLevel=logging.DEBUG, nCores=0):
     """
     :param rdf:
     :param expression:
@@ -94,6 +94,8 @@ def test_define(logLevel=logging.DEBUG):
 
     """
     # from RootInteractive.Tools.RDataFrame.test_RDataFrame_Array  import *
+    if (nCores>0):
+            ROOT.EnableImplicitMT(nCores)
     log = logging.getLogger('')
     log.setLevel(logLevel)
     makeTestDictionary()
