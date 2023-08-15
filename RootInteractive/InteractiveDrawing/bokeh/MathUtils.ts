@@ -142,7 +142,7 @@ function chol(X: number[], nRows: number){
 }
 
 // Solves a system of linear equations using Cholesky decomposition
-function solve(x:number[], y:number[]){
+export function solve(x:number[], y:number[]){
   let nRows = y.length
   chol(x,nRows)
   let iRow = 0
