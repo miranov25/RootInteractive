@@ -505,9 +505,9 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     try:
          ROOT.rdfgener_rdf
     except:
-        ROOT.gInterpreter.ProcessLine("ROOT::RDF::RInterface<ROOT::Detail::RDF::RLoopManager, void>  *rdfgener_rdf=0;")            ## add to global space
+        ROOT.gInterpreter.ProcessLine("ROOT::RDF::RNode  *rdfgener_rdf=0;")            ## add to global space
     if ROOT.rdfgener_rdf!=rdf:
-        ROOT.rdfgener_rdf=rdf
+        ROOT.rdfgener_rdf=ROOT.RDF.AsRNode(rdf)
     # 2.) be verbose
     if verbose&0x4:
         rdf.Describe().Print();                                      ## workimg
@@ -517,12 +517,12 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     dependency=dependency.replace("'","\"")
 
     defineLine=f"""
-        auto rdfOut=rdfgener_rdf->Define("{columnName}",{funName},{dependency});
+        auto rdfOut=ROOT::RDF::AsRNode(rdfgener_rdf->Define("{columnName}",{funName},{dependency}));
         rdfgener_rdf=&rdfOut;   
     """
     if (rdf.HasColumn(columnName) & ((flag&0x2)==0)):
         defineLine = f"""
-            auto rdfOut=rdfgener_rdf->Redefine("{columnName}",{funName},{dependency});
+            auto rdfOut=ROOT::RDF::AsRNode(rdfgener_rdf->Redefine("{columnName}",{funName},{dependency}));
             rdfgener_rdf=&rdfOut;   
         """
 
@@ -531,7 +531,6 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
 
     ROOT.gInterpreter.ProcessLine(defineLine)
     return  ROOT.rdfgener_rdf
-
 
 
 def makeDefine(name, code, df, verbose=3, flag=0x1):
