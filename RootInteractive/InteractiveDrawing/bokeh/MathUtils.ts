@@ -113,3 +113,57 @@ export function weighted_kth_value(sample:number[], weights: number[], k:number,
       }
     }
   }
+  
+  // Cholesky decomposition without pivoting - inplace
+// TODO: Perhaps add a version with pivoting too?
+function chol(X: number[], nRows: number){
+  let iRow = 0
+  let jRow, kRow
+  for(let i=0; i < nRows; ++i){
+    const pivotDiag = 1/X[i+iRow]
+    jRow = iRow+i+1
+    for(let j=i+1; j < nRows; ++j) {
+      const pivotRow = pivotDiag*X[i+jRow]
+      kRow = iRow+i+1
+      for(let k=i+1; k <= j; ++k){
+	X[k+jRow] -= pivotRow*X[i+kRow]
+	kRow += k+1
+      }
+      for(let k=j+1; k < nRows; ++k) {
+	X[j+kRow] -= pivotRow*X[i+kRow]
+	kRow += k+1
+      }
+      X[i+jRow] = pivotRow
+      jRow += j+1
+    }
+    iRow += i+1
+  }
+  return X
+}
+
+// Solves a system of linear equations using Cholesky decomposition
+function solve(x:number[], y:number[]){
+  let nRows = y.length
+  chol(x,nRows)
+  let iRow = 0
+  for(let i=0; i < nRows; ++i){
+    for(let j=0; j < i; ++j){
+      y[i] -= y[j]*x[iRow+j]
+    }
+    iRow += i+1
+  }
+  let iDiag=0
+  for(let i=0; i < nRows; i++){
+    y[i] /= x[iDiag]
+    iDiag += i+2
+  }
+  let jRow = 0
+  for(let i=nRows-1; i >= 0; --i){
+    jRow = 1+((i*(i+5))>>1)
+    for(let j=i+1; j < nRows; ++j){
+      y[i] -= y[j]*x[jRow]
+      jRow += j+1
+    }
+  }
+  return y
+}
