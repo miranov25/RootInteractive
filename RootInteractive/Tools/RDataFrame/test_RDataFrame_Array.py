@@ -1,3 +1,4 @@
+# https://root.cern/doc/master/classROOT_1_1RDataFrame.html
 # from RootInteractive.Tools.RDataFrame.test_RDataFrame_Array  import *
 from RootInteractive.Tools.RDataFrame.RDataFrame_Array  import *
 import pprint
@@ -164,6 +165,8 @@ def test_exception(rdf):
     rdf = makeDefine("arrayPdgCode", "array1DTrack[:].fPdgCode", rdf, 1)
     # this is crashing with seg fault - private attributes should be tested
     rdf = makeDefine("arraymAlphaT1", "array1DTPCTrack[:].mAlpha", rdf, 1)
+    #test new
+    parsed = makeDefine("arrayD2D_RDF", "array2D0[1:10,:]-array2D1[1:10,:]", rdf, 3, 0x4);
 
 
 def makeDefineRDFv2(columnName, funName, parsed,  rdf, verbose=1):

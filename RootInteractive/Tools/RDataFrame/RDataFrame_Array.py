@@ -532,6 +532,39 @@ def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     ROOT.gInterpreter.ProcessLine(defineLine)
     return  ROOT.rdfgener_rdf
 
+def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
+    """
+    makeDefineRDF         this is internal function to create columns  column Name for fucnion funName
+
+    :param columnName:  output column name to append
+    :param funName:     function to use
+    :param parsed:      implementation + dependencies
+    :param rdf:         input RDF
+    :param verbose:     verbosity
+    :param flag            - 0x1-makeDefine / do nothing if column exist, 0x2- force bit to redefine if exist
+    :return:            data frame with new column - columns name
+    """
+    if verbose & 0x1:
+        logging.info(f"{columnName}\t{funName}\t{parsed}")
+    # 0.) Define function if does not exist yet
+
+    try:
+        ROOT.gInterpreter.Declare( parsed["implementation"])
+    except:
+        logging.error(f'makeDefineRDF compilation of {funName} failed Implementation in {parsed["implemntation"]}')
+        return rdf
+        pass
+    # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
+    #
+    try:
+        #funString=f"{funName}"+"("+f'{parsed["dependencies"]}'[1:-1]+")".replace("'","")
+        funString=f"{funName}" + "(" + f'{parsed["dependencies"]}'[2:-2].replace("'", "") + ")"
+        dfOut=rdf.Define(columnName,funString)
+    except:
+        logging.error(f'makeRNode compilation of {funName} failed Implementation in {parsed["implementation"]}\n {funString}')
+        return rdf
+        pass
+    return  dfOut
 
 def makeDefine(name, code, df, verbose=3, flag=0x1):
     """
@@ -566,7 +599,9 @@ def makeDefine(name, code, df, verbose=3, flag=0x1):
         logging.info(f'Dependencies\n  {parsed["dependencies"]}')
     if df is not None and (flag&0x4)==0:
         if df is not None:
-            rdf=makeDefineRDF(name,name,parsed,df,verbose)
+            #rdf=makeDefineRDF(name,name,parsed,df,verbose)
+            rdf = makeDefineRNode(name, name, parsed, df, verbose)
+
             return rdf
     return parsed
 
