@@ -508,7 +508,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
                     "nbins":["nbinsX","nbinsY","nbinsZ"], "axis":[1,2],"quantiles": [0.35,0.5],"unbinned_projections":True,
                 })
 
-    yAxisTitleNorm = "{varY}-{varYNorm}"
+    yAxisTitleNorm = "{varY}-{varYNorm} ({diffFuncTransform})"
 
     figureArray=[
         # histo XY
