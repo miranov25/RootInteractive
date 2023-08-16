@@ -566,7 +566,7 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
         pass
     return  dfOut
 
-def makeDefine(name, code, df, verbose=3, flag=0x1):
+def makeDefine(name, code, df, verbose=3, flag=0x1, cppLibDictionary=None):
     """
 
     :param name:           - name of the new column
@@ -597,11 +597,43 @@ def makeDefine(name, code, df, verbose=3, flag=0x1):
 
     if verbose & 0x2:
         logging.info(f'Dependencies\n  {parsed["dependencies"]}')
+    if cppLibDictionary!=None:
+        parsed["code"]=code
+        cppLibDictionary[name]=parsed
+
     if df is not None and (flag&0x4)==0:
         if df is not None:
             #rdf=makeDefineRDF(name,name,parsed,df,verbose)
             rdf = makeDefineRNode(name, name, parsed, df, verbose)
-
             return rdf
     return parsed
 
+def makeLibrary(cppLib,outFile, includes=""):
+    """
+
+    :param cppLib:   dictioanry optionaly filled in the makeDefine as c[[LibDictionary
+    :param outFile:  output text file with cpp code
+    :return:         output file - ROOT C++ macro which can be loaded or compiled as share library
+    outFile="rdf.C"
+    """
+    with open(outFile, 'w') as f:
+        # insert implementnation
+        f.write(includes)
+        for key in cppLib:
+            f.write(cppLib[key]["implementation"])
+            f.write("\n")
+        #inserte rdf
+        f.write("""
+        ROOT::RDF::RNode getDFAll(ROOT::RDF::RNode &df){
+        """)
+        for key in cppLib:
+            v=cppLib[key]
+            dependency = "{" + f'{v["dependencies"]}'[1:-1] + "}".replace("'", "\"")
+            dependency = dependency.replace("'", "\"")
+            dfLine=\
+            f'''
+            df=df.Define("{v['name']}",{v['name']},{dependency});\n 
+            '''
+            f.write(dfLine)
+        f.write("return df;\n")
+        f.write("}\n")

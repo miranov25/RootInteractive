@@ -101,53 +101,55 @@ def test_define(logLevel=logging.DEBUG, nCores=0):
     log.setLevel(logLevel)
     makeTestDictionary()
     rdf=makeTestRDataFrame()
+    cppLibrary={}
     # test 0 -  1D delta fixed range -OK
-    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, 0x4)  # working
+    parsed= makeDefine("arrayD","array1D0[1:10]-array1D2[:20:2]", rdf,3, 0x4,cppLibrary)  # working
     rdf = makeDefineRNode("arrayD0", parsed["name"], parsed,  rdf, verbose=1)
 
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameD0.root")
     #return rdf
     # test 1 -  1D delta auto range -OK
-    parsed= makeDefine("arrayDAll","array1D0[:]-array1D2[:]", rdf,3, 0x4)  # working
+    parsed= makeDefine("arrayDAll","array1D0[:]-array1D2[:]", rdf,3, 0x4,cppLibrary)  # working
     rdf = makeDefineRNode("arrayDAall", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameDAll.root")
     # test 2 -  - 1D  function  fix range -OK
-    parsed = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, 0x4);
+    parsed = makeDefine("arrayCos","cos(array1D0[1:10])", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayCos0", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCos0.root");
     # test 3 -  - 1D  function  full range -OK
-    parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, 0x4);
+    parsed = makeDefine("arrayCosAll","cos(array1D0[:])", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayCosAll", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameCosAll.root");
     # test 4  - 1D member function OK
-    parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, 0x4);
+    parsed = makeDefine("arrayPx","array1DTrack[1:10].Px()", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayPx", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayPx.root");
     # test 4.b  - 1D member function  OK
-    parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, 0x4);
+    parsed = makeDefine("arrayAlpha","array1DTPCTrack[:].getAlpha()", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayAlpha", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayGetAlpha.root");
     # test 4.c  - 1D member function  OK
     rdf=makeDefine("arrayAlpha3","array1DTPCTrack[:].getAlpha()", rdf,3);
     # test 4.d  - 1D member function   - not yet working - need public getter for private and protected
-    # parsed = makeDefine("arrayfPdgCode","array1DTrack[:].fPdgCode", rdf,3, 0x4);
+    # parsed = makeDefine("arrayfPdgCode","array1DTrack[:].fPdgCode", rdf,3, 0x4,cppLibrary);
     # rdf = makeDefineRNode("arrayfPdgCode", parsed["name"], parsed,  rdf, verbose=1)
     # rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayfPdgCode.root");
     # test 5  - 2D delta auto range
-    parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, 0x4);
+    parsed = makeDefine("arrayD2D","array2D0[1:10,:]-array2D1[1:10,:]", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayD2D", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD2D.root");
     # test 6  - 2D delta against 1D
-    parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, 0x4);
+    parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayD1D2D", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     # test 7   - 2D boolen test
-    parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0", rdf,3, 0x4);
+    parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0", rdf,3, 0x4,cppLibrary);
     rdf = makeDefineRNode("arrayD20Bool", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
     #
-    rdf = makeDefine("arrayD1D2DP","array2D0[:,:]+array1D0[:]", rdf,3, False);
-    rdf.Describe()
+    rdf = makeDefine("arrayD1D2DP","array2D0[:,:]+array1D0[:]", rdf,3, 0x4, cppLibrary);
+    rdf.Describe();
+    makeLibrary(cppLibrary,"cppRDFtest.C", includes="")
     # Test of invarainces
     # tt.Draw("arrayCosAll:cos(array1D0)","arrayCos0!=0","*")
     # entries = tt.Draw("arrayCosAll-cos(array1D0)","","");
@@ -155,7 +157,7 @@ def test_define(logLevel=logging.DEBUG, nCores=0):
     # tt.GetHistogram().GetRms()  # should be 0 +- errror  cut e.g 10^-5
     # tt.GetHistogram().GetRms()  # should be 0 +- errorr
 
-    return rdf
+    return rdf,cppLibrary
 
 def test_exception(rdf):
     # here we should test that the code is not crashing but showing error message and continue
@@ -168,7 +170,7 @@ def test_exception(rdf):
     # this is crashing with seg fault - private attributes should be tested
     rdf = makeDefine("arraymAlphaT1", "array1DTPCTrack[:].mAlpha", rdf, 1)
     #test new
-    parsed = makeDefine("arrayD2D_RDF", "array2D0[1:10,:]-array2D1[1:10,:]", rdf, 3, 0x4);
+    parsed = makeDefine("arrayD2D_RDF", "array2D0[1:10,:]-array2D1[1:10,:]", rdf, 3, 0x4,cppLibrary);
 
 
 def makeDefineRDFv2(columnName, funName, parsed,  rdf, verbose=1):
