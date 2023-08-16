@@ -2,6 +2,7 @@ import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {ColumnDataSource} from "models/sources/column_data_source"
 import {RIFilter} from "./RIFilter"
 import * as p from "core/properties"
+//import { kth_value, weighted_kth_value } from "./MathUtils"
 
 export namespace HistogramCDS {
   export type Attrs = p.AttrsOf<Props>
@@ -153,9 +154,9 @@ export class HistogramCDS extends ColumnarDataSource {
       this._stale_range = false
   }
 
-  histogram(weights: string | null, weights_transform: ((x:number) => number) | null=null ): number[]{
+  histogram(weights: string | null = null, weights_transform: ((x:number) => number) | null=null, initial_value:number = 0 ): number[]{
     const bincount = Array<number>(this._nbins)
-    bincount.fill(0)
+    bincount.fill(initial_value)
     const sample_array = this.source.get_column(this.sample)
     if(sample_array == null){
       throw ReferenceError("Column " + this.sample + " not found in source")
@@ -279,7 +280,25 @@ export class HistogramCDS extends ColumnarDataSource {
         data[key] = this.histogram(null)
       } else {
         const h = histograms[key]!
-        const histogram = this.histogram(h.weights)
+        let histogram
+        if(h.aggregation){
+          if(h.aggregation === "mean"){
+            histogram = this.histogram(h.y)
+            let sum_weights
+            if(h.weights){
+              sum_weights = this.histogram(h.weights)
+            } else {
+              sum_weights = this.histogram()
+            }
+            for(let i=0; i<histogram.length; ++i){
+              histogram[i] /= sum_weights[i]
+            }
+          } else {
+            histogram = this.histogram(h.weights)
+          }
+        } else {
+          histogram = this.histogram(h.weights)
+        }
         if(h.cumulative){
           let acc = 0
           let cumulative = []

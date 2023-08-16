@@ -1,7 +1,7 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
-from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio, getDefaultVarsNormAll
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
@@ -441,4 +441,19 @@ def test_interactiveTemplateMultiY():
     widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16)
-    
+ 
+def test_interactiveTemplateMultiDiff():
+    output_file("test_histogramTemplateMultiDiff.html")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"])
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
+                          jsFunctionArray=jsFunctionArray)
+
