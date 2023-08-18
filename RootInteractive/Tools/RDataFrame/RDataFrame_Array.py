@@ -7,7 +7,7 @@ def getGlobalFunction(name="cos", verbose=1):
     info={"fun":0, "returnType":"", "nArgs":0}
     fun = ROOT.gROOT.GetListOfGlobalFunctions().FindObject(name)
     if fun:
-        info["fun"]=fun
+        info["fun"]=name
         info["returnType"]=fun.GetReturnTypeName()
         info["nArgs"]=fun.GetNargs()
     if info["fun"]==0:
@@ -20,7 +20,8 @@ def getGlobalFunction(name="cos", verbose=1):
             logging.error(f"Non supported function {name}")
             raise NotImplementedError(f"Non supported function {name}")
         nArgs=docString.split(" ", 1)[1].count(",") + 1
-        info["fun"]=name
+        funImp=docString.split(" ", 1)[1].split("(", 1)[0]
+        info["fun"]=funImp
         info["returnType"]=returnType
         info["nArgs"]=nArgs
 
