@@ -233,9 +233,12 @@ class RDataFrame_Visit:
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
         if self.df is not None:
-            columnType = self.df.GetColumnType(node.id)
-            self.dependencies[node.id] = {"type":columnType}
-            return {"implementation": node.id, "type":columnType}
+            if self.df.hasColumn(node.id):
+                columnType = self.df.GetColumnType(node.id)
+                self.dependencies[node.id] = {"type":columnType}
+                return {"implementation": node.id, "type":columnType}
+            else:
+                return {"implementation": node.id, "type":None}               
         self.dependencies[node.id] = {"type":"RVec<double>"}
         return {"implementation": node.id, "type":"RVec<double>"}
 
@@ -467,6 +470,9 @@ class RDataFrame_Visit:
     def visit_Attribute(self, node:ast.Attribute):
         left = self.visit(node.value)
         className = left["type"]
+        if className is None:
+            func = getGlobalFunction(f"{left['implementation']}::{node.attr}")
+            return {"type":"function", "implementation":f"{left['implementation']}::{node.attr}", "returnType":func["returnType"]}
         (fieldType, offset) = getClassProperty(className, node.attr)
         return {"type":scalar_type(fieldType), "implementation": f"{left['implementation']}.{node.attr}"}
 
