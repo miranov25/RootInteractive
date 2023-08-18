@@ -470,15 +470,15 @@ class RDataFrame_Visit:
     def visit_Attribute(self, node:ast.Attribute):
         left = self.visit(node.value)
         className = left["type"]
-        if className is None:
-            func = getGlobalFunction(f"{left['implementation']}::{node.attr}")
-            return {"type":"function", "implementation":f"{left['implementation']}::{node.attr}", "returnType":func["returnType"]}
         (fieldType, offset) = getClassProperty(className, node.attr)
         return {"type":scalar_type(fieldType), "implementation": f"{left['implementation']}.{node.attr}"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
         className = left["type"]
+        if className is None:
+            func = getGlobalFunction(f"{left['implementation']}::{node.attr}")
+            return {"type":"function", "implementation":f"{left['implementation']}::{node.attr}", "returnType":func["returnType"]}
         (returnType, docstring) = getClassMethod(className, node.attr, args)
         return {"type":"function", "implementation":f"{left['implementation']}.{node.attr}", "returnType":returnType}
 
