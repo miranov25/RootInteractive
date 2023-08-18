@@ -110,7 +110,8 @@ def scalar_type(name):
         "long long": ('i', 64),
         "unsigned int": ('u', 32),
         "int": ('i', 32),
-        "char": ('i', 8)
+        "char": ('i', 8),
+        "unsigned char": ('u', 8)
     }
     return dtypes.get(name, name)
 
@@ -479,62 +480,9 @@ def unpackScalarType(vecType:str, level:int=0):
     return unpackScalarType(vecTypeNew, level-1)
 
 
-def makeDefineRDF(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
-    """
-    makeDefineRDF         this is internal function to create columns  column Name for fucnion funName
-
-    :param columnName:  output column name to append
-    :param funName:     function to use
-    :param parsed:      implementation + dependencies
-    :param rdf:         input RDF
-    :param verbose:     verbosity
-    :param flag            - 0x1-makeDefine / do nothing if column exist, 0x2- force bit to redefine if exist
-    :return:            data frame with new column - columns name
-    """
-    if verbose & 0x1:
-        logging.info(f"{columnName}\t{funName}\t{parsed}")
-    # 0.) Define function if does not exist yet
-
-    try:
-        ROOT.gInterpreter.Declare( parsed["implementation"])
-    except:
-        logging.error(f'makeDefineRDF compilation of {funName} failed Implementation in {parsed["implemntation"]}')
-        return rdf
-        pass
-    # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
-    try:
-         ROOT.rdfgener_rdf
-    except:
-        ROOT.gInterpreter.ProcessLine("ROOT::RDF::RNode  *rdfgener_rdf=0;")            ## add to global space
-    if ROOT.rdfgener_rdf!=rdf:
-        ROOT.rdfgener_rdf=ROOT.RDF.AsRNode(rdf)
-    # 2.) be verbose
-    if verbose&0x4:
-        rdf.Describe().Print();                                      ## workimg
-        ROOT.gInterpreter.ProcessLine("rdfgener_rdf->Describe()");  ## print content of the rdf
-    #
-    dependency="{"+f'{parsed["dependencies"]}'[1:-1]+"}".replace("'","\"")
-    dependency=dependency.replace("'","\"")
-
-    defineLine=f"""
-        auto rdfOut=ROOT::RDF::AsRNode(rdfgener_rdf->Define("{columnName}",{funName},{dependency}));
-        rdfgener_rdf=&rdfOut;   
-    """
-    if (rdf.HasColumn(columnName) & ((flag&0x2)==0)):
-        defineLine = f"""
-            auto rdfOut=ROOT::RDF::AsRNode(rdfgener_rdf->Redefine("{columnName}",{funName},{dependency}));
-            rdfgener_rdf=&rdfOut;   
-        """
-
-    if verbose>0:
-        logging.info(defineLine)
-
-    ROOT.gInterpreter.ProcessLine(defineLine)
-    return  ROOT.rdfgener_rdf
-
 def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     """
-    makeDefineRDF         this is internal function to create columns  column Name for fucnion funName
+    makeDefinerNode         this is internal function to create columns  column Name for fucnion funName
 
     :param columnName:  output column name to append
     :param funName:     function to use
@@ -551,7 +499,7 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     try:
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
-        logging.error(f'makeDefineRDF compilation of {funName} failed Implementation in {parsed["implemntation"]}')
+        logging.error(f'makeDefineRNode compilation of {funName} failed Implementation in {parsed["implemntation"]}')
         return rdf
         pass
     # 1.) set  rdf to ROOT space - the RDataFrame_Array should be owner
@@ -566,13 +514,13 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
         pass
     return  dfOut
 
-def makeDefine(name, code, df, verbose=3, flag=0x1, cppLibDictionary=None):
+def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
     """
 
     :param name:           - name of the new column
     :param code:           - source code string
     :param df:             - data frame to add new imlementation and to define input varaible list
-    :param verbose:        - verbosity
+    :param verbose:        - verbosity bitmask
     :param flag            - 0x1-makeDefine / do nothing if column exist, 0x2- force bit to redefine if exist 0x4 - test only
     :return:
     """
@@ -603,7 +551,6 @@ def makeDefine(name, code, df, verbose=3, flag=0x1, cppLibDictionary=None):
 
     if df is not None and (flag&0x4)==0:
         if df is not None:
-            #rdf=makeDefineRDF(name,name,parsed,df,verbose)
             rdf = makeDefineRNode(name, name, parsed, df, verbose)
             return rdf
     return parsed
