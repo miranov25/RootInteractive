@@ -233,7 +233,7 @@ class RDataFrame_Visit:
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
         if self.df is not None:
-            if self.df.hasColumn(node.id):
+            if self.df.HasColumn(node.id):
                 columnType = self.df.GetColumnType(node.id)
                 self.dependencies[node.id] = {"type":columnType}
                 return {"implementation": node.id, "type":columnType}
