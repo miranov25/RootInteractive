@@ -183,6 +183,8 @@ class RDataFrame_Visit:
             return self.visit_Expression(node)
         elif isinstance(node, ast.Subscript):
             return self.visit_Subscript(node)
+        elif isinstance(node, ast.Index):
+            return self.visit_Index(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
         elif isinstance(node, ast.ExtSlice):
@@ -359,6 +361,9 @@ class RDataFrame_Visit:
             "type": values[-1]["type"],
             "implementation": implementation
         }
+
+    def visit_Index(self, node:ast.Index):
+        return self.visit(node.value)
 
     def visit_Slice(self, node:ast.Slice, idx=0):
         lower_value = 0
