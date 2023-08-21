@@ -123,7 +123,8 @@ def scalar_type(name):
         "unsigned int": ('u', 32),
         "int": ('i', 32),
         "char": ('i', 8),
-        "unsigned char": ('u', 8)
+        "unsigned char": ('u', 8),
+        "bool":('u', 8)
     }
     return dtypes.get(name, name)
 
