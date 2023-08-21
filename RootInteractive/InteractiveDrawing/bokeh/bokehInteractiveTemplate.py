@@ -318,7 +318,28 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     ]
 
     transformArray = [
-            {"name":"diffFunc", "func":"if(diffFuncTransform=='diff') return varY-varYNorm; if(diffFuncTransform=='ratio') return varY/varYNorm; return Math.log(varY)/Math.log(varYNorm)", "parameters":["diffFuncTransform"], "fields":["varY", "varYNorm"]}
+            {"name":"diffFunc",
+              "v_func":"""
+                if($output == null || $output.length !== varY.length){
+                    $output = new Float64Array(varY.length)
+                }
+                if(diffFuncTransform=='diff'){
+                    for(let i=0; i<$output.length; i++){
+                        $output[i] = varY[i]-varYNorm[i]
+                    }
+                }
+                else if(diffFuncTransform=='ratio'){
+                    for(let i=0; i<$output.length; i++){
+                        $output[i] = varY[i]/varYNorm[i]
+                    }                
+                }
+                else if(diffFuncTransform=='logRatio'){
+                    for(let i=0; i<$output.length; i++){
+                        $output[i] = Math.log(varY[i])/Math.log(varYNorm[i])
+                    }                
+                }
+                return $output
+              """, "parameters":["diffFuncTransform"], "fields":["varY", "varYNorm"]}
     ]
 
     parameterArray.extend(figureParameters["legend"]['parameterArray'])

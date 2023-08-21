@@ -115,7 +115,6 @@ export class HistoNdProfile extends ColumnarDataSource {
         const global_cumulative_histogram = unbinned ? source.cumulative_histogram_noweights() : null
         // const sorted_indices = unbinned && source.compute_sorted_indices()
 
-        const bin_count = source.get_column("bin_count") as number[]
         const bin_centers = source.get_column("bin_center_"+axis_idx) as number[]
         const edges_left = source.get_column("bin_bottom_"+axis_idx) as number[]
         const edges_right = source.get_column("bin_top_"+axis_idx) as number[]
@@ -136,6 +135,8 @@ export class HistoNdProfile extends ColumnarDataSource {
 
           let entries_total = 0
           const offset: number = cdf_column.length
+
+          const bin_count = source.histogram(current_weights) as number[]
   
           for(let x = 0; x < nbins_total; x += stride_high){
             for(let z = 0; z < stride_low; z ++){
