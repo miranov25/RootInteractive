@@ -144,6 +144,10 @@ def test_define(logLevel=logging.DEBUG, nCores=0):
     parsed = makeDefine("arrayD1D2D","array2D0[:,:]-array1D0[:]",rdf, cppLibrary,3, 0x4);
     rdf = makeDefineRNode("arrayD1D2D", parsed["name"], parsed,  rdf, verbose=1)
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD1D2D.root");
+    #
+    parsed = makeDefine("arrayD2D1D","-array1D0[:]+array2D0[:,:]",rdf, cppLibrary,3, 0x4);
+    rdf = makeDefineRNode("arrayD2D1DD", parsed["name"], parsed,  rdf, verbose=1)
+    rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrameArrayD2D1D.root");
     # test 7   - 2D boolen test
     parsed=makeDefine("arrayD20Bool","array2D0[:,:]>0",rdf, cppLibrary,3, 0x4);
     rdf = makeDefineRNode("arrayD20Bool", parsed["name"], parsed,  rdf, verbose=1)
