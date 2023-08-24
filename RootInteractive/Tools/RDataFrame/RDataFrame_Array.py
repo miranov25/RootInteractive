@@ -409,14 +409,18 @@ class RDataFrame_Visit:
     def visit_Subscript(self, node:ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        n_iter_arr = sliceValue["n_iter"]
+        n_iter_arr = sliceValue.get("n_iter", None)
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
+        axis_idx = 0
         for idx, n_iter in enumerate(n_iter_arr):
-            if len(self.n_iter) <= idx:
+            if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
-            if n_iter <= 0:
+            if n_iter is None:
+                continue
+            axis_idx += 1
+            if n_iter < 0:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
