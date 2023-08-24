@@ -414,11 +414,11 @@ class RDataFrame_Visit:
             n_iter_arr = [n_iter_arr]
         axis_idx = 0
         for idx, n_iter in enumerate(n_iter_arr):
+            if n_iter is None:
+                continue
             if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
-            if n_iter is None:
-                continue
             axis_idx += 1
             if n_iter < 0:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
