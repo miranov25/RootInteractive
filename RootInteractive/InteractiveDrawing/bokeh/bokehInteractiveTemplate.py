@@ -290,12 +290,13 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     # defining custom javascript function to query  (used later in variable list)
     if variables is None:
         variables = []
-    variables.extend(["funCustom0","funCustom1","funCustom2"])
+    variablesCopy = variables.copy()
     aliasArray=[
-        {"name": "funCustom0",  "func":"funCustomForm0",},
-        {"name": "funCustom1",  "func":"funCustomForm1",},
-        {"name": "funCustom2",  "func":"funcCustomForm2",},
+        {"name": "funCustom0",  "func":"funCustomForm0", "variables":variablesCopy},
+        {"name": "funCustom1",  "func":"funCustomForm1", "variables":variablesCopy},
+        {"name": "funCustom2",  "func":"funcCustomForm2", "variables":variablesCopy},
     ]
+    variables.extend(["funCustom0","funCustom1","funCustom2"])
 
     parameterArray = [
         # histo vars
@@ -429,18 +430,18 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
             histoXYZNames = {i:f"histoXYNormZData[{i}]" for i in variables}
             histoXYZ1Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
             histoXYZ2Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
-            varNorm = lambda x,y: f"diff_{x}_{y}"
+            varNorm = lambda x: f"diff_{x}"
             aliasArray.extend([{
-                    "name": varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i),
+                    "name": varNorm(i),
                     "transform": "diffFunc",
-                    "variables": [i, "varYNorm"] if multiAxis == "varY" else ["varY", i]
-                } for i in variables])
+                    "variables": [iVar, "varYNorm"] if multiAxis == "varY" else ["varY", iVar]
+                } for i, iVar in enumerate(variables)])
             histoArray.extend([{
-                "name": f"histoXYNormData[{i}]",
-                "variables": ["varX", varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i)],
+                "name": f"histoXYNormData[{iVar}]",
+                "variables": ["varX", varNorm(i)],
                 "weights": "weights" if weights else defaultWeights,   
                 "nbins": ["nbinsX", "nbinsY"]        
-            } for i in variables])
+            } for i, iVar in enumerate(variables)])
             histoArray.extend([{
                 "name": f"histoXYNormData_1[{i}]",
                 "type": "projection",
@@ -450,11 +451,11 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
                 "quantiles": [0.35,0.5],"unbinned":True,                
             } for i in variables])
             histoArray.extend([{
-                "name": f"histoXYNormZData[{i}]",
-                "variables": ["varX", varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i), "varZ"],
+                "name": f"histoXYNormZData[{iVar}]",
+                "variables": ["varX", varNorm(i), "varZ"],
                 "weights": "weights" if weights else defaultWeights,
                 "nbins":["nbinsX","nbinsY", "nbinsZ"],                
-            } for i in variables])
+            } for i, iVar in enumerate(variables)])
             histoArray.extend([{
                 "name": f"histoXYNormZData_1[{i}]",
                 "type": "projection",
