@@ -430,6 +430,11 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
             histoXYZ1Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
             histoXYZ2Names = {i:f"histoXYNormZData_1[{i}]" for i in variables}
             varNorm = lambda x,y: f"diff_{x}_{y}"
+            aliasArray.extend([{
+                    "name": varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i),
+                    "transform": "diffFunc",
+                    "variables": [i, "varYNorm"] if multiAxis == "varY" else ["varY", i]
+                } for i in variables])
             histoArray.extend([{
                 "name": f"histoXYNormData[{i}]",
                 "variables": ["varX", varNorm(i, "varYNorm") if multiAxis == "varY" else varNorm("varY", i)],
