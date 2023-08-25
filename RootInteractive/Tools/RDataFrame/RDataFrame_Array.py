@@ -494,8 +494,19 @@ class RDataFrame_Visit:
 
     def visit_Tuple(self, node:ast.Tuple):
         # So far, the only tuple supported is a slice tuple
-        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}
+        x = []
+        n_iter = []
+        iDim = 0
+        for iSlice in node.elts:
+            if isinstance(iSlice, ast.Slice):
+                x.append(self.visit_Slice(iSlice, iDim))
+                n_iter.append(x[-1]["n_iter"])
+                iDim += 1
+            else:
+                elt = self.visit(iSlice)
+                elt["high_water"] = elt["value"]
+                x.append(elt)
+        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}      
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
         # DEPRECATED: will be removed when we stop supporting python 3.8
