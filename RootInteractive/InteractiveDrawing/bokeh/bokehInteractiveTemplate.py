@@ -294,7 +294,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0", "variables":variablesCopy},
         {"name": "funCustom1",  "func":"funCustomForm1", "variables":variablesCopy},
-        {"name": "funCustom2",  "func":"funcCustomForm2", "variables":variablesCopy},
+        {"name": "funCustom2",  "func":"funCustomForm2", "variables":variablesCopy},
     ]
     variables.extend(["funCustom0","funCustom1","funCustom2"])
 
