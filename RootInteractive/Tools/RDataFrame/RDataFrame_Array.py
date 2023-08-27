@@ -432,7 +432,7 @@ class RDataFrame_Visit:
                 self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
                 self.n_iter[axis_idx] = str(n_iter)
-            acc += f"[i_{axis_idx}]]"
+            acc += f"[i_{axis_idx}]" if axis_idx>0 else "[i]"
             axis_idx += 1
         dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
         dtype = scalar_type(dtype_str)
