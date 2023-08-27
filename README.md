@@ -1,6 +1,6 @@
 # RootInteractive
 
-Code for the interactive visualisation of multidimensional data in ROOT or native Python formats (Panda, numpy).
+Code for the interactive sttistical aggregation and visualisation of multidimensional data in ROOT or native Python formats (Panda, numpy).
 
 Support for ROOT data structures:
 * TTree and TTreeFormula, aliases ... 
@@ -18,7 +18,8 @@ CDS for the NDimensional histograms, projections and aggregated information.
 * Interactive n-dimensional histogramming/projection and derived aggregated information extraction
 * Client/server application Jupyter, Bokeh 
 * Standalone client application - (Bokeh Standalone Dashboard)
-*  Lossy and lossless data compression (server- > client)
+* Lossy and lossless data compression (server -->  client)
+* ROOT and RDataFrame tools and interfaces
   
 
 

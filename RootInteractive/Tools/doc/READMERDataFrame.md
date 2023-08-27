@@ -2,7 +2,7 @@
 
 ROOT RDataFrame provides a modern, sophisticated interface for analysing data stored in TTree , CSV and other data 
 formats in C++ or Python.
-In our RDataFrame_aarray.py we provide an interface for creating C++ template functions, C++ 
+In our RDataFrame_array.py we provide an interface for creating C++ template functions, C++ 
 libraries and RDataFrame columns using a domain-specific language similar to the old type tree->Draw query language.
 
 We extend C++ with Python syntax for array slicing and projection. Internally, Python ast, cppyy.ll and 
@@ -50,10 +50,14 @@ array2D[:,index1]-array1D[:]
 
 
 ## Join like iterators
+* [left, right, upper bound, nearest, in range,stat in range (rolling)]
+* in pandas https://pandas.pydata.org/pandas-docs/version/0.25.0/reference/api/pandas.merge_asof.html
+
 ```
 join=("left","right")
 index=([indices],0)
 ```
+left="track", right="
 
 ```
 makeDefineJoin(<name>,<function>,<dataFrame>,[left],[rights])
@@ -74,3 +78,8 @@ getVertexZ(ROOT::VecOps::RVec<int> &trackIndices,
   }
   return VertexZ;
 }`
+
+## Join like iterator
+* [left, right, upper bound, nearest, in range,stat in range]
+* in pandas https://pandas.pydata.org/pandas-docs/version/0.25.0/reference/api/pandas.merge_asof.html
+* 
