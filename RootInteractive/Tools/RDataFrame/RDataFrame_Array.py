@@ -126,7 +126,7 @@ def scalar_type(name):
         "unsigned char": ('u', 8),
         "bool":('u', 8)
     }
-    return dtypes.get(name, name)
+    return dtypes.get(name, ('o', name))
 
 def scalar_type_str(dtype):
     dtypes = {
@@ -139,10 +139,12 @@ def scalar_type_str(dtype):
         ('u', 8): "unsigned char",
         ('i', 8): "char"
     }
-    return dtypes[dtype]
+    return dtypes.get(dtype, dtype[1])
 
 def add_dtypes(left, right):
     # This is a hack - use minimum for kind and maximum for depth
+    if left[0] == 'o' or right[0] == 'o':
+        raise NotImplementedError(f"Binary ops not supported between {left[1]} and {right[1]}")
     return (min(left[0],right[0]), max(left[1], right[1]))
 
 def truediv_dtype(left, right):
@@ -214,7 +216,7 @@ class RDataFrame_Visit:
         if isinstance(node.value, int):
             node_type = ('i', 64)
         if isinstance(node.value, str):
-            node_type = ("o", 64)
+            node_type = ("o", "std::string")
         return {
             "implementation": str(node.n),
             "value": node.n,
@@ -226,7 +228,7 @@ class RDataFrame_Visit:
         if isinstance(node.value, int):
             node_type = ('i', 64)
         if isinstance(node.value, str):
-            node_type = ("o", 64)
+            node_type = ("o", "std::string")
         return {
             "implementation": str(node.value),
             "value": node.value,
@@ -237,13 +239,13 @@ class RDataFrame_Visit:
         # Replaced with a mock
         if self.df is not None:
             if self.df.HasColumn(node.id):
-                columnType = self.df.GetColumnType(node.id)
+                columnType = scalar_type(self.df.GetColumnType(node.id))
                 self.dependencies[node.id] = {"type":columnType}
                 return {"implementation": node.id, "type":columnType}
             else:
                 return {"implementation": node.id, "type":None}               
-        self.dependencies[node.id] = {"type":"RVec<double>"}
-        return {"implementation": node.id, "type":"RVec<double>"}
+        self.dependencies[node.id] = {"type":('o',"RVec<double>")}
+        return {"implementation": node.id, "type":('o',"RVec<double>")}
 
     def visit_BinOp(self, node:ast.BinOp):
         op = node.op
@@ -424,7 +426,7 @@ class RDataFrame_Visit:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
-        dtype_str = unpackScalarType(value["type"], len(n_iter_arr))
+        dtype_str = unpackScalarType(scalar_type_str(value["type"]), len(n_iter_arr))
         dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
@@ -506,7 +508,7 @@ class RDataFrame_Visit:
                 elt = self.visit(iSlice)
                 elt["high_water"] = elt["value"]
                 x.append(elt)
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}      
+        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}      
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
         # DEPRECATED: will be removed when we stop supporting python 3.8
@@ -522,7 +524,7 @@ class RDataFrame_Visit:
                 elt = self.visit(iSlice)
                 elt["high_water"] = elt["value"]
                 x.append(elt)
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}       
+        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}       
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
