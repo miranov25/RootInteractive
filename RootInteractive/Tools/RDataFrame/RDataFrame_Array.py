@@ -416,6 +416,7 @@ class RDataFrame_Visit:
         n_iter_arr = sliceValue.get("n_iter", None)
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
+        n_dims = len(n_iter_arr)
         axis_idx = 0
         for idx, n_iter in enumerate(n_iter_arr):
             if n_iter is None:
@@ -428,7 +429,7 @@ class RDataFrame_Visit:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
-        dtype_str = unpackScalarType(scalar_type_str(value["type"]), len(n_iter_arr))
+        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
         dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
