@@ -515,6 +515,7 @@ class RDataFrame_Visit:
             else:
                 elt = self.visit(iSlice)
                 elt["high_water"] = elt["value"]
+                n_iter.append(None)
                 x.append(elt)
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}      
 
@@ -531,6 +532,7 @@ class RDataFrame_Visit:
             else:
                 elt = self.visit(iSlice)
                 elt["high_water"] = elt["value"]
+                n_iter.append(None)
                 x.append(elt)
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}       
 
