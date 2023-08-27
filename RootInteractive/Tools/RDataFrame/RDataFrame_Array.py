@@ -534,7 +534,7 @@ class RDataFrame_Visit:
                 elt["high_water"] = elt["value"]
                 n_iter.append(None)
                 x.append(elt)
-        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x]}       
+        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
