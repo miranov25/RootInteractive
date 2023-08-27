@@ -440,7 +440,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
-        input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
+        input_args = ', '.join([f"{scalar_type_str(value['type'])} &{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
             "implementation":f"""{signature}{{
@@ -566,7 +566,6 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     except:
         logging.error(f'makeRNode compilation of {funName} failed Implementation in {parsed["implementation"]}\n {funString}')
         return rdf
-        pass
     return  dfOut
 
 def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
