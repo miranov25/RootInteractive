@@ -457,3 +457,18 @@ def test_interactiveTemplateMultiDiff():
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                           jsFunctionArray=jsFunctionArray)
 
+def test_interactiveTemplateMultiYDiff():
+    output_file("test_histogramTemplateMultiY.html")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D"], multiAxis="varY")
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
+                          jsFunctionArray=jsFunctionArray)
+    

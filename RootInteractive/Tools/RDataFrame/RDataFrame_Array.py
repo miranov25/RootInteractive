@@ -126,7 +126,7 @@ def scalar_type(name):
         "unsigned char": ('u', 8),
         "bool":('u', 8)
     }
-    return dtypes.get(name, name)
+    return dtypes.get(name, ('o', name))
 
 def scalar_type_str(dtype):
     dtypes = {
@@ -139,10 +139,14 @@ def scalar_type_str(dtype):
         ('u', 8): "unsigned char",
         ('i', 8): "char"
     }
-    return dtypes[dtype]
+    if dtype is None:
+        return None
+    return dtypes.get(dtype, dtype[1])
 
 def add_dtypes(left, right):
     # This is a hack - use minimum for kind and maximum for depth
+    if left[0] == 'o' or right[0] == 'o':
+        raise NotImplementedError(f"Binary ops not supported between {left[1]} and {right[1]}")
     return (min(left[0],right[0]), max(left[1], right[1]))
 
 def truediv_dtype(left, right):
@@ -183,6 +187,8 @@ class RDataFrame_Visit:
             return self.visit_Expression(node)
         elif isinstance(node, ast.Subscript):
             return self.visit_Subscript(node)
+        elif isinstance(node, ast.Index):
+            return self.visit_Index(node)
         elif isinstance(node, ast.Slice):
             return self.visit_Slice(node)
         elif isinstance(node, ast.ExtSlice):
@@ -212,7 +218,7 @@ class RDataFrame_Visit:
         if isinstance(node.value, int):
             node_type = ('i', 64)
         if isinstance(node.value, str):
-            node_type = ("o", 64)
+            node_type = ("o", "std::string")
         return {
             "implementation": str(node.n),
             "value": node.n,
@@ -224,7 +230,7 @@ class RDataFrame_Visit:
         if isinstance(node.value, int):
             node_type = ('i', 64)
         if isinstance(node.value, str):
-            node_type = ("o", 64)
+            node_type = ("o", "std::string")
         return {
             "implementation": str(node.value),
             "value": node.value,
@@ -235,13 +241,13 @@ class RDataFrame_Visit:
         # Replaced with a mock
         if self.df is not None:
             if self.df.HasColumn(node.id):
-                columnType = self.df.GetColumnType(node.id)
+                columnType = scalar_type(self.df.GetColumnType(node.id))
                 self.dependencies[node.id] = {"type":columnType}
                 return {"implementation": node.id, "type":columnType}
             else:
                 return {"implementation": node.id, "type":None}               
-        self.dependencies[node.id] = {"type":"RVec<double>"}
-        return {"implementation": node.id, "type":"RVec<double>"}
+        self.dependencies[node.id] = {"type":('o',"RVec<double>")}
+        return {"implementation": node.id, "type":('o',"RVec<double>")}
 
     def visit_BinOp(self, node:ast.BinOp):
         op = node.op
@@ -360,6 +366,9 @@ class RDataFrame_Visit:
             "implementation": implementation
         }
 
+    def visit_Index(self, node:ast.Index):
+        return self.visit(node.value)
+
     def visit_Slice(self, node:ast.Slice, idx=0):
         lower_value = 0
         if node.lower is not None:
@@ -404,18 +413,28 @@ class RDataFrame_Visit:
     def visit_Subscript(self, node:ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        n_iter_arr = sliceValue["n_iter"]
+        n_iter_arr = sliceValue.get("n_iter", None)
+        idx_arr = sliceValue.get("value", None)
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
-        for idx, n_iter in enumerate(n_iter_arr):
-            if len(self.n_iter) <= idx:
+            idx_arr = [idx_arr]
+        n_dims = len(n_iter_arr)
+        axis_idx = 0
+        acc = value["implementation"]
+        for dim, n_iter in enumerate(n_iter_arr):
+            if n_iter is None:
+                acc += f"[{idx_arr[dim]}]"
+                continue
+            if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
             if n_iter <= 0:
-                self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
+                self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
-                self.n_iter[idx] = n_iter
-        dtype_str = unpackScalarType(value["type"], len(n_iter_arr))
+                self.n_iter[axis_idx] = str(n_iter)
+            acc += f"[{idx_arr[dim]}]"
+            axis_idx += 1
+        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
         dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
@@ -427,7 +446,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
-        input_args = ', '.join([f"{value['type']} &{key}" for key, value in dependencies_list])
+        input_args = ', '.join([f"{scalar_type_str(value['type'])} &{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
             "implementation":f"""{signature}{{
@@ -470,13 +489,13 @@ class RDataFrame_Visit:
     
     def visit_Attribute(self, node:ast.Attribute):
         left = self.visit(node.value)
-        className = left["type"]
+        className = scalar_type_str(left["type"])
         (fieldType, offset) = getClassProperty(className, node.attr)
         return {"type":scalar_type(fieldType), "implementation": f"{left['implementation']}.{node.attr}"}
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
-        className = left["type"]
+        className = scalar_type_str(left["type"])
         if className is None:
             func = getGlobalFunction(f"{left['implementation']}::{node.attr}")
             return {"type":"function", "implementation":f"{left['implementation']}::{node.attr}", "returnType":func["returnType"]}
@@ -485,12 +504,41 @@ class RDataFrame_Visit:
 
     def visit_Tuple(self, node:ast.Tuple):
         # So far, the only tuple supported is a slice tuple
-        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.elts)]
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}
+        x = []
+        n_iter = []
+        iDim = 0
+        for iSlice in node.elts:
+            if isinstance(iSlice, ast.Slice):
+                elt = self.visit_Slice(iSlice, iDim)
+                elt["value"] = elt["implementation"]
+                x.append(elt)
+                n_iter.append(x[-1]["n_iter"])
+                iDim += 1
+            else:
+                elt = self.visit(iSlice)
+                elt["high_water"] = elt["value"]
+                n_iter.append(None)
+                x.append(elt)
+        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}      
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
-        x = [self.visit_Slice(iSlice, i) for i, iSlice in enumerate(node.dims)]
-        return {"type":"int*", "implementation":']['.join([i["implementation"] for i in x]), "n_iter": [i["n_iter"] for i in x], "high_water": [i["high_water"] for i in x]}       
+        # DEPRECATED: will be removed when we stop supporting python 3.8
+        x = []
+        n_iter = []
+        iDim = 0
+        for iSlice in node.dims:
+            if isinstance(iSlice, ast.Slice):
+                elt = self.visit_Slice(iSlice, iDim)
+                elt["value"] = elt["implementation"]
+                x.append(elt)
+                n_iter.append(x[-1]["n_iter"])
+                iDim += 1
+            else:
+                elt = self.visit(iSlice)
+                elt["high_water"] = elt["value"]
+                n_iter.append(None)
+                x.append(elt)
+        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
@@ -530,7 +578,6 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     except:
         logging.error(f'makeRNode compilation of {funName} failed Implementation in {parsed["implementation"]}\n {funString}')
         return rdf
-        pass
     return  dfOut
 
 def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
