@@ -481,7 +481,7 @@ class RDataFrame_Visit:
     
     def visit_Attribute(self, node:ast.Attribute):
         left = self.visit(node.value)
-        className = left["type"]
+        className = scalar_type_str(left["type"])
         (fieldType, offset) = getClassProperty(className, node.attr)
         return {"type":scalar_type(fieldType), "implementation": f"{left['implementation']}.{node.attr}"}
 
