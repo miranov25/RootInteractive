@@ -432,7 +432,7 @@ class RDataFrame_Visit:
                 self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
                 self.n_iter[axis_idx] = str(n_iter)
-            acc += f"[i_{axis_idx}]" if axis_idx>0 else "[i]"
+            acc += f"[{idx_arr[dim]}]"
             axis_idx += 1
         dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
         dtype = scalar_type(dtype_str)
@@ -509,7 +509,9 @@ class RDataFrame_Visit:
         iDim = 0
         for iSlice in node.elts:
             if isinstance(iSlice, ast.Slice):
-                x.append(self.visit_Slice(iSlice, iDim))
+                elt = self.visit_Slice(iSlice, iDim)
+                elt["value"] = elt["implementation"]
+                x.append(elt)
                 n_iter.append(x[-1]["n_iter"])
                 iDim += 1
             else:
@@ -526,7 +528,9 @@ class RDataFrame_Visit:
         iDim = 0
         for iSlice in node.dims:
             if isinstance(iSlice, ast.Slice):
-                x.append(self.visit_Slice(iSlice, iDim))
+                elt = self.visit_Slice(iSlice, iDim)
+                elt["value"] = elt["implementation"]
+                x.append(elt)
                 n_iter.append(x[-1]["n_iter"])
                 iDim += 1
             else:
