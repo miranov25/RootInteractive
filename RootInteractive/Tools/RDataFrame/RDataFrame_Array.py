@@ -139,6 +139,8 @@ def scalar_type_str(dtype):
         ('u', 8): "unsigned char",
         ('i', 8): "char"
     }
+    if dtype is None:
+        return None
     return dtypes.get(dtype, dtype[1])
 
 def add_dtypes(left, right):
@@ -487,7 +489,7 @@ class RDataFrame_Visit:
 
     def visit_func_Attribute(self, node:ast.Attribute, args):
         left = self.visit(node.value)
-        className = left["type"]
+        className = scalar_type_str(left["type"])
         if className is None:
             func = getGlobalFunction(f"{left['implementation']}::{node.attr}")
             return {"type":"function", "implementation":f"{left['implementation']}::{node.attr}", "returnType":func["returnType"]}
