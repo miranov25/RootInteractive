@@ -424,7 +424,7 @@ class RDataFrame_Visit:
                 self.n_iter.append(n_iter)
             # Detect if length needs to be used here
             axis_idx += 1
-            if n_iter < 0:
+            if n_iter <= 0:
                 self.n_iter[idx] = f"{value['implementation']}.size() - {-n_iter}"
             else:
                 self.n_iter[idx] = n_iter
