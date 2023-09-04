@@ -130,6 +130,12 @@ figureLayoutDesc={
     "selectionTable": [["selection"],{'plot_height': 100, 'sizing_mode': 'scale_width'}]
 }
 
+def test_invalidWidget():
+    widgetParamsBroken = widgetParams.copy()
+    widgetParamsBroken[-1] = ['spinneRange', ['ones'], {"name":"ones"}]
+    with pytest.raises(NotImplementedError):
+        fig=bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParamsBroken, layout=figureLayoutDesc, tooltips=tooltips,widgetLayout=widgetLayoutDesc,sizing_mode=None, parameterArray=parameterArray, nPointRender="nPoints")
+
 def test_record(record_property: ty.Callable[[str, ty.Any], None]):
     record_property("value1", "value1")
     record_property("value2", "value2")
