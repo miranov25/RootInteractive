@@ -13,6 +13,8 @@ from bokeh.models.layouts import Column
 
 from bokeh.plotting import Figure, output_file
 
+import pytest
+
 import pandas as pd
 import numpy as np
 
@@ -187,7 +189,16 @@ def test_customJsFunctionBokehDrawArray_v():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
-    
+ 
+def test_Error():
+    aliasArrayBad = aliasArray.copy()
+    aliasArrayBad[1] = ("C_accepted", "C < C_accepted")
+    with pytest.raises(KeyError):
+        bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
+                           aliasArray=aliasArrayBad, histogramArray=histoArray)
+
+
 def test_makeColumns():
     varList, ctx_updated, memoized_columns, sources = (None, None, None, None)
     df = pd.DataFrame(np.random.random_sample(size=(200000, 3)), columns=list('XYZ'))
