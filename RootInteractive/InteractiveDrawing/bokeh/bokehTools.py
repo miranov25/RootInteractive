@@ -565,14 +565,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget       
             continue
-        if variables[0] == 'div':
+        elif variables[0] == 'div':
             text_content = optionLocal.get("text", variables[1])
             widget = Div(text=text_content)
             plotArray.append(widget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
             continue
-        if variables[0] == 'descriptionTable':
+        elif variables[0] == 'descriptionTable':
             data_source = optionLocal.get("source", None)
             meta_fields = optionLocal.get("meta_fields", ["AxisTitle", "Description"])
             if "variables" in optionLocal:
@@ -585,7 +585,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
             continue
-        if variables[0] == 'table':
+        elif variables[0] == 'table':
             TOptions = {
                 'include': '',
                 'exclude': ''
@@ -598,7 +598,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = dataTable
             continue
-        if variables[0] == 'tableHisto':
+        elif variables[0] == 'tableHisto':
             histoListLocal = []
             TOptions = {
                 'include': '',
@@ -618,7 +618,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = tableHisto
             continue
-        if variables[0] in ALLOWED_WIDGET_TYPES:
+        elif variables[0] in ALLOWED_WIDGET_TYPES:
             optionWidget = {}
             if len(variables) == 3:
                 optionWidget = variables[2].copy()
@@ -757,7 +757,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetDictLocal = {"widget": localWidget, "type": variables[0], "key": varName, "filter": widgetFilter, "isIndex": optionWidget.get("index", False)}
                 widgetDict[cds_used]["widgetList"].append(widgetDictLocal)
             continue
-        if variables[0] == "textQuery":
+        elif variables[0] == "textQuery":
             optionWidget = {}
             if len(variables) >= 2:
                 optionWidget.update(variables[-1])
@@ -779,7 +779,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetDict[cds_used] = {"widgetList":[]}
             widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": widgetName, "filter": widgetFilter})
             continue
-        if variables[0] == "text":
+        elif variables[0] == "text":
             optionWidget = {"title": variables[1][0]}
             if len(variables) > 2:
                 optionWidget.update(variables[-1])
@@ -791,6 +791,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             widgetArray.append(localWidget)
             widgetParams.append(variables)
             continue
+        elif isinstance(variables[0], str):
+            raise NotImplementedError(f"Widget not supported: {variables[0]}")
 
         x_transform = optionLocal.get("x_transform", None)
         x_transform_parsed, x_transform_customjs = make_transform(x_transform, paramDict, aliasDict, cdsDict, jsFunctionDict)
