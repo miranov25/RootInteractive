@@ -146,6 +146,19 @@ def scalar_type_str(dtype):
 def add_dtypes(left, right):
     # This is a hack - use minimum for kind and maximum for depth
     if left[0] == 'o' or right[0] == 'o':
+        # if both are RVecs, return RVec of added dtypes
+        # if left is RVec of scalar type right return left
+        if left[0] == 'o':
+            left_local = left
+            right_local = right
+        else:
+            left_local = right
+            right_local = left
+        if left_local[1][0:4] == "RVec":
+            if right_local == 'o' and right_local[1][0:4] == "RVec"
+                left_scalar = scalar_type(unpackScalarType(left[1],1))
+                right_scalar = scalar_type(unpackScalarType(right[1],1))
+                return ('o', f"RVec<{scalar_type_str(add_dtypes(left_scalar, right_scalar))>")
         raise NotImplementedError(f"Binary ops not supported between {left[1]} and {right[1]}")
     return (min(left[0],right[0]), max(left[1], right[1]))
 
@@ -324,7 +337,7 @@ class RDataFrame_Visit:
         }
 
     def visit_Compare(self, node:ast.Compare):
-        js_comparisons = []
+        comparisons = []
         for i, op in enumerate(node.ops):
             if i==0:
                 lhs = self.visit(node.left)["implementation"]
@@ -345,8 +358,8 @@ class RDataFrame_Visit:
                 op_infix = " >= "
             else:
                 raise NotImplementedError(f"Comparison operator {ast.dump(op)} not implemented")
-            js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
-        implementation = " && ".join(js_comparisons)
+            comparisons.append(f"(({lhs}){op_infix}({rhs}))")
+        implementation = " && ".join(comparisons)
         return {
             "name": self.code,
             "type": ('i', 8),
