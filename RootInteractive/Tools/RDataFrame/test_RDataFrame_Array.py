@@ -61,6 +61,17 @@ def makeTestRDataFrame():
             //for (size_t i=0; i<n; i++) array=i;
             return array;
         ;};
+        auto makeRVecPermutation = [](int n){
+            auto array = ROOT::RVec<size_t>(n);
+            array.resize(n);
+            for (size_t i=0; i<n; i++) array[i]=i;
+            return array;
+        ;};
+        auto scatter = [](ROOT::RVec<size_t> x){
+            auto array = ROOT::RVec<size_t>(x.size());
+            for(size_t i=0; i<x.size(); i++) array[x[i]] = i;
+            return array;
+            }
     """)
     #
     nTracks=50
@@ -74,6 +85,8 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
     rdf = rdf.Define('array1DTPCTrack', "makeUnitRVec1DTPCTrack(nPoints)")
+    rdf = rdf.Define('arrayPermutatuion', "makeRVecPermutation(nPoints)")
+    rdf = rdf.Define('arrayPermutationInverse', "scatter(arrayPermutation)")
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrame.root")
     return rdf
 
@@ -172,7 +185,7 @@ def test_define2(rdf):
     # support for the operator [index]
     rdf = makeDefine("array2D0_0", "array2D0[0,:]", rdf, None, 3);
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
-
+    rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]")
     return
 
 def test_exception(rdf):
