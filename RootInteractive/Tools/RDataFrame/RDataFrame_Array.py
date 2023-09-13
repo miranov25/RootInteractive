@@ -158,7 +158,7 @@ def add_dtypes(left, right):
             if right_local == 'o' and right_local[1][0:4] == "RVec":
                 left_scalar = scalar_type(unpackScalarType(left[1],1))
                 right_scalar = scalar_type(unpackScalarType(right[1],1))
-                return ('o', f"RVec<{scalar_type_str(add_dtypes(left_scalar, right_scalar))>")
+                return ('o', f"RVec<{scalar_type_str(add_dtypes(left_scalar, right_scalar))}>")
         raise NotImplementedError(f"Binary ops not supported between {left[1]} and {right[1]}")
     return (min(left[0],right[0]), max(left[1], right[1]))
 
