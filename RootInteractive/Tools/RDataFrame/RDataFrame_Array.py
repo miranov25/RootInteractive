@@ -155,7 +155,7 @@ def add_dtypes(left, right):
             left_local = right
             right_local = left
         if left_local[1][0:4] == "RVec":
-            if right_local == 'o' and right_local[1][0:4] == "RVec"
+            if right_local == 'o' and right_local[1][0:4] == "RVec":
                 left_scalar = scalar_type(unpackScalarType(left[1],1))
                 right_scalar = scalar_type(unpackScalarType(right[1],1))
                 return ('o', f"RVec<{scalar_type_str(add_dtypes(left_scalar, right_scalar))>")
