@@ -71,7 +71,7 @@ def makeTestRDataFrame():
             auto array = ROOT::RVec<size_t>(x.size());
             for(size_t i=0; i<x.size(); i++) array[x[i]] = i;
             return array;
-            }
+            ;};
     """)
     #
     nTracks=50
