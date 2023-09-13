@@ -85,7 +85,7 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
     rdf = rdf.Define('array1DTPCTrack', "makeUnitRVec1DTPCTrack(nPoints)")
-    rdf = rdf.Define('arrayPermutatuion', "makeRVecPermutation(nPoints)")
+    rdf = rdf.Define('arrayPermutation', "makeRVecPermutation(nPoints)")
     rdf = rdf.Define('arrayPermutationInverse', "scatter(arrayPermutation)")
     rdf.Snapshot("makeTestRDataFrame","makeTestRDataFrame.root")
     return rdf
