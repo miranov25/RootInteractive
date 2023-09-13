@@ -185,7 +185,7 @@ def test_define2(rdf):
     # support for the operator [index]
     rdf = makeDefine("array2D0_0", "array2D0[0,:]", rdf, None, 3);
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
-    rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]")
+    rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]", rdf, None, 3)
     return
 
 def test_exception(rdf):
