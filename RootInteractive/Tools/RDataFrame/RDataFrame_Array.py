@@ -178,6 +178,7 @@ class RDataFrame_Visit:
         self.df = df
         self.name = name
         self.dependencies = {}
+        self.closure = []
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -212,6 +213,8 @@ class RDataFrame_Visit:
             return self.visit_Constant(node)
         elif isinstance(node, ast.Attribute):
             return self.visit_Attribute(node)
+        elif isinstance(node, ast.Lambda):
+            return self.visit_Lambda(node)
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
@@ -552,6 +555,14 @@ class RDataFrame_Visit:
                 n_iter.append(None)
                 x.append(elt)
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
+
+    def visit_Lambda(self, node:ast.Lambda):
+        self.closure.push(self.dependencies)
+        self.dependencies = {}
+        args = [i.arg for i in node.args.args]
+        body = self.visit(node.body)
+        self.dependencies = self.closure.pop()
+        return {}
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
