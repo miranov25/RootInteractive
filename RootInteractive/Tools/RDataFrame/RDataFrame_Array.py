@@ -494,7 +494,9 @@ class RDataFrame_Visit:
         if isinstance(node, ast.Name):
             return self.visit_func_Name(node, args)
         if isinstance(node, ast.Attribute):
-            return self.visit_func_Attribute(node, args)        
+            return self.visit_func_Attribute(node, args)  
+        if isinstance(node, ast.Lambda):
+            return self.visit_Lambda(node, args)
         raise NotImplementedError(f"{ast.dump(node)} is not supported as a function")
 
     def visit_func_Name(self, node:ast.Name, args):
@@ -556,13 +558,19 @@ class RDataFrame_Visit:
                 x.append(elt)
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
-    def visit_Lambda(self, node:ast.Lambda):
+    def visit_Lambda(self, node:ast.Lambda, args:list = []):
         self.closure.push(self.dependencies)
         self.dependencies = {}
-        args = [i.arg for i in node.args.args]
+        args_lambda = [i.arg for i in node.args.args]
+        args_implementation = []
+        if len(args) != len(args_lambda):
+            raise TypeError(f"Expected {len(args_lambda)} arguments, got {len(args)}")
+        for i, iArg in enumerate(args_lambda):
+            args_implementation.append(f"{scalar_type_str(args[i]['type'])} {iArg}")
+        args_implementation = ', '.join(args_implementation)
         body = self.visit(node.body)
         self.dependencies = self.closure.pop()
-        return {}
+        return {"implementation":f"[&]({args_implementation}){{ {body.implementation};}}", "returnType":body["type"]}
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
