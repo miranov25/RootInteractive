@@ -178,6 +178,7 @@ class RDataFrame_Visit:
         self.df = df
         self.name = name
         self.dependencies = {}
+        self.args = {} 
         self.closure = []
 
     def visit(self, node):
@@ -218,6 +219,25 @@ class RDataFrame_Visit:
         raise NotImplementedError(node)
 
     def visit_Call(self, node: ast.Call):
+        # Hack for passing lambdas into functions as arguments - arg types needed to make the lambda
+        if isinstance(node.func, ast.Name) and node.func.id in ["upperBound", "lowerBound"]:
+            bsearch_names={
+                    "upperBound":"std::upper_bound",
+                    "lowerBound":"std:lower_bound"
+                    }
+            if len(node.args) == 2:
+                searched_arr = self.visit(node.args[0])
+                query = self.visit(node.args[1])
+                return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']})-{searched_arr['implementation']}.begin())"}
+           elif len(node.args) == 3:
+                searched_arr = self.visit(node.args[0])
+                query = self.visit(node.args[1])
+                search_scalar_type = scalar_type(unpackScalarType(scalar_type_str(searched_arr["type"]), 1))
+                x = {"type":search_scalar_type, "implementation":"<THIS SHOULDN'T GET INTO OUTPUT>"}
+                cmp = self.visit_Func(node.args[2], [x, query])
+                return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation'])-{searched_arr['implementation']}.begin())"}
+           else:
+               raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
@@ -255,6 +275,8 @@ class RDataFrame_Visit:
 
     def visit_Name(self, node: ast.Name):
         # Replaced with a mock
+        if node.id in self.args:
+            return self.args[node.id]
         if self.df is not None:
             if self.df.HasColumn(node.id):
                 columnType = scalar_type(self.df.GetColumnType(node.id))
@@ -559,17 +581,18 @@ class RDataFrame_Visit:
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
     def visit_Lambda(self, node:ast.Lambda, args:list = []):
-        self.closure.push(self.dependencies)
-        self.dependencies = {}
+        self.closure.push(self.args)
+        self.args = {}
         args_lambda = [i.arg for i in node.args.args]
         args_implementation = []
         if len(args) != len(args_lambda):
             raise TypeError(f"Expected {len(args_lambda)} arguments, got {len(args)}")
         for i, iArg in enumerate(args_lambda):
             args_implementation.append(f"{scalar_type_str(args[i]['type'])} {iArg}")
+            self.args[iArg] = args[i]
         args_implementation = ', '.join(args_implementation)
         body = self.visit(node.body)
-        self.dependencies = self.closure.pop()
+        self.args = self.closure.pop()
         return {"implementation":f"[&]({args_implementation}){{return {body.implementation};}}", "returnType":body["type"]}
 
 def unpackScalarType(vecType:str, level:int=0):

@@ -187,14 +187,14 @@ def test_define2(rdf):
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
     rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]", rdf, None, 3)
     # test array "tracks", array "V0", index_tracksTOV0, N:N   index_tracksTOV0, - better to do not create Alice object can be tested with root classes
-    rdf = makeDefine("arrayJoin_0", "V0[index_tracksTOV0[:]].getMass()", rdf, None, 3)
+    rdf = makeDefine("arrayJoin_0_Func", "V0[index_tracksTOV0[:]].getMass()", rdf, None, 3)
     # test array "tracks", array "collisions" both has key for  which the distance can be used
     #         track.getZ(),   collision.getZ()
     # ???? upper and lower bound resp, nearest - syntax to be defined
-    rdf = makeDefine("arrayJoin_0", "nearest(tracks[:],collisions,track.getZ(),collision.getZ())", rdf, None, 3);
-    rdf = makeDefine("arrayJoin_1", "upperBound(tracks[:],collisions,track.getZ(),collision.getZ())", rdf, None, 3);
-    rdf = makeDefine("arrayJoin_2", "lowerBound(tracks[:],collisions,track.getZ(),collision.getZ())", rdf, None, 3);
-    rdf = makeDefine("arrayJoin_3", "inrange(tracks[:],collisions,track.getZ(),collision.getZ(),min,max)", rdf, None, 3);
+    # rdf = makeDefine("arrayJoin_0", "nearest(tracks[:],collisions,track.getZ(),collision.getZ())", rdf, None, 3);
+    rdf = makeDefine("arrayJoin_1", "upperBound(collisions, tracks[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
+    rdf = makeDefine("arrayJoin_2", "lowerBound(collisions, tracks[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
+    # rdf = makeDefine("arrayJoin_3", "inrange(tracks[:],collisions,track.getZ(),collision.getZ(),min,max)", rdf, None, 3);
 
     return
 
