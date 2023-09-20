@@ -58,7 +58,7 @@ def makeTestRDataFrame():
         auto makeUnitRVec1DTPCTrack = [](int n){
             auto array = ROOT::RVec<o2::tpc::TrackTPC>(n);
             array.resize(n);
-            //for (size_t i=0; i<n; i++) array=i;
+            for (size_t i=0; i<n; i++) array[i].setZ(gRandom->Gaus());
             return array;
         ;};
         auto makeRVecPermutation = [](int n){
