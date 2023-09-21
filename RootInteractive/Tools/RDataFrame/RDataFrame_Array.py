@@ -581,7 +581,7 @@ class RDataFrame_Visit:
         return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
     def visit_Lambda(self, node:ast.Lambda, args:list = []):
-        self.closure.push(self.args)
+        self.closure.append(self.args)
         self.args = {}
         args_lambda = [i.arg for i in node.args.args]
         args_implementation = []
