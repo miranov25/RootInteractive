@@ -235,7 +235,7 @@ class RDataFrame_Visit:
                 search_scalar_type = scalar_type(unpackScalarType(scalar_type_str(searched_arr["type"]), 1))
                 x = {"type":search_scalar_type, "implementation":"<THIS SHOULDN'T GET INTO OUTPUT>"}
                 cmp = self.visit_Func(node.args[2], [x, query])
-                return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation'])-{searched_arr['implementation']}.begin())"}
+                return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
         args = [self.visit(iArg) for iArg in node.args]
