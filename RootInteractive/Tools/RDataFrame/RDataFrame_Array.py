@@ -225,7 +225,7 @@ class RDataFrame_Visit:
                     "upperBound":"std::upper_bound",
                     "lowerBound":"std:lower_bound"
                     }
-            if len(node.args) == 2:
+           if len(node.args) == 2:
                 searched_arr = self.visit(node.args[0])
                 query = self.visit(node.args[1])
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']})-{searched_arr['implementation']}.begin())"}
