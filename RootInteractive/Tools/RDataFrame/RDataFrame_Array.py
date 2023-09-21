@@ -223,7 +223,7 @@ class RDataFrame_Visit:
         if isinstance(node.func, ast.Name) and node.func.id in ["upperBound", "lowerBound"]:
            bsearch_names={
                     "upperBound":"std::upper_bound",
-                    "lowerBound":"std:lower_bound"
+                    "lowerBound":"std::lower_bound"
                     }
            if len(node.args) == 2:
                 searched_arr = self.visit(node.args[0])
@@ -589,7 +589,8 @@ class RDataFrame_Visit:
             raise TypeError(f"Expected {len(args_lambda)} arguments, got {len(args)}")
         for i, iArg in enumerate(args_lambda):
             args_implementation.append(f"{scalar_type_str(args[i]['type'])} {iArg}")
-            self.args[iArg] = args[i]
+            self.args[iArg] = args[i].copy()
+            self.args[iArg]["implementation"] = iArg
         args_implementation = ', '.join(args_implementation)
         body = self.visit(node.body)
         self.args = self.closure.pop()
