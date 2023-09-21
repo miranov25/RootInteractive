@@ -593,7 +593,7 @@ class RDataFrame_Visit:
         args_implementation = ', '.join(args_implementation)
         body = self.visit(node.body)
         self.args = self.closure.pop()
-        return {"implementation":f"[&]({args_implementation}){{return {body.implementation};}}", "returnType":body["type"]}
+        return {"implementation":f"[&]({args_implementation}){{return {body['implementation']};}}", "returnType":body["type"]}
 
 def unpackScalarType(vecType:str, level:int=0):
     if level <= 0:
