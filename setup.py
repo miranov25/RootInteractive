@@ -5,11 +5,11 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    author_email='marian.ivanov@cern.ch, ivanov6@uniba.sk',
+    author_email='marian.ivanov@cern.ch, marian.i@cern.ch',
     author='Marian I. Ivanov, Marian Ivanov  ',
     url='https://github.com/miranov25/RootInteractive',
     name='RootInteractive',
-    version='v0.01.09',
+    version='v0.01.10',
     #packages=setuptools.find_packages(),
     packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
@@ -29,7 +29,7 @@ setup(
         ## root dependencies
         'iminuit',
         ##---------------------   graphics  dependencies
-        'bokeh>2,<=2.5',
+        'bokeh>2.3,<=2.5',
         'matplotlib',
         # ----------------------   jupyter notebook dependencies
         'ipywidgets',
