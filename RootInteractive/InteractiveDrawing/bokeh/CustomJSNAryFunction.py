@@ -6,6 +6,6 @@ class CustomJSNAryFunction(Model):
 
     parameters = Dict(String, Any, help="Extra arguments to call the function with")
     fields = List(String, default=[], help="List of positional arguments - might be made optional in the future")
-    func = String(serialized=True, help="Code to be computed on the client - scalar case")
-    v_func = String(serialized=True, help="Code to be computed on the client - vector case")
+    func = String(help="Code to be computed on the client - scalar case")
+    v_func = String(help="Code to be computed on the client - vector case")
 
