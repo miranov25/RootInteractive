@@ -579,7 +579,7 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
         #      read metadata #tag:value information - signed by # at the beginning of the line
         for jFile in range(iFile, nFiles):  # get rid of the loop using continue
             name = residualMapList.At(jFile).GetName()
-            if name[0] is '#':
+            if name[0] == '#':
                 first = name.find(":")
                 tag = name[1:name.find(":")]
                 value = name[name.find(":") + 1:len(name)]
@@ -616,13 +616,13 @@ def LoadTrees(inputDataList, chRegExp, chNotReg, inputFileSelection, verbose):
             return None,None,None
         isLegend = False
         for iKey in range(keys.GetEntries()):
-            if regExp.Match(keys.At(iKey).GetName()) is 0:
+            if regExp.Match(keys.At(iKey).GetName()) == 0:
                 continue  # is selected
-            if notReg.Match(keys.At(iKey).GetName()) is not 0:
+            if notReg.Match(keys.At(iKey).GetName()) != 0:
                 continue  # is rejected
             tree = finput.Get(keys.At(iKey).GetName())  # better to use dynamic cast
             treeBaseList.append(tree)
-            if treeBase.GetEntries() is 0:
+            if treeBase.GetEntries() == 0:
                 finput2 = ROOT.TFile.Open(fileName, option)
                 fileList.append(finput2)
                 treeBase = finput2.Get(keys.At(iKey).GetName())
