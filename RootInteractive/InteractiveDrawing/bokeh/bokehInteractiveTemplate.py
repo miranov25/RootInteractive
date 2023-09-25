@@ -2,6 +2,9 @@
 # from RootInteractive.Tools.compressArray import arrayCompressionRelative16, arrayCompressionRelative8
 # from bokeh.plotting import output_file
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters 
+import re
+
+RE_VALID_JS_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
 def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None):
     """
@@ -290,7 +293,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     # defining custom javascript function to query  (used later in variable list)
     if variables is None:
         variables = []
-    variablesCopy = variables.copy()
+    variablesCopy = [i for i in variables if re.match(RE_VALID_JS_NAME, i)]
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0", "variables":variablesCopy},
         {"name": "funCustom1",  "func":"funCustomForm1", "variables":variablesCopy},

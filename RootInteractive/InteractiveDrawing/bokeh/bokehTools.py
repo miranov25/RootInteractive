@@ -13,7 +13,7 @@ from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.layouts import *
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner
+from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner, Panel
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
