@@ -48,31 +48,24 @@ export class CDSAlias extends ColumnarDataSource {
     super.connect_signals()
 
     this.connect(this.source.change, () => {this.cached_columns.clear(); this.change.emit()})
+    let changed_columns = new Map<string, any>()
     for( const key in this.mapping){
       const column = this.mapping[key]
       if(column != null && column.hasOwnProperty("transform")){
-        this.connect(column.transform.change, () => {
-          this.invalidate_column(key)
-        })
+	if(changed_columns.has(column.transform.id)){
+	  changed_columns.get(column.transform.id)[1].push(key)
+	} else {
+          changed_columns.set(column.transform.id, [column.transform, [key]])
+	}
       }
+    }
+    for(const value of changed_columns.values()){
+      this.connect(value[0].change, () => {
+	this.invalidate_columns(value[1])
+      })
     }
 
     this.connect(this.selected.change, () => this.update_selection())
-  }
-
-  compute_functions(){
-    const {mapping, change, selected, source, data, includeOrigColumns} = this
-    for (const key in mapping) {
-      this.compute_function(key)
-    }
-    if(includeOrigColumns)
-    for (const key in source.data) {
-      if(mapping[key] === undefined){
-        data[key] = source.get_array(key)
-      }
-    }
-    selected.indices = source.selected.indices
-    change.emit()
   }
 
   compute_function(key: string){
@@ -187,13 +180,20 @@ export class CDSAlias extends ColumnarDataSource {
     return old_columns.concat(new_columns)
   }
 
+  invalidate_columns(keys: string[], emit_change=true){
+    let watched_changed = false
+    for(const key of keys){
+      watched_changed ||= this.invalidate_column(key, false)
+    }
+    if(watched_changed && emit_change){
+      console.log(keys)
+      this.change.emit()
+    }
+  }
+
   invalidate_column(key: string, emit_change=true){
     if(!this.cached_columns.has(key)){
-      // Seems like a bogus change, but might be there for some reason
-      if(emit_change){
-        // this.change.emit()
-      }
-      return
+      return false
     }
     this.cached_columns.delete(key)
     // A bruteforce solution should work, there shouldn't be that many columns that it's problematic
@@ -202,7 +202,7 @@ export class CDSAlias extends ColumnarDataSource {
       const column = this.mapping[new_key]
       let should_invalidate = false
       if(column.hasOwnProperty("fields")){
-        for(let i=0; i<column.fields.length; i++){
+        for(let i=0; i < column.fields.length; i++){
           if(key == column.fields[i]){
             should_invalidate = true
             break
@@ -218,8 +218,10 @@ export class CDSAlias extends ColumnarDataSource {
       }
     }
     if(emit_change){
+      console.log(key)
       this.change.emit()
     }
+    return true
   }
 
 }
