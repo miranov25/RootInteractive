@@ -32,11 +32,12 @@ export class LazyIntersectionFilter extends RIFilter {
   old_values: boolean[][]
   cached_indices: number[]
   changed_indices: boolean
+  _changed_values: boolean
 
   initialize(){
     super.initialize()
     this.changed = new Set()
-    for(let i=0; i<this.filters.length; i++){
+    for(let i=0; i < this.filters.length; i++){
         this.changed.add(i)
     }
     this.changed_indices = true
@@ -46,13 +47,18 @@ export class LazyIntersectionFilter extends RIFilter {
   connect_signals(): void {
     super.connect_signals()
 
-    for (let i=0; i<this.filters.length; i++) {
+    for (let i=0; i < this.filters.length; i++) {
         this.connect(this.filters[i].change, ()=>this.change_filter(i))
     }
   }
 
   change_filter(i: number){
+    // Until we add dependency trees, just eagerly compute the values, if all equal don't emit change
     this.changed.add(i)
+    this.v_compute()
+    if(!this._changed_values){
+      return
+    }
     this.changed_indices = true
     this.change.emit()
   }
@@ -62,6 +68,7 @@ export class LazyIntersectionFilter extends RIFilter {
     if (this.changed.size === 0 && cached_vector != null){
         return cached_vector
     }
+    this._changed_values = false
     for(const x of this.changed){
         if(this.old_values.length <= x){
             this.old_values.length = x+1
@@ -80,16 +87,20 @@ export class LazyIntersectionFilter extends RIFilter {
         const invert = filters[x].invert
         const old_values = this.old_values[x]
         if(filters[x].active){
-          for(let i=0; i<values.length; i++){
+          for(let i=0; i < values.length; i++){
             const new_value = values[i]!==invert
+	    let old_count = this.counts[i]
             this.counts[i] += new_value ? 1 : 0
             this.counts[i] -= old_values[i] ? 1 : 0
+	    this._changed_values ||= (!!old_count !== !!this.counts[i])
             old_values[i] = new_value
           }
         } else {
-          for(let i=0; i<values.length; i++){
+          for(let i=0; i < values.length; i++){
+            let old_count = this.counts[i]
             this.counts[i] += 1
             this.counts[i] -= old_values[i] ? 1 : 0
+	    this._changed_values ||= (!!old_count !== !!this.counts[i])
             old_values[i] = true
           }            
         }
@@ -101,7 +112,7 @@ export class LazyIntersectionFilter extends RIFilter {
     } else {
         new_vector.length = this.counts.length
     }
-    for(let i=0; i<this.counts.length; i++){
+    for(let i=0; i < this.counts.length; i++){
         new_vector[i] = !this.counts[i]
     }
     this.cached_vector = new_vector
