@@ -61,6 +61,10 @@ def makeTestRDataFrame():
             for (size_t i=0; i<n; i++) array[i].setZ(gRandom->Gaus());
             return array;
         ;};
+        auto makeUnitRVec1DTPCTrackSorted = [](int n){
+            auto array = makeUnitRVec1DTPCTrack(n);
+            std::sort(array.begin(), array.end(), [](o2::tpc::track x, o2::tpc::track y){return x.getZ() < y.getZ();});
+        };
         auto makeRVecPermutation = [](int n){
             auto array = ROOT::RVec<size_t>(n);
             array.resize(n);
@@ -72,6 +76,13 @@ def makeTestRDataFrame():
             for(size_t i=0; i<x.size(); i++) array[x[i]] = i;
             return array;
             ;};
+        auto is_arange = [](ROOT::RVec<size_t> x){
+            char acc = 1;
+            for(auto i=x.begin(); i<x.end(); ++i){
+              acc &= (*i != i-x.begin());
+              };
+            return acc;
+        ;};
     """)
     #
     nTracks=50
@@ -84,7 +95,7 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array2D0","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
-    rdf = rdf.Define('array1DTPCTrack2',"makeUnitRVec1DTPCTrack(nPoints2)")
+    rdf = rdf.Define('array1DTPCTrack2',"makeUnitRVec1DTPCTrackSorted(nPoints2)")
     rdf = rdf.Define('array1DTPCTrack', "makeUnitRVec1DTPCTrack(nPoints)")
     rdf = rdf.Define('arrayPermutation', "makeRVecPermutation(nPoints)")
     rdf = rdf.Define('arrayPermutationInverse', "scatter(arrayPermutation)")
@@ -184,12 +195,14 @@ def test_define2(rdf):
     # support for the TMath:: functions
     parsed = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
     parsed = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
+    rdf = rdf.Define("array2D0_cos_diff", "array2D0_cos0-array2D0_cos1")
+    
     # support for the operator [index]
     rdf = makeDefine("array2D0_0", "array2D0[0,:]", rdf, None, 3);
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
     rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]", rdf, None, 3)
     ### todo
-    rdf3 = rdf.Define("inv_PermSum", "Sum(arrayJoin_0+arrayPermutation-nPoints)")
+    rdf3 = rdf.Define("inv_PermSum", "is_arange(arrayJoin_0)")
     inv_PermSum= rdf3.Histo1D("inv_PermSum").GetMean(); # raise error if not 0
 
 
@@ -202,7 +215,8 @@ def test_define2(rdf):
     rdf = makeDefine("arrayJoin_1", "upperBound(array1DTPCTrack2, array1DTPCTrack[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
     rdf = makeDefine("arrayJoin_2", "lowerBound(array1DTPCTrack2, array1DTPCTrack[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
     # rdf = makeDefine("arrayJoin_3", "inrange(tracks[:],collisions,track.getZ(),collision.getZ(),min,max)", rdf, None, 3);
-
+    rdf = makeDefine("inv_arrayJoin", "arrayJoin_1[:] <= arrayJoin_2[:]", rdf, None, 3);
+    
     return
 
 def test_exception(rdf):
