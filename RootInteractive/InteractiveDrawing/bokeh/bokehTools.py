@@ -365,7 +365,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "flip_histogram_axes": False,
         "show_histogram_error": False,
         "arrayCompression": None,
-        "removeExtraColumns": False
+        "removeExtraColumns": False,
+        "axis_label_text_font_size":"12pt",
+        "major_label_text_font_size":"12pt"
+        #p.xaxis.axis_label_text_font_size = "40pt"
     }
     options.update(kwargs)
     if query is not None:
@@ -844,6 +847,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
                              tools=options['tools'], x_axis_type=options['x_axis_type'],
                              y_axis_type=options['y_axis_type'])
+            figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
+            figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
+            figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
+            figureI.yaxis.major_label_text_font_size = options["major_label_text_font_size"]
 
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))
