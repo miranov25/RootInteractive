@@ -455,6 +455,7 @@ class RDataFrame_Visit:
         sliceValue = self.visit(node.slice)
         n_iter_arr = sliceValue.get("n_iter", None)
         idx_arr = sliceValue.get("value", None)
+        impl_arr = sliceValue["implementation"]
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
             idx_arr = [idx_arr]
@@ -466,8 +467,9 @@ class RDataFrame_Visit:
         for dim, n_iter in enumerate(n_iter_arr):
             if n_iter is None:
                 # If scalar, add check for scalar, if gather, add check for gather
-                gather_valid_check.append(f"{idx_arr[dim]} >= 0 && {acc}.size() > {idx_arr[dim]}")
-                acc += f"[{idx_arr[dim]}]"
+                if idx_arr[dim] is None:
+                    gather_valid_check.append(f"{impl_arr[dim]} >= 0 && {acc}.size() > {impl_arr[dim]}")
+                acc += f"[{impl_arr[dim]}]"
                 continue
             if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
@@ -477,7 +479,7 @@ class RDataFrame_Visit:
                 self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
                 self.n_iter[axis_idx] = str(n_iter)
-            acc += f"[{idx_arr[dim]}]"
+            acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
         if len(gather_valid_check) > 0:
             acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : ({dtype_str}())"
@@ -567,7 +569,7 @@ class RDataFrame_Visit:
                 elt["high_water"] = elt["value"]
                 n_iter.append(None)
                 x.append(elt)
-        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}      
+        return {"type":('o',"int*"), "implementation":[i["implementation"] for i in x], "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}      
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
         # DEPRECATED: will be removed when we stop supporting python 3.8
@@ -586,7 +588,7 @@ class RDataFrame_Visit:
                 elt["high_water"] = elt["value"]
                 n_iter.append(None)
                 x.append(elt)
-        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
+        return {"type":('o',"int*"), "implementation":[i["implementation"] for i in x], "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
     def visit_Lambda(self, node:ast.Lambda, args:list = []):
         self.closure.append(self.args)
