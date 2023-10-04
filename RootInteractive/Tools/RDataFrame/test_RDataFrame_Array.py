@@ -194,8 +194,8 @@ def test_define(logLevel=logging.DEBUG, nCores=0):
 
 def test_define2(rdf):
     # support for the TMath:: functions
-    parsed = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
-    parsed = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
+    rdf = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
+    rdf = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
     rdf = makeDefine("array2D0_cos_diff", "array2D0_cos0-array2D0_cos1", rdf, None, 3)
     
     # support for the operator [index]
