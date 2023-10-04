@@ -180,6 +180,7 @@ class RDataFrame_Visit:
         self.dependencies = {}
         self.args = {} 
         self.closure = []
+        self.range_checks = []
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -449,6 +450,7 @@ class RDataFrame_Visit:
         }
 
     def visit_Subscript(self, node:ast.Subscript):
+        #TODO: In case of gather with overflow, use sentinel value instead
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
         n_iter_arr = sliceValue.get("n_iter", None)
@@ -459,24 +461,29 @@ class RDataFrame_Visit:
         n_dims = len(n_iter_arr)
         axis_idx = 0
         acc = value["implementation"]
+        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
+        gather_valid_check = []
         for dim, n_iter in enumerate(n_iter_arr):
             if n_iter is None:
+                # If scalar, add check for scalar, if gather, add check for gather
+                gather_valid_check.append(f"{idx_arr[dim]} >= 0 && {acc}.size() > {idx_arr[dim]}")
                 acc += f"[{idx_arr[dim]}]"
                 continue
             if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
-            # Detect if length needs to be used here
+                self.range_checks.append({})
+            # Detect if length needs to be used here for slice
             if n_iter <= 0:
                 self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
                 self.n_iter[axis_idx] = str(n_iter)
             acc += f"[{idx_arr[dim]}]"
             axis_idx += 1
-        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
+        acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : ({dtype_str}())"
         dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
-            "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
+            "implementation":acc,
             "type":dtype
         }
 
