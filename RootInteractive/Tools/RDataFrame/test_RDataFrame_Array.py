@@ -63,7 +63,7 @@ def makeTestRDataFrame():
         ;};
         auto makeUnitRVec1DTPCTrackSorted = [](int n){
             auto array = makeUnitRVec1DTPCTrack(n);
-            std::sort(array.begin(), array.end(), [](o2::tpc::track x, o2::tpc::track y){return x.getZ() < y.getZ();});
+            std::sort(array.begin(), array.end(), [](o2::tpc::TrackTPC x, o2::tpc::TrackTPC y){return x.getZ() < y.getZ();});
         };
         auto makeRVecPermutation = [](int n){
             auto array = ROOT::RVec<size_t>(n);
