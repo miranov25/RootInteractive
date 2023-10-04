@@ -40,12 +40,14 @@ def _accumulate_predictionNL(predict, X, out,col):
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
 
-def predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs):
+def predictRFStatChunk(rf, X, statDictionary, parallel):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
+    This is internal function used in the predictRFStat
     predict statistics from random forest
     :param rf:                  random forest object
     :param X:                   input vector
+    :param parallel:            ...
     :param statDictionary:      dictionary of statistics to predict
     :param n_jobs:              number of parallel jobs for prediction
     :return:                    dictionary with requested output statistics
