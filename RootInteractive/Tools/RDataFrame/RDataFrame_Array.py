@@ -492,7 +492,7 @@ class RDataFrame_Visit:
                 sentinel_value = 'std::nanf("")' if dtype[1] == 32 else 'std::nan("")'
             else:
                 sentinel_value = "0"
-            acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : {sentinel_value}"
+            acc = f"(({' && '.join(gather_valid_check)}) ? ({acc}) : {sentinel_value})"
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
             "implementation":acc,
