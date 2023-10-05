@@ -488,7 +488,7 @@ class RDataFrame_Visit:
             axis_idx += 1
         if len(gather_valid_check) > 0:
             if dtype[0] == 'o':
-                sentinel_value = f"{dtype_str}"
+                sentinel_value = f"{dtype_str}()"
             elif dtype[0] == 'f':
                 sentinel_value = 'std::nanf("")' if dtype[1] == 32 else 'std::nan("")'
             else:
