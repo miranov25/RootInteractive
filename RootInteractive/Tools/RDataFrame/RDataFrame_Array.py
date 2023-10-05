@@ -484,7 +484,7 @@ class RDataFrame_Visit:
             acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
         if len(gather_valid_check) > 0:
-            acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : ({dtype_str}())"
+            acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : ({dtype_str})()"
         dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
