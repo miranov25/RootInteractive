@@ -119,6 +119,7 @@ def scalar_type(name):
         "double": ('f', 64),
         "long double": ('f', 64),
         "size_t": ('u', 64),
+        "unsigned long": ('u', 64),
         "long long": ('i', 64),
         "unsigned int": ('u', 32),
         "int": ('i', 32),
