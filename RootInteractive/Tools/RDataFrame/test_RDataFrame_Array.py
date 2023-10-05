@@ -198,7 +198,7 @@ def test_define2(rdf):
     rdf = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
     rdf = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
     rdf = makeDefine("array2D0_cos_diff", "array2D0_cos0[:]-array2D0_cos1[:]", rdf, None, 3)
-    assert math.abs(rdf.Sum("array2D0_cos_diff").GetValue()) < 1e-5
+    assert abs(rdf.Sum("array2D0_cos_diff").GetValue()) < 1e-5
     # support for the operator [index]
     rdf = makeDefine("array2D0_0", "array2D0[0,:]", rdf, None, 3);
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
