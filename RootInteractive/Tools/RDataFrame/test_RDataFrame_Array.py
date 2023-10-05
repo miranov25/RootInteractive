@@ -204,8 +204,8 @@ def test_define2(rdf):
     rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]", rdf, None, 3)
     ### todo
     rdf3 = rdf.Define("inv_PermSum", "is_arange(arrayJoin_0)")
-    inv_PermSum= rdf3.Histo1D("inv_PermSum").GetMean(); # raise error if not 0
-
+    inv_PermSum= rdf3.Histo1D("inv_PermSum").GetSum(); # raise error if not 0
+    assert inv_PermSum == 0
 
     # test array "tracks", array "V0", index_tracksTOV0, N:N   index_tracksTOV0, - better to do not create Alice object can be tested with root classes
     rdf = makeDefine("arrayJoin_0_Func", "array1DTrack[arrayPermutation[:]].Px()", rdf, None, 3)
@@ -217,8 +217,7 @@ def test_define2(rdf):
     rdf = makeDefine("arrayJoin_2", "lowerBound(array1DTPCTrack2, array1DTPCTrack[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
     # rdf = makeDefine("arrayJoin_3", "inrange(tracks[:],collisions,track.getZ(),collision.getZ(),min,max)", rdf, None, 3);
     rdf = makeDefine("inv_arrayJoin", "arrayJoin_1[:] <= arrayJoin_2[:]", rdf, None, 3);
-    
-    return
+    return rdf
 
 def test_exception(rdf):
     # here we should test that the code is not crashing but showing error message and continue
