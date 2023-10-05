@@ -133,7 +133,7 @@ def scalar_type_str(dtype):
     dtypes = {
         ('f', 32): "float",
         ('f', 64): "double",
-        ('u', 64): "size_t",
+        ('u', 64): "unsigned long",
         ('i', 64): "long long",
         ('u', 32): "unsigned int",
         ('i', 32): "int",
@@ -182,6 +182,7 @@ class RDataFrame_Visit:
         self.args = {} 
         self.closure = []
         self.range_checks = []
+        self.helpervar_idx = 0
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -486,9 +487,9 @@ class RDataFrame_Visit:
             acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
         if len(gather_valid_check) > 0:
-            #if dtype[0] == 'o':
-            #    sentinel_value = f"{dtype_str}"
-            if dtype[0] == 'f':
+            if dtype[0] == 'o':
+                sentinel_value = f"{dtype_str}"
+            elif dtype[0] == 'f':
                 sentinel_value = 'std::nanf("")' if dtype[1] == 32 else 'std::nan("")'
             else:
                 sentinel_value = "0"
