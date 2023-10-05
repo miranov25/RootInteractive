@@ -456,6 +456,8 @@ class RDataFrame_Visit:
         n_iter_arr = sliceValue.get("n_iter", None)
         idx_arr = sliceValue.get("value", None)
         impl_arr = sliceValue["implementation"]
+        if isinstance(impl_arr, str):
+            impl_arr = [impl_arr]
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
             idx_arr = [idx_arr]
