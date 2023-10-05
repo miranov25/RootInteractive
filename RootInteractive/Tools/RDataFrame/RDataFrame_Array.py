@@ -465,6 +465,7 @@ class RDataFrame_Visit:
         axis_idx = 0
         acc = value["implementation"]
         dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
+        dtype = scalar_type(dtype_str)
         gather_valid_check = []
         for dim, n_iter in enumerate(n_iter_arr):
             if n_iter is None:
@@ -484,8 +485,12 @@ class RDataFrame_Visit:
             acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
         if len(gather_valid_check) > 0:
+            sentinel_value = f"({dtype_str})()"
+            if dtype[0] == 'f':
+                sentinel_value = "std::nanf" if dtype[1] == 32 else "std::nan"
+            if dtype[0] == 'i':
+                sentinel_value = "-1"
             acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : ({dtype_str})()"
-        dtype = scalar_type(dtype_str)
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
             "implementation":acc,
