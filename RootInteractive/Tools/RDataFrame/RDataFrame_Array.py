@@ -485,12 +485,11 @@ class RDataFrame_Visit:
             acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
         if len(gather_valid_check) > 0:
-            sentinel_value = f"({dtype_str})()"
-            if dtype[0] == 'f':
+            if dtype[0] == 'o':
+                sentinel_value = f"({dtype_str})()"
+            elif dtype[0] == 'f':
                 sentinel_value = 'std::nanf("")' if dtype[1] == 32 else 'std::nan("")'
-            if dtype[0] == 'i':
-                sentinel_value = "-1"
-            if dtype[0] == 'u':
+            else:
                 sentinel_value = "0"
             acc = f"({' && '.join(gather_valid_check)}) ? ({acc}) : {sentinel_value}"
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
