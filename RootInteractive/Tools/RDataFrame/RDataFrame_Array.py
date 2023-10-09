@@ -430,8 +430,10 @@ class RDataFrame_Visit:
             raise ValueError("Slice step cannot be zero")
         n_iter = (upper_value-lower_value)//step
         dim_idx = f"_{idx}" if idx>0 else ""
+        lower_value_mod = "" if lower_value == 0 else f"{lower_value}+"
+        step_str = "" if step == 1 else f"*{step}"
         return {
-            "implementation":f"{lower_value}{infix}i{dim_idx}*{step}",
+            "implementation":f"{lower_value_mod}i{dim_idx}{step_str}",
             "type":"slice",
             "n_iter":n_iter,
             "high_water":max(lower_value,upper_value)
