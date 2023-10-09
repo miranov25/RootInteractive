@@ -395,12 +395,12 @@ class RDataFrame_Visit:
         }
 
     def visit_BoolOp(self, node:ast.BoolOp):
-        values = [f"({self.visit(i)})" for i in node.values]
+        values = [self.visit(i) for i in node.values]
         if isinstance(node.op, ast.And):
             op_infix = " && "
         elif isinstance(node.op, ast.Or):
             op_infix = " || "
-        implementation = op_infix.join([i["implementation"] for i in values])
+        implementation = op_infix.join([f'({i["implementation"]})' for i in values])
         return {
             "name": self.code,
             "type": values[-1]["type"],
