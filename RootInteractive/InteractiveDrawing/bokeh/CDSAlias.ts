@@ -24,6 +24,7 @@ export class CDSAlias extends ColumnarDataSource {
   static __name__ = "CDSAlias"
 
   cached_columns: Set<string>
+  changed_columns: Set<string>
 
   _locked_columns: Set<string>
 
@@ -39,6 +40,7 @@ export class CDSAlias extends ColumnarDataSource {
   initialize(){
     super.initialize()
     this.cached_columns = new Set()
+    this.changed_columns = new Set()
     this._locked_columns = new Set()
     this.data = {}
    // this.compute_functions()
@@ -188,6 +190,7 @@ export class CDSAlias extends ColumnarDataSource {
     if(watched_changed && emit_change){
       console.log(keys)
       this.change.emit()
+      this.changed_columns.clear()
     }
   }
 
@@ -196,6 +199,7 @@ export class CDSAlias extends ColumnarDataSource {
       return false
     }
     this.cached_columns.delete(key)
+    this.changed_columns.add(key)
     // A bruteforce solution should work, there shouldn't be that many columns that it's problematic
     const candidate_columns = Object.keys(this.mapping)
     for(const new_key of candidate_columns){
@@ -220,6 +224,7 @@ export class CDSAlias extends ColumnarDataSource {
     if(emit_change){
       console.log(key)
       this.change.emit()
+      this.changed_columns.clear()
     }
     return true
   }
