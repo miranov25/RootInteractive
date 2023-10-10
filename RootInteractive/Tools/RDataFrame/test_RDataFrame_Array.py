@@ -222,7 +222,7 @@ def test_define2(rdf):
     rdf = makeDefine("inv_arrayJoin_lower", "arrayJoin_2[:] < nPoints2 and array1DTPCTrack2[arrayJoin_2[:]].getZ() < array1DTPCTrack[:].getZ()", rdf, None, 3)
     rdf = makeDefine("inv_arrayJoin_upper", "arrayJoin_1[:] < nPoints2 and array1DTPCTrack2[arrayJoin_1[:]].getZ() <= array1DTPCTrack[:].getZ()", rdf, None, 3)
     assert rdf.Sum("inv_arrayJoin").GetValue() == 0
-    # assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
+    assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
     return rdf
 
 def test_exception(rdf):
