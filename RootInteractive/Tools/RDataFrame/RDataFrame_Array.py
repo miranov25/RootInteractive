@@ -525,7 +525,7 @@ class RDataFrame_Visit:
         depth_f = f"_{depth}" if depth>0 else ""
         depth_f_lower = f"_{depth-1}" if depth>1 else ""
         if depth>=len(self.n_iter):
-            if depth < 0:
+            if depth == 0:
                 return f"result = {innerLoop}", dtype
             depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
