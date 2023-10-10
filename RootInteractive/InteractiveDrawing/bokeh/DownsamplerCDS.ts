@@ -48,8 +48,6 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   private _cached_columns: Set<string>
 
-  private _source_length: number
-
   initialize(){
     super.initialize()
     this.booleans = null
@@ -60,14 +58,13 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this._needs_update = true
     this._is_trivial = false
     this._cached_columns = new Set()
-    this._source_length = -1
   }
 
   shuffle_indices(){
     const {_indices, source} = this
     _indices.length = source.get_length()!
     // Fisher-Yates random permutation
-    for(let i=0; i < _indices.length; ++i){
+    for(let i=0; i<_indices.length; ++i){
       let random_index = (Math.random()*(i+1)) | 0
       _indices[i] = i
       _indices[i] = _indices[random_index]
@@ -81,7 +78,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     this.connect(this.selected.change, () => this.update_selection())
     this.connect(this.source.change, () => {this.invalidate()})
     if(this.filter != null){
-      this.connect(this.filter.change, () => {this.change_filter()})
+      this.connect(this.filter.change, () => {this.invalidate()})
     }
     this.connect(this.properties.watched.change, () => {this.toggle_watched()})
   }
@@ -89,7 +86,6 @@ export class DownsamplerCDS extends ColumnarDataSource {
   update(){
     const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
-    this._source_length = l
     if(filter == null && (nPoints < 0 || nPoints >= l)){
       this._is_trivial = true
       return
@@ -199,11 +195,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
       new_column = Array(_downsampled_indices.length)
     }
     if(new_column.length < _downsampled_indices.length) new_column.length = _downsampled_indices.length
-    for(let i=0; i < _downsampled_indices.length; i++){
+    for(let i=0; i<_downsampled_indices.length; i++){
       new_column[i] = column_orig[_downsampled_indices[i]]
     }
     data[columnName] = new_column
-    _cached_columns.add(columnName)
     return data[columnName]
   }
 
@@ -217,27 +212,10 @@ export class DownsamplerCDS extends ColumnarDataSource {
     return this._downsampled_indices.length
   }
 
-  change_filter(){
+  invalidate(){
     this._needs_update = true
     this._cached_columns.clear()
     if(this.watched){
-      this.change.emit()
-    }
-  }
-
-  invalidate(){
-    if(this._source_length !== this.source.get_length()){
-	 this.change_filter()
-	 return
-    }
-    let changed = false
-    for(let i of this.source.changed_columns){
-	if(this._cached_columns.has(i)){
-	  this._cached_columns.delete(i)
-	  changed = true
-	}
-    }    
-    if(this.watched && changed){
       this.change.emit()
     }
   }
