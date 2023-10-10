@@ -51,9 +51,11 @@ def getClassMethod(className, methodName, arguments=[]):
     className = "AliExternalTrackParam" ; methodName="GetX"
     """
     import re
-    className2=className.replace("::",".")
-    className2 =className2.replace("<", '("')
-    className2 =className2.replace(">", '")')
+    tokenizedClassName=className.split('<', 1)
+    tokenizedClassName[0] = tokenizedClassName[0].replace("::",".")
+    tokenizedClassName[1] = ')'.join(tokenizedClassName[1].rsplit('>'))
+    
+    className2=''.join(tokenizedClassName)
 
     docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
     returnType=docString.split(" ", 1)[0]
