@@ -54,9 +54,9 @@ def getClassMethod(className, methodName, arguments=[]):
     tokenizedClassName=className.split('<', 1)
     tokenizedClassName[0] = tokenizedClassName[0].replace("::",".")
     if(len(tokenizedClassName) > 1):
-        tokenizedClassName[1] = ')'.join(tokenizedClassName[1].rsplit('>'))
-    
-    className2='('.join(tokenizedClassName)
+        tokenizedClassName[1] = '")'.join(tokenizedClassName[1].rsplit('>'))
+
+    className2='("'.join(tokenizedClassName)
 
     docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
     returnType=docString.split(" ", 1)[0]
