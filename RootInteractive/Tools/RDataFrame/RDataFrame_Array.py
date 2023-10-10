@@ -527,7 +527,7 @@ class RDataFrame_Visit:
         if depth>=len(self.n_iter):
             if depth < 0:
                 return f"result = {innerLoop}", dtype
-            depth_f = f"{depth-1}" if depth>1 else ""
+            depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
         next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
         array_type = f"ROOT::VecOps::RVec<{array_type}>"
