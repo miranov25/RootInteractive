@@ -509,7 +509,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
-        input_args = ', '.join([f"{scalar_type_str(value['type'])} {'&' if value['type'] == 'o' else ''}{key}" for key, value in dependencies_list])
+        input_args = ', '.join([f"{scalar_type_str(value['type'])} {'&' if value['type'][0] == 'o' else ''}{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
             "implementation":f"""{signature}{{
