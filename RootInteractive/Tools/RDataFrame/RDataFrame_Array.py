@@ -28,7 +28,7 @@ def getGlobalFunction(name="cos", verbose=1):
     logging.info(f"GetGlobalFunction {name} {info}")
     return info
 
-def getClass(name="TParticle", verbose=0):
+def getClass(name="TParticle", verbose=1):
     info={"rClass":0}
     rClass = ROOT.gROOT.GetListOfClasses().FindObject(name)
     if rClass:
