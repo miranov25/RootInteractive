@@ -123,11 +123,16 @@ export class CDSAlias extends ColumnarDataSource {
             }            
         } else{
             new_column = new Array(len).fill(.0)
+	    try {
+
             for (let i = 0; i < len; i++) {
                 const row = fields.map((x: any[]) => x[i])
                 // This will likely have very bad performance
                 new_column[i] = column.transform.compute(row)
             }
+	    } catch (error){
+		    console.error(error)
+	    }
             data[key] = new_column
         }
     } else if(Object.prototype.toString.call(column) === '[object String]'){
