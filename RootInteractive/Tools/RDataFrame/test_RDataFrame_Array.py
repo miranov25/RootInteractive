@@ -61,6 +61,11 @@ def makeTestRDataFrame():
             for (size_t i=0; i<n; i++) array[i].setZ(gRandom->Gaus());
             return array;
         ;};
+        auto makeUnitRVec1DTPCTrackSorted = [](int n){
+            auto array = makeUnitRVec1DTPCTrack(n);
+            std::sort(array.begin(), array.end(), [](const o2::tpc::TrackTPC &x, const o2::tpc::TrackTPC &y){return x.getZ() < y.getZ();});
+            return array;
+        };
         auto makeRVecPermutation = [](int n){
             auto array = ROOT::RVec<size_t>(n);
             array.resize(n);
@@ -72,6 +77,13 @@ def makeTestRDataFrame():
             for(size_t i=0; i<x.size(); i++) array[x[i]] = i;
             return array;
             ;};
+        auto is_arange = [](ROOT::RVec<size_t> x){
+            char acc = 1;
+            for(auto i=x.begin(); i<x.end(); ++i){
+              acc &= (*i != i-x.begin());
+              };
+            return acc;
+        ;};
     """)
     #
     nTracks=50
@@ -84,7 +96,7 @@ def makeTestRDataFrame():
     rdf= rdf.Define("array2D0","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define("array2D1","makeUnitRVec2D(nPoints,nPoints2)")
     rdf= rdf.Define('array1DTrack',"makeUnitRVec1DTrack(nPoints)")
-    rdf = rdf.Define('array1DTPCTrack2',"makeUnitRVec1DTPCTrack(nPoints2)")
+    rdf = rdf.Define('array1DTPCTrack2',"makeUnitRVec1DTPCTrackSorted(nPoints2)")
     rdf = rdf.Define('array1DTPCTrack', "makeUnitRVec1DTPCTrack(nPoints)")
     rdf = rdf.Define('arrayPermutation', "makeRVecPermutation(nPoints)")
     rdf = rdf.Define('arrayPermutationInverse', "scatter(arrayPermutation)")
@@ -182,16 +194,18 @@ def test_define(logLevel=logging.DEBUG, nCores=0):
 
 def test_define2(rdf):
     # support for the TMath:: functions
-    parsed = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
-    parsed = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
+    rdf = makeDefine("array2D0_cos0", "cos(array2D0[0,:])", rdf, None, 3);         # this is working
+    rdf = makeDefine("array2D0_cos1", "TMath.Cos(array2D0[0,:])", rdf, None, 3);   # this is working
+    rdf = makeDefine("array2D0_cos_diff", "array2D0_cos0[:]-array2D0_cos1[:]", rdf, None, 3)
+    assert abs(rdf.Mean("array2D0_cos_diff").GetValue()) < 1e-5
     # support for the operator [index]
     rdf = makeDefine("array2D0_0", "array2D0[0,:]", rdf, None, 3);
     #rdf = makeDefine("array2D0_0", "array2D0[0]", rdf, None, 3);       # should return 1D RVec at position 0, now it is failing
     rdf = makeDefine("arrayJoin_0", "arrayPermutation[arrayPermutationInverse[:]]", rdf, None, 3)
     ### todo
-    rdf3 = rdf.Define("inv_PermSum", "Sum(arrayJoin_0+arrayPermutation-nPoints)")
-    inv_PermSum= rdf3.Histo1D("inv_PermSum").GetMean(); # raise error if not 0
-
+    rdf3 = rdf.Define("inv_PermSum", "is_arange(arrayJoin_0)")
+    inv_PermSum= rdf3.Histo1D("inv_PermSum").GetSum(); # raise error if not 0
+    assert inv_PermSum == 0
 
     # test array "tracks", array "V0", index_tracksTOV0, N:N   index_tracksTOV0, - better to do not create Alice object can be tested with root classes
     rdf = makeDefine("arrayJoin_0_Func", "array1DTrack[arrayPermutation[:]].Px()", rdf, None, 3)
@@ -202,8 +216,14 @@ def test_define2(rdf):
     rdf = makeDefine("arrayJoin_1", "upperBound(array1DTPCTrack2, array1DTPCTrack[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
     rdf = makeDefine("arrayJoin_2", "lowerBound(array1DTPCTrack2, array1DTPCTrack[:], lambda x,y: x.getZ() < y.getZ())", rdf, None, 3);
     # rdf = makeDefine("arrayJoin_3", "inrange(tracks[:],collisions,track.getZ(),collision.getZ(),min,max)", rdf, None, 3);
-
-    return
+    rdf = makeDefine("inv_arrayJoin", "arrayJoin_1[:] > arrayJoin_2[:]", rdf, None, 3)
+    # test FAILING because array of objects doesn't work with size() for some reason
+    rdf = makeDefine("inv_arraySize", "array1DTPCTrack2.size() == nPoints2", rdf, None, 3)
+    rdf = makeDefine("inv_arrayJoin_lower", "arrayJoin_2[:] < nPoints2 and array1DTPCTrack2[arrayJoin_2[:]].getZ() < array1DTPCTrack[:].getZ()", rdf, None, 3)
+    rdf = makeDefine("inv_arrayJoin_upper", "arrayJoin_1[:] < nPoints2 and array1DTPCTrack2[arrayJoin_1[:]].getZ() <= array1DTPCTrack[:].getZ()", rdf, None, 3)
+    assert rdf.Sum("inv_arrayJoin").GetValue() == 0
+    assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
+    return rdf
 
 def test_exception(rdf):
     # here we should test that the code is not crashing but showing error message and continue

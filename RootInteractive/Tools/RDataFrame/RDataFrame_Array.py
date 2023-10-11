@@ -28,7 +28,7 @@ def getGlobalFunction(name="cos", verbose=1):
     logging.info(f"GetGlobalFunction {name} {info}")
     return info
 
-def getClass(name="TParticle", verbose=0):
+def getClass(name="TParticle", verbose=1):
     info={"rClass":0}
     rClass = ROOT.gROOT.GetListOfClasses().FindObject(name)
     if rClass:
@@ -51,9 +51,12 @@ def getClassMethod(className, methodName, arguments=[]):
     className = "AliExternalTrackParam" ; methodName="GetX"
     """
     import re
-    className2=className.replace("::",".")
-    className2 =className2.replace("<", '("')
-    className2 =className2.replace(">", '")')
+    tokenizedClassName=className.split('<', 1)
+    tokenizedClassName[0] = tokenizedClassName[0].replace("::",".")
+    if(len(tokenizedClassName) > 1):
+        tokenizedClassName[1] = '")'.join(tokenizedClassName[1].rsplit('>'))
+
+    className2='("'.join(tokenizedClassName)
 
     docString= eval(f"ROOT.{className2}.{methodName}.func_doc")
     returnType=docString.split(" ", 1)[0]
@@ -119,6 +122,7 @@ def scalar_type(name):
         "double": ('f', 64),
         "long double": ('f', 64),
         "size_t": ('u', 64),
+        "unsigned long": ('u', 64),
         "long long": ('i', 64),
         "unsigned int": ('u', 32),
         "int": ('i', 32),
@@ -132,7 +136,7 @@ def scalar_type_str(dtype):
     dtypes = {
         ('f', 32): "float",
         ('f', 64): "double",
-        ('u', 64): "size_t",
+        ('u', 64): "unsigned long",
         ('i', 64): "long long",
         ('u', 32): "unsigned int",
         ('i', 32): "int",
@@ -180,6 +184,8 @@ class RDataFrame_Visit:
         self.dependencies = {}
         self.args = {} 
         self.closure = []
+        self.range_checks = []
+        self.helpervar_idx = 0
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -392,12 +398,12 @@ class RDataFrame_Visit:
         }
 
     def visit_BoolOp(self, node:ast.BoolOp):
-        values = [f"({self.visit(i)})" for i in node.values]
+        values = [self.visit(i) for i in node.values]
         if isinstance(node.op, ast.And):
             op_infix = " && "
         elif isinstance(node.op, ast.Or):
             op_infix = " || "
-        implementation = op_infix.join([i["implementation"] for i in values])
+        implementation = op_infix.join([f'({i["implementation"]})' for i in values])
         return {
             "name": self.code,
             "type": values[-1]["type"],
@@ -427,8 +433,10 @@ class RDataFrame_Visit:
             raise ValueError("Slice step cannot be zero")
         n_iter = (upper_value-lower_value)//step
         dim_idx = f"_{idx}" if idx>0 else ""
+        lower_value_mod = "" if lower_value == 0 else f"{lower_value}+"
+        step_str = "" if step == 1 else f"*{step}"
         return {
-            "implementation":f"{lower_value}{infix}i{dim_idx}*{step}",
+            "implementation":f"{lower_value_mod}i{dim_idx}{step_str}",
             "type":"slice",
             "n_iter":n_iter,
             "high_water":max(lower_value,upper_value)
@@ -449,34 +457,51 @@ class RDataFrame_Visit:
         }
 
     def visit_Subscript(self, node:ast.Subscript):
+        #TODO: In case of gather with overflow, use sentinel value instead
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
         n_iter_arr = sliceValue.get("n_iter", None)
         idx_arr = sliceValue.get("value", None)
+        impl_arr = sliceValue["implementation"]
+        if isinstance(impl_arr, str):
+            impl_arr = [impl_arr]
         if not isinstance(n_iter_arr, list):
             n_iter_arr = [n_iter_arr]
             idx_arr = [idx_arr]
         n_dims = len(n_iter_arr)
         axis_idx = 0
         acc = value["implementation"]
+        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
+        dtype = scalar_type(dtype_str)
+        gather_valid_check = []
         for dim, n_iter in enumerate(n_iter_arr):
             if n_iter is None:
-                acc += f"[{idx_arr[dim]}]"
+                # If scalar, add check for scalar, if gather, add check for gather
+                if idx_arr[dim] is None:
+                    gather_valid_check.append(f"{impl_arr[dim]} >= 0 && {acc}.size() > {impl_arr[dim]}")
+                acc += f"[{impl_arr[dim]}]"
                 continue
             if len(self.n_iter) <= axis_idx:
                 self.n_iter.append(n_iter)
-            # Detect if length needs to be used here
+                self.range_checks.append({})
+            # Detect if length needs to be used here for slice
             if n_iter <= 0:
                 self.n_iter[axis_idx] = f"{acc}.size() - {-n_iter}"
             else:
                 self.n_iter[axis_idx] = str(n_iter)
-            acc += f"[{idx_arr[dim]}]"
+            acc += f"[{impl_arr[dim]}]"
             axis_idx += 1
-        dtype_str = unpackScalarType(scalar_type_str(value["type"]), n_dims)
-        dtype = scalar_type(dtype_str)
+        if len(gather_valid_check) > 0:
+            if dtype[0] == 'o':
+                sentinel_value = f"{dtype_str}()"
+            elif dtype[0] == 'f':
+                sentinel_value = 'std::nanf("")' if dtype[1] == 32 else 'std::nan("")'
+            else:
+                sentinel_value = "0"
+            acc = f"(({' && '.join(gather_valid_check)}) ? ({acc}) : {sentinel_value})"
         logging.info(f"\t Data type: {dtype_str}, {dtype}")
         return {
-            "implementation":f"{value['implementation']}[{sliceValue['implementation']}]",
+            "implementation":acc,
             "type":dtype
         }
 
@@ -484,7 +509,7 @@ class RDataFrame_Visit:
         body = self.visit(node.body)
         loop, array_type = self.makeOuterLoop(0, body["implementation"], scalar_type_str(body["type"]))
         dependencies_list = [(key, value) for key, value in self.dependencies.items()]
-        input_args = ', '.join([f"{scalar_type_str(value['type'])} &{key}" for key, value in dependencies_list])
+        input_args = ', '.join([f"{scalar_type_str(value['type'])} {'&' if value['type'][0] == 'o' else ''}{key}" for key, value in dependencies_list])
         signature = f"{array_type} {self.name}({input_args})"
         return {
             "implementation":f"""{signature}{{
@@ -500,6 +525,8 @@ class RDataFrame_Visit:
         depth_f = f"_{depth}" if depth>0 else ""
         depth_f_lower = f"_{depth-1}" if depth>1 else ""
         if depth>=len(self.n_iter):
+            if depth == 0:
+                return f"{dtype} result = {innerLoop};", dtype
             depth_f = f"_{depth-1}" if depth>1 else ""
             return f"result{depth_f}[i{depth_f}] = {innerLoop};", dtype
         next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
@@ -559,7 +586,7 @@ class RDataFrame_Visit:
                 elt["high_water"] = elt["value"]
                 n_iter.append(None)
                 x.append(elt)
-        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}      
+        return {"type":('o',"int*"), "implementation":[i["implementation"] for i in x], "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}      
 
     def visit_ExtSlice(self, node:ast.ExtSlice):
         # DEPRECATED: will be removed when we stop supporting python 3.8
@@ -578,7 +605,7 @@ class RDataFrame_Visit:
                 elt["high_water"] = elt["value"]
                 n_iter.append(None)
                 x.append(elt)
-        return {"type":('o',"int*"), "implementation":']['.join([i["implementation"] for i in x]), "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
+        return {"type":('o',"int*"), "implementation":[i["implementation"] for i in x], "n_iter": n_iter, "high_water": [i["high_water"] for i in x], "value":[i.get("value", None) for i in x]}       
 
     def visit_Lambda(self, node:ast.Lambda, args:list = []):
         self.closure.append(self.args)
