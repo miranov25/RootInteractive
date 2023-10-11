@@ -115,19 +115,28 @@ export class CDSAlias extends ColumnarDataSource {
             new_column.length = source.get_length()
             const nvars = fields.length
             let row = new Array(nvars)
+	    try {
             for (let i = 0; i < len; i++) {
               for(let j=0; j < nvars; j++){
                 row[j] = fields[j][i]
               }
               new_column[i] = column.transform.compute(row)
-            }            
+            }  
+  	    } catch (error) {
+		console.error(error)
+	    }	    
         } else{
             new_column = new Array(len).fill(.0)
+	    try {
+
             for (let i = 0; i < len; i++) {
                 const row = fields.map((x: any[]) => x[i])
                 // This will likely have very bad performance
                 new_column[i] = column.transform.compute(row)
             }
+	    } catch (error){
+		    console.error(error)
+	    }
             data[key] = new_column
         }
     } else if(Object.prototype.toString.call(column) === '[object String]'){
