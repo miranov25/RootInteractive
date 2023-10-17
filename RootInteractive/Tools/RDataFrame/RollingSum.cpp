@@ -5,6 +5,8 @@
 
 using size_t = decltype(sizeof 1);
 
+namespace RootInteractive {
+
 template <class InputIt, class T>
 std::vector<T> rolling_sum(InputIt first, InputIt last, size_t radius, T init){
 	std::vector<T> result(last-first);
@@ -62,6 +64,8 @@ void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T
 	  *d_first = init;
 	  ++d_first;
   }
+}
+
 }
 
 #endif
