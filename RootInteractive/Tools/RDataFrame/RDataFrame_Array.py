@@ -285,7 +285,7 @@ for(size_t i={width}; i;--i){{
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
         elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd"]:
-            return visit_Rolling(self, node)
+            return self.visit_Rolling(node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
