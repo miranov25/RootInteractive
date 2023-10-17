@@ -186,6 +186,7 @@ class RDataFrame_Visit:
         self.closure = []
         self.range_checks = []
         self.helpervar_idx = 0
+        self.helpervar_stmt = []
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -224,6 +225,45 @@ class RDataFrame_Visit:
             return self.visit_Lambda(node)
         raise NotImplementedError(node)
 
+    def visit_Rolling(self, node: ast.Call):
+        if len(node.args) < 2:
+            raise TypeError(f"Got {len(node.args)} arguments, expected 2")
+        arr = self.visit(node.args[0])
+        arr_name = arr["implementation"]
+        dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
+        width = self.visit(node.args[1])["implementation"]
+        if len(node.args) == 2:
+           init = "0"
+        else:
+            init = node.args[2]["implementation"]
+        # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
+        # as making them commutative allows vectorization - default sum, mean and std are obviously commutative
+        if len(node.args) > 3:
+            #TODO: Add code for custom add/sub functions
+            pass
+        new_helper_id = self.helpervar_idx
+        self.helpervar_idx += 1
+        self.helpervar_stmt.append((0, f"""
+RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width-1});
+rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {n_elems}, {init});
+        """))
+        if node.func.id == "rollingMean":
+            self.helpvar_stmt.append(f"""
+for(size_t i=0; i<{width};++i){
+    arr_{new_helper_id}[i] /= i;
+};
+for(size_t i={width};i<{arr_name}.size();++i){
+    arr_{new_helper_id}[i] /= {width};
+};
+for(size_t i={width}; i;--i){
+    *(arr_{new_helper_id}.end()-i) /= i;
+};
+            """)
+        return {
+                "implementation":f"arr_{new_helper_id}",
+                "type":('o',f"RVec<{dtype}>")
+                }
+
     def visit_Call(self, node: ast.Call):
         # Hack for passing lambdas into functions as arguments - arg types needed to make the lambda
         if isinstance(node.func, ast.Name) and node.func.id in ["upperBound", "lowerBound"]:
@@ -244,6 +284,8 @@ class RDataFrame_Visit:
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
+        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd"]:
+            return visit_Rolling(self, node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
@@ -336,7 +378,6 @@ class RDataFrame_Visit:
         if isinstance(op, ast.FloorDiv) and merged_dtype[0] == 'f':
             implementation = f"floor({implementation})"
         return {
-            "name": self.code,
             "implementation": implementation,
             "type": merged_dtype
         }
@@ -532,7 +573,9 @@ class RDataFrame_Visit:
         next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
         array_type = f"ROOT::VecOps::RVec<{array_type}>"
         expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
-        return f"""{array_type} result{depth_f}({self.n_iter[depth]});
+        return f"""
+    {[i[1] for i in self.helpvar_stmt if i[0] == depth]}
+    {array_type} result{depth_f}({self.n_iter[depth]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
         {next_level}
     }}
