@@ -574,7 +574,7 @@ for(size_t i={width}; i;--i){{
         array_type = f"ROOT::VecOps::RVec<{array_type}>"
         expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
         return f"""
-    {[i[1] for i in self.helpvar_stmt if i[0] == depth]}
+    {[i[1] for i in self.helpervar_stmt if i[0] == depth]}
     {array_type} result{depth_f}({self.n_iter[depth]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
         {next_level}
