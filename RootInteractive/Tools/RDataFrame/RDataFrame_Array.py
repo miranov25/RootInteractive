@@ -248,7 +248,7 @@ RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width-1});
 rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {n_elems}, {init});
         """))
         if node.func.id == "rollingMean":
-            self.helpvar_stmt.append(f"""
+            self.helpvar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){
     arr_{new_helper_id}[i] /= i;
 };
@@ -258,7 +258,7 @@ for(size_t i={width};i<{arr_name}.size();++i){
 for(size_t i={width}; i;--i){
     *(arr_{new_helper_id}.end()-i) /= i;
 };
-            """)
+            """))
         return {
                 "implementation":f"arr_{new_helper_id}",
                 "type":('o',f"RVec<{dtype}>")
