@@ -247,7 +247,7 @@ class RDataFrame_Visit:
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
 RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width}-1);
-RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {n_elems}, {init});
+RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {width}, {init});
         """))
         if node.func.id == "rollingMean":
             self.helpvar_stmt.append((0, f"""
