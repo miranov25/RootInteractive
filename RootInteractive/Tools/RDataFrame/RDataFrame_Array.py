@@ -561,7 +561,8 @@ for(size_t i={width}; i;--i){{
 }} """,
 "type": array_type,
 "name": self.name,
-"dependencies": [i[0] for i in dependencies_list]
+"dependencies": [i[0] for i in dependencies_list],
+"headers": self.headers
         }
 
     def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
@@ -732,6 +733,7 @@ def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
     if verbose & 0x8:
         logging.info("makeDefine - evaluator",evaluator)
     parsed = evaluator.visit(t)
+
     if verbose>0:
         logging.info(f"{name} \n{code}")
 
