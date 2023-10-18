@@ -250,7 +250,7 @@ RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width}-1);
 RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {width}, {init});
         """))
         if node.func.id == "rollingMean":
-            self.helpvar_stmt.append((0, f"""
+            self.helpervar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){{
     arr_{new_helper_id}[i] /= i;
 }};
