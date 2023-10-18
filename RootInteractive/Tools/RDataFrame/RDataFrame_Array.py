@@ -252,13 +252,13 @@ RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_help
         if node.func.id == "rollingMean":
             self.helpervar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){{
-    arr_{new_helper_id}[i] /= i;
+    arr_{new_helper_id}[i] /= i+1;
 }};
 for(size_t i={width};i<{arr_name}.size();++i){{
     arr_{new_helper_id}[i] /= {width};
 }};
 for(size_t i={width}; i;--i){{
-    *(arr_{new_helper_id}.end()-i) /= i;
+    *(arr_{new_helper_id}.end()-i) /= i+1;
 }};
             """))
         return {
