@@ -187,6 +187,7 @@ class RDataFrame_Visit:
         self.range_checks = []
         self.helpervar_idx = 0
         self.helpervar_stmt = []
+        self.headers = {} 
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -228,6 +229,7 @@ class RDataFrame_Visit:
     def visit_Rolling(self, node: ast.Call):
         if len(node.args) < 2:
             raise TypeError(f"Got {len(node.args)} arguments, expected 2")
+        self.headers["RollingSum"] = "#include \"rolling_sum.cpp\"\n"
         arr = self.visit(node.args[0])
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
@@ -235,7 +237,7 @@ class RDataFrame_Visit:
         if len(node.args) == 2:
            init = "0"
         else:
-            init = node.args[2]["implementation"]
+            init = self.visit(node.args[2])["implementation"]
         # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
         # as making them commutative allows vectorization - default sum, mean and std are obviously commutative
         if len(node.args) > 3:
@@ -690,6 +692,7 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     # 0.) Define function if does not exist yet
 
     try:
+        ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
         logging.error(f'makeDefineRNode compilation of {funName} failed Implementation in {parsed["implemntation"]}')
@@ -750,7 +753,7 @@ def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
 def makeLibrary(cppLib,outFile, includes=""):
     """
 
-    :param cppLib:   dictioanry optionaly filled in the makeDefine as c[[LibDictionary
+    :param cppLib:   dictioanry optionaly filled in the makeDefine as cppLibDictionary
     :param outFile:  output text file with cpp code
     :return:         output file - ROOT C++ macro which can be loaded or compiled as share library
     outFile="rdf.C"
