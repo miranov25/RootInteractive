@@ -229,7 +229,7 @@ class RDataFrame_Visit:
     def visit_Rolling(self, node: ast.Call):
         if len(node.args) < 2:
             raise TypeError(f"Got {len(node.args)} arguments, expected 2")
-        self.headers["RollingSum"] = "#include \"rolling_sum.cpp\"\n"
+        self.headers["RollingSum"] = "#include \"RollingSum.cpp\"\n"
         arr = self.visit(node.args[0])
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
@@ -246,7 +246,7 @@ class RDataFrame_Visit:
         new_helper_id = self.helpervar_idx
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
-RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width}-1);
+ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width}-1);
 RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {width}, {init});
         """))
         if node.func.id == "rollingMean":
@@ -263,7 +263,7 @@ for(size_t i={width}; i;--i){{
             """))
         return {
                 "implementation":f"arr_{new_helper_id}",
-                "type":('o',f"RVec<{dtype}>")
+                "type":('o',f"ROOT::VecOps::RVec<{dtype}>")
                 }
 
     def visit_Call(self, node: ast.Call):
