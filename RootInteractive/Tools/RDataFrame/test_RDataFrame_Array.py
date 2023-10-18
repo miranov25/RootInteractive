@@ -223,7 +223,7 @@ def test_define2(rdf):
     rdf = makeDefine("inv_arrayJoin_upper", "arrayJoin_1[:] < nPoints2 and array1DTPCTrack2[arrayJoin_1[:]].getZ() <= array1DTPCTrack[:].getZ()", rdf, None, 3)
     assert rdf.Sum("inv_arrayJoin").GetValue() == 0
     assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
-    rdf = makeDefine("arrayRollingMean1D0", "rollingMean(array1D0, 5, 0)[:-5]-array1D0[:]", rdf, None, 3)
+    rdf = makeDefine("arrayRollingMean1D0", "rollingSum(array1D0, 5, 0)[:-5]-array1D0[:]", rdf, None, 3)
     print(rdf.Sum("arrayRollingMean1D0").GetValue())
     return rdf
 
