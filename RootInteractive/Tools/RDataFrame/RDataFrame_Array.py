@@ -253,7 +253,7 @@ class RDataFrame_Visit:
             new_arr_size = f"{arr_name}.size()"
             qualifiers.append("_weighted")
             time_arr=self.visit(keywords["time"])
-            if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"]))[0] == 'o':
+            if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"])))[0] == 'o':
                 raise TypeError("Weights array for rolling sum must be of numeric data type"
             time_arr_name = f", time_arr['implementation']"
         new_helper_id = self.helpervar_idx
