@@ -21,7 +21,7 @@ std::vector<T> rolling_sum(InputIt first, InputIt last, size_t radius, T init){
   //TODO: Find out if it's automatically parallelized - should be, as it should find the "scan" operation
   //Algorithm works single threaded if operation is associative and has a left inverse, but parallel only works if op is also commutative and has an inverse
 template <class InputIt, class OutputIt, class T, class AddOp, class SubOp>
-void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kernel_width, T init, AddOp add, SubOp sub){
+OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kernel_width, T init, AddOp add, SubOp sub){
   InputIt window_end = first;
   for(;window_end < last && window_end < first + kernel_width; ++window_end){
 	  init = add(std::move(init), *window_end);
@@ -36,11 +36,12 @@ void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kernel_wi
 	  *d_first = init;
 	  ++d_first;
   }
-  for(;first < last; ++first){
+  for(;first+1 < last; ++first){
 	  init = sub(std::move(init), *first);
 	  *d_first = init;
 	  ++d_first;
   }
+  return d_first
 }
 
 template <class InputIt, class OutputIt, class T>
@@ -68,8 +69,8 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, size_t width, T init)
-	// compute the cumulative sum of difference
+OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, size_t width, T init){
+	// compute the differences
 	OutputIt d_last = d_first;
 	InputIt high = first+width;
 	InputIt low = first;
@@ -80,7 +81,32 @@ OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, si
 		high = high == last ? first : high;
 		++low;
 	}	
+	// now sum it up
 	return std::exclusive_scan(d_first, d_last, d_first, std::reduce(first, first+width)+init);
+}
+
+template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
+OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT radius, T init){
+	InputIt low = first;
+	InputIt high = first;
+	WeightsIt w_low = w_first;
+	WeightsIt w_high = w_first;
+	for(;first<last;++first){
+		while(high < last && *w_first + radius > *w_high){
+			init = std::move(init) + *high;
+			++high;
+			++w_high;
+		}
+		while(*w_first - radius > *w_low){
+			init = std::move(init) - *low;
+			++low;
+			++w_low;
+		}
+		*d_first = init;
+		++d_first;
+		++w_first;
+	}
+	return d_first;
 }
 
 #endif
