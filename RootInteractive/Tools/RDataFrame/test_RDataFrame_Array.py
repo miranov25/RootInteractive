@@ -225,7 +225,7 @@ def test_define2(rdf):
     assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
     rdf = makeDefine("arrayRollingSum1D0", "rollingSum(array1D0, 4, 0)[4:-4]/array1D0[2:-2]-1", rdf, None, 3)
     print(rdf.Mean("arrayRollingSum1D0").GetValue())
-    rdf = makeDefine("arrayRollingMean1D0", "rollingMean(array1D0, 5, 0)[4:-4]-array1D0[:]", rdf, None, 3)
+    rdf = makeDefine("arrayRollingMean1D0", "rollingMean(array1D0, 5, 0)[4:-4]-array1D0[2:-2]", rdf, None, 3)
     print(rdf.Sum("arrayRollingMean1D0").GetValue())
     return rdf
 
