@@ -227,6 +227,8 @@ def test_define2(rdf):
     print(rdf.Mean("arrayRollingSum1D0").GetValue())
     rdf = makeDefine("arrayRollingMean1D0", "rollingMean(array1D0, 5, 0)[4:-4]-array1D0[2:-2]", rdf, None, 3)
     print(rdf.Sum("arrayRollingMean1D0").GetValue())
+    rdf = makeDefine("arrayRollingMean1D1", "abs(rollingMean(array1D0, 2.5, time=array1D0)[:]-array1D0[:])", rdf, None, 3)
+    print(rdf.Sum("arrayRollingMean1D1").GetValue())
     return rdf
 
 def test_exception(rdf):

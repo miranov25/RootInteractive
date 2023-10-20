@@ -224,6 +224,8 @@ class RDataFrame_Visit:
             return self.visit_Attribute(node)
         elif isinstance(node, ast.Lambda):
             return self.visit_Lambda(node)
+        elif isinstance(node, ast.Keyword):
+            return self.visit_Keyword(node)
         raise NotImplementedError(node)
 
     def visit_Rolling(self, node: ast.Call):
@@ -243,11 +245,22 @@ class RDataFrame_Visit:
         if len(node.args) > 3:
             #TODO: Add code for custom add/sub functions
             pass
+        keywords = {i.arg:i.value for i in node.keywords}
+        new_arr_size = f"{arr_name}.size() + {width} - 1"
+        qualifiers = [] 
+        time_arr_name=""
+        if "time" in keywords:
+            new_arr_size = f"{arr_name}.size()"
+            qualifiers.append("_weighted")
+            time_arr=self.visit(keywords["time"])
+            if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"]))[0] == 'o':
+                raise TypeError("Weights array for rolling sum must be of numeric data type"
+            time_arr_name = f", time_arr['implementation']"
         new_helper_id = self.helpervar_idx
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
-ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({arr_name}.size() + {width} - 1);
-RootInteractive::rolling_sum({arr_name}.begin(), {arr_name}.end(), arr_{new_helper_id}.begin(), {width}, {init});
+ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
+RootInteractive::rolling_sum{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init});
         """))
         if node.func.id == "rollingMean":
             self.helpervar_stmt.append((0, f"""
