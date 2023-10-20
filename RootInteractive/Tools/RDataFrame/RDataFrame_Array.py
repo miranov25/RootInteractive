@@ -263,6 +263,12 @@ ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
 RootInteractive::rolling_sum{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init});
         """))
         if node.func.id == "rollingMean":
+            if "time" in keywords:
+                self.helpervar_stmt.append((0, f"""
+for(size_t i=0; i<{arr_name}.size(); ++i){{
+    arr_{new_helper_id}[i] /= 2*{width};
+}}
+                """)
             self.helpervar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){{
     arr_{new_helper_id}[i] /= i+1;

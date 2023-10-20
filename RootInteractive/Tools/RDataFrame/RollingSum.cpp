@@ -87,6 +87,7 @@ OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, si
 
 template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
 OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT radius, T init){
+	// Uses rolling window and nearest neighbor interpolation
 	InputIt low = first;
 	InputIt high = first;
 	WeightsIt w_low = w_first;
@@ -108,6 +109,7 @@ OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, Ou
 	}
 	return d_first;
 }
+
 }
 
 #endif
