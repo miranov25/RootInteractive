@@ -269,7 +269,8 @@ for(size_t i=0; i<{arr_name}.size(); ++i){{
     arr_{new_helper_id}[i] /= 2*{width};
 }}
                 """)
-            self.helpervar_stmt.append((0, f"""
+            else:
+                self.helpervar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){{
     arr_{new_helper_id}[i] /= i+1;
 }};
