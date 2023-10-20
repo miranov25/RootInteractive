@@ -44,7 +44,7 @@ void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kernel_wi
 }
 
 template <class InputIt, class OutputIt, class T>
-void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init){
+OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init){
   InputIt window_end = first;
   for(;window_end < last && window_end < first + radius; ++window_end){
 	  init = std::move(init) + *window_end;
@@ -59,13 +59,28 @@ void rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T
 	  *d_first = init;
 	  ++d_first;
   }
-  for(;first < last; ++first){
+  for(;first+1 < last; ++first){
 	  init = std::move(init) - *first;
 	  *d_first = init;
 	  ++d_first;
   }
+  return d_first
 }
 
+template <class InputIt, class OutputIt, class T>
+OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, size_t width, T init)
+	// compute the cumulative sum of difference
+	OutputIt d_last = d_first;
+	InputIt high = first+width;
+	InputIt low = first;
+	while(low<last){
+		*d_last = *high - *low; 
+		++d_last;
+		++high;
+		high = high == last ? first : high;
+		++low;
+	}	
+	return std::exclusive_scan(d_first, d_last, d_first, std::reduce(first, first+width)+init);
 }
 
 #endif
