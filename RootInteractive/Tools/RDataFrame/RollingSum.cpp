@@ -41,7 +41,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kerne
 	  *d_first = init;
 	  ++d_first;
   }
-  return d_first
+  return d_first;
 }
 
 template <class InputIt, class OutputIt, class T>
@@ -65,7 +65,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  *d_first = init;
 	  ++d_first;
   }
-  return d_first
+  return d_first;
 }
 
 template <class InputIt, class OutputIt, class T>
@@ -107,6 +107,7 @@ OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, Ou
 		++w_first;
 	}
 	return d_first;
+}
 }
 
 #endif
