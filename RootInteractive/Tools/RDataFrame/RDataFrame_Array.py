@@ -268,7 +268,7 @@ RootInteractive::rolling_sum{''.join(qualifiers)}({arr_name}.begin(), {arr_name}
 for(size_t i=0; i<{arr_name}.size(); ++i){{
     arr_{new_helper_id}[i] /= 2*{width};
 }}
-                """)
+                """))
             else:
                 self.helpervar_stmt.append((0, f"""
 for(size_t i=0; i<{width};++i){{
