@@ -713,8 +713,8 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     # 0.) Define function if does not exist yet
 
     try:
-        ROOT.gSystem.AddIncludePath("-l$RootInteractive/")
-        ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
+        ROOT.gSystem.AddIncludePath(" -I$RootInteractive/")
+        #ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
         logging.error(f'makeDefineRNode compilation of {funName} failed Implementation in {parsed["implemntation"]}')
