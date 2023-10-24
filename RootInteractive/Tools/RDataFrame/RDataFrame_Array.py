@@ -231,7 +231,7 @@ class RDataFrame_Visit:
     def visit_Rolling(self, node: ast.Call):
         if len(node.args) < 2:
             raise TypeError(f"Got {len(node.args)} arguments, expected 2")
-        self.headers["RollingSum"] = "#include \"RollingSum.cpp\"\n"
+        self.headers["RollingSum"] = "#include \"$RootInteractive/RootInteractive/Tools/RDataFrame/RollingSum.cpp\"\n"
         arr = self.visit(node.args[0])
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
