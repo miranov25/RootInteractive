@@ -231,7 +231,7 @@ class RDataFrame_Visit:
     def visit_Rolling(self, node: ast.Call):
         if len(node.args) < 2:
             raise TypeError(f"Got {len(node.args)} arguments, expected 2")
-        self.headers["RollingSum"] = "#include \"$RootInteractive/RootInteractive/Tools/RDataFrame/RollingSum.cpp\"\n"
+        self.headers["RollingSum"] = "#include \"RootInteractive/Tools/RDataFrame/RollingSum.cpp\"\n"
         arr = self.visit(node.args[0])
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
@@ -713,6 +713,7 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     # 0.) Define function if does not exist yet
 
     try:
+        ROOT.gSystem.AddIncludePath("-I$RootInteractive/")
         ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
