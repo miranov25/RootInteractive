@@ -713,7 +713,7 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     # 0.) Define function if does not exist yet
 
     try:
-        ROOT.gSystem.AddIncludePath(" -I$RootInteractive/")
+        ROOT.gSystem.AddIncludePath(" -I$RootInteractive/RootInteractive/Tools/RDataFrame/")
         #ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
