@@ -111,7 +111,7 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
   unsigned long n_skip = radius >> 1;
@@ -171,7 +171,7 @@ OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, si
 }
 
 template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
-OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT width, T init, bool center){
+OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT radius, T init, bool center){
 	// Uses rolling window and nearest neighbor interpolation
 	InputIt low = first;
 	InputIt high = first;
