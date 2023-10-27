@@ -246,10 +246,20 @@ class RDataFrame_Visit:
             #TODO: Add code for custom add/sub functions
             pass
         keywords = {i.arg:i.value for i in node.keywords}
-        new_arr_size = f"{arr_name}.size() + {width} - 1"
-        qualifiers = [] 
+        new_arr_size = f"{arr_name}.size()"
+        qualifiers = []
+        rollingStatistics = {
+                "rollingSum": "rolling_sum",
+                "rollingMean": "rolling_mean",
+                "rollingStd": "rolling_std"
+                }
         time_arr_name=""
+        rolling_statistic_name = rollingStatistics[node.func.id]
+        center = "false"
+        if "center" in keywords:
+            center = "true"
         if "time" in keywords:
+            rolling_statistic = "rolling_sum"
             new_arr_size = f"{arr_name}.size()"
             qualifiers.append("_weighted")
             time_arr=self.visit(keywords["time"])
@@ -260,7 +270,7 @@ class RDataFrame_Visit:
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
 ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
-RootInteractive::rolling_sum{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init});
+RootInteractive:{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
         """))
         if node.func.id == "rollingMean":
             if "time" in keywords:
@@ -269,18 +279,6 @@ for(size_t i=0; i<{arr_name}.size(); ++i){{
     arr_{new_helper_id}[i] /= 2*{width};
 }}
                 """))
-            else:
-                self.helpervar_stmt.append((0, f"""
-for(size_t i=0; i<{width};++i){{
-    arr_{new_helper_id}[i] /= i+1;
-}};
-for(size_t i={width};i<{arr_name}.size();++i){{
-    arr_{new_helper_id}[i] /= {width};
-}};
-for(size_t i={width}; i;--i){{
-    *(arr_{new_helper_id}.end()-i) /= i+1;
-}};
-            """))
         return {
                 "implementation":f"arr_{new_helper_id}",
                 "type":('o',f"ROOT::VecOps::RVec<{dtype}>")

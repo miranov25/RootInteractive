@@ -45,12 +45,17 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kerne
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init){
+OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
   InputIt window_end = first;
+  unsigned long count = 0;
+  unsigned long n_skip = radius >> 1;
   for(;window_end < last && window_end < first + radius; ++window_end){
 	  init = std::move(init) + *window_end;
-	  *d_first = init;
-	  ++d_first;
+	  if(count >= n_skip || !center){
+	  	*d_first = init;
+	  	++d_first;
+	  }
+	  ++count;
   }
   while(window_end < last){
 	  init = std::move(init) + *window_end;
@@ -60,9 +65,78 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  *d_first = init;
 	  ++d_first;
   }
-  for(;first+1 < last; ++first){
+  if(center){
+  	for(;count>0; --count){
+		  init = std::move(init) - *first;
+		  *d_first = init;
+		  ++d_first;
+ 	 }
+  }
+  return d_first;
+}
+
+template <class InputIt, class OutputIt, class T>
+OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+  InputIt window_end = first;
+  unsigned long count = 0;
+  unsigned long n_skip = radius >> 1;
+  for(;window_end < last && window_end < first + radius; ++window_end){
+	  init = std::move(init) + *window_end;
+	  if(count >= n_skip || !center){
+	  	*d_first = init / count;
+	  	++d_first;
+	  }
+	  ++count;
+  }
+  while(window_end < last){
+	  init = std::move(init) + *window_end;
 	  init = std::move(init) - *first;
-	  *d_first = init;
+	  ++first;
+	  ++window_end;
+	  *d_first = init / count;
+	  ++d_first;
+  }
+  if(center){
+  for(;count>0; --count){
+	  init = std::move(init) - *first;
+	  *d_first = init / count;
+	  ++d_first;
+  }
+  }
+  return d_first;
+}
+
+template <class InputIt, class OutputIt, class T>
+OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+  InputIt window_end = first;
+  unsigned long count = 0;
+  unsigned long n_skip = radius >> 1;
+  T sum_sq = init;
+  T cur;
+  for(;window_end < last && window_end < first + radius; ++window_end){
+	  cur = *window_end;
+	  init = std::move(init) + cur;
+	  sum_sq = std::move(sum_sq) + cur*cur;
+	  *d_first = (sum_sq-init*init/count)/count;
+	  ++d_first;
+  }
+  while(window_end < last){
+	  cur = *window_end;
+	  init = std::move(init) + cur;
+	  sum_sq = std::move(sum_sq) + cur*cur;
+	  cur = *first;
+	  init = std::move(init) - cur;
+	  sum_sq = std::move(sum_sq) - cur*cur;
+	  ++first;
+	  ++window_end;
+	  *d_first = (sum_sq-init*init/count)/count;
+	  ++d_first;
+  }
+  for(;count>0; --count){
+	  cur = *window_end;
+	  init = std::move(init) - cur;
+	  sum_sq = std::move(sum_sq) - cur*cur;
+	  *d_first = (sum_sq-init*init/count)/count;
 	  ++d_first;
   }
   return d_first;
