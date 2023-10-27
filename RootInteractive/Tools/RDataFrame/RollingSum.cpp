@@ -66,6 +66,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  ++d_first;
   }
   if(center){
+	  --count;
   	for(;count>n_skip; --count){
 		  init = std::move(init) - *first;
 		  ++first;
@@ -98,6 +99,7 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
 	  ++d_first;
   }
   if(center){
+	  --count;
   for(;count>n_skip; --count){
 	  init = std::move(init) - *first;
 	  ++first;
@@ -138,6 +140,7 @@ OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t 
 	  ++d_first;
   }
   if(center){
+	  --count;
   for(;count>n_skip; --count){
 	  cur = *window_end;
 	  init = std::move(init) - cur;
@@ -168,19 +171,20 @@ OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, si
 }
 
 template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
-OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT radius, T init){
+OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT width, T init, bool center){
 	// Uses rolling window and nearest neighbor interpolation
 	InputIt low = first;
 	InputIt high = first;
 	WeightsIt w_low = w_first;
 	WeightsIt w_high = w_first;
+	DistT off_low = center ? -radius : 0;
 	for(;first<last;++first){
 		while(high < last && *w_first + radius > *w_high){
 			init = std::move(init) + *high;
 			++high;
 			++w_high;
 		}
-		while(*w_first - radius > *w_low){
+		while(*w_first + off_low > *w_low){
 			init = std::move(init) - *low;
 			++low;
 			++w_low;
