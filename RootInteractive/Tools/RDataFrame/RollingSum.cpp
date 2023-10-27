@@ -68,6 +68,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
   if(center){
   	for(;count>0; --count){
 		  init = std::move(init) - *first;
+		  ++first;
 		  *d_first = init;
 		  ++d_first;
  	 }
@@ -99,6 +100,7 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
   if(center){
   for(;count>0; --count){
 	  init = std::move(init) - *first;
+	  ++first;
 	  *d_first = init / count;
 	  ++d_first;
   }
