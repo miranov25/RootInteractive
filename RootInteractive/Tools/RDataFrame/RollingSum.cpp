@@ -145,7 +145,7 @@ OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  cur = *window_end;
 	  init = std::move(init) - cur;
 	  sum_sq = std::move(sum_sq) - cur*cur;
-	  ++first
+	  ++first;
 	  *d_first = (sum_sq-init*init/count)/count;
 	  ++d_first;
   }
