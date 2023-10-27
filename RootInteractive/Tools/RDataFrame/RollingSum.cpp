@@ -81,12 +81,12 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
   unsigned long count = 0;
   unsigned long n_skip = radius >> 1;
   for(;window_end < last && window_end < first + radius; ++window_end){
+	  ++count
 	  init = std::move(init) + *window_end;
 	  if(count >= n_skip || !center){
 	  	*d_first = init / count;
 	  	++d_first;
 	  }
-	  ++count;
   }
   while(window_end < last){
 	  init = std::move(init) + *window_end;
