@@ -66,7 +66,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  ++d_first;
   }
   if(center){
-  	for(;count>0; --count){
+  	for(;count>n_skip; --count){
 		  init = std::move(init) - *first;
 		  ++first;
 		  *d_first = init;
@@ -98,7 +98,7 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
 	  ++d_first;
   }
   if(center){
-  for(;count>0; --count){
+  for(;count>n_skip; --count){
 	  init = std::move(init) - *first;
 	  ++first;
 	  *d_first = init / count;
@@ -120,8 +120,10 @@ OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t 
 	  cur = *window_end;
 	  init = std::move(init) + cur;
 	  sum_sq = std::move(sum_sq) + cur*cur;
-	  *d_first = (sum_sq-init*init/count)/count;
-	  ++d_first;
+	  if(count > n_skip || !center){
+	  	*d_first = (sum_sq-init*init/count)/count;
+	  	++d_first;
+	  }
   }
   while(window_end < last){
 	  cur = *window_end;
@@ -135,12 +137,15 @@ OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t 
 	  *d_first = (sum_sq-init*init/count)/count;
 	  ++d_first;
   }
-  for(;count>0; --count){
+  if(center){
+  for(;count>n_skip; --count){
 	  cur = *window_end;
 	  init = std::move(init) - cur;
 	  sum_sq = std::move(sum_sq) - cur*cur;
+	  ++first
 	  *d_first = (sum_sq-init*init/count)/count;
 	  ++d_first;
+  }
   }
   return d_first;
 }
