@@ -270,7 +270,7 @@ class RDataFrame_Visit:
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
 ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
-RootInteractive:{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
+RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
         """))
         if node.func.id == "rollingMean":
             if "time" in keywords:
