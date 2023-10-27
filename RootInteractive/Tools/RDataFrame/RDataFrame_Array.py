@@ -259,7 +259,7 @@ class RDataFrame_Visit:
         if "center" in keywords:
             center = "true"
         if "time" in keywords:
-            rolling_statistic = "rolling_sum"
+            rolling_statistic_name = "rolling_sum"
             new_arr_size = f"{arr_name}.size()"
             qualifiers.append("_weighted")
             time_arr=self.visit(keywords["time"])

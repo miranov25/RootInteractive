@@ -114,6 +114,7 @@ OutputIt rolling_variance(InputIt first, InputIt last, OutputIt d_first, size_t 
   T sum_sq = init;
   T cur;
   for(;window_end < last && window_end < first + radius; ++window_end){
+	  ++count;
 	  cur = *window_end;
 	  init = std::move(init) + cur;
 	  sum_sq = std::move(sum_sq) + cur*cur;
