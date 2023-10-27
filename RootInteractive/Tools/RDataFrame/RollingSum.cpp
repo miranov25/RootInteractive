@@ -51,7 +51,7 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
   unsigned long n_skip = radius >> 1;
   for(;window_end < last && window_end < first + radius; ++window_end){
 	  init = std::move(init) + *window_end;
-	  if(count >= n_skip || !center){
+	  if(count > n_skip || !center){
 	  	*d_first = init;
 	  	++d_first;
 	  }
@@ -84,7 +84,7 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
   for(;window_end < last && window_end < first + radius; ++window_end){
 	  ++count;
 	  init = std::move(init) + *window_end;
-	  if(count >= n_skip || !center){
+	  if(count > n_skip || !center){
 	  	*d_first = init / count;
 	  	++d_first;
 	  }
