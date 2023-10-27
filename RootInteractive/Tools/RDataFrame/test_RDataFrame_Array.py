@@ -231,7 +231,7 @@ def test_define2(rdf):
     print(rdf.Sum("arrayRollingMean1D1").GetValue())
     rdf = makeDefine("arrayRollingMean1D2", "abs(rollingMean(array1D0, 2.5, time=array1D0)[2:-2]-array1D0[2:-2])", rdf, None, 3)
     print(rdf.Sum("arrayRollingMean1D2").GetValue())
-    rdf = makeDefine("arrayRollingStd1D0", "abs(rollingStd(array1D0, 5)[2:-2]-10)", rdf, None, 3)
+    rdf = makeDefine("arrayRollingStd1D0", "abs(rollingStd(array1D0, 5)[2:-2]-2)", rdf, None, 3)
     print(rdf.Sum("arrayRollingStd1D0").GetValue())
     return rdf
 
