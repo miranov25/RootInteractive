@@ -223,6 +223,16 @@ def test_define2(rdf):
     rdf = makeDefine("inv_arrayJoin_upper", "arrayJoin_1[:] < nPoints2 and array1DTPCTrack2[arrayJoin_1[:]].getZ() <= array1DTPCTrack[:].getZ()", rdf, None, 3)
     assert rdf.Sum("inv_arrayJoin").GetValue() == 0
     assert rdf.Sum("inv_arrayJoin_upper").GetValue() == 0
+    rdf = makeDefine("arrayRollingSum1D0", "rollingSum(array1D0, 5, 0)[4:]/array1D0[2:-2]-1", rdf, None, 3)
+    print(rdf.Mean("arrayRollingSum1D0").GetValue())
+    rdf = makeDefine("arrayRollingMean1D0", "rollingMean(array1D0, 5, 0)[4:]-array1D0[2:-2]", rdf, None, 3)
+    print(rdf.Sum("arrayRollingMean1D0").GetValue())
+    rdf = makeDefine("arrayRollingMean1D1", "abs(rollingMean(array1D0, 5, 0, center=True)[2:-2]-array1D0[2:-2])", rdf, None, 3)
+    print(rdf.Sum("arrayRollingMean1D1").GetValue())
+    rdf = makeDefine("arrayRollingMean1D2", "abs(rollingMean(array1D0, 2.5, time=array1D0)[2:-2]-array1D0[2:-2])", rdf, None, 3)
+    print(rdf.Sum("arrayRollingMean1D2").GetValue())
+    rdf = makeDefine("arrayRollingStd1D0", "abs(rollingStd(array1D0, 5)[2:-2]-2)", rdf, None, 3)
+    print(rdf.Sum("arrayRollingStd1D0").GetValue())
     return rdf
 
 def test_exception(rdf):

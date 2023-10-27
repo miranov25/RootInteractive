@@ -186,6 +186,8 @@ class RDataFrame_Visit:
         self.closure = []
         self.range_checks = []
         self.helpervar_idx = 0
+        self.helpervar_stmt = []
+        self.headers = {} 
 
     def visit(self, node):
         if isinstance(node, ast.Call):
@@ -222,7 +224,65 @@ class RDataFrame_Visit:
             return self.visit_Attribute(node)
         elif isinstance(node, ast.Lambda):
             return self.visit_Lambda(node)
+        elif isinstance(node, ast.Keyword):
+            return self.visit_Keyword(node)
         raise NotImplementedError(node)
+
+    def visit_Rolling(self, node: ast.Call):
+        if len(node.args) < 2:
+            raise TypeError(f"Got {len(node.args)} arguments, expected 2")
+        self.headers["RollingSum"] = "#include \"RollingSum.cpp\""
+        arr = self.visit(node.args[0])
+        arr_name = arr["implementation"]
+        dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
+        width = self.visit(node.args[1])["implementation"]
+        if len(node.args) == 2:
+           init = "0"
+        else:
+            init = self.visit(node.args[2])["implementation"]
+        # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
+        # as making them commutative allows vectorization - default sum, mean and std are obviously commutative
+        if len(node.args) > 3:
+            #TODO: Add code for custom add/sub functions
+            pass
+        keywords = {i.arg:i.value for i in node.keywords}
+        new_arr_size = f"{arr_name}.size()"
+        qualifiers = []
+        rollingStatistics = {
+                "rollingSum": "rolling_sum",
+                "rollingMean": "rolling_mean",
+                "rollingStd": "rolling_std"
+                }
+        time_arr_name=""
+        rolling_statistic_name = rollingStatistics[node.func.id]
+        center = "false"
+        if "center" in keywords:
+            center = "true"
+        if "time" in keywords:
+            rolling_statistic_name = "rolling_sum"
+            new_arr_size = f"{arr_name}.size()"
+            qualifiers.append("_weighted")
+            time_arr=self.visit(keywords["time"])
+            if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"]), 1))[0] == 'o':
+                raise TypeError("Weights array for rolling sum must be of numeric data type")
+            time_arr_name = f", {time_arr['implementation']}.begin()"
+        new_helper_id = self.helpervar_idx
+        self.helpervar_idx += 1
+        self.helpervar_stmt.append((0, f"""
+ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
+RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
+        """))
+        if node.func.id == "rollingMean":
+            if "time" in keywords:
+                self.helpervar_stmt.append((0, f"""
+for(size_t i=0; i<{arr_name}.size(); ++i){{
+    arr_{new_helper_id}[i] /= 2*{width};
+}}
+                """))
+        return {
+                "implementation":f"arr_{new_helper_id}",
+                "type":('o',f"ROOT::VecOps::RVec<{dtype}>")
+                }
 
     def visit_Call(self, node: ast.Call):
         # Hack for passing lambdas into functions as arguments - arg types needed to make the lambda
@@ -244,6 +304,8 @@ class RDataFrame_Visit:
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
+        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd"]:
+            return self.visit_Rolling(node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)
         implementation = left['implementation'] + '('
@@ -336,7 +398,6 @@ class RDataFrame_Visit:
         if isinstance(op, ast.FloorDiv) and merged_dtype[0] == 'f':
             implementation = f"floor({implementation})"
         return {
-            "name": self.code,
             "implementation": implementation,
             "type": merged_dtype
         }
@@ -518,7 +579,8 @@ class RDataFrame_Visit:
 }} """,
 "type": array_type,
 "name": self.name,
-"dependencies": [i[0] for i in dependencies_list]
+"dependencies": [i[0] for i in dependencies_list],
+"headers": self.headers
         }
 
     def makeOuterLoop(self, depth:int, innerLoop:str, dtype:str):
@@ -532,7 +594,9 @@ class RDataFrame_Visit:
         next_level, array_type = self.makeOuterLoop(depth+1, innerLoop, dtype)
         array_type = f"ROOT::VecOps::RVec<{array_type}>"
         expr_f = f"result{depth_f_lower}[i{depth_f_lower}] = result{depth_f};" if depth>0 else ""
-        return f"""{array_type} result{depth_f}({self.n_iter[depth]});
+        return f"""
+    {''.join([i[1] for i in self.helpervar_stmt if i[0] == depth])}
+    {array_type} result{depth_f}({self.n_iter[depth]});
     for(size_t i{depth_f}=0; i{depth_f}<{self.n_iter[depth]}; i{depth_f}++){{
         {next_level}
     }}
@@ -647,6 +711,10 @@ def makeDefineRNode(columnName, funName, parsed,  rdf, verbose=1, flag=0x1):
     # 0.) Define function if does not exist yet
 
     try:
+        ROOT.gSystem.AddIncludePath(" -I$RootInteractive/RootInteractive/Tools/RDataFrame/")
+        for i in parsed["headers"].values():
+            ROOT.gInterpreter.ProcessLine(i)
+        #ROOT.gInterpreter.Declare( "".join(parsed["headers"].values()))
         ROOT.gInterpreter.Declare( parsed["implementation"])
     except:
         logging.error(f'makeDefineRNode compilation of {funName} failed Implementation in {parsed["implemntation"]}')
@@ -686,6 +754,7 @@ def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
     if verbose & 0x8:
         logging.info("makeDefine - evaluator",evaluator)
     parsed = evaluator.visit(t)
+
     if verbose>0:
         logging.info(f"{name} \n{code}")
 
@@ -707,7 +776,7 @@ def makeDefine(name, code, df, cppLibDictionary=None, verbose=3, flag=0x1):
 def makeLibrary(cppLib,outFile, includes=""):
     """
 
-    :param cppLib:   dictioanry optionaly filled in the makeDefine as c[[LibDictionary
+    :param cppLib:   dictioanry optionaly filled in the makeDefine as cppLibDictionary
     :param outFile:  output text file with cpp code
     :return:         output file - ROOT C++ macro which can be loaded or compiled as share library
     outFile="rdf.C"
