@@ -259,7 +259,6 @@ class RDataFrame_Visit:
         if "center" in keywords:
             center = "true"
         if "time" in keywords:
-            rolling_statistic_name = "rolling_sum"
             new_arr_size = f"{arr_name}.size()"
             qualifiers.append("_weighted")
             time_arr=self.visit(keywords["time"])
@@ -272,13 +271,6 @@ class RDataFrame_Visit:
 ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
 RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
         """))
-        if node.func.id == "rollingMean":
-            if "time" in keywords:
-                self.helpervar_stmt.append((0, f"""
-for(size_t i=0; i<{arr_name}.size(); ++i){{
-    arr_{new_helper_id}[i] /= 2*{width};
-}}
-                """))
         return {
                 "implementation":f"arr_{new_helper_id}",
                 "type":('o',f"ROOT::VecOps::RVec<{dtype}>")
