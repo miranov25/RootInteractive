@@ -75,7 +75,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 // TODO: If performance is bad, add a better algorithm than brute force
 template <class InputIt, class TimeIt, class OutputIt, class DistT>
 OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_first, DistT window, bool center){
-	std::vector<T> window_contents;
+	std::vector<InputIt> window_contents;
 	InputIt low = first;
 	InputIt high = first;
 	TimeIt t_low = t_first;
@@ -93,9 +93,9 @@ OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_
 		}
 		window_contents.clear();
 		for(InputIt j = low; j<high; ++j){
-			window_contents.push_back(*j);
+			window_contents.push_back(j);
 		}
-		std::nth_element(window_contents.begin(), window_contents.begin() + (high - low)/2, window_contents.end());
+		std::nth_element(window_contents.begin(), window_contents.begin() + (high - low)/2, window_contents.end(), [](InputIt a, InputIt b){return *a < *b;});
 		*d_first = *(window_contents.begin() + (high - low)/2);
 	       ++d_first;
 		++t_first;	       
