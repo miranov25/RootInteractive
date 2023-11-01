@@ -11,7 +11,7 @@ using size_t = decltype(sizeof 1);
 // For small windows, insertion sort has less overhead than the heap or Las Vegas algorithms
 template <class InputIt, class OutputIt>
 OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t window, bool center){
-	std::vector<InputIt> sorted(window);
+	std::vector<InputIt> sorted;
 	size_t rolling_pos = 0;
 	unsigned long count = 0;
 	unsigned long idx_insert;
@@ -19,7 +19,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 	InputIt window_end = first;
 	for(;window_end < last && window_end < first+window; ++window_end){
 		++count;
-		sorted[rolling_pos] = window_end;
+		sorted.push_back(window_end);
 		for(size_t insert_pos = rolling_pos; insert_pos > 0; --insert_pos){
 			if(*(sorted[insert_pos]-1) >= *sorted[insert_pos]){
 				break;
@@ -57,7 +57,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		}
 		++first;
 		++window_end;
-		*d_first = *sorted[rolling_pos/2];
+		*d_first = *sorted[window/2];
 		++d_first;
 	}
 	if(center){
