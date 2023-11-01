@@ -231,15 +231,19 @@ class RDataFrame_Visit:
     def visit_Rolling(self, node: ast.Call):
         if len(node.args) < 2:
             raise TypeError(f"Got {len(node.args)} arguments, expected 2")
-        self.headers["RollingSum"] = "#include \"RollingSum.cpp\""
+        if node.func.id in ["rollingSum", "rollingMean", "rollingStd"]:
+            self.headers["RollingSum"] = "#include \"RollingSum.cpp\""
+        else:
+            self.headers["RollingQuantile"] = "#include \"RollingQuantile.cpp\""
         arr = self.visit(node.args[0])
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
         width = self.visit(node.args[1])["implementation"]
-        if len(node.args) == 2:
-           init = "0"
-        else:
-            init = self.visit(node.args[2])["implementation"]
+        if node.func.id != "rollingMedian":
+            if len(node.args) == 2:
+                j=init = ", 0"
+            else
+                init = f', {self.visit(node.args[2])["implementation"]}'
         # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
         # as making them commutative allows vectorization - default sum, mean and std are obviously commutative
         if len(node.args) > 3:
@@ -251,7 +255,8 @@ class RDataFrame_Visit:
         rollingStatistics = {
                 "rollingSum": "rolling_sum",
                 "rollingMean": "rolling_mean",
-                "rollingStd": "rolling_std"
+                "rollingStd": "rolling_std",
+                "rollingMedian": "rolling_median"
                 }
         time_arr_name=""
         rolling_statistic_name = rollingStatistics[node.func.id]
@@ -269,7 +274,7 @@ class RDataFrame_Visit:
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
 ROOT::VecOps::RVec<{dtype}> arr_{new_helper_id}({new_arr_size});
-RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}, {init}, {center});
+RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(), {arr_name}.end(){time_arr_name}, arr_{new_helper_id}.begin(), {width}{init}, {center});
         """))
         return {
                 "implementation":f"arr_{new_helper_id}",
@@ -296,7 +301,7 @@ RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
-        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd"]:
+        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd", "rollingMedian"]:
             return self.visit_Rolling(node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)

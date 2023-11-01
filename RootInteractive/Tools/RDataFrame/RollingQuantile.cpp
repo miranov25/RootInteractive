@@ -1,3 +1,6 @@
+#ifndef ROOTINTERACTIVE_ROLLING_QUANTILE
+#define ROOTINTERACTIVE_ROLLING_QUANTILE
+
 #include <algorithm>
 #include <vector>
 
@@ -94,3 +97,5 @@ OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_
 	}
 	return d_first;
 }
+
+#endif
