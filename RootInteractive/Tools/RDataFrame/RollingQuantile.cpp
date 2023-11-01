@@ -9,7 +9,7 @@ namespace RootInteractive{
 using size_t = decltype(sizeof 1);
 
 // For small windows, insertion sort has less overhead than the heap or Las Vegas algorithms
-template <class InputIt, class OutputIt, class T>
+template <class InputIt, class OutputIt>
 OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t window, bool center){
 	std::vector<InputIt> sorted(window);
 	size_t rolling_pos = 0;
@@ -73,7 +73,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 }
 
 // TODO: If performance is bad, add a better algorithm than brute force
-template <class InputIt, class TimeIt, class OutputIt, class T, class DistT>
+template <class InputIt, class TimeIt, class OutputIt, class DistT>
 OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_first, DistT window, bool center){
 	std::vector<T> window_contents;
 	InputIt low = first;
