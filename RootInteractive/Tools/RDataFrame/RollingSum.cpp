@@ -49,8 +49,8 @@ template <class InputIt, class OutputIt, class T>
 OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t window, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
-  unsigned long n_skip = width >> 1;
-  for(;window_end < last && window_end < first + width; ++window_end){
+  unsigned long n_skip = window >> 1;
+  for(;window_end < last && window_end < first + window; ++window_end){
 	  init = std::move(init) + *window_end;
 	  if(count > n_skip || !center){
 	  	*d_first = init;
@@ -112,13 +112,13 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t wind
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t width, T init, bool center){
+OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t window, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
-  unsigned long n_skip = width >> 1;
+  unsigned long n_skip = window >> 1;
   T sum_sq = init;
   T cur;
-  for(;window_end < last && window_end < first + width; ++window_end){
+  for(;window_end < last && window_end < first + window; ++window_end){
 	  ++count;
 	  cur = *window_end;
 	  init = std::move(init) + cur;
