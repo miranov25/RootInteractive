@@ -242,7 +242,7 @@ class RDataFrame_Visit:
         if node.func.id != "rollingMedian":
             if len(node.args) == 2:
                 j=init = ", 0"
-            else
+            else:
                 init = f', {self.visit(node.args[2])["implementation"]}'
         # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
         # as making them commutative allows vectorization - default sum, mean and std are obviously commutative
