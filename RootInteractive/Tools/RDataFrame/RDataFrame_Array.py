@@ -239,9 +239,10 @@ class RDataFrame_Visit:
         arr_name = arr["implementation"]
         dtype = unpackScalarType(scalar_type_str(arr["type"]), 1)
         width = self.visit(node.args[1])["implementation"]
+        init = ""
         if node.func.id != "rollingMedian":
             if len(node.args) == 2:
-                j=init = ", 0"
+                init = ", 0"
             else:
                 init = f', {self.visit(node.args[2])["implementation"]}'
         # Args: array, kernel width, init (default value 0), optional pair of right add/left sub functions - required to be associative - TODO: Maybe specifying whether they are commutative is needed too
