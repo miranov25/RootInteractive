@@ -4,17 +4,18 @@
 #include <algorithm>
 #include <vector>
 
-using size_t = decltype(sizeof, 1);
+using size_t = decltype(sizeof 1);
 
 // For small windows, insertion sort has less overhead than the heap or Las Vegas algorithms
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t window){
+OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t window, bool center){
 	std::vector<InputIt> sorted(window);
 	size_t rolling_pos = 0;
 	unsigned long count = 0;
 	unsigned long idx_insert;
+	size_t n_skip = window >> 1;
 	InputIt window_end = first;
-	for(;window_end < last && window_end < first+radius; ++window_end){
+	for(;window_end < last && window_end < first+window; ++window_end){
 		++count;
 		sorted[rolling_pos] = window_end;
 		for(size_t insert_pos = rolling_pos; insert_pos > 0; --insert_pos){
@@ -29,26 +30,28 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			*d_first = *sorted[count/2];
 			++d_first;
 		}
+		++rolling_pos;
 		++window_end;
 	}
 	while(window_end < last){
-		for(size_t find=0; find<window; ++find){
-			if(sorted[find] == first){
-				sorted[find] = window_end;
+		size_t found;
+		for(found=0; found<window; ++found){
+			if(sorted[found] == first){
+				sorted[found] = window_end;
 				break;
 			}
 		}
-		while(find+1<window && *sorted[find+1] < *sorted[find]){
-			InputIt tmp = sorted[find];
-			sorted[find] = sorted[find+1];
-			sorted[find+1] = sorted[find];	
-			++find;
+		while(found+1<window && *sorted[found+1] < *sorted[found]){
+			InputIt tmp = sorted[found];
+			sorted[found] = sorted[found+1];
+			sorted[founf+1] = sorted[found];	
+			++found;
 		}
-		while(find>0 && *sorted[find-1] > *sorted[find]){
-			InputIt tmp = sorted[find];
-			sorted[find] = sorted[find-1];
-			sorted[find-1] = sorted[find];
-			--find;
+		while(found>0 && *sorted[found-1] > *sorted[found]){
+			InputIt tmp = sorted[found];
+			sorted[found] = sorted[found-1];
+			sorted[found-1] = sorted[found];
+			--found;
 		}
 		++first;
 		++window_end;
@@ -57,7 +60,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 	}
 	if(center){
 		for(--count;count>n_skip;count--){
-			sorted.erase(std::remove(sorted.begin(), sorted.end(), first);
+			sorted.erase(std::remove(sorted.begin(), sorted.end(), first));
 			++first;
 			*d_first = *sorted[count/2];
 			++d_first;
