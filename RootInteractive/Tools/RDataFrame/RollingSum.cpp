@@ -4,9 +4,9 @@
 #include <vector>
 #include <cmath>
 
-using size_t = decltype(sizeof 1);
-
 namespace RootInteractive {
+
+using size_t = decltype(sizeof 1);
 
 template <class InputIt, class T>
 std::vector<T> rolling_sum(InputIt first, InputIt last, size_t width, T init){

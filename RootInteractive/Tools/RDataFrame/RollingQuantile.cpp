@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <vector>
 
+namespace RootInteractive{
+
 using size_t = decltype(sizeof 1);
 
 // For small windows, insertion sort has less overhead than the heap or Las Vegas algorithms
@@ -44,7 +46,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		while(found+1<window && *sorted[found+1] < *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found+1];
-			sorted[founf+1] = sorted[found];	
+			sorted[found+1] = sorted[found];	
 			++found;
 		}
 		while(found>0 && *sorted[found-1] > *sorted[found]){
@@ -78,8 +80,8 @@ OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_
 	InputIt high = first;
 	TimeIt t_low = t_first;
 	TimeIt t_high = t_first;
-	DistT off_low = center ? -width/2 : 0;
-	DistT off_high = center ? width/2 : width;
+	DistT off_low = center ? -window/2 : 0;
+	DistT off_high = center ? window/2 : window;
 	for(;first<last;++first){
 		while(high > last && *t_first + off_high > *t_high){
 			++high;
@@ -99,6 +101,8 @@ OutputIt rolling_median(InputIt first, InputIt last, TimeIt t_first, OutputIt d_
 		++t_first;	       
 	}
 	return d_first;
+}
+
 }
 
 #endif
