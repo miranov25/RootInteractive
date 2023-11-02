@@ -38,7 +38,6 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		}
 		std::cout << std::endl;
 		++rolling_pos;
-		++window_end;
 	}
 	while(window_end < last){
 		size_t found;
