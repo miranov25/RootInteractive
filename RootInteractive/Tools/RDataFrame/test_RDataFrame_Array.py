@@ -234,9 +234,9 @@ def test_define2(rdf):
     rdf = makeDefine("arrayRollingStd1D0", "abs(rollingStd(array1D0, 5)[2:-2]-2)", rdf, None, 3)
     print(rdf.Sum("arrayRollingStd1D0").GetValue())
     rdf = makeDefine("arrayRollingMedian1D0", "abs(rollingMedian(array1D0, 7, center=True, time=array1D0)[3:-3] - array1D0[3:-3])", rdf, None, 3)
-    print rdf.Sum("arrayRollingMedian1D0").GetValue()
+    print(rdf.Sum("arrayRollingMedian1D0").GetValue())
     rdf = makeDefine("arrayRollingMedian1D1", "abs(rollingMedian(array1D0, 7, center=True)[3:-3] - array1D0[3:-3])", rdf, None, 3)
-    print rdf.Sum("arrayRollingMedian1D1").GetValue()
+    print(rdf.Sum("arrayRollingMedian1D1").GetValue())
     return rdf
 
 def test_exception(rdf):
