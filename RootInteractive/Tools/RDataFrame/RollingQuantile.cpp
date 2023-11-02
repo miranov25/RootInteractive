@@ -33,6 +33,10 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			*d_first = *sorted[count/2];
 			++d_first;
 		}
+		for(auto insert_pos = sorted.begin(); insert_pos < sorted.end(); ++insert_pos){
+			std::cout << *insert_pos - first;
+		}
+		std::cout << std::endl;
 		++rolling_pos;
 		++window_end;
 	}
