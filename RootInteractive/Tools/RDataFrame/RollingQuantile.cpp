@@ -22,7 +22,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		++count;
 		sorted.push_back(window_end);
 		for(auto insert_pos = sorted.end()-1; insert_pos > sorted.begin(); --insert_pos){
-			if(*(insert_pos-1) >= *insert_pos){
+			if(*(insert_pos-1) <= *insert_pos){
 				break;
 			}
 			InputIt tmp = *insert_pos;
