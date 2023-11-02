@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <vector>
-#include <iostream>
 
 namespace RootInteractive{
 
@@ -33,37 +32,28 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			*d_first = *sorted[count/2];
 			++d_first;
 		}
-		for(auto insert_pos = sorted.begin(); insert_pos < sorted.end(); ++insert_pos){
-			std::cout << *insert_pos - first;
-		}
-		std::cout << std::endl;
 		++rolling_pos;
 	}
 	while(window_end < last){
 		size_t found;
 		for(found=0; found<window; ++found){
-			std::cout << sorted[found] - first << " ";
 			if(sorted[found] == first){
 				sorted[found] = window_end;
 				break;
 			}
 		}
-		std::cout << found << std::endl;
 		while(found+1<window && *sorted[found+1] < *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found+1];
 			sorted[found+1] = tmp;	
 			++found;
-			std::cout << sorted[found] - first << " ";
 		}
-		std::cout << found << std::endl;
 		while(found>0 && *sorted[found-1] > *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found-1];
 			sorted[found-1] = tmp;
 			--found;
 		}
-		std::cout << found << std::endl;
 		++first;
 		++window_end;
 		*d_first = *sorted[count/2];
