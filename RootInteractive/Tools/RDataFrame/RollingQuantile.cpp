@@ -34,7 +34,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		}
 		++rolling_pos;
 		++window_end;
-	}
+	}/*
 	while(window_end < last){
 		size_t found;
 		for(found=0; found<window; ++found){
@@ -67,7 +67,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			*d_first = *sorted[count/2];
 			++d_first;
 		}
-	}
+	}*/
 	return d_first;
 
 }
