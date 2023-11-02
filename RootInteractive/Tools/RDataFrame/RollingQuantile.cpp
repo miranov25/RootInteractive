@@ -84,7 +84,7 @@ OutputIt rolling_median_weighted(InputIt first, InputIt last, TimeIt t_first, Ou
 	DistT off_low = center ? -window/2 : 0;
 	DistT off_high = center ? window/2 : window;
 	for(;first<last;++first){
-		while(high > last && *t_first + off_high > *t_high){
+		while(high < last && *t_first + off_high > *t_high){
 			++high;
 			++t_high;
 		}	
