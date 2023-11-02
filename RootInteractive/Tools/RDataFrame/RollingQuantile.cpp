@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <iostream>
 
 namespace RootInteractive{
 
@@ -96,6 +97,7 @@ OutputIt rolling_median_weighted(InputIt first, InputIt last, TimeIt t_first, Ou
 			window_contents.push_back(j);
 		}
 		std::nth_element(window_contents.begin(), window_contents.begin() + (high - low)/2, window_contents.end(), [](InputIt a, InputIt b){return *a < *b;});
+		std::cout << high-low << std::endl;
 		*d_first = **(window_contents.begin() + (high - low)/2);
 	       ++d_first;
 		++t_first;	       
