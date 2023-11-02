@@ -51,6 +51,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			sorted[found] = sorted[found+1];
 			sorted[found+1] = tmp;	
 			++found;
+			std::cout << sorted[found] - first << " ";
 		}
 		std::cout << found << std::endl;
 		while(found>0 && *sorted[found-1] > *sorted[found]){
