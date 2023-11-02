@@ -35,7 +35,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		}
 		++rolling_pos;
 		++window_end;
-	}/*
+	}
 	while(window_end < last){
 		size_t found;
 		for(found=0; found<window; ++found){
@@ -44,6 +44,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 				break;
 			}
 		}
+		std::cout << found << std::endl;
 		while(found+1<window && *sorted[found+1] < *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found+1];
@@ -68,7 +69,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			*d_first = *sorted[count/2];
 			++d_first;
 		}
-	}*/
+	}
 	return d_first;
 
 }
@@ -97,7 +98,6 @@ OutputIt rolling_median_weighted(InputIt first, InputIt last, TimeIt t_first, Ou
 			window_contents.push_back(j);
 		}
 		std::nth_element(window_contents.begin(), window_contents.begin() + (high - low)/2, window_contents.end(), [](InputIt a, InputIt b){return *a < *b;});
-		std::cout << high-low << std::endl;
 		*d_first = **(window_contents.begin() + (high - low)/2);
 	       ++d_first;
 		++t_first;	       
