@@ -20,13 +20,11 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 	for(;window_end < last && window_end < first+window; ++window_end){
 		++count;
 		sorted.push_back(window_end);
-		for(size_t insert_pos = rolling_pos; insert_pos > 0; --insert_pos){
-			if(*(sorted[insert_pos]-1) >= *sorted[insert_pos]){
+		for(auto insert_pos = sorted.end()-1; insert_pos > sorted.begin(); --insert_pos){
+			if(*(insert_pos-1) >= *insert_pos){
 				break;
 			}
-			InputIt tmp = sorted[insert_pos-1];
-			sorted[insert_pos-1] = sorted[insert_pos];
-			sorted[insert_pos] = tmp;
+			std::swap(insert_pos, insert_pos-1);
 		}
 		if(count > n_skip || !center){
 			*d_first = *sorted[count/2];

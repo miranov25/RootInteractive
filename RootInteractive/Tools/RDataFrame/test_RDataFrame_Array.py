@@ -233,7 +233,7 @@ def test_define2(rdf):
     print(rdf.Sum("arrayRollingMean1D2").GetValue())
     rdf = makeDefine("arrayRollingStd1D0", "abs(rollingStd(array1D0, 5)[2:-2]-2)", rdf, None, 3)
     print(rdf.Sum("arrayRollingStd1D0").GetValue())
-    rdf = makeDefine("arrayRollingMedian1D0", "abs(rollingMedian(array1D0, 7)[3:-3] - array1D0[2:-2])", rdf, None, 3)
+    rdf = makeDefine("arrayRollingMedian1D0", "abs(rollingMedian(array1D0, 7)[3:-3] - array1D0[2:-2], time=array1D0)", rdf, None, 3)
     assert rdf.Sum("arrayRollingMedian1D0").GetValue() == 0
     return rdf
 
