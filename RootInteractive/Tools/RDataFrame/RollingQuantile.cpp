@@ -27,7 +27,7 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			}
 			InputIt tmp = *insert_pos;
 			*insert_pos = *(insert_pos-1);
-			insert_pos[-1] = *insert_pos;
+			insert_pos[-1] = tmp;
 		}
 		if(count > n_skip || !center){
 			*d_first = *sorted[count/2];
@@ -49,13 +49,13 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 		while(found+1<window && *sorted[found+1] < *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found+1];
-			sorted[found+1] = sorted[found];	
+			sorted[found+1] = tmp;	
 			++found;
 		}
 		while(found>0 && *sorted[found-1] > *sorted[found]){
 			InputIt tmp = sorted[found];
 			sorted[found] = sorted[found-1];
-			sorted[found-1] = sorted[found];
+			sorted[found-1] = tmp;
 			--found;
 		}
 		++first;
