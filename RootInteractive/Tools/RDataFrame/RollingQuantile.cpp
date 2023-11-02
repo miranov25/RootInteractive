@@ -24,7 +24,9 @@ OutputIt rolling_median(InputIt first, InputIt last, OutputIt d_first, size_t wi
 			if(*(insert_pos-1) >= *insert_pos){
 				break;
 			}
-			std::swap(insert_pos, insert_pos-1);
+			InputIt tmp = *insert_pos;
+			*insert_pos = *(insert_pos-1);
+			insert_pos[-1] = *insert_pos;
 		}
 		if(count > n_skip || !center){
 			*d_first = *sorted[count/2];
