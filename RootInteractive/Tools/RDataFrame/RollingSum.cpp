@@ -1,21 +1,22 @@
-#include <vector>
-
 #ifndef ROOTINTERACTIVE_ROLLING_SUM
 #define ROOTINTERACTIVE_ROLLING_SUM
 
-using size_t = decltype(sizeof 1);
+#include <vector>
+#include <cmath>
 
 namespace RootInteractive {
 
+using size_t = decltype(sizeof 1);
+
 template <class InputIt, class T>
-std::vector<T> rolling_sum(InputIt first, InputIt last, size_t radius, T init){
+std::vector<T> rolling_sum(InputIt first, InputIt last, size_t width, T init){
 	std::vector<T> result(last-first);
 	InputIt window_end = first;
 
 	return result;
 }
 
-  //size_t arr_size = radius < last - first ? last-first+radius : 2*(last-first)-1;
+  //size_t arr_size = width < last - first ? last-first+radius : 2*(last-first)-1;
   //std::vector<T> result(arr_size);
   //
   //TODO: Find out if it's automatically parallelized - should be, as it should find the "scan" operation
@@ -45,11 +46,11 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t kerne
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t window, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
-  unsigned long n_skip = radius >> 1;
-  for(;window_end < last && window_end < first + radius; ++window_end){
+  unsigned long n_skip = window >> 1;
+  for(;window_end < last && window_end < first + window; ++window_end){
 	  init = std::move(init) + *window_end;
 	  if(count > n_skip || !center){
 	  	*d_first = init;
@@ -78,11 +79,11 @@ OutputIt rolling_sum(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t window, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
-  unsigned long n_skip = radius >> 1;
-  for(;window_end < last && window_end < first + radius; ++window_end){
+  unsigned long n_skip = window >> 1;
+  for(;window_end < last && window_end < first + window; ++window_end){
 	  ++count;
 	  init = std::move(init) + *window_end;
 	  if(count > n_skip || !center){
@@ -111,19 +112,19 @@ OutputIt rolling_mean(InputIt first, InputIt last, OutputIt d_first, size_t radi
 }
 
 template <class InputIt, class OutputIt, class T>
-OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t radius, T init, bool center){
+OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t window, T init, bool center){
   InputIt window_end = first;
   unsigned long count = 0;
-  unsigned long n_skip = radius >> 1;
+  unsigned long n_skip = window >> 1;
   T sum_sq = init;
   T cur;
-  for(;window_end < last && window_end < first + radius; ++window_end){
+  for(;window_end < last && window_end < first + window; ++window_end){
 	  ++count;
 	  cur = *window_end;
 	  init = std::move(init) + cur;
 	  sum_sq = std::move(sum_sq) + cur*cur;
 	  if(count > n_skip || !center){
-	  	*d_first = (sum_sq-init*init/count)/count;
+	  	*d_first = std::sqrt((sum_sq-init*init/count)/count);
 	  	++d_first;
 	  }
   }
@@ -136,7 +137,7 @@ OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  sum_sq = std::move(sum_sq) - cur*cur;
 	  ++first;
 	  ++window_end;
-	  *d_first = (sum_sq-init*init/count)/count;
+	  *d_first = std::sqrt((sum_sq-init*init/count)/count);
 	  ++d_first;
   }
   if(center){
@@ -146,7 +147,7 @@ OutputIt rolling_std(InputIt first, InputIt last, OutputIt d_first, size_t radiu
 	  init = std::move(init) - cur;
 	  sum_sq = std::move(sum_sq) - cur*cur;
 	  ++first;
-	  *d_first = (sum_sq-init*init/count)/count;
+	  *d_first = std::sqrt((sum_sq-init*init/count)/count);
 	  ++d_first;
   }
   }
@@ -171,15 +172,16 @@ OutputIt rolling_sum_symmetric(InputIt first, InputIt last, OutputIt d_first, si
 }
 
 template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
-OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT radius, T init, bool center){
+OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT width, T init, bool center){
 	// Uses rolling window and nearest neighbor interpolation
 	InputIt low = first;
 	InputIt high = first;
 	WeightsIt w_low = w_first;
 	WeightsIt w_high = w_first;
-	DistT off_low = center ? -radius : 0;
+	DistT off_low = center ? -width/2 : 0;
+	DistT off_high = center ? width/2 : width;
 	for(;first<last;++first){
-		while(high < last && *w_first + radius > *w_high){
+		while(high < last && *w_first + off_high > *w_high){
 			init = std::move(init) + *high;
 			++high;
 			++w_high;
@@ -190,6 +192,70 @@ OutputIt rolling_sum_weighted(InputIt first, InputIt last, WeightsIt w_first, Ou
 			++w_low;
 		}
 		*d_first = init;
+		++d_first;
+		++w_first;
+	}
+	return d_first;
+}
+
+template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
+OutputIt rolling_mean_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT width, T init, bool center){
+	// Uses rolling window and nearest neighbor interpolation
+	InputIt low = first;
+	InputIt high = first;
+	WeightsIt w_low = w_first;
+	WeightsIt w_high = w_first;
+	DistT off_low = center ? -width/2 : 0;
+	DistT off_high = center ? width/2 : width;
+	long count = 0;
+	for(;first<last;++first){
+		while(high < last && *w_first + off_high > *w_high){
+			++count;
+			init = std::move(init) + *high;
+			++high;
+			++w_high;
+		}
+		while(*w_first + off_low > *w_low){
+			--count;
+			init = std::move(init) - *low;
+			++low;
+			++w_low;
+		}
+		*d_first = init / count;
+		++d_first;
+		++w_first;
+	}
+	return d_first;
+}
+
+template <class InputIt, class WeightsIt, class OutputIt, class T, class DistT>
+OutputIt rolling_std_weighted(InputIt first, InputIt last, WeightsIt w_first, OutputIt d_first, DistT width, T init, bool center){
+	// Uses rolling window and nearest neighbor interpolation
+	InputIt low = first;
+	InputIt high = first;
+	WeightsIt w_low = w_first;
+	WeightsIt w_high = w_first;
+	DistT off_low = center ? -width/2 : 0;
+	DistT off_high = center ? width/2 : width;
+	long count = 0;
+	T sum_sq = init;
+	T cur;
+	for(;first<last;++first){
+		while(high < last && *w_first + off_high > *w_high){
+			cur = *high;
+			init = std::move(init) + cur;
+			sum_sq += cur*cur;
+			++high;
+			++w_high;
+		}
+		while(*w_first + off_low > *w_low){
+			cur = *low;
+			init = std::move(init) - *low;
+			sum_sq -= cur*cur;
+			++low;
+			++w_low;
+		}
+		*d_first = std::sqrt((sum_sq-init*init/count)/count);
 		++d_first;
 		++w_first;
 	}
