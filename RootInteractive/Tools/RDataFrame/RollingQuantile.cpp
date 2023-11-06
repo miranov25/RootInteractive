@@ -172,6 +172,43 @@ OutputIt rolling_quantile(InputIt first, InputIt last, OutputIt d_first, size_t 
 
 }
 
+// TODO: If performance is bad, add a better algorithm than brute force
+template <class InputIt, class TimeIt, class OutputIt, class DistT>
+OutputIt rolling_quantile_weighted(InputIt first, InputIt last, TimeIt t_first, OutputIt d_first, DistT window, double quantile, bool center){
+	std::vector<InputIt> window_contents;
+	InputIt low = first;
+	InputIt high = first;
+	TimeIt t_low = t_first;
+	TimeIt t_high = t_first;
+	DistT off_low = center ? -window/2 : 0;
+	DistT off_high = center ? window/2 : window;
+	// Sanity checks on quantile to prevent buffer overflow
+	if(quantile >= 1.){
+		quantile = 1.;
+	}
+	if(quantile <= 0. || quantile != quantile){
+		quantile = 0.;
+	}
+	for(;first<last;++first){
+		while(high < last && *t_first + off_high > *t_high){
+			++high;
+			++t_high;
+		}	
+		while(*t_first + off_low > *t_low){
+			++low;
+			++t_low;
+		}
+		window_contents.clear();
+		for(InputIt j = low; j<high; ++j){
+			window_contents.push_back(j);
+		}
+		std::nth_element(window_contents.begin(), window_contents.begin() + (size_t)((high - low)*quantile), window_contents.end(), [](InputIt a, InputIt b){return *a < *b;});
+		*d_first = **(window_contents.begin() + (size_t)((high - low)*quantile));
+	       ++d_first;
+		++t_first;	       
+	}
+	return d_first;
+}
 
 }
 
