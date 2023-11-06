@@ -257,7 +257,8 @@ class RDataFrame_Visit:
                 "rollingSum": "rolling_sum",
                 "rollingMean": "rolling_mean",
                 "rollingStd": "rolling_std",
-                "rollingMedian": "rolling_median"
+                "rollingMedian": "rolling_median",
+                "rollingQuantile": "rolling_quantile"
                 }
         time_arr_name=""
         rolling_statistic_name = rollingStatistics[node.func.id]
@@ -271,6 +272,8 @@ class RDataFrame_Visit:
             if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"]), 1))[0] == 'o':
                 raise TypeError("Weights array for rolling sum must be of numeric data type")
             time_arr_name = f", {time_arr['implementation']}.begin()"
+        if rolling_statistic_name == "rolling_quantile":
+            init = f'self.visit(keywords["quantile"])["value"]'
         new_helper_id = self.helpervar_idx
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""

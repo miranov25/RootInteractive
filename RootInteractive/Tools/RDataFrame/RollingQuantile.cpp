@@ -102,6 +102,70 @@ OutputIt rolling_median_weighted(InputIt first, InputIt last, TimeIt t_first, Ou
 	return d_first;
 }
 
+// For small windows, insertion sort has less overhead than the heap or Las Vegas algorithms
+template <class InputIt, class OutputIt>
+OutputIt rolling_quantile(InputIt first, InputIt last, OutputIt d_first, size_t window, double quantile, bool center){
+	std::vector<InputIt> sorted;
+	size_t rolling_pos = 0;
+	unsigned long count = 0;
+	unsigned long idx_insert;
+	size_t n_skip = window >> 1;
+	InputIt window_end = first;
+	for(;window_end < last && window_end < first+window; ++window_end){
+		++count;
+		sorted.push_back(window_end);
+		for(auto insert_pos = sorted.end()-1; insert_pos > sorted.begin(); --insert_pos){
+			if(*(insert_pos-1) <= *insert_pos){
+				break;
+			}
+			InputIt tmp = *insert_pos;
+			*insert_pos = insert_pos[-1];
+			insert_pos[-1] = tmp;
+		}
+		if(count > n_skip || !center){
+			*d_first = *sorted[(size_t)(count*quantile)];
+			++d_first;
+		}
+		++rolling_pos;
+	}
+	while(window_end < last){
+		size_t found;
+		for(found=0; found<window; ++found){
+			if(sorted[found] == first){
+				sorted[found] = window_end;
+				break;
+			}
+		}
+		while(found+1<window && *sorted[found+1] < *sorted[found]){
+			InputIt tmp = sorted[found];
+			sorted[found] = sorted[found+1];
+			sorted[found+1] = tmp;	
+			++found;
+		}
+		while(found>0 && *sorted[found-1] > *sorted[found]){
+			InputIt tmp = sorted[found];
+			sorted[found] = sorted[found-1];
+			sorted[found-1] = tmp;
+			--found;
+		}
+		++first;
+		++window_end;
+		*d_first = *sorted[(size_t)(count*quantile)];
+		++d_first;
+	}
+	if(center){
+		for(--count;count>n_skip;count--){
+			sorted.erase(std::remove(sorted.begin(), sorted.end(), first));
+			++first;
+			*d_first = *sorted[(size_t)(count*quantile)];
+			++d_first;
+		}
+	}
+	return d_first;
+
+}
+
+
 }
 
 #endif
