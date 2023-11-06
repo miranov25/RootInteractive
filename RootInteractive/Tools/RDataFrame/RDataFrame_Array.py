@@ -273,7 +273,7 @@ class RDataFrame_Visit:
                 raise TypeError("Weights array for rolling sum must be of numeric data type")
             time_arr_name = f", {time_arr['implementation']}.begin()"
         if rolling_statistic_name == "rolling_quantile":
-            init = f'self.visit(keywords["quantile"])["value"]'
+            init = f', {self.visit(keywords["quantile"])["value"]}'
         new_helper_id = self.helpervar_idx
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
