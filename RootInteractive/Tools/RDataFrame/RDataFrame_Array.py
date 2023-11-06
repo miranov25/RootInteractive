@@ -305,7 +305,7 @@ RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
-        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd", "rollingMedian"]:
+        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd", "rollingMedian", "rollingQuantile"]:
             return self.visit_Rolling(node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)

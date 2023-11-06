@@ -110,6 +110,13 @@ OutputIt rolling_quantile(InputIt first, InputIt last, OutputIt d_first, size_t 
 	unsigned long count = 0;
 	unsigned long idx_insert;
 	size_t n_skip = window >> 1;
+	// Sanity checks on quantile to prevent buffer overflow
+	if(quantile >= 1.){
+		quantile = 1.;
+	}
+	if(quantile <= 0. || quantile != quantile){
+		quantile = 0.;
+	}
 	InputIt window_end = first;
 	for(;window_end < last && window_end < first+window; ++window_end){
 		++count;
