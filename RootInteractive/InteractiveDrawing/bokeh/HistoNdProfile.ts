@@ -167,19 +167,30 @@ export class HistoNdProfile extends ColumnarDataSource {
               entries_total += entries
               if(entries > 0){
                 let mean = 0
+		let std = 0
+		let entries_ = 0
                 if(unbinned){
+		  let old_mean = 0
                   for (let y = 0; y < stride_high; y+= stride_low) {
                     const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
                     const index_high = global_cumulative_histogram![x+y+z]
                     if(sorted_weights == null){
                       for(let i=index_low; i < index_high; ++i){
-                        if (isFinite(sorted_entries![i]))
-                        mean += sorted_entries![i]
+                        if (isFinite(sorted_entries![i])){
+				entries_ ++
+				old_mean = mean
+				mean += (sorted_entries![i] - mean) / entries_
+				std += (sorted_entries![i] - mean) * (sorted_entries![i] - old_mean)
+			}
                       }
                     } else {
                       for(let i=index_low; i < index_high; ++i){
-                        if (isFinite(sorted_entries![i]))
-                        mean += sorted_entries![i] * sorted_weights[i]
+                        if (isFinite(sorted_entries![i])){
+				entries_ += sorted_weights[i]
+				old_mean = mean
+                        	mean += (sorted_entries![i] - mean) * sorted_weights[i] / entries_
+				std += (sorted_entries![i] - mean) * (sorted_entries![i] - old_mean) * sorted_weights[i]
+			}
                       }
                     }
                   }
@@ -188,29 +199,8 @@ export class HistoNdProfile extends ColumnarDataSource {
                   for (let y = 0; y < stride_high; y+= stride_low) {
                     mean += bin_count[x+y+z] * bin_centers[x+y+z]
                   }
-                }
-                let std = 0
-                mean /= entries
-                if(unbinned){
-                  for (let y = 0; y < stride_high; y+= stride_low) {
-                    const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
-                    const index_high = global_cumulative_histogram![x+y+z]
-                    if(sorted_weights == null){
-                      for(let i=index_low; i < index_high; ++i){
-                        if (isFinite(sorted_entries![i]))
-                        std += sorted_entries![i] * sorted_entries![i]
-                      }
-                    } else {
-                      for(let i=index_low; i < index_high; ++i){
-                        if (isFinite(sorted_entries![i]))
-                        std += sorted_entries![i] * sorted_entries![i] * sorted_weights[i]
-                      }
-                    }
-                  }
-                  std -= mean*mean*entries
-                } else 
-                {
-                  for (let y = 0; y < stride_high; y+= stride_low) {
+		  mean /= entries
+                   for (let y = 0; y < stride_high; y+= stride_low) {
                     std += (bin_centers[x+y+z] - mean) * (bin_centers[x+y+z] - mean) * bin_count[x+y+z]
                   }
                 }
