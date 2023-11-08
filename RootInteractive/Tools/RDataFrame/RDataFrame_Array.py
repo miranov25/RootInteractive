@@ -257,7 +257,8 @@ class RDataFrame_Visit:
                 "rollingSum": "rolling_sum",
                 "rollingMean": "rolling_mean",
                 "rollingStd": "rolling_std",
-                "rollingMedian": "rolling_median"
+                "rollingMedian": "rolling_median",
+                "rollingQuantile": "rolling_quantile"
                 }
         time_arr_name=""
         rolling_statistic_name = rollingStatistics[node.func.id]
@@ -271,6 +272,8 @@ class RDataFrame_Visit:
             if scalar_type(unpackScalarType(scalar_type_str(time_arr["type"]), 1))[0] == 'o':
                 raise TypeError("Weights array for rolling sum must be of numeric data type")
             time_arr_name = f", {time_arr['implementation']}.begin()"
+        if rolling_statistic_name == "rolling_quantile":
+            init = f', {self.visit(keywords["quantile"])["value"]}'
         new_helper_id = self.helpervar_idx
         self.helpervar_idx += 1
         self.helpervar_stmt.append((0, f"""
@@ -302,7 +305,7 @@ RootInteractive::{rolling_statistic_name}{''.join(qualifiers)}({arr_name}.begin(
                 return {"type":('u',64), "implementation":f"({bsearch_names[node.func.id]}({searched_arr['implementation']}.begin(), {searched_arr['implementation']}.end(), {query['implementation']}, {cmp['implementation']})-{searched_arr['implementation']}.begin())"}
            else:
                raise TypeError(f"Expected 2 or 3 arguments, got {len(node.args)}")
-        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd", "rollingMedian"]:
+        elif isinstance(node.func, ast.Name) and node.func.id in ["rollingSum", "rollingMean", "rollingStd", "rollingMedian", "rollingQuantile"]:
             return self.visit_Rolling(node)
         args = [self.visit(iArg) for iArg in node.args]
         left = self.visit_func(node.func, args)
