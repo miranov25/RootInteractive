@@ -1,6 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {ColumnDataSource} from "models/sources/column_data_source"
-import {RIFilter} from "./RIFilter"
+import {Model} from "model"
 import * as p from "core/properties"
 //import { kth_value, weighted_kth_value } from "./MathUtils"
 
@@ -8,8 +7,8 @@ export namespace HistogramCDS {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnarDataSource.Props & {
-    source: p.Property<ColumnDataSource>
-    filter: p.Property<RIFilter | null>
+    source: p.Property<ColumnarDataSource>
+    filter: p.Property<any>
     nbins:        p.Property<number>
     range:    p.Property<number[] | null>
     sample:      p.Property<string>
@@ -29,11 +28,11 @@ export class HistogramCDS extends ColumnarDataSource {
 
   static __name__ = "HistogramCDS"
 
-  static init_HistogramCDS() {
+  static {
 
     this.define<HistogramCDS.Props>(({Ref, Number, Array, Nullable, String, Any})=>({
-      source:  [Ref(ColumnDataSource)],
-      filter:         [Nullable(Ref(RIFilter)), null],
+      source:  [Ref(ColumnarDataSource)],
+      filter:         [Nullable(Ref(Model)), null],
       nbins:        [Number],
       range:    [Nullable(Array(Number))],
       sample:      [String],

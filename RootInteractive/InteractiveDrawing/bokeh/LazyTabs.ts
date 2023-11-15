@@ -1,12 +1,12 @@
 import {Tabs, TabsView} from "models/layouts/tabs"
-import { DownsamplerCDS } from "./DownsamplerCDS"
+import {Model} from "model"
 import * as p from "core/properties"
 
 export namespace LazyTabs {
     export type Attrs = p.AttrsOf<Props>
   
     export type Props = Tabs.Props & {
-      renderers: p.Property<(DownsamplerCDS | LazyTabs)[][]>
+      renderers: p.Property<any[][]>
       watched: p.Property<boolean>
     }
   }
@@ -22,18 +22,12 @@ export namespace LazyTabs {
       super(attrs)
     }
   
-    // The ``__name__`` class attribute should generally match exactly the name
-    // of the corresponding Python class. Note that if using TypeScript, this
-    // will be automatically filled in during compilation, so except in some
-    // special cases, this shouldn't be generally included manually, to avoid
-    // typos, which would prohibit serialization/deserialization of this model.
     static __name__ = "LazyTabs"
   
-    static init_LazyTabs() {
-      // This is usually boilerplate. In some cases there may not be a view.
+    static {
       this.prototype.default_view = TabsView
-      this.define<LazyTabs.Props>(({Ref, Array, Or, Boolean})=>({
-        renderers:  [Array(Array(Or(Ref(LazyTabs), Ref(DownsamplerCDS))))],
+      this.define<LazyTabs.Props>(({Ref, Array, Boolean})=>({
+        renderers:  [Array(Array(Ref(Model)))],
         watched: [Boolean, true]
       }))
       }
@@ -45,13 +39,13 @@ export namespace LazyTabs {
         if(this.renderers == null){
           this.renderers = tabs.map(_=>[])
         }
-        for(let i=0; i<this.renderers.length; i++){
-          for(let j=0; j<this.renderers[i].length; j++){
+        for(let i=0; i < this.renderers.length; i++){
+          for(let j=0; j <this.renderers[i].length; j++){
             this.renderers[i][j].watched = false
             this.renderers[i][j].on_visible_change()
           }
         }
-        for(let j=0; j<this.renderers[active].length; j++){
+        for(let j=0; j < this.renderers[active].length; j++){
           this.renderers[active][j].watched = watched
           this.renderers[active][j].on_visible_change()
         } 

@@ -26,11 +26,11 @@ export class MultiSelectFilter extends RIFilter {
 
   static __name__ = "MultiSelectFilter"
 
-  static init_MultiSelectFilter() {
-    this.define<MultiSelectFilter.Props>(({Ref, Int, Array, String})=>({
+  static {
+    this.define<MultiSelectFilter.Props>(({Ref, Int, Array, String, Any})=>({
       source:  [Ref(ColumnarDataSource)],
       selected:    [ Array(String), [] ],
-      mapping:    [p.Instance],
+      mapping:    [Any],
       mask: [Int, -1],
       field: [String],
       how: [String, "any"]
@@ -77,10 +77,10 @@ export class MultiSelectFilter extends RIFilter {
     if (how == "whitelist"){
         const accepted_codes = selected.map((a: string) => mapping[a])
         let count=0
-        for(let i=0; i<col.length; i++){
+        for(let i=0; i <col.length; i++){
             const x = col[i]
             let isOK = false
-            for(let j=0; j<accepted_codes.length; j++){
+            for(let j=0; j <accepted_codes.length; j++){
               if(accepted_codes[j] == x){
                 isOK = true
                 break
@@ -96,22 +96,22 @@ export class MultiSelectFilter extends RIFilter {
     }
     const mask_new = selected.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
     if (how == "any"){
-        for(let i=0; i<col.length; i++){
+        for(let i=0; i <col.length; i++){
           const x = col[i] as number
           new_vector[i] = (x & mask_new) != 0
         }
     } else if(how == "all"){
-      for(let i=0; i<col.length; i++){
+      for(let i=0; i <col.length; i++){
         const x = col[i] as number
         new_vector[i] = (x & mask_new) == mask_new
       }
     } else if(how == "neither"){
-      for(let i=0; i<col.length; i++){
+      for(let i=0; i <col.length; i++){
         const x = col[i] as number
         new_vector[i] = (x & mask_new) == 0
       }
     } else if(how == "eq"){
-      for(let i=0; i<col.length; i++){
+      for(let i=0; i <col.length; i++){
         const x = col[i] as number
         new_vector[i] = x == mask_new
       }

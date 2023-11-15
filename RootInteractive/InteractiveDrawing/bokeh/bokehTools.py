@@ -6,14 +6,15 @@ from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.widgets.markups import Div
 from bokeh.models.plots import Plot
-from bokeh.transform import *
+from bokeh.transform import factor_mark, factor_cmap
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.pandaTools import initMetadata
-from bokeh.layouts import *
+from bokeh.models.layouts import TabPanel
+from bokeh.layouts import row, column, gridplot
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner, Panel
+from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
@@ -33,6 +34,7 @@ from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
+from RootInteractive.Tools.aliTreePlayer import initMetadata
 import numpy as np
 import pandas as pd
 import re
@@ -115,7 +117,7 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
         renderers = []
         for i, iPanel in widgetLayoutDesc.items():
             child, childRenderers = processBokehLayoutArrayRenderers(iPanel, widgetArray, widgetDict)
-            tabs.append(Panel(child=child, title=i))
+            tabs.append(TabPanel(child=child, title=i))
             renderers.append(childRenderers)
         tabsModel.tabs = tabs
         tabsModel.renderers = renderers
@@ -173,9 +175,9 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
                 if i > 0: figure.yaxis.visible = False
         if hasattr(figure, 'plot_width'):
             if "plot_width" in optionLocal:
-                figure.plot_width = int(optionLocal["plot_width"] / nRows)
+                figure.width = int(optionLocal["plot_width"] / nRows)
             if "plot_height" in optionLocal:
-                figure.plot_height = optionLocal["plot_height"]
+                figure.height = optionLocal["plot_height"]
             if figure.legend:
                 figure.legend.visible = optionLocal["legend_visible"]
         else:
@@ -844,7 +846,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 plotDict[optionLocal["name"]] = plotI
             continue
         else:
-            figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
+            figureI = figure(width=options['plot_width'], height=options['plot_height'], 
                              tools=options['tools'], x_axis_type=options['x_axis_type'],
                              y_axis_type=options['y_axis_type'])
             figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
@@ -1271,22 +1273,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(iFilter, RangeFilter):
                     widgetTypes.append("range")
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
-                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},null);
-                    """))
+                    if selectionCDS is not None:
+                        iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},{});
+                        """))
                 elif isinstance(iWidget["filter"], MultiSelectFilter):
                     widgetTypes.append(f"multiselect ({iFilter.how})")
                     widgetValues.append(f"{{{', '.join(iFilter.selected)}}}")
-                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},null);
-                    """))
+                    if selectionCDS is not None:
+                        iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},{});
+                        """))
                 elif isinstance(iWidget["filter"], ColumnFilter):
                     widgetTypes.append("expression")
                     if iFilter.field in aliasDict[iCds]:
                         widgetValues.append(aliasDict[iCds][iFilter.field]["transform"].func)
-                        aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                            target.patch({"value": [[i, this.func ]]},null);
-                        """))
+                        if selectionCDS is not None:
+                            aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                                target.patch({"value": [[i, this.func ]]},{});
+                            """))
                     else:
                         widgetValues.append("true")
                 i += 1

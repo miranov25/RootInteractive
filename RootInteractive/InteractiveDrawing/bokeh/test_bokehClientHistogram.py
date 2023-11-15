@@ -4,8 +4,9 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import ge
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
+from bokeh.transform import factor_mark, factor_cmap, linear_cmap
 
-df = pd.DataFrame(np.random.random_sample(size=(20000, 4)), columns=list('ABCD'))
+df = pd.DataFrame(np.random.random_sample(size=(500000, 4)), columns=list('ABCD'))
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )

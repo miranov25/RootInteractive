@@ -1,5 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {HistoNdCDS} from "./HistoNdCDS"
+import {Model} from "model"
 import * as p from "core/properties"
 import { kth_value, weighted_kth_value } from "./MathUtils"
 
@@ -7,7 +7,7 @@ export namespace HistoNdProfile {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnarDataSource.Props & {
-    source: p.Property<HistoNdCDS>
+    source: p.Property<any>
     axis_idx: p.Property<number>
     quantiles: p.Property<number[]>
     sum_range: p.Property<number[][]>
@@ -29,10 +29,10 @@ export class HistoNdProfile extends ColumnarDataSource {
 
   static __name__ = "HistoNdProfile"
 
-  static init_HistoNdProfile() {
+  static {
 
     this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int, Boolean, String, Nullable, Or})=>({
-      source:  [Ref(HistoNdCDS)],
+      source:  [Ref(Model)],
       axis_idx: [Int, 0],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       sum_range: [Array(Array(Number)), []],

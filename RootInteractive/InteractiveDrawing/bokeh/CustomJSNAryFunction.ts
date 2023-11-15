@@ -7,8 +7,8 @@ export namespace CustomJSNAryFunction {
   export type Props = Model.Props & {
     parameters: p.Property<Record<string, any>>
     fields: p.Property<Array<string>>
-    func: p.Property<string>
-    v_func: p.Property<string>
+    func: p.Property<string | null>
+    v_func: p.Property<string | null>
   }
 }
 
@@ -23,12 +23,12 @@ export class CustomJSNAryFunction extends Model {
 
   static __name__ = "CustomJSNAryFunction"
 
-  static init_CustomJSNAryFunction() {
-    this.define<CustomJSNAryFunction.Props>(({Array, String})=>({
-      parameters:  [p.Instance, {}],
+  static {
+    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable})=>({
+      parameters:  [Any, {}],
       fields: [Array(String), []],
-      func:    [ String ],
-      v_func:  [String]
+      func:    [ Nullable(String), null ],
+      v_func:  [Nullable(String), null]
     }))
   }
 
