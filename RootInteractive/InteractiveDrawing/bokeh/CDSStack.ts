@@ -46,8 +46,11 @@ export class CDSStack extends ColumnarDataSource {
     super.connect_signals()
     for (let i=0; i < this.sources.length; i++){
         this.connect(this.sources[i].change, () => {
+		if(this._selected.has(i)){
 		    this._selected_invalid = true
-		    this.change.emit()})
+		    this.change.emit()
+		}
+	})
     }
     this.connect(this.properties.activeSources.change, () => {
 		this._selected_invalid = true

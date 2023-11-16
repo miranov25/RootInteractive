@@ -1930,7 +1930,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         if weightsOrig == weightsNew:
                             i.js_link("weights", cdsProfile, "weights")
                         projections.append(cdsProfile)
-                    cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, activeSources=cdsOrig.activeSources)
+                    cdsMultiProfile = CDSStack(sources=projections, mapping=cdsOrig.mapping, name=cdsName, activeSources=cdsOrig.activeSources)
                     cdsOrig.js_link("activeSources", cdsMultiProfile, "activeSources")
                     iCds["cdsOrig"] = cdsMultiProfile
                     iCds["sources"] = cdsDict[source]["sources"]
@@ -1994,7 +1994,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         sample_value[multi_axis[1]] = i
                     cdsOrig = HistoNdCDS(source=source, sample_variables=sample_value.copy(), weights=weights_value, name=f"{cdsName}[{i}]", nbins=nbins_value, range=range_value)
                     histogramsLocal.append(cdsOrig)
-                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=[str(i) for i in paramDict[acc]["value"]], mapping={str(value):i for (i, value) in enumerate(histoOptions)})
+                cdsOrig = CDSStack(sources=histogramsLocal, name=cdsName, activeSources=[str(i) for i in paramDict[acc]["value"]], mapping={str(value):i for (i, value) in enumerate(histoOptions)})
                 iCds["cdsOrig"] = cdsOrig
                 paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
             for binsIdx, iBins in enumerate(nbins):
@@ -2039,7 +2039,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             elif isinstance(mapping, dict):
                 sourcesInverse = {value:i for i,value in enumerate(iSource["sources_all"])}
                 mappingNew = {i:sourcesInverse[value] for (i, value) in mapping.items()}
-            iSource["cdsOrig"] = CDSStack(sources=sourcesObjs, mapping=mappingNew, activeSources=iSource["active"])
+            iSource["cdsOrig"] = CDSStack(sources=sourcesObjs, mapping=mappingNew, name=cdsName, activeSources=iSource["active"])
             if "tooltips" not in iSource:
                 tooltipsOrig = cdsDict[iSource["sources_all"][0]].get("tooltips", None)
                 if tooltipsOrig is not None:
@@ -2098,7 +2098,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         sample_value = i
                     cdsOrig = HistogramCDS(source=source, sample=sample_value, weights=weights_value, name=f"{cdsName}_{i}", nbins=nbins_value, range=range_value)
                     histogramsLocal.append(cdsOrig)
-                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], mapping={value:i for (i, value) in enumerate(histoOptions)})
+                cdsOrig = CDSStack(sources=histogramsLocal, activeSources=paramDict[acc]["value"], name=cdsName, mapping={value:i for (i, value) in enumerate(histoOptions)})
                 paramDict[acc]["subscribed_events"].append(["value", cdsOrig, "activeSources"])
                 iSource["cdsOrig"] = cdsOrig
             if "source" not in iSource:
