@@ -499,7 +499,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     let cumulativeHistogram = [...histogram]
     let acc = 0
     let l = histogram.length
-    for (let i=0; i<l; i++){
+    for (let i=0; i < l; i++){
       acc += histogram[i]
       cumulativeHistogram[i] = acc
     }
