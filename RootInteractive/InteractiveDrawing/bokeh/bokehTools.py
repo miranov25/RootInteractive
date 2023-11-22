@@ -566,7 +566,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             continue
         elif variables[0] == 'div':
             text_content = optionLocal.get("text", variables[1])
-            widget = Div(text=text_content)
+            widget = Div(text=text_content, sizing_mode=optionLocal.get("sizing_mode", "inherit"))
             plotArray.append(widget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
@@ -674,7 +674,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 active = False
                 if optionWidget["callback"] == "parameter":
                     active = paramDict[variables[1][0]]["value"]
-                localWidget = Toggle(label=label, active=active)
+                localWidget = Toggle(label=label, active=active, sizing_mode="stretch_width")
                 widgetFull = localWidget
             if variables[0] == 'spinner':
                 label = variables[1][0]
@@ -684,7 +684,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     value = paramDict[variables[1][0]]["value"]
                 formatter = optionWidget.get("format", "0.[0000]")
-                localWidget = Spinner(title=label, value=value, format=formatter)
+                localWidget = Spinner(title=label, value=value, format=formatter, sizing_mode="stretch_width")
                 widgetFull = localWidget
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
@@ -696,8 +696,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if step == 0:
                     zero_step = True
                     step = 1
-                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
-                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
+                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter, sizing_mode="stretch_width")
+                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter, sizing_mode="stretch_width")
                 if zero_step:
                     localWidgetMin.disabled = True
                     localWidgetMax.disabled = True
@@ -721,7 +721,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         """))
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
-                widgetToggle = Toggle(label="disable", active=True, width=70)
+                widgetToggle = Toggle(label="disable", active=True, width=70, sizing_mode="stretch_width")
                 widgetFilter.active = False
                 if variables[0] == 'spinnerRange':
                     localWidgetMin.disabled = True
@@ -762,7 +762,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionWidget.update(variables[-1])
             cds_used = optionWidget.get("source", None)
             # By default, uses all named variables from the data source - but they can't be known at this point yet
-            localWidget = TextAreaInput(**optionWidget)
+            localWidget = TextAreaInput(sizing_mode="scale_width", **optionWidget)
             widgetName = optionWidget.get("name", f"$widget_{len(plotArray)}")
             plotArray.append(localWidget)
             plotDict[widgetName] = localWidget
@@ -783,7 +783,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 2:
                 optionWidget.update(variables[-1])
             value = paramDict[variables[1][0]]["value"]
-            localWidget = TextAreaInput(value=value, **optionWidget)
+            localWidget = TextAreaInput(value=value, sizing_mode="scale_width", **optionWidget)
             plotArray.append(localWidget)
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = localWidget
