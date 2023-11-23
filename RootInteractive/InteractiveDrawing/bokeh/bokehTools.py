@@ -907,7 +907,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         color_axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
                     color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-                    if optionLocal.get("showColorAxisTitle", False):
+                    if optionLocal.get("showColorAxisTitle", True):
                         color_axis_title_model = makeAxisLabelFromTemplate(color_axis_title, paramDict, meta)
                         applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
