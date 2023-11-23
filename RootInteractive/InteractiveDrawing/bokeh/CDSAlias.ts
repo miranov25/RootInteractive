@@ -192,7 +192,7 @@ export class CDSAlias extends ColumnarDataSource {
   invalidate_columns(keys: string[], emit_change=true){
     let watched_changed = false
     for(const key of keys){
-      const did_change = this.invalidae_column(key, false)
+      const did_change = this.invalidate_column(key, false)
       watched_changed = watched_changed || did_change
     }
     if(watched_changed && emit_change){
