@@ -521,7 +521,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     for(let i=0; i<working_indices.length; i++){
       working_indices[i] -= histogram[i]
     }
-    const view_sorted: number[] = Array(n_entries)
+    const view_sorted: number[] = Array(n_entries).fill(0)
     const l = view != null ? view.length : source.get_length()!
     if(view == null){
       for(let i=0; i<l; i++){
