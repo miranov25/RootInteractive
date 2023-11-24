@@ -1,5 +1,4 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
-from RootInteractive.Tools.aliTreePlayer import *
 from bokeh.io import curdoc
 import os
 import sys
@@ -11,6 +10,7 @@ import math
 
 if "ROOT" in sys.modules:
     from ROOT import TFile, gSystem
+    from RootInteractive.Tools.aliTreePlayer import *
 
 output_file("test_bokehDrawSA.html")
 # import logging
