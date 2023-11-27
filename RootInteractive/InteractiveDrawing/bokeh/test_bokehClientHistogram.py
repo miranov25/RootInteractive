@@ -1,5 +1,4 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
-from RootInteractive.Tools.aliTreePlayer import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio, getDefaultVarsNormAll
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters

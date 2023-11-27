@@ -9,7 +9,7 @@ from bokeh.models.plots import Plot
 from bokeh.transform import *
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
-from RootInteractive.Tools.aliTreePlayer import *
+from RootInteractive.Tools.pandaTools import initMetadata
 from bokeh.layouts import *
 import logging
 from IPython import get_ipython
