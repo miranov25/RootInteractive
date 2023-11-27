@@ -34,7 +34,6 @@ from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
-from RootInteractive.Tools.aliTreePlayer import initMetadata
 import numpy as np
 import pandas as pd
 import re
@@ -111,8 +110,15 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
     return processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray, widgetDict, isHorizontal, options)[0]
 
 def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
+    if options is None:
+        options = {
+            'commonX': -1, 'commonY': -1,
+            'x_visible': 1, 'y_visible': 1,
+            'sizing_mode': 'scale_width',
+            'legend_visible': True
+        }
     if isinstance(widgetLayoutDesc, dict):
-        tabsModel = LazyTabs()
+        tabsModel = LazyTabs(sizing_mode=options.get("sizing_mode", "scale_width"))
         tabs = []
         renderers = []
         for i, iPanel in widgetLayoutDesc.items():
@@ -122,13 +128,6 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
         tabsModel.tabs = tabs
         tabsModel.renderers = renderers
         return tabsModel, [tabsModel]
-    if options is None:
-        options = {
-            'commonX': -1, 'commonY': -1,
-            'x_visible': 1, 'y_visible': 1,
-            'sizing_mode': 'scale_width',
-            'legend_visible': True
-        }
 
     widgetRows = []
     nRows = len(widgetArray)
@@ -841,7 +840,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         else:
             figureI = figure(width=options.get("plot_width", 600), height=options.get("plot_height", 400),
                     tools=options['tools'], x_axis_type=options['x_axis_type'],
-                             y_axis_type=options['y_axis_type'])
+                             y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"))
             figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
             figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
             figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
