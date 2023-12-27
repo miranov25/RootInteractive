@@ -881,7 +881,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
                         low = np.nanmin(cdsDict[cds_name]["data"][varColor["name"]])
                         high= np.nanmax(cdsDict[cds_name]["data"][varColor["name"]])
-                        mapperC = linear_cmap(field_name=varColor["name"], palette=palette, low=low, high=high)
+                        mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=palette, low=low, high=high)}
                     else:
                         if varColor["name"] in colorMapperDict:
                             mapperC = colorMapperDict[varColor["name"]]

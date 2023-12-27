@@ -27,15 +27,15 @@ export class CDSJoin extends ColumnarDataSource {
 
   static __name__ = "CDSJoin"
 
-  static init_CDSJoin() {
+  static {
     this.define<CDSJoin.Props>(({Ref, Array, String, Number})=>({
       left:  [Ref(ColumnarDataSource)],
       right: [Ref(ColumnarDataSource)],
       on_left: [ Array(String), [] ],
       on_right: [ Array(String), [] ],
-      prefix_left: [String],
-      prefix_right: [String],
-      how: [ String ],
+      prefix_left: [String, ""],
+      prefix_right: [String, ""],
+      how: [ String, "inner" ],
       tolerance: [Number, 1e-5]
     }))
   }
