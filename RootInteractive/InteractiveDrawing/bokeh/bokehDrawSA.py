@@ -181,7 +181,7 @@ class bokehDrawSA(object):
         #self.Widgets = self.initWidgets(widgetString)
         if isinstance(self.widgetLayout, list) or isinstance(self.widgetLayout, dict):
             widgetList=processBokehLayoutArray(self.widgetLayout, self.plotArray[nFigures:], self.plotDict)
-        self.pAll=gridplotRow([self.figure, widgetList], sizing_mode=self.options.get('sizing_mode', 'inherit'))
+        self.pAll=gridplotRow([self.figure, widgetList], sizing_mode=self.options.get('sizing_mode', 'scale_width'))
         self.widgetList=widgetList
         #self.pAll=column([self.figure,widgetList],sizing_mode=self.options['sizing_mode'])
         self.handle=show(self.pAll,notebook_handle=self.isNotebook)
