@@ -20,7 +20,7 @@ export class LazyIntersectionFilter extends RIFilter {
 
   static __name__ = "LazyIntersectionFilter"
 
-  static init_LazyIntersectionFilter() {
+  static {
     this.define<LazyIntersectionFilter.Props>(({Ref, Array})=>({
       filters:  [Array(Ref(RIFilter)), []],
     }))

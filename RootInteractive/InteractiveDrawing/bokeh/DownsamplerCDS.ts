@@ -1,22 +1,21 @@
-import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {CDSAlias} from "./CDSAlias"
-import {RIFilter} from "./RIFilter"
+import {ColumnDataSource} from "models/sources/column_data_source"
+import {Model} from "model"
 import * as p from "core/properties"
 
 export namespace DownsamplerCDS {
   export type Attrs = p.AttrsOf<Props>
 
-  export type Props = ColumnarDataSource.Props & {
-    source: p.Property<CDSAlias>
+  export type Props = ColumnDataSource.Props & {
+    source: p.Property<any>
     nPoints: p.Property<number>
     watched: p.Property<boolean>
-    filter: p.Property<null|RIFilter>
+    filter: p.Property<any>
   }
 }
 
 export interface DownsamplerCDS extends DownsamplerCDS.Attrs {}
 
-export class DownsamplerCDS extends ColumnarDataSource {
+export class DownsamplerCDS extends ColumnDataSource {
   properties: DownsamplerCDS.Props
 
   constructor(attrs?: Partial<DownsamplerCDS.Attrs>) {
@@ -25,12 +24,12 @@ export class DownsamplerCDS extends ColumnarDataSource {
 
   static __name__ = "DownsamplerCDS"
 
-  static init_DownsamplerCDS() {
+  static {
     this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean, Nullable})=>({
-      source:  [Ref(CDSAlias)],
+      source:  [Ref(Model)],
       nPoints:    [ Int, 300 ],
       watched: [Boolean, true],
-      filter: [Nullable(Ref(RIFilter)), null]
+      filter: [Nullable(Ref(Model)), null]
     }))
   }
 
@@ -52,6 +51,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     super.initialize()
     this.booleans = null
     this._indices = []
+    this._downsampled_indices = []
     this.data = {}
     this.low = 0
     this.high = -1
@@ -64,7 +64,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
     const {_indices, source} = this
     _indices.length = source.get_length()!
     // Fisher-Yates random permutation
-    for(let i=0; i<_indices.length; ++i){
+    for(let i=0; i <_indices.length; ++i){
       let random_index = (Math.random()*(i+1)) | 0
       _indices[i] = i
       _indices[i] = _indices[random_index]
@@ -138,7 +138,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
   update_selection(){
     if(this._is_trivial) return
     const downsampled_indices = this.data.index
-    const selected_indices = this.selected.indices.map((x:number)=>downsampled_indices[x])
+    const selected_indices = Array.from(this.selected.indices).map((x:number)=>downsampled_indices[x])
     selected_indices.sort((a,b)=>a-b)
     const original_indices = this.source.selected.indices
     // TODO: Change original CDS selection indices
@@ -195,7 +195,7 @@ export class DownsamplerCDS extends ColumnarDataSource {
       new_column = Array(_downsampled_indices.length)
     }
     if(new_column.length < _downsampled_indices.length) new_column.length = _downsampled_indices.length
-    for(let i=0; i<_downsampled_indices.length; i++){
+    for(let i=0; i <_downsampled_indices.length; i++){
       new_column[i] = column_orig[_downsampled_indices[i]]
     }
     data[columnName] = new_column

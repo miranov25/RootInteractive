@@ -27,10 +27,10 @@ export class CDSAlias extends ColumnarDataSource {
 
   _locked_columns: Set<string>
 
-  static init_CDSAlias() {
+  static {
     this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref})=>({
       source:  [Ref(ColumnarDataSource)],
-      mapping:    [ p.Instance, {} ],
+      mapping:    [ Any, {} ],
       includeOrigColumns: [Boolean, true],
       columnDependencies: [Array(Any), []]
     }))

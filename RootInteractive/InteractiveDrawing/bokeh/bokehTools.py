@@ -6,14 +6,15 @@ from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.widgets.tables import ScientificFormatter, DataTable
 from bokeh.models.widgets.markups import Div
 from bokeh.models.plots import Plot
-from bokeh.transform import *
+from bokeh.transform import factor_mark, factor_cmap
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.pandaTools import initMetadata
-from bokeh.layouts import *
+from bokeh.models.layouts import TabPanel
+from bokeh.layouts import row, column, gridplot
 import logging
 from IPython import get_ipython
-from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner, Panel
+from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner
 from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
@@ -109,17 +110,6 @@ def processBokehLayoutArray(widgetLayoutDesc, widgetArray: list, widgetDict: dic
     return processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray, widgetDict, isHorizontal, options)[0]
 
 def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widgetDict: dict={}, isHorizontal: bool=False, options: dict=None):
-    if isinstance(widgetLayoutDesc, dict):
-        tabsModel = LazyTabs()
-        tabs = []
-        renderers = []
-        for i, iPanel in widgetLayoutDesc.items():
-            child, childRenderers = processBokehLayoutArrayRenderers(iPanel, widgetArray, widgetDict)
-            tabs.append(Panel(child=child, title=i))
-            renderers.append(childRenderers)
-        tabsModel.tabs = tabs
-        tabsModel.renderers = renderers
-        return tabsModel, [tabsModel]
     if options is None:
         options = {
             'commonX': -1, 'commonY': -1,
@@ -127,6 +117,17 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
             'sizing_mode': 'scale_width',
             'legend_visible': True
         }
+    if isinstance(widgetLayoutDesc, dict):
+        tabsModel = LazyTabs(sizing_mode=options.get("sizing_mode", "scale_width"))
+        tabs = []
+        renderers = []
+        for i, iPanel in widgetLayoutDesc.items():
+            child, childRenderers = processBokehLayoutArrayRenderers(iPanel, widgetArray, widgetDict)
+            tabs.append(TabPanel(child=child, title=i))
+            renderers.append(childRenderers)
+        tabsModel.tabs = tabs
+        tabsModel.renderers = renderers
+        return tabsModel, [tabsModel]
 
     widgetRows = []
     nRows = len(widgetArray)
@@ -158,6 +159,8 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
         else:
             figure = widgetDict[iWidget]
         widgetRows.append(figure)
+        # if hasattr(figure, 'sizing_mode'):
+        #    figure.sizing_mode = options['sizing_mode']
         if hasattr(figure, 'x_range'):
             if optionLocal['commonX'] >= 0:
                 figure.x_range = widgetArray[int(optionLocal["commonX"])].x_range
@@ -171,18 +174,12 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
                 figure.yaxis.visible = False
             if optionLocal['y_visible'] == 2:
                 if i > 0: figure.yaxis.visible = False
-        if hasattr(figure, 'plot_width'):
-            if "plot_width" in optionLocal:
-                figure.plot_width = int(optionLocal["plot_width"] / nRows)
-            if "plot_height" in optionLocal:
-                figure.plot_height = optionLocal["plot_height"]
-            if figure.legend:
-                figure.legend.visible = optionLocal["legend_visible"]
-        else:
-            if "plot_width" in optionLocal:
-                figure.width = int(optionLocal["plot_width"] / nRows)
-            if "plot_height" in optionLocal:
-                figure.height = optionLocal["plot_height"]
+        if hasattr(figure, 'legend'):
+            figure.legend.visible = optionLocal["legend_visible"]
+        if "plot_width" in optionLocal:
+            figure.width = optionLocal["plot_width"] // nRows
+        if "plot_height" in optionLocal:
+            figure.height = optionLocal["plot_height"]
         if isinstance(figure, Plot):
             renderers += [i.data_source for i in figure.renderers if isinstance(i.data_source, DownsamplerCDS)]
 
@@ -345,8 +342,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         'histo2dTooltips': defaultHisto2DTooltips,
         'y_axis_type': 'auto',
         'x_axis_type': 'auto',
-        'plot_width': 600,
-        'plot_height': 400,
         'commonX': 0,
         'commonY': 0,
         'ncols': -1,
@@ -570,7 +565,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             continue
         elif variables[0] == 'div':
             text_content = optionLocal.get("text", variables[1])
-            widget = Div(text=text_content)
+            widget = Div(text=text_content, sizing_mode=optionLocal.get("sizing_mode", "inherit"))
             plotArray.append(widget)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = widget           
@@ -678,7 +673,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 active = False
                 if optionWidget["callback"] == "parameter":
                     active = paramDict[variables[1][0]]["value"]
-                localWidget = Toggle(label=label, active=active)
+                localWidget = Toggle(label=label, active=active, sizing_mode="stretch_width")
                 widgetFull = localWidget
             if variables[0] == 'spinner':
                 label = variables[1][0]
@@ -688,7 +683,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if optionWidget["callback"] == "parameter":
                     value = paramDict[variables[1][0]]["value"]
                 formatter = optionWidget.get("format", "0.[0000]")
-                localWidget = Spinner(title=label, value=value, format=formatter)
+                localWidget = Spinner(title=label, value=value, format=formatter, sizing_mode="stretch_width")
                 widgetFull = localWidget
             if variables[0] == 'spinnerRange':
                 # TODO: Make a spinner pair custom widget, or something similar
@@ -700,8 +695,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if step == 0:
                     zero_step = True
                     step = 1
-                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter)
-                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter)
+                localWidgetMin = Spinner(title=f"min({label})", value=start, step=step, format=formatter, sizing_mode="stretch_width")
+                localWidgetMax = Spinner(title=f"max({label})", value=end, step=step, format=formatter, sizing_mode="stretch_width")
                 if zero_step:
                     localWidgetMin.disabled = True
                     localWidgetMax.disabled = True
@@ -725,7 +720,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         """))
                 widgetFull=localWidget=row([localWidgetMin, localWidgetMax])
             if "toggleable" in optionWidget:
-                widgetToggle = Toggle(label="disable", active=True, width=70)
+                widgetToggle = Toggle(label="disable", active=True, width=70, sizing_mode="stretch_width")
                 widgetFilter.active = False
                 if variables[0] == 'spinnerRange':
                     localWidgetMin.disabled = True
@@ -766,7 +761,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionWidget.update(variables[-1])
             cds_used = optionWidget.get("source", None)
             # By default, uses all named variables from the data source - but they can't be known at this point yet
-            localWidget = TextAreaInput(**optionWidget)
+            localWidget = TextAreaInput(sizing_mode="scale_width", **optionWidget)
             widgetName = optionWidget.get("name", f"$widget_{len(plotArray)}")
             plotArray.append(localWidget)
             plotDict[widgetName] = localWidget
@@ -787,7 +782,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if len(variables) > 2:
                 optionWidget.update(variables[-1])
             value = paramDict[variables[1][0]]["value"]
-            localWidget = TextAreaInput(value=value, **optionWidget)
+            localWidget = TextAreaInput(value=value, sizing_mode="scale_width", **optionWidget)
             plotArray.append(localWidget)
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = localWidget
@@ -836,17 +831,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
             cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
-            plotI = BokehVisJSGraph3D(width=options['plot_width'], height=options['plot_height'],
-                                      data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
+            plotI = BokehVisJSGraph3D( data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
             plotArray.append(plotI)
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = plotI
             continue
         else:
-            figureI = figure(plot_width=options['plot_width'], plot_height=options['plot_height'], 
-                             tools=options['tools'], x_axis_type=options['x_axis_type'],
-                             y_axis_type=options['y_axis_type'])
+            figureI = figure(width=options.get("plot_width", 600), height=options.get("plot_height", 400),
+                    tools=options['tools'], x_axis_type=options['x_axis_type'],
+                             y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"))
             figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
             figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
             figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
@@ -887,7 +881,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if not rescaleColorMapper and cdsDict[cds_name]["type"] == "source":
                         low = np.nanmin(cdsDict[cds_name]["data"][varColor["name"]])
                         high= np.nanmax(cdsDict[cds_name]["data"][varColor["name"]])
-                        mapperC = linear_cmap(field_name=varColor["name"], palette=palette, low=low, high=high)
+                        mapperC = {"field": varColor["name"], "transform": LinearColorMapper(palette=palette, low=low, high=high)}
                     else:
                         if varColor["name"] in colorMapperDict:
                             mapperC = colorMapperDict[varColor["name"]]
@@ -912,7 +906,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         color_axis_title = getHistogramAxisTitle(cdsDict, varColor["name"], cds_name)
                     color_bar = ColorBar(color_mapper=mapperC['transform'], width=8, location=(0, 0))
-                    if optionLocal.get("showColorAxisTitle", False):
+                    if optionLocal.get("showColorAxisTitle", True):
                         color_axis_title_model = makeAxisLabelFromTemplate(color_axis_title, paramDict, meta)
                         applyParametricAxisLabel(color_axis_title_model, color_bar, "title")
             elif 'color' in optionLocal:
@@ -1054,7 +1048,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
                 else:
-                    raise NotImplementedError(f"Visualization type not suppoerted: {visualization_type}")
+                    raise NotImplementedError(f"Visualization type not supported: {visualization_type}")
                 if varColor is not None and varColor["name"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
@@ -1271,22 +1265,25 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if isinstance(iFilter, RangeFilter):
                     widgetTypes.append("range")
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
-                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},null);
-                    """))
+                    if selectionCDS is not None:
+                        iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, "["+this.range.join(', ')+ "]" ]]},{});
+                        """))
                 elif isinstance(iWidget["filter"], MultiSelectFilter):
                     widgetTypes.append(f"multiselect ({iFilter.how})")
                     widgetValues.append(f"{{{', '.join(iFilter.selected)}}}")
-                    iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                        target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},null);
-                    """))
+                    if selectionCDS is not None:
+                        iFilter.js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, '{'+this.selected.join(', ')+'}' ]]},{});
+                        """))
                 elif isinstance(iWidget["filter"], ColumnFilter):
                     widgetTypes.append("expression")
                     if iFilter.field in aliasDict[iCds]:
                         widgetValues.append(aliasDict[iCds][iFilter.field]["transform"].func)
-                        aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
-                            target.patch({"value": [[i, this.func ]]},null);
-                        """))
+                        if selectionCDS is not None:
+                            aliasDict[iCds][iFilter.field]["transform"].js_on_change("change", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                                target.patch({"value": [[i, this.func ]]},{});
+                            """))
                     else:
                         widgetValues.append("true")
                 i += 1
@@ -1416,11 +1413,11 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
             end+=1
         if value is None:
             value = (start, end)
-        slider = RangeSlider(title=title, start=start, end=end, step=step, value=value, name=name)
+        slider = RangeSlider(title=title, start=start, end=end, step=step, value=value, name=name, sizing_mode="stretch_width")
     else:
         if value is None:
             value = (start + end) * 0.5
-        slider = Slider(title=title, start=start, end=end, step=step, value=value, name=name)
+        slider = Slider(title=title, start=start, end=end, step=step, value=value, name=name, sizing_mode="stretch_width")
     return slider
 
 
@@ -1510,7 +1507,7 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
         default_value = 0
     else:
         default_value = optionsPlot.index(str(default))
-    widget_local = Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot)
+    widget_local = Select(title=params[0], value=optionsPlot[default_value], options=optionsPlot, sizing_mode="stretch_width")
     filterLocal = None
     newColumn = None
     js_callback_code="""
@@ -1551,7 +1548,7 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         for i, val in enumerate(optionsPlot):
             optionsPlot[i] = str(val)
         optionsSelected = optionsPlot
-    widget_local = MultiSelect(title=params[0], value=optionsSelected, options=optionsPlot, size=options['size'])
+    widget_local = MultiSelect(title=params[0], value=optionsSelected, options=optionsPlot, size=options['size'], sizing_mode="stretch_width")
     if options['callback'] == 'parameter':
         return widget_local, None, None
     filterLocal = None
@@ -1583,7 +1580,7 @@ def makeBokehMultiSelectBitmaskWidget(column: dict, title: str, mapping: dict, *
         multiselect_value = keys
     else:
         multiselect_value = []
-    widget_local = MultiSelect(title=title, value=multiselect_value, options=keys, size=options["size"])
+    widget_local = MultiSelect(title=title, value=multiselect_value, options=keys, size=options["size"], sizing_mode="stretch_width")
     filter_local = MultiSelectFilter(selected=multiselect_value, field=column["name"], how=options["how"], mapping=mapping)
     widget_local.js_link("value", filter_local, "selected")
     return widget_local, filter_local

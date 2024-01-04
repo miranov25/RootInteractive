@@ -6,7 +6,7 @@ tabulate
 ## root dependencies
 iminuit
 ##---------------------   graphics  dependencies
-bokeh>2,<2.5              # possibility to use new bokeh #150
+bokeh>=3              # possibility to use new bokeh #150
 # ----------------------   jupyter notebook dependencies
 ipywidgets
 runtime

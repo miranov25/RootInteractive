@@ -22,10 +22,10 @@ export class CDSStack extends ColumnarDataSource {
 
   static __name__ = "CDSStack"
 
-  static init_CDSStack() {
-    this.define<CDSStack.Props>(({Ref, Array, String})=>({
+  static {
+    this.define<CDSStack.Props>(({Ref, Array, String, Any})=>({
       sources:  [Array(Ref(ColumnarDataSource)), []],
-      mapping: [p.Instance],
+      mapping: [Any],
       activeSources: [Array(String), []]
     }))
   }

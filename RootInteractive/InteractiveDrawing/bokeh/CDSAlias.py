@@ -16,5 +16,5 @@ class CDSAlias(ColumnarDataSource):
     source=Instance(ColumnarDataSource, help="The source to draw from")
     mapping=Dict(String, Any, help="The mapping from new columns to old columns and possibly mappers")
     includeOrigColumns=Bool()
-    columnDependencies=List(Instance(Model), [], help="Hacky way of improving performance and fixing a weird serialization bug")
+    columnDependencies=List(Instance(Model), help="Hacky way of improving performance and fixing a weird serialization bug")
     print("Import ", __implementation__)

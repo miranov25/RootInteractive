@@ -6,14 +6,13 @@
 // Pandas, etc.) to web presentations using the Bokeh server.
 import {LayoutDOM, LayoutDOMView} from "models/layouts/layout_dom"
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {LayoutItem} from "core/layout"
 import * as p from "core/properties"
 
 
 
 declare namespace vis {
   class Graph3d {
-    constructor(el: HTMLElement, data: object, OPTIONS: object)
+    constructor(el: HTMLElement | DocumentFragment, data: object, OPTIONS: object)
     setData(data: vis.DataSet): void
     setOptions(options: object): void
   }
@@ -70,7 +69,7 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // Many Bokeh views ignore this default <div>, and instead do things like
     // draw to the HTML canvas. In this case though, we use the <div> to attach
     // a Graph3d to the DOM.
-    this._graph = new vis.Graph3d(this.el, this.get_data(), OPTIONS)
+    this._graph = new vis.Graph3d(this.shadow_el, this.get_data(), OPTIONS)
     if(this.model.options3D !== null){
       this.model.options3D.xLabel=this.model.x
       this.model.options3D.yLabel=this.model.y
@@ -114,10 +113,6 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     return []
   }
 
-  _update_layout(): void {
-    this.layout = new LayoutItem()
-    this.layout.set_sizing(this.box_sizing())
-  }
 }
 
 // We must also create a corresponding JavaScript BokehJS model subclass to
@@ -154,7 +149,7 @@ export class BokehVisJSGraph3D extends LayoutDOM {
   // typos, which would prohibit serialization/deserialization of this model.
   static __name__ = "BokehVisJSGraph3D"
 
-  static init_BokehVisJSGraph3D() {
+  static {
     // This is usually boilerplate. In some cases there may not be a view.
     this.prototype.default_view = BokehVisJSGraph3DView
 
@@ -163,13 +158,13 @@ export class BokehVisJSGraph3D extends LayoutDOM {
     // types have counterparts, e.g. ``bokeh.core.properties.String`` will be
     // ``p.String`` in the JS implementatin. Where the JS type system is not yet
     // as rich, you can use ``p.Any`` as a "wildcard" property type.
-    this.define<BokehVisJSGraph3D.Props>({
-      x:            [ p.String   ],
-      y:            [ p.String   ],
-      z:            [ p.String   ],
-      style:        [ p.String   ],
-      options3D:    [ p.Instance ],
-      data_source:  [ p.Instance ],
-    })
+    this.define<BokehVisJSGraph3D.Props>(({String, Any}) => ({
+      x:            [ String   ],
+      y:            [ String   ],
+      z:            [ String   ],
+      style:        [ String   ],
+      options3D:    [ Any ],
+      data_source:  [ Any ],
+    }))
   }
 }

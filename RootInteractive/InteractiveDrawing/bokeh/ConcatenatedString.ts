@@ -23,7 +23,7 @@ export class ConcatenatedString extends Model {
   #is_dirty: boolean
   #value: string
 
-  static init_ConcatenatedString() {
+  static {
     this.define<ConcatenatedString.Props>(({Array, String})=>({
       components:  [Array(String), []]
     }))

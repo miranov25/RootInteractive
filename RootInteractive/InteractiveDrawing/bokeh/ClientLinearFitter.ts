@@ -26,7 +26,7 @@ export class ClientLinearFitter extends Model {
 
   static __name__ = "ClientLinearFitter"
 
-  static init_ClientLinearFitter() {
+  static {
     this.define<ClientLinearFitter.Props>(({Array, String, Number, Ref, Nullable})=>({
       varX: [Array(String), []],
       source: [Ref(ColumnarDataSource)],

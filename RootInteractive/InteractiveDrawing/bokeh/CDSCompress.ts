@@ -79,8 +79,8 @@ export namespace CDSCompress {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnDataSource.Props & {
-      inputData :    p.Property<Record<string, any>>
-      sizeMap :    p.Property<Record<string, any>>
+      inputData :    p.Property<any>
+      sizeMap :    p.Property<any>
   }
 }
 
@@ -95,11 +95,11 @@ export class CDSCompress extends ColumnDataSource {
 
   static __name__ = "CDSCompress"
 
-  static init_CDSCompress() {
+  static {
 
-    this.define<CDSCompress.Props>(()=>({
-        inputData:    [ p.Instance ],
-        sizeMap:    [ p.Instance ]
+    this.define<CDSCompress.Props>(({Any})=>({
+        inputData:    [ Any, {} ],
+        sizeMap:    [ Any, {} ]
     }))
   }
 

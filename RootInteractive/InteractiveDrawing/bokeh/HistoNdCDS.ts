@@ -1,5 +1,5 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
-import {RIFilter} from "./RIFilter"
+import {Model} from "model"
 import * as p from "core/properties"
 
 export namespace HistoNdCDS {
@@ -7,7 +7,7 @@ export namespace HistoNdCDS {
 
   export type Props = ColumnarDataSource.Props & {
     source: p.Property<ColumnarDataSource>
-    filter: p.Property<RIFilter | null>
+    filter: p.Property<any | null>
     nbins:        p.Property<number[]>
     range:    p.Property<(number[] | null)[] | null>
     sample_variables:      p.Property<string[]>
@@ -34,11 +34,11 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   static __name__ = "HistoNdCDS"
 
-  static init_HistoNdCDS() {
+  static {
 
     this.define<HistoNdCDS.Props>(({Ref, Array, Nullable, Number, Int, String, Any})=>({
       source:  [Ref(ColumnarDataSource)],
-      filter:         [Nullable(Ref(RIFilter)), null], 
+      filter:         [Nullable(Ref(Model)), null], 
       nbins:        [Array(Int)],
       range:    [Nullable(Array(Nullable(Array(Number))))],
       sample_variables:      [Array(String)],
@@ -499,7 +499,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     let cumulativeHistogram = [...histogram]
     let acc = 0
     let l = histogram.length
-    for (let i=0; i<l; i++){
+    for (let i=0; i < l; i++){
       acc += histogram[i]
       cumulativeHistogram[i] = acc
     }

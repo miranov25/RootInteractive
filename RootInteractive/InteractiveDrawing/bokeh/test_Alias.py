@@ -11,7 +11,7 @@ from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets import Slider
 from bokeh.models.layouts import Column
 
-from bokeh.plotting import Figure, output_file
+from bokeh.plotting import figure, output_file
 
 import pytest
 
@@ -158,7 +158,7 @@ def test_customJsFunction():
     """))
 
     output_file("test_Alias.html")
-    fig = Figure()
+    fig = figure()
     fig.scatter(x="a", y="b", source=cdsDownsampled)
     fig.scatter(x="a", y="a*x+b", source=cdsDownsampled)
     show(Column(fig, sliderWidget))

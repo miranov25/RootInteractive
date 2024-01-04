@@ -30,18 +30,18 @@ export class HistoStatsCDS extends ColumnDataSource {
 
   static __name__ = "HistoStatsCDS"
 
-  static init_HistoStatsCDS() {
+  static {
 
     this.define<HistoStatsCDS.Props>(({Ref, Array, String, Boolean, Number, Nullable})=>({
       sources:  [Array(Ref(ColumnarDataSource))],
       names: [Array(String)],
       bincount_columns: [Array(String)],
       bin_centers: [Array(String)],
-      rowwise: [Boolean],
+      rowwise: [Boolean, false],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       compute_quantile: [Nullable(Array(Boolean))],
-      edges_left: [Array(String)],
-      edges_right: [Array(String)],
+      edges_left: [Array(String), []],
+      edges_right: [Array(String), []],
       sum_range: [Array(Array(Number)), []]
     }))
   }

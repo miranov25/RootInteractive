@@ -21,7 +21,7 @@ export class RIFilter extends Model {
 
   static __name__ = "RIFilter"
 
-  static init_RIFilter() {
+  static {
     this.define<RIFilter.Props>(({Boolean})=>({
       active:  [Boolean, true],
       invert: [Boolean, false]

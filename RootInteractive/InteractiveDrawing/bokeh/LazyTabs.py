@@ -1,4 +1,4 @@
-from bokeh.models.widgets import Tabs
+from bokeh.models.layouts import Tabs
 from bokeh.core.properties import List, Instance, Bool
 from bokeh.model import Model
 

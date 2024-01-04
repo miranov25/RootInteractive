@@ -29,7 +29,7 @@ setup(
         ## root dependencies
         'iminuit',
         ##---------------------   graphics  dependencies
-        'bokeh>2.3,<=2.5',
+        'bokeh>3',
         'matplotlib',
         # ----------------------   jupyter notebook dependencies
         'ipywidgets',

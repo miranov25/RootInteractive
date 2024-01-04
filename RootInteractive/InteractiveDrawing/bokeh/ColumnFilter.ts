@@ -22,7 +22,7 @@ export class ColumnFilter extends RIFilter {
 
   static __name__ = "ColumnFilter"
 
-  static init_ColumnFilter() {
+  static {
     this.define<ColumnFilter.Props>(({Ref, String})=>({
       source:  [Ref(ColumnarDataSource)],
       field: [String]
