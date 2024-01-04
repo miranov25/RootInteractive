@@ -9,7 +9,7 @@ iminuit
 bokeh>=3              # possibility to use new bokeh #150
 # ----------------------   jupyter notebook dependencies
 ipywidgets
-runtime
+#runtime
 requests
 jupyter
 # ---------------------    machine learning dependencies
