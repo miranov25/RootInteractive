@@ -56,7 +56,7 @@ df['errY']=df.A*0.02+0.02
 df['maskAC']=2*(df['A']>.5)|1*(df['C']>.5)
 df['ones']=1
 df.head(10)
-df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'E.AxisTitle': "Category", "A.Description": "The distance A"}
+df.meta.metaData = {'A.AxisTitle': r"\[x\pi\]", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)", 'D.AxisTitle': "D (a.u.)", 'E.AxisTitle': "Category", "A.Description": "The distance A"}
 
 parameterArray = [
     {"name": "colorZ", "value":"A", "options":["A", "B", "EE"]},
@@ -73,7 +73,7 @@ parameterArray = [
 figureArray = [
 #   ['A'], ['C-A'], {"color": "red", "size": 7, "colorZvar":"C", "filter": "A<0.5"}],
     [['A'], ['A*A-C*C'], {"color": "red", "size": 2, "colorZvar": "A", "varZ": "C", "errY": "errY", "errX":"0.01"}],
-    [['X'], ['C+A', 'C-A', 'A/A'], {"name": "fig1"}],
+    [['X'], ['C+A', 'C-A', 'A/A'], {"name": "fig1", "xAxisTitle":r"\[x\pi\]", "plotTitle":"C+A, C-A vs {X}" }],
     [['B'], ['C+B', 'C-B'], { "colorZvar": "B", "errY": "errY", "rescaleColorMapper": True, "colorAxisLabel": "B (cm/s)"}],
     [['D'], ['(A+B+C)*DD'], {"colorZvar": "colorZ", "size": 10, "errY": "errY"} ],
 #    [['D'], ['D*10'], {"size": 10, "errY": "errY","markers":markerFactor, "color":colorFactor,"legend_field":"DDC"}],

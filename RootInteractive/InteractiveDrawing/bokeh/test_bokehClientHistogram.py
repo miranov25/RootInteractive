@@ -22,7 +22,7 @@ df["DDC"]=((df.D*4).round(0)).astype(int).map(mapDDC)
 df['errY']=df.A*0.02+0.02
 df.head(10)
 df.meta.metaData = {'A.AxisTitle': "A (cm)", 'B.AxisTitle': "B (cm/s)", 'C.AxisTitle': "C (s)",
-                    'D.AxisTitle': "D (a.u.)", 'Bool.AxisTitle': "A>half"}
+                    'D.AxisTitle': r"\[x\pi\]", 'Bool.AxisTitle': "A>half"}
 
 #widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1), multiselect.E(0,1,2,3,4)"
 widgets="slider.A(0,1,0.05,0,1), slider.B(0,1,0.05,0,1), slider.C(0,1,0.01,0.1,1), slider.D(0,1,0.01,0,1), checkbox.Bool(1)"
@@ -458,7 +458,7 @@ def test_interactiveTemplateMultiDiff():
                           jsFunctionArray=jsFunctionArray)
 
 def test_interactiveTemplateMultiYDiff():
-    output_file("test_histogramTemplateMultiY.html")
+    output_file("test_histogramTemplateMultiYDiff.html")
     aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D"], multiAxis="varY")
     widgetsSelect = [
         ['range', ['A'], {"name":"A"}],
@@ -472,3 +472,4 @@ def test_interactiveTemplateMultiYDiff():
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                           jsFunctionArray=jsFunctionArray)
     
+test_interactiveTemplateMultiY()
