@@ -269,6 +269,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         #
         ['descriptionTable', {"name":"description"}],
         ['selectionTable', {"name":"selection"}],
+        [['bin_center_0'], ['bin_count'], {"source":"histoXYData", "name":"tex_hack", "xAxisTitle": "$$X_0$$"}],
         figureGlobalOption
     ]
     figureLayoutDesc={
@@ -281,6 +282,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     }
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -570,6 +572,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
         #
         ['descriptionTable', {"name":"description"}],
         ['selectionTable', {"name":"selection"}],
+        [['bin_center_0'], ['bin_count'], {"source":"histoXYData", "name":"tex_hack", "xAxisTitle": "$$X_0$$"}],
         figureGlobalOption
     ]
     figureLayoutDesc={
@@ -582,6 +585,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     }
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
+    figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, transformArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc

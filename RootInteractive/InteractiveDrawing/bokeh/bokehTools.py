@@ -557,7 +557,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 TableColumn(title="Value", field="value"),
                 TableColumn(title="Is active", field="active"),
             ]
-            widget = DataTable(columns=columns)
+            widget = DataTable(columns=columns, sizing_mode=optionLocal.get("sizing_mode", "inherit"))
             selectionTables.append(widget)
             plotArray.append(widget)
             if "name" in optionLocal:
@@ -741,7 +741,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     filter.active = !this.active
                     filter.change.emit()
                     """))
-                widgetFull = row([widgetFull, widgetToggle])
+                widgetFull = row([widgetFull, widgetToggle], sizing_mode=optionLocal.get("sizing_mode", "inherit"))
             plotArray.append(widgetFull)
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = widgetFull
@@ -1291,7 +1291,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         selectionCDS.data = selectionTableData
     for i in selectionTables:
         i.source = selectionCDS
-        i.view = CDSView(source=selectionCDS)
+        i.view = CDSView()
     if isinstance(options['layout'], list) or isinstance(options['layout'], dict):
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
@@ -2254,7 +2254,7 @@ def makeCdsSel(cdsDict, paramDict, key):
     cds_used["cdsSel"] = cdsSel
     return cdsSel
 
-def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
+def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields, **kwargs):
     cds = ColumnDataSource()
     new_dict = {}
     columns = []
@@ -2270,4 +2270,4 @@ def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields):
         new_dict[i] = column
         columns.append(TableColumn(field=i, title=i))
     cds.data = new_dict
-    return DataTable(source=cds, columns=columns)
+    return DataTable(source=cds, columns=columns, sizing_mode=kwargs.get("sizing_mode", "inherit"))
