@@ -67,6 +67,8 @@ RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
+RE_MATHFORMULA = re.compile(r"\$\$|\\\(|\\\[")
+
 IS_PANDAS_1 = pd.__version__.split('.')[0] == '1'
 
 def mergeFigureArrays(figureArrayOld, figureArrayNew):
@@ -468,12 +470,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             result = evaluator.visit(exprTree.body)
             if result["type"] == "javascript":
                 func = "return "+result["implementation"]
-                fields = list(evaluator.aliasDependencies)
+                fields = list(evaluator.aliasDependencies.values())
                 parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
                 variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
                 customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
                 nvars_local = len(fields)
-                variablesAlias = fields.copy()
+                variablesAlias = list(evaluator.aliasDependencies.keys())
                 for j in variablesParam:
                     if "subscribed_events" not in paramDict[j]:
                         paramDict[j]["subscribed_events"] = []
@@ -840,7 +842,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         else:
             figureI = figure(width=options.get("plot_width", 600), height=options.get("plot_height", 400),
                     tools=options['tools'], x_axis_type=options['x_axis_type'],
-                             y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"))
+                             y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"),
+                             title=r"\[x\pi\]")
             figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
             figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
             figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
@@ -2052,7 +2055,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             how = iSource.get("how", "inner")
             sourceLeft = getOrMakeCdsFull(cdsDict, paramDict, left)
             sourceRight = getOrMakeCdsFull(cdsDict, paramDict, right)
-            iSource["cdsOrig"] = CDSJoin(left=sourceLeft, right=sourceRight, prefix_left=left or "cdsFull", prefix_right=right or "csFull", on_left=on_left, on_right=on_right, how=how, name=cdsName)
+            iSource["cdsOrig"] = CDSJoin(left=sourceLeft, right=sourceRight, prefix_left=(left+'.') or "cdsFull.", prefix_right=(right+'.') or "csFull.", on_left=on_left, on_right=on_right, how=how, name=cdsName)
         elif cdsType == "histogram":
             iSource = iCds
             weights = iSource.get("weights", None)
@@ -2133,6 +2136,7 @@ def getOrMakeCdsFull(cdsDict: dict, paramDict: dict, key: str):
 def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
     components = re.split(RE_CURLY_BRACE, template)
     label = ConcatenatedString()
+    has_tex= True
     for i in range(1, len(components), 2):
         if components[i] in paramDict:
             if "options" in paramDict[components[i]]:
@@ -2144,15 +2148,21 @@ def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
                     label.properties.components.change.emit();
                     label.change.emit();
                 """)])
+                for iOption in options.keys():
+                    m = re.match(RE_MATHFORMULA, iOption)
+                    has_tex = has_tex or m is not None
             else:
                 paramDict[components[i]]["subscribed_events"].append(["change", CustomJS(args={"i":i, "label":label}, code="""
                     label.components[i] = this.value;
                     label.properties.components.change.emit();
                     label.change.emit();
                 """)])
+                has_tex = True
             components[i] = paramDict[components[i]]["value"]
         components[i] = str(components[i]) if components[i] is not None else ''
         components[i] = meta.get(f"{components[i]}.AxisTitle", components[i])
+    #if has_tex:
+    #    components.append(" $$1$$ ")
     label.components = components
     return label
 
