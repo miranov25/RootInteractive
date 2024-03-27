@@ -1,6 +1,6 @@
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
-from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio, getDefaultVarsNormAll
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff, getDefaultVarsRatio, getDefaultVarsNormAll, getDefaultVarsRefWeights
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import figureParameters
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
@@ -456,6 +456,21 @@ def test_interactiveTemplateMultiDiff():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                           jsFunctionArray=jsFunctionArray)
+    
+def test_interactiveTemplateWeightsRef():
+    output_file("test_histogramTemplateWeightsRef.html")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsRefWeights(variables=["A", "B", "C", "D", "A*A", "A*A+B", "B/(1+C)"])
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
+                          jsFunctionArray=jsFunctionArray)
 
 def test_interactiveTemplateMultiYDiff():
     output_file("test_histogramTemplateMultiYDiff.html")
@@ -472,4 +487,3 @@ def test_interactiveTemplateMultiYDiff():
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                           jsFunctionArray=jsFunctionArray)
     
-test_interactiveTemplateMultiY()

@@ -43,9 +43,12 @@ export class CDSJoin extends ColumnarDataSource {
   _indices_left: number[] | null
   _indices_right: number[] | null
 
+  cached_columns: Set<string>
+
   initialize(){
     super.initialize()
     this.data = {}
+    this.cached_columns = new Set()
     this.compute_indices()
   }
 
@@ -73,6 +76,9 @@ export class CDSJoin extends ColumnarDataSource {
       if (on_right.length === 0){
         this._indices_left = null
         this._indices_right = null
+        this.cached_columns.clear()
+        change.emit()
+        return
       }
     } else if(on_left.length === 1 && on_right.length === 0){
       this._indices_left = null
@@ -176,30 +182,31 @@ export class CDSJoin extends ColumnarDataSource {
       this._indices_left = indices_left
       this._indices_right = indices_right
     }
-    for (const key of left.columns()) {
-      const col = left.get_array(key)
-      if(col !== null) this.data[key] = this.join_column(col, this._indices_left)
-    }
-    for (const key of right.columns()) {
-      const col = right.get_array(key)
-      if(col !== null) this.data[key] = this.join_column(col, this._indices_right)
-    }
     // selected.indices = this.source.selected.indices
+    this.cached_columns.clear()
     change.emit()
   }
 
   get_column(key: string){
-    const {left, right, data} = this
-    if (data[key] != null) return data[key]
+    const {left, right, data, prefix_left, prefix_right} = this
+    if (this.cached_columns.has(key)) return data[key]
     let column = null
-    try {
-      column = left.get_column(key)
-    }
-    catch {
-      column = right.get_column(key)
-    }
-    if (column == null){
-      column = right.get_column(key)
+    if (prefix_left && key.startsWith(prefix_left)){
+      let key_new = key.replace(prefix_left,"")
+      column = left.get_column(key_new)
+    } else if(prefix_right && key.startsWith(prefix_right)){
+      let key_new = key.replace(prefix_right,"")
+      column = right.get_column(key_new)      
+    } else {
+      try {
+        column = left.get_column(key)
+      }
+      catch {
+        column = right.get_column(key)
+      }
+      if (column == null){
+        column = right.get_column(key)
+      }
     }
     if(column != null) {
       if (!Array.isArray(column)){
@@ -208,11 +215,27 @@ export class CDSJoin extends ColumnarDataSource {
         data[key] = this.join_column(column, this._indices_right)
       }
     }
+    this.cached_columns.add(key)
+    console.log(data[key])
     return data[key]
   }
 
   get_length(){
-    if (this._indices_left == null) return 0
+    if (this._indices_left == null){
+      if(this._indices_right == null){
+        let l = this.left.get_length()
+        if(l == null){
+          return this.right.get_length()
+        }
+        let r = this.right.get_length()
+        if(r == null){
+          return l
+        }
+        return Math.min(l, r)
+      } else {
+        return this._indices_right.length
+      }
+    }
     return this._indices_left.length
   }
 

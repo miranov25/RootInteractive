@@ -73,13 +73,14 @@ class ColumnEvaluator:
         self.context = context
         self.dependencies = set()
         self.paramDependencies = set()
-        self.aliasDependencies = set()
+        self.aliasDependencies = {}
         self.firstGeneratedID = firstGeneratedID
         self.code = code
         self.isSource = True 
         self.aliasDict = aliasDict
         self.isAuto = False
         self.locals = []
+        self.helper_idx = 0
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -145,7 +146,7 @@ class ColumnEvaluator:
             elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
                 for i in self.aliasDict[self.context][node.attr]["fields"]:
                     self.dependencies.add((self.context, i))
-            self.aliasDependencies.add(node.attr)
+            self.aliasDependencies[node.attr] = node.attr
             return {
                 "name": node.attr,
                 "implementation": node.attr,
@@ -176,10 +177,16 @@ class ColumnEvaluator:
             if(cds_used < len(attrChain)):
                 if attrChain[cds_used] in [cds["left"], cds["right"]]:
                     self.dependencies.add((attrChain[cds_used], node.attr))
-            self.aliasDependencies.add(node.attr)
+            if attrChain[0] == "self":
+                attrChainStr = '.'.join(attrChain[1:] + [node.attr])
+            else:
+                attrChainStr = '.'.join(attrChain + [node.attr])
+            if attrChainStr not in self.aliasDependencies:
+                self.aliasDependencies[attrChainStr] = "$parameter_" + str(self.helper_idx)
+                self.helper_idx += 1
             return {
                 "name": node.attr,
-                "implementation": node.attr,
+                "implementation": self.aliasDependencies[attrChainStr],
                 "type": "column"
             }
         if not isinstance(node.value, ast.Name):
@@ -208,7 +215,7 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
             #}           
-        self.aliasDependencies.add(node.attr)
+        self.aliasDependencies[node.attr] = node.attr
         try:
             is_boolean = "data" in self.cdsDict[self.context] and self.cdsDict[self.context]["data"][node.attr].dtype.kind == "b"
         except AttributeError:
@@ -308,7 +315,7 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in histogram " + histogram["name"]
             #}
-        self.aliasDependencies.add(id)
+        self.aliasDependencies[id] = id
         return {
             "name": id,
             "implementation": id,
@@ -516,8 +523,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         aliasDict[i_context] = {}
                     columnName = column["name"]
                     func = "return "+column["implementation"]
-                    variablesAlias = list(evaluator.aliasDependencies)
-                    fieldsAlias = list(evaluator.aliasDependencies)
+                    variablesAlias = list(evaluator.aliasDependencies.keys())
+                    fieldsAlias = list(evaluator.aliasDependencies.values())
                     parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
                     variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
                     nvars_local = len(variablesAlias)
