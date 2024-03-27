@@ -2055,7 +2055,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             how = iSource.get("how", "inner")
             sourceLeft = getOrMakeCdsFull(cdsDict, paramDict, left)
             sourceRight = getOrMakeCdsFull(cdsDict, paramDict, right)
-            iSource["cdsOrig"] = CDSJoin(left=sourceLeft, right=sourceRight, prefix_left=(left+'.') or "cdsFull.", prefix_right=(right+'.') or "csFull.", on_left=on_left, on_right=on_right, how=how, name=cdsName)
+            iSource["cdsOrig"] = CDSJoin(left=sourceLeft, right=sourceRight, prefix_left=(left+'.') if left else "cdsFull.", prefix_right=(right+'.') if right else "csFull.", on_left=on_left, on_right=on_right, how=how, name=cdsName)
         elif cdsType == "histogram":
             iSource = iCds
             weights = iSource.get("weights", None)
