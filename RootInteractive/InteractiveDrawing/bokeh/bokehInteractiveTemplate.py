@@ -903,7 +903,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         [["bin_center_1"], ["histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],   
         [["bin_center_0"], ["histoXYData_1.mean - projXYRef_1.mean", "histoXYData_1.quantile_1 - projXYRef_1.quantile_1"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)"}],
         [["bin_center_0"], ["histoXYData_1.std - projXYRef_1.std"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["bin_count - histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],
+        [["bin_center_1"], ["bin_count - histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],
         # histoXYNorm
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
