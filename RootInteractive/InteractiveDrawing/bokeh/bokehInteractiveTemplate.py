@@ -736,10 +736,9 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "variables": ["varX","varY"],
             "weights": "weights",
             "nbins":["nbinsX","nbinsY"], "quantiles": [0.35,0.5],"unbinned_projections":True,
-            "histograms":[
-                 {"name": "histoXYRef",
-                  "weights": "weightsRef"}
-            ]
+            "histograms":{
+                 "histoXYRef":{"weights": "weightsRef"}
+            }
         },
         {
             "name": "histoXYZData",
@@ -865,10 +864,24 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "weights": "weightsRef",
             "source": "histoXYData",
             "axis_idx": 1,
+            "quantiles": [0.35,0.5],
+        })
+    histoArray.append({
+            "name": "projXYNormRef_1",
+            "type": "projection",
+            "weights": "weightsRef",
+            "source": "histoXYNormData",
+            "axis_idx": 1,
+            "quantiles": [0.35,0.5],
         })
     histoArray.append({
             "name": "histoXYData_1_join",
             "right": "histoXYData_1", "left":"projXYRef_1",
+            "left_on":[], "right_on": []
+        })
+    histoArray.append({
+            "name": "histoXYNormData_1_join",
+            "right": "histoXYNormData_1", "left":"projXYNormRef_1",
             "left_on":[], "right_on": []
         })
     aliasArray.append(("meanRef", "mean", "projXYRef_1"))
@@ -879,10 +892,18 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         # histo XY
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYData"}],
         [["bin_center_1"], ["bin_count"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],
-        [["bin_center_0"], ["mean","mean"], { "source":["histoXYData_1", "projXYRef_1"],"errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["std","std"], { "source":["histoXYData_1", "projXYRef_1"],"errY":"std/sqrt(entries)"}],
-        [["bin_center_0"], ["histoXYData_1.mean - projXYRef_1.mean"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["mean","quantile_1"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["std"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
+        # histo XY weights
+        [["bin_center_0"], ["mean","quantile_1"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["std"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_1"], ["bin_count"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],      
+        [["bin_center_0"], ["mean","quantile_1"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["std"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_1"], ["histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],   
+        [["bin_center_0"], ["histoXYData_1.mean - projXYRef_1.mean", "histoXYData_1.quantile_1 - projXYRef_1.quantile_1"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)"}],
         [["bin_center_0"], ["histoXYData_1.std - projXYRef_1.std"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["bin_count - histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],
         # histoXYNorm
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
@@ -913,12 +934,13 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         figureGlobalOption
     ]
     figureLayoutDesc={
-        "histoXY":[[0,1],[2,3], [4,5],{"plot_height":250}],
-        "histoXYNorm":[[6,7],[8,9], [10, 11],{"plot_height":250}],
-        "histoXYZ":[[12,13],[14,15],{"plot_height":250}],
-        "histoXYNormZ":[[14,15],[16,17],{"plot_height":250}],
-        "histoXYNormZMedian":[[18,19],{"plot_height":350}],
-        "histoXYNormZMean":[[20,21],{"plot_height":350}],
+        "histoXY":[[0,1],[2,3], {"plot_height":250}],
+        "histoXYWeight":[[4,5,6],[7,8,9], [10,11,12],{"plot_height":200}],
+        "histoXYNorm":[[13,14],[15,16],{"plot_height":250}],
+        "histoXYZ":[[17,18],[19,20],{"plot_height":250}],
+        "histoXYNormZ":[[21,22],[23,24],{"plot_height":250}],
+        "histoXYNormZMedian":[[25,26],{"plot_height":350}],
+        "histoXYNormZMean":[[27,28],{"plot_height":350}],
     }
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
