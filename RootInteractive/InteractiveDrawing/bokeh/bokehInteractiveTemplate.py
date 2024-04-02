@@ -835,6 +835,9 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "variables": ["varX","diffY"],
             "weights": "weights",
             "nbins":["nbinsX","nbinsY"], "axis":[1],"quantiles": [0.35,0.5],"unbinned_projections":True,
+            "histograms":{
+                 "histoXYRef":{"weights": "weightsRef"}
+            }
         },
         {
             "name": "histoXYNormZData",
@@ -909,8 +912,16 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        # histoXYNorm weights
+        [["bin_center_0"], ["mean","quantile_1"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0"}],      
+        [["bin_center_0"], ["mean","quantile_1"], { "source":"projXYNormRef_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_0"], ["std"], { "source":"projXYNormRef_1","errY":"std/sqrt(entries)"}],
+        [["bin_center_1"], ["histoXYRef"], { "source":"histoXYNormData", "colorZvar": "bin_center_0"}],   
+        [["bin_center_0"], ["histoXYNormData_1.mean - projXYNormRef_1.mean", "histoXYNormData_1.quantile_1 - projXYNormRef_1.quantile_1"], { "source":"histoXYNormData_1_join","errY":"sqrt(histoXYNormData_1.std**2+projXYNormRef_1.std**2)/sqrt(entries)"}],
+        [["bin_center_0"], ["histoXYNormData_1.std - projXYNormRef_1.std"], { "source":"histoXYNormData_1_join","errY":"std/sqrt(entries)"}],
+        [["bin_center_1"], ["bin_count - histoXYRef"], { "source":"histoXYNormData", "colorZvar": "bin_center_0"}],
         # histoXYZ
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["entries"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
@@ -937,10 +948,11 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         "histoXY":[[0,1],[2,3], {"plot_height":250}],
         "histoXYWeight":[[4,5,6],[7,8,9], [10,11,12],{"plot_height":200}],
         "histoXYNorm":[[13,14],[15,16],{"plot_height":250}],
-        "histoXYZ":[[17,18],[19,20],{"plot_height":250}],
-        "histoXYNormZ":[[21,22],[23,24],{"plot_height":250}],
-        "histoXYNormZMedian":[[25,26],{"plot_height":350}],
-        "histoXYNormZMean":[[27,28],{"plot_height":350}],
+        "histoXYNormWeight":[[17,18,19],[20,21,22], [23,24,25],{"plot_height":200}],
+        "histoXYZ":[[26,27],[28,29],{"plot_height":250}],
+        "histoXYNormZ":[[30,31],[32,33],{"plot_height":250}],
+        "histoXYNormZMedian":[[34,35],{"plot_height":350}],
+        "histoXYNormZMean":[[36,37],{"plot_height":350}],
     }
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
