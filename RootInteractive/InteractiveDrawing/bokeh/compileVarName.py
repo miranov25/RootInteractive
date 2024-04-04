@@ -120,7 +120,8 @@ class ColumnEvaluator:
         return {
             "implementation": implementation,
             "type": "javascript",
-            "name": self.code
+            "name": self.code,
+            "is_customjs_func": left.get("is_customjs", False)
         }
 
     def visit_Num(self, node: ast.Num):
@@ -255,8 +256,9 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "n_args": len(self.funcDict[node.id]["parameters"]),
-                "type": "js_lambda"
+                "n_args": len(self.funcDict[node.id].parameters),
+                "type": "js_lambda",
+                "is_customjs": True
             }
         if node.id in self.paramDict:
             self.isSource = False
@@ -538,7 +540,11 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         variablesAlias.append(paramDict[j]["value"])
                         fieldsAlias.append(j)
                         nvars_local = nvars_local+1
-                    transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
+                    is_customjs_func = column.get("is_customjs_func", False)
+                    if is_customjs_func:
+                        transform = funcDict[queryAST.body.func.id]
+                    else:
+                        transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
