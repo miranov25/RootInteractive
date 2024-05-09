@@ -42,6 +42,7 @@ export class ConcatenatedString extends Model {
   compute(): string{
     if (this.#is_dirty){
         this.#value = String.prototype.concat(...this.components)
+        this.#is_dirty = false
     }
     return this.#value
   }

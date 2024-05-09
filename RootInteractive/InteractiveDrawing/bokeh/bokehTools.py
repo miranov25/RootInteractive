@@ -59,7 +59,7 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
-BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY"]
+BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY", "filter"]
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
 
@@ -353,7 +353,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         "markers": bokehMarkers,
         "colors": 'Category10',
         "rescaleColorMapper": False,
-        "filter": '',
         'doDraw': False,
         "legend_field": None,
         "legendTitle": None,
@@ -827,12 +826,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             varNameX = variablesLocal[0][0]["name"]
             varNameY = variablesLocal[1][0]["name"]
             varNameZ = variablesLocal[2][0]["name"]
+            varNameFilter = variablesLocal[8][0]["name"]
             if variablesLocal[3] is not None:
                 varNameColor = variablesLocal[3][0]["name"]
             else:
                 varNameColor = None
             options3D = {"width": "99%", "height": "99%"}
-            cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
+            cds_used = makeCdsSel(cdsDict, paramDict, cds_name, varNameFilter)
             plotI = BokehVisJSGraph3D( data_source=cds_used, x=varNameX, y=varNameY, z=varNameZ, style=varNameColor,
                                       options3D=options3D)
             plotArray.append(plotI)
@@ -870,8 +870,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     variables_dict[axis_name] = variables_dict[axis_name][i % len(variables_dict[axis_name])]
             cds_name = cds_names[i]
             cds_used = None
+            varFilter = variables_dict["filter"]
             if cds_name != "$IGNORE":
-                cds_used = makeCdsSel(cdsDict, paramDict, cds_name)
+                cds_used = makeCdsSel(cdsDict, paramDict, cds_name, str(varFilter))
             varColor = variables_dict["colorZvar"]
             if varColor is not None:
                 if mapperC is not None:
@@ -893,8 +894,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                             colorMapperDict[varColor["name"]] = mapperC
                     # HACK for projections - should probably just remove the rows as there's no issue with joins at all
                     if cdsDict[cds_name]["type"] == "projection" and not rescaleColorMapper and varColor["name"].split('_')[0] == 'bin':
-                        makeCdsSel(cdsDict, paramDict, cds_name)
-                        cdsDict[cds_name]["cdsSel"].js_on_change('change', CustomJS(code="""
+                        makeCdsSel(cdsDict, paramDict, cds_name, str(varFilter))
+                        cdsDict[cds_name]["cdsSel"][str(varFilter)].js_on_change('change', CustomJS(code="""
                         const col = this.get_column(field)
                         const isOK = this.get_column("isOK")
                         const low = col.map((x,i) => isOK[i] ? col[i] : Infinity).reduce((acc, cur)=>Math.min(acc,cur), Infinity);
@@ -962,7 +963,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
             if isinstance(varY, str) and varY in cdsDict and cdsDict[varY]["type"] in ["histogram", "histo2d"]:
                 histoHandle = cdsDict[varY]
-                makeCdsSel(cdsDict, paramDict, varY)
+                makeCdsSel(cdsDict, paramDict, varY, str(varFilter))
                 if histoHandle["type"] == "histogram":
                     colorHisto = colorAll[max(length, 4)][i]
                     x_label = f"{{{histoHandle['variables'][0]}}}"
@@ -2247,10 +2248,13 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
         transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
         return transform_new
 
-def makeCdsSel(cdsDict, paramDict, key):
+def makeCdsSel(cdsDict, paramDict, key, filter=""):
     cds_used = cdsDict[key]
     if "cdsSel" in cds_used:
-        return cds_used["cdsSel"]
+        if filter in cds_used["cdsSel"]:
+            return cds_used["cdsSel"][filter]
+    else:
+        cds_used["cdsSel"] = {}
     cds_name = key if key is not None else "default cds"
     nPoints = cds_used.get("nPointRender",-1)
     if nPoints in paramDict:
@@ -2261,7 +2265,7 @@ def makeCdsSel(cdsDict, paramDict, key):
                         downsampler.nPoints = this.value | 0
                         downsampler.update()
                     """)])
-    cds_used["cdsSel"] = cdsSel
+    cds_used["cdsSel"][filter] = cdsSel
     return cdsSel
 
 def makeDescriptionTable(cdsDict, cdsName, fields, meta_fields, **kwargs):

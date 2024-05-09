@@ -108,13 +108,13 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     formulaYNorm = {
             "diff":"varY-varYNorm",
             "ratio":"varY/varYNorm",
-            "logRatio":"log(varY)/log(varYNorm)"
+            "logRatio":"log(varY)-log(varYNorm)"
             }[normalization]
     
     formulaZNorm = {
             "diff":"varZ-varZNorm",
             "ratio":"varZ/varZNorm",
-            "logRatio":"log(varZ)/log(varZNorm)"
+            "logRatio":"log(varZ)-log(varZNorm)"
             }[normalization]
 
     histoArray=[
@@ -142,7 +142,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
             varNorm = {
                 "diff": lambda x,y: f"{x}-{y}",
                 "ratio": lambda x,y: f"{x}/{y}",
-                "logRatio":lambda x,y: f"log({x})/log({y})"
+                "logRatio":lambda x,y: f"log({x})-log({y})"
             }[normalization]
             histoArray.extend([{
                 "name": f"histoXYNormData[{i}]",
@@ -236,7 +236,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     yAxisTitleNorm = {
             "diff":"{varY}-{varYNorm}",
             "ratio":"{varY}/{varYNorm}",
-            "logRatio":"log({varY})/log({varYNorm})"
+            "logRatio":"log({varY})-log({varYNorm})"
             }[normalization]
 
     figureArray=[
@@ -341,7 +341,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
                 }
                 else if(diffFuncTransform=='logRatio'){
                     for(let i=0; i<$output.length; i++){
-                        $output[i] = Math.log(varY[i])/Math.log(varYNorm[i])
+                        $output[i] = Math.log(varY[i])-Math.log(varYNorm[i])
                     }                
                 }
                 return $output
@@ -650,7 +650,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
                 }
                 else if(diffFuncTransform=='logRatio'){
                     for(let i=0; i<$output.length; i++){
-                        $output[i] = Math.log(varY[i])/Math.log(varYNorm[i])
+                        $output[i] = Math.log(varY[i])-Math.log(varYNorm[i])
                     }                
                 }
                 return $output
@@ -672,7 +672,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
                 }
                 else if(diffFuncWeightsTransform=='logRatio'){
                     for(let i=0; i<$output.length; i++){
-                        $output[i] = Math.log(varY[i])/Math.log(varYNorm[i])
+                        $output[i] = Math.log(varY[i])-Math.log(varYNorm[i])
                     }                
                 }
                 return $output
