@@ -935,11 +935,13 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
 
     yAxisTitleWeightsMean = "Mean({varY}) - Mean({varY} (ref)) ({diffFuncWeightsTransform})"
     yAxisTitleWeightsStd = "Std({varY}) - Std({varY} (ref)) ({diffFuncWeightsTransform})"
-    yAxisTitleWeightsMedian = "Mdiean({varY}) - Median({varY} (ref)) ({diffFuncWeightsTransform})"
+    yAxisTitleWeightsMedian = "Median({varY}) - Median({varY} (ref)) ({diffFuncWeightsTransform})"
+    yAxisTitleWeightsMeanMedian = "Delta mean, delta median {varY} ({diffFuncWeightsTransform})"
 
     yAxisTitleNormWeightsMean = f"Mean({yAxisTitleNorm}) - Mean({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
     yAxisTitleNormWeightsStd = f"Std({yAxisTitleNorm}) - Std({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
     yAxisTitleNormWeightsMedian = f"Mdiean({yAxisTitleNorm}) - Median({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
+    yAxisTitleNormWeightsMeanMedian = f"Delta mean, delta median {yAxisTitleNorm} ({{diffFuncWeightsTransform}})"
 
     figureArray=[
         # histo XY
@@ -954,7 +956,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         [["bin_center_0"], ["mean","quantile_1"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_1"}],   
-        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.mean, projXYRef_1.mean)", "diffFuncWeights(histoXYData_1.quantile_1, projXYRef_1.quantile_1)"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":f"{yAxisTitleWeightsMean}, {yAxisTitleWeightsMedian}"}],
+        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.mean, projXYRef_1.mean)", "diffFuncWeights(histoXYData_1.quantile_1, projXYRef_1.quantile_1)"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":yAxisTitleWeightsMeanMedian}],
         [["bin_center_0"], ["diffFuncWeights(histoXYData_1.std,  projXYRef_1.std )"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":yAxisTitleWeightsStd}],
         [["bin_center_0"], ["diffFuncWeights(bin_count, histoXYRef)"], { "source":"histoXYData", "colorZvar": "bin_center_1","xAxisTitle":"{varX}","yAxisTitle":"{varY} - {varY} (ref)"}],
         # histoXYNorm
@@ -969,9 +971,9 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         [["bin_center_0"], ["mean","quantile_1"], { "source":"projXYNormRef_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm+" (ref)"}],
         [["bin_center_0"], ["std"], { "source":"projXYNormRef_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm+" (ref)"}],
         [["bin_center_0"], ["histoXYRef"], { "source":"histoXYNormData", "colorZvar": "bin_center_1","yAxisTitle":yAxisTitleNorm+" (ref)"}],   
-        [["bin_center_0"], ["diffFuncWeights(histoXYNormData_1.mean, projXYNormRef_1.mean)", "diffFuncWeights(histoXYNormData_1.quantile_1, projXYNormRef_1.quantile_1)"], { "source":"histoXYNormData_1_join","errY":"sqrt(histoXYNormData_1.std**2+projXYNormRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}"}],
-        [["bin_center_0"], ["diffFuncWeights(histoXYNormData_1.std, projXYNormRef_1.std)"], { "source":"histoXYNormData_1_join","errY":"std/sqrt(entries)","xAxisTitle":"{varX}"}],
-        [["bin_center_0"], ["diffFuncWeights(bin_count, histoXYRef)"], { "source":"histoXYNormData", "colorZvar": "bin_center_1","xAxisTitle":"{varX}"}],
+        [["bin_center_0"], ["diffFuncWeights(histoXYNormData_1.mean, projXYNormRef_1.mean)", "diffFuncWeights(histoXYNormData_1.quantile_1, projXYNormRef_1.quantile_1)"], { "source":"histoXYNormData_1_join","errY":"sqrt(histoXYNormData_1.std**2+projXYNormRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}", "yAxisTitle":yAxisTitleNormWeightsMeanMedian}],
+        [["bin_center_0"], ["diffFuncWeights(histoXYNormData_1.std, projXYNormRef_1.std)"], { "source":"histoXYNormData_1_join","errY":"std/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":yAxisTitleNormWeightsStd}],
+        [["bin_center_0"], ["diffFuncWeights(bin_count, histoXYRef)"], { "source":"histoXYNormData", "colorZvar": "bin_center_1","xAxisTitle":"{varX}","yAxisTitle":f"{yAxisTitleNorm} - {yAxisTitleNorm} (ref)"}],
         # histoXYZ
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["entries"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
