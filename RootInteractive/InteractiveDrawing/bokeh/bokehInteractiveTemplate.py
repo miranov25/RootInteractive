@@ -933,7 +933,13 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
 
     yAxisTitleNorm = "{varY}-{varYNorm} ({diffFuncTransform})"
 
-    yAxisTitleWeightsMean = "Mean()"
+    yAxisTitleWeightsMean = "Mean({varY}) - Mean({varY} (ref)) ({diffFuncWeightsTransform})"
+    yAxisTitleWeightsStd = "Std({varY}) - Std({varY} (ref)) ({diffFuncWeightsTransform})"
+    yAxisTitleWeightsMedian = "Mdiean({varY}) - Median({varY} (ref)) ({diffFuncWeightsTransform})"
+
+    yAxisTitleNormWeightsMean = f"Mean({yAxisTitleNorm}) - Mean({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
+    yAxisTitleNormWeightsStd = f"Std({yAxisTitleNorm}) - Std({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
+    yAxisTitleNormWeightsMedian = f"Mdiean({yAxisTitleNorm}) - Median({yAxisTitleNorm} (ref)) ({{diffFuncWeightsTransform}})"
 
     figureArray=[
         # histo XY
@@ -948,9 +954,9 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         [["bin_center_0"], ["mean","quantile_1"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"projXYRef_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["histoXYRef"], { "source":"histoXYData", "colorZvar": "bin_center_1"}],   
-        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.mean, projXYRef_1.mean)", "diffFuncWeights(histoXYData_1.quantile_1, projXYRef_1.quantile_1)"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}"}],
-        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.std,  projXYRef_1.std )"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)","xAxisTitle":"{varX}"}],
-        [["bin_center_0"], ["diffFuncWeights(bin_count, histoXYRef)"], { "source":"histoXYData", "colorZvar": "bin_center_1","xAxisTitle":"{varX}"}],
+        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.mean, projXYRef_1.mean)", "diffFuncWeights(histoXYData_1.quantile_1, projXYRef_1.quantile_1)"], { "source":"histoXYData_1_join","errY":"sqrt(histoXYData_1.std**2+projXYRef_1.std**2)/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":f"{yAxisTitleWeightsMean}, {yAxisTitleWeightsMedian}"}],
+        [["bin_center_0"], ["diffFuncWeights(histoXYData_1.std,  projXYRef_1.std )"], { "source":"histoXYData_1_join","errY":"std/sqrt(entries)","xAxisTitle":"{varX}","yAxisTitle":yAxisTitleWeightsStd}],
+        [["bin_center_0"], ["diffFuncWeights(bin_count, histoXYRef)"], { "source":"histoXYData", "colorZvar": "bin_center_1","xAxisTitle":"{varX}","yAxisTitle":"{varY} - {varY} (ref)"}],
         # histoXYNorm
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
         [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
@@ -1010,13 +1016,13 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
     ]
     figureLayoutDesc={
         "histoXY":[[0,1],[2,3], {"plot_height":250}],
-        "histoXYWeight":[[4,5,6],[7,8,9], [10,11,12],{"plot_height":200}],
+        "histoXYWeight":[[4,5,6],[7,8,9], [10,11,12],{"plot_height":220}],
         "histoXYNorm":[[13,14],[15,16],{"plot_height":250}],
-        "histoXYNormWeight":[[17,18,19],[20,21,22], [23,24,25],{"plot_height":200}],
+        "histoXYNormWeight":[[17,18,19],[20,21,22], [23,24,25],{"plot_height":220}],
         "histoXYZ":[[26,27],[28,29],{"plot_height":250}],
-        "histoXYZWeight":[[30,31,32],[33,34,35], [36,37,38],{"plot_height":200}],
+        "histoXYZWeight":[[30,31,32],[33,34,35], [36,37,38],{"plot_height":220}],
         "histoXYNormZ":[[39,40],[41,42],{"plot_height":250}],
-        "histoXYNormZWeight":[[43,44,45],[46,47,48], [49,50,51],{"plot_height":200}],
+        "histoXYNormZWeight":[[43,44,45],[46,47,48], [49,50,51],{"plot_height":220}],
         "histoXYNormZMedian":[[52,53],{"plot_height":350}],
         "histoXYNormZMean":[[54,55],{"plot_height":350}],
     }
