@@ -2256,6 +2256,8 @@ def makeCdsSel(cdsDict, paramDict, key, filter=""):
     else:
         cds_used["cdsSel"] = {}
     cds_name = key if key is not None else "default cds"
+    if filter != "None":
+        cds_name = cds_name + "#" + filter
     nPoints = cds_used.get("nPointRender",-1)
     if nPoints in paramDict:
         nPoints = paramDict[cds_used["nPointRender"]]["value"]
