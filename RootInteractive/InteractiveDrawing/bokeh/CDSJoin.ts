@@ -216,7 +216,6 @@ export class CDSJoin extends ColumnarDataSource {
       }
     }
     this.cached_columns.add(key)
-    console.log(data[key])
     return data[key]
   }
 
