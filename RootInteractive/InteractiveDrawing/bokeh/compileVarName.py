@@ -89,7 +89,7 @@ class ColumnEvaluator:
             return self.visit_Call(node)
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
-        elif isinstance(node, ast.Num):
+        elif isinstance(node, ast.Num) or isinstance(node, ast.Constant):
             return self.visit_Num(node)
         elif isinstance(node, ast.BinOp):
             return self.visit_BinOp(node)
