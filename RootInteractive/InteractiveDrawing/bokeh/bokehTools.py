@@ -1325,7 +1325,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
-    cdsHisto = histoHandle["cdsSel"]
+    cdsHisto = histoHandle["cdsSel"][None]
 
     tooltips = None
     if "tooltips" in histoHandle:
@@ -1361,7 +1361,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
 
 
 def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
-    cdsHisto = histoHandle["cdsSel"]
+    cdsHisto = histoHandle["cdsSel"][None]
     if 'color' in options:
         colorHisto = options['color']
     tooltips = None
