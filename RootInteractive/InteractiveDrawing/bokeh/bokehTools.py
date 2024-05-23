@@ -1228,16 +1228,19 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                                                                             """)])
         cdsFull.columnDependencies = list(aliasArrayLocal)
 
-    for iCds, widgets in widgetDict.items():
-        widgetList = widgets["widgetList"]
-        cdsOrig = cdsDict[iCds]["cdsOrig"]
-        cdsFull = cdsDict[iCds]["cdsFull"]
-        cdsSel = cdsDict[iCds].get("cdsSel", None)
+    for iName, iCds in cdsDict.items():
+        if "cdsFull" not in iCds:
+            continue
+        widgets = widgetDict.get(iName, {})
+        widgetList = widgets.get("widgetList", [])
+        cdsOrig = iCds["cdsOrig"]
+        cdsFull = iCds["cdsFull"]
+        cdsSel = iCds.get("cdsSel", None)
         histoList = []
         for cdsKey, cdsValue in cdsDict.items():
             if cdsKey not in memoized_columns or "cdsOrig" not in cdsValue:
                 continue
-            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue.get("source", None) == iCds:
+            if cdsValue["type"] in ["histogram", "histo2d", "histoNd"] and cdsValue.get("source", None) == iName:
                 if isinstance(cdsValue["cdsOrig"], CDSStack):
                     for i in cdsValue["cdsOrig"].sources:
                         histoList.append(i)
@@ -1247,14 +1250,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         for iWidget in widgetList:
             if "filter" in iWidget:
                 field = iWidget["filter"].field
-                if memoized_columns[iCds][field]["type"] in ["alias", "expr"]:
+                if memoized_columns[iName][field]["type"] in ["alias", "expr"]:
                     iWidget["filter"].source = cdsFull
                 else:
                     iWidget["filter"].source = cdsOrig    
                 intersectionFilter.filters.append(iWidget["filter"])
         if cdsSel is not None:
             for iFilter, iCdsSel in cdsSel.items():
-                filterNew = cdsDict[iCds].get("filters", {}).get(iFilter, None)
+                filterNew = iCds.get("filters", {}).get(iFilter, None)
                 if filterNew is not None:
                     if len(intersectionFilter.filters)>0:
                         iCdsSel.filter = LazyIntersectionFilter(filters=[intersectionFilter, filterNew])
