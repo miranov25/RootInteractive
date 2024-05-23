@@ -56,7 +56,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     this.low = 0
     this.high = -1
     this._needs_update = true
-    this._is_trivial = this.nPoints < 0
+    this._is_trivial = this.nPoints < 0 && this.filter == null
     this._cached_columns = new Set()
   }
 
