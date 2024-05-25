@@ -124,7 +124,15 @@ class ColumnEvaluator:
             "is_customjs_func": left.get("is_customjs", False)
         }
 
-    def visit_Num(self, node: ast.Num):
+    def visit_Num(self, node: ast.Constant):
+        if isinstance(node.value, bool):
+            return {
+            "name": str(node.n),
+            "implementation": "true" if node.n else "false",
+            "type": "constant",
+            "value": node.n,
+            "is_boolean": True            
+            }
         # Kept for compatibility with old Python
         return {
             "name": str(node.n),
