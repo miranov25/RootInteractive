@@ -73,13 +73,14 @@ class ColumnEvaluator:
         self.context = context
         self.dependencies = set()
         self.paramDependencies = set()
-        self.aliasDependencies = set()
+        self.aliasDependencies = {}
         self.firstGeneratedID = firstGeneratedID
         self.code = code
         self.isSource = True 
         self.aliasDict = aliasDict
         self.isAuto = False
         self.locals = []
+        self.helper_idx = 0
 
     def visit(self, node):
         if isinstance(node, ast.Attribute):
@@ -88,7 +89,7 @@ class ColumnEvaluator:
             return self.visit_Call(node)
         elif isinstance(node, ast.Name):
             return self.visit_Name(node)
-        elif isinstance(node, ast.Num):
+        elif isinstance(node, ast.Num) or isinstance(node, ast.Constant):
             return self.visit_Num(node)
         elif isinstance(node, ast.BinOp):
             return self.visit_BinOp(node)
@@ -119,10 +120,19 @@ class ColumnEvaluator:
         return {
             "implementation": implementation,
             "type": "javascript",
-            "name": self.code
+            "name": self.code,
+            "is_customjs_func": left.get("is_customjs", False)
         }
 
-    def visit_Num(self, node: ast.Num):
+    def visit_Num(self, node: ast.Constant):
+        if isinstance(node.value, bool):
+            return {
+            "name": str(node.n),
+            "implementation": "true" if node.n else "false",
+            "type": "constant",
+            "value": node.n,
+            "is_boolean": True            
+            }
         # Kept for compatibility with old Python
         return {
             "name": str(node.n),
@@ -145,7 +155,7 @@ class ColumnEvaluator:
             elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
                 for i in self.aliasDict[self.context][node.attr]["fields"]:
                     self.dependencies.add((self.context, i))
-            self.aliasDependencies.add(node.attr)
+            self.aliasDependencies[node.attr] = node.attr
             return {
                 "name": node.attr,
                 "implementation": node.attr,
@@ -176,10 +186,16 @@ class ColumnEvaluator:
             if(cds_used < len(attrChain)):
                 if attrChain[cds_used] in [cds["left"], cds["right"]]:
                     self.dependencies.add((attrChain[cds_used], node.attr))
-            self.aliasDependencies.add(node.attr)
+            if attrChain[0] == "self":
+                attrChainStr = '.'.join(attrChain[1:] + [node.attr])
+            else:
+                attrChainStr = '.'.join(attrChain + [node.attr])
+            if attrChainStr not in self.aliasDependencies:
+                self.aliasDependencies[attrChainStr] = "$parameter_" + str(self.helper_idx)
+                self.helper_idx += 1
             return {
                 "name": node.attr,
-                "implementation": node.attr,
+                "implementation": self.aliasDependencies[attrChainStr],
                 "type": "column"
             }
         if not isinstance(node.value, ast.Name):
@@ -208,7 +224,7 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
             #}           
-        self.aliasDependencies.add(node.attr)
+        self.aliasDependencies[node.attr] = node.attr
         try:
             is_boolean = "data" in self.cdsDict[self.context] and self.cdsDict[self.context]["data"][node.attr].dtype.kind == "b"
         except AttributeError:
@@ -248,8 +264,9 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "n_args": len(self.funcDict[node.id]["parameters"]),
-                "type": "js_lambda"
+                "n_args": len(self.funcDict[node.id].parameters),
+                "type": "js_lambda",
+                "is_customjs": True
             }
         if node.id in self.paramDict:
             self.isSource = False
@@ -308,7 +325,7 @@ class ColumnEvaluator:
             #    "error": KeyError,
             #    "msg": "Column " + id + " not found in histogram " + histogram["name"]
             #}
-        self.aliasDependencies.add(id)
+        self.aliasDependencies[id] = id
         return {
             "name": id,
             "implementation": id,
@@ -516,8 +533,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         aliasDict[i_context] = {}
                     columnName = column["name"]
                     func = "return "+column["implementation"]
-                    variablesAlias = list(evaluator.aliasDependencies)
-                    fieldsAlias = list(evaluator.aliasDependencies)
+                    variablesAlias = list(evaluator.aliasDependencies.keys())
+                    fieldsAlias = list(evaluator.aliasDependencies.values())
                     parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
                     variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
                     nvars_local = len(variablesAlias)
@@ -531,7 +548,11 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         variablesAlias.append(paramDict[j]["value"])
                         fieldsAlias.append(j)
                         nvars_local = nvars_local+1
-                    transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
+                    is_customjs_func = column.get("is_customjs_func", False)
+                    if is_customjs_func:
+                        transform = funcDict[queryAST.body.func.id]
+                    else:
+                        transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []

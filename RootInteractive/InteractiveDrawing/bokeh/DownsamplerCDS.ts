@@ -56,7 +56,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     this.low = 0
     this.high = -1
     this._needs_update = true
-    this._is_trivial = false
+    this._is_trivial = this.nPoints < 0 && this.filter == null
     this._cached_columns = new Set()
   }
 
@@ -86,8 +86,10 @@ export class DownsamplerCDS extends ColumnDataSource {
   update(){
     const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
+    console.log(this.name)
     if(filter == null && (nPoints < 0 || nPoints >= l)){
       this._is_trivial = true
+      this._needs_update = false
       return
     }
     if(nPoints < 0 || nPoints >= l){
@@ -226,6 +228,9 @@ export class DownsamplerCDS extends ColumnDataSource {
     }
   }
 
-  //Needed because of typescript, is supposed to be a nop
-  on_visible_change(){}
+  on_visible_change(){
+    if(this.watched && this._needs_update){
+      this.change.emit()
+    }   
+  }
 }

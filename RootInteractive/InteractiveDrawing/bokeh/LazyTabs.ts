@@ -62,11 +62,13 @@ export namespace LazyTabs {
         const {active, _last_index} = this
         const old_renderers = this.renderers[_last_index]
         for(let i=0; i<old_renderers.length; i++){
-          old_renderers[i].watched = false
+          old_renderers[i].properties.watched._value = false
+          old_renderers[i].on_visible_change()
         }
         const active_renderers = this.renderers[active]
         for(let i=0; i<active_renderers.length; i++){
-          active_renderers[i].watched = true
+          active_renderers[i].properties.watched._value = true
+          active_renderers[i].on_visible_change()
         }
         this._last_index = active
     }
@@ -75,7 +77,8 @@ export namespace LazyTabs {
       const {_last_index, watched} = this
       const active_renderers = this.renderers[_last_index]
       for(let i=0; i<active_renderers.length; i++){
-        active_renderers[i].watched = watched
+        active_renderers[i].properties.watched._value = watched
+        active_renderers[i].on_visible_change()
       }
    //   tabs[_last_index].child.visible = visible
     }
