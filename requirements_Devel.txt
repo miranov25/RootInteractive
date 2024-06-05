@@ -5,8 +5,8 @@ pytest_tornasync
 pytest-json-report
 pytest-regressions
 pytest-datadir
-pytest-parallel
+pytest-parallel        # this is not working with the python3.10 and default path
+pytest-xdist           # this is proven to work with python3.10 standard running - pytest -n 24
 jq
 pyparsing
 #
-uproot
