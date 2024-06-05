@@ -29,7 +29,7 @@ export class LazyIntersectionFilter extends RIFilter {
   changed: Set<number>
   counts: number[]
   cached_vector: boolean[]
-  old_values: boolean[][]
+  old_values: number[][]
   cached_indices: number[]
   changed_indices: boolean
   _changed_values: boolean
@@ -77,8 +77,8 @@ export class LazyIntersectionFilter extends RIFilter {
             this.old_values[x] = []
         }
         const values = filters[x].v_compute()
-        while(this.old_values[x].length < values.length){
-            this.old_values[x].push(true)
+        while(this.old_values[x].length < values.length / 32 + 1){
+            this.old_values[x].push(-1)
         }
         if(this.counts == null){
             this.counts = Array(values.length).fill(0)
@@ -86,22 +86,32 @@ export class LazyIntersectionFilter extends RIFilter {
         this.counts.length = values.length
         const invert = filters[x].invert
         const old_values = this.old_values[x]
+	let mask = 1
         if(filters[x].active){
+	debugger
           for(let i=0; i < values.length; i++){
             const new_value = values[i]!==invert
 	    let old_count = this.counts[i]
             this.counts[i] += new_value ? 1 : 0
-            this.counts[i] -= old_values[i] ? 1 : 0
+            this.counts[i] -= old_values[i >> 5] & mask ? 1 : 0
 	    this._changed_values ||= (!!old_count !== !!this.counts[i])
-            old_values[i] = new_value
+	    if (new_value){
+		    old_values[i >> 5] |= mask
+	    } else {
+		    old_values[i >> 5] &= ~mask
+	    }
+	    mask = mask << 1
+	    if (mask === 0) mask = 1
           }
         } else {
           for(let i=0; i < values.length; i++){
             let old_count = this.counts[i]
             this.counts[i] += 1
-            this.counts[i] -= old_values[i] ? 1 : 0
+            this.counts[i] -= old_values[i >> 5] & mask ? 1 : 0
 	    this._changed_values ||= (!!old_count !== !!this.counts[i])
-            old_values[i] = true
+            old_values[i >> 5] |= mask
+	    mask = mask << 1
+	    if (mask === 0) mask = 1
           }            
         }
     }
