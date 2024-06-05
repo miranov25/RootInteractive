@@ -250,22 +250,25 @@ export class HistoNdCDS extends ColumnarDataSource {
         }
       }
     } else {
-      const n_indices = view_indices.length
+      const n_indices = this.source.length
       if(weights != null){
         const weights_array = this.source.get_column(weights)
         if (weights_array == null){
           throw ReferenceError("Column "+ weights + " not found in " + this.source.name)
         }
         for(let i=0; i<n_indices; i++){
-          let j = view_indices[i]
-          const bin = this.getbin(j, sample_array)
+          if (!view_indices[i])
+            continue
+          const bin = this.getbin(i, sample_array)
           if(bin >= 0 && bin < length){
-            bincount[bin] += weights_array[j]
+            bincount[bin] += weights_array[i]
           }
         }
       } else {
         for(let i=0; i<n_indices; i++){
-          const bin = this.getbin(view_indices[i], sample_array)
+          if (!view_indices[i])
+            continue
+          const bin = this.getbin(i, sample_array)
           if(bin >= 0 && bin < length){
             bincount[bin] += 1
           }
@@ -424,12 +427,11 @@ export class HistoNdCDS extends ColumnarDataSource {
     let range_min = Infinity
     let range_max = -Infinity
     const view = this.view!
-    const l = this.view!.length
+    const l = view!.length
     for(let x=0; x<l; x++){
-      const y = view[x]
-      if(isFinite(column[y])){
-        range_min = Math.min(range_min, column[y])
-        range_max = Math.max(range_max, column[y])
+      if(view[x] && isFinite(column[x])){
+        range_min = Math.min(range_min, column[x])
+        range_max = Math.max(range_max, column[x])
       }
     }
     if(range_min == range_max){
@@ -451,7 +453,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._unweighted_histogram = null
     this.cached_columns.clear()
     if(this.filter != null && this.filter.active){
-      this.view = this.filter.get_indices()
+      this.view = this.filter.v_compute()
     } else {
       this.view = null
     }
@@ -522,7 +524,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       working_indices[i] -= histogram[i]
     }
     const view_sorted: number[] = Array(n_entries).fill(0)
-    const l = view != null ? view.length : source.get_length()!
+    const l = source.get_length()!
     if(view == null){
       for(let i=0; i<l; i++){
         let bin_idx = this.getbin(i, sample_array)
@@ -534,8 +536,8 @@ export class HistoNdCDS extends ColumnarDataSource {
     } else {
       for(let i=0; i<l; i++){
         let bin_idx = this.getbin(view[i], sample_array)
-        if(bin_idx >= 0){
-          view_sorted[working_indices[bin_idx]] = view[i]
+        if(bin_idx >= 0 && view[i]){
+          view_sorted[working_indices[bin_idx]] = i
           working_indices[bin_idx] ++
         }
       }
