@@ -88,7 +88,6 @@ export class LazyIntersectionFilter extends RIFilter {
         const old_values = this.old_values[x]
 	let mask = 1
         if(filters[x].active){
-	debugger
           for(let i=0; i < values.length; i++){
             const new_value = values[i]!==invert
 	    let old_count = this.counts[i]
