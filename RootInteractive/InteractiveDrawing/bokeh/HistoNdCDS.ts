@@ -535,7 +535,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
     } else {
       for(let i=0; i<l; i++){
-        let bin_idx = this.getbin(view[i], sample_array)
+        let bin_idx = this.getbin(i, sample_array)
         if(bin_idx >= 0 && view[i]){
           view_sorted[working_indices[bin_idx]] = i
           working_indices[bin_idx] ++
