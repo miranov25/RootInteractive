@@ -9,6 +9,7 @@ export namespace CustomJSNAryFunction {
     fields: p.Property<Array<string>>
     func: p.Property<string | null>
     v_func: p.Property<string | null>
+    auto_fields:p.Property<boolean>
   }
 }
 
@@ -24,11 +25,12 @@ export class CustomJSNAryFunction extends Model {
   static __name__ = "CustomJSNAryFunction"
 
   static {
-    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable})=>({
+    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable, Boolean})=>({
       parameters:  [Any, {}],
       fields: [Array(String), []],
       func:    [ Nullable(String), null ],
-      v_func:  [Nullable(String), null]
+      v_func:  [Nullable(String), null],
+      auto_fields: [Boolean, false]
     }))
   }
 
@@ -40,6 +42,8 @@ export class CustomJSNAryFunction extends Model {
 
   args_keys: Array<string>
   args_values: Array<any>
+
+  effective_fields: Array<string>
 
   scalar_func: Function | null
   vector_func: Function | null
@@ -53,9 +57,10 @@ export class CustomJSNAryFunction extends Model {
 	    this.scalar_func = null
 	    return
     }
+    this.compute_effective_fields(this.func)
     this.args_keys = Object.keys(this.parameters)
     this.args_values = Object.values(this.parameters)
-    this.scalar_func = new Function(...this.args_keys, ...this.fields, '"use strict";\n'+this.func)
+    this.scalar_func = new Function(...this.args_keys, ...this.effective_fields, '"use strict";\n'+this.func)
     this.change.emit()
   }
 
@@ -68,9 +73,10 @@ export class CustomJSNAryFunction extends Model {
 	    this.vector_func = null
 	    return
     }
+    this.compute_effective_fields(this.v_func)
     this.args_keys = Object.keys(this.parameters)
     this.args_values = Object.values(this.parameters)
-    this.vector_func = new Function(...this.args_keys, ...this.fields, "data_source", "$output",'"use strict";\n'+this.v_func)
+    this.vector_func = new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output",'"use strict";\n'+this.v_func)
     this.change.emit()
   }
 
@@ -86,6 +92,23 @@ export class CustomJSNAryFunction extends Model {
       } else {
           return null
       }
+  }
+
+  compute_effective_fields(search:string){
+    if(!this.auto_fields){
+      this.effective_fields = this.fields
+      return
+    }
+    this.effective_fields = []
+    for (const field of this.fields) {
+      if(search.includes(field)){
+        this.effective_fields.push(field)
+      }
+    }
+  }
+
+  get_fields():string[]{
+    return this.effective_fields
   }
 
 }

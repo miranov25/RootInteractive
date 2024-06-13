@@ -106,7 +106,13 @@ export class CDSAlias extends ColumnarDataSource {
           return
         }
         _locked_columns.add(key)
-        const fields = column.fields.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        let field_names
+        if (column.fields === "auto"){
+          field_names = column.transform.get_fields()
+        } else {
+          field_names = column.fields
+        }
+        const fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column){
             data[key] = new_column
@@ -123,7 +129,7 @@ export class CDSAlias extends ColumnarDataSource {
               new_column[i] = column.transform.compute(row)
             }  
   	    } catch (error) {
-		console.error(error)
+		      console.error(error)
 	    }	    
         } else{
             new_column = new Array(len).fill(.0)

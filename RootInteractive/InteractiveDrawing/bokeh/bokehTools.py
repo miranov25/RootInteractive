@@ -1216,8 +1216,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if "transform" in aliasDict[cdsKey][columnKey]:
                         aliasArrayLocal.add(aliasDict[cdsKey][columnKey]["transform"])
                     if "fields" in aliasDict[cdsKey][columnKey] and aliasDict[cdsKey][columnKey]["fields"] is None:
-                        aliasDict[cdsKey][columnKey]["fields"] = weakAll
+                        aliasDict[cdsKey][columnKey]["fields"] = "auto"
                         aliasDict[cdsKey][columnKey]["transform"].fields = weakAll
+                        aliasDict[cdsKey][columnKey]["transform"].auto_fields = True
                 # Columns directly controlled by parameter
                 elif value["type"] == "parameter":
                     cdsFull.mapping[columnKey] = paramDict[value["name"]]["value"]
