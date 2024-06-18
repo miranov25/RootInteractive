@@ -116,7 +116,7 @@ export function weighted_kth_value(sample:number[], weights: number[], k:number,
   
   // Cholesky decomposition without pivoting - inplace
 // TODO: Perhaps add a version with pivoting too?
-function chol(X: number[], nRows: number){
+export function chol(X: number[], nRows: number){
   let iRow = 0
   let jRow, kRow
   for(let i=0; i < nRows; ++i){
