@@ -600,9 +600,9 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         variables = []
     variablesCopy = [i for i in variables if re.match(RE_VALID_JS_NAME, i)]
     aliasArray=[
-        {"name": "funCustom0",  "func":"funCustomForm0", "variables":variablesCopy},
-        {"name": "funCustom1",  "func":"funCustomForm1", "variables":variablesCopy},
-        {"name": "funCustom2",  "func":"funCustomForm2", "variables":variablesCopy},
+        {"name": "funCustom0",  "func":"funCustomForm0"},
+        {"name": "funCustom1",  "func":"funCustomForm1"},
+        {"name": "funCustom2",  "func":"funCustomForm2"},
     ]
     variables.extend(["funCustom0","funCustom1","funCustom2"])
 
