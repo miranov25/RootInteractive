@@ -1011,8 +1011,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     y_label = getHistogramAxisTitle(cdsDict, bottom, cds_name)
                     if y_transform:
                         y_label = f"{{{y_transform}}} {y_label}"
-                    drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=dataSpecLeft, right=dataSpecRight,
-                    fill_alpha=1, source=cds_used, color=color, legend_label=y_label + " vs " + x_label)
+                    legend_label = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
+                    if isinstance(legend_label, str):
+                        drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=dataSpecLeft, right=dataSpecRight,
+                        fill_alpha=1, source=cds_used, color=color, legend_label=legend_label)
+                    else:
+                        drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=dataSpecLeft, right=dataSpecRight,
+                        fill_alpha=1, source=cds_used, color=color, legend_label=''.join(legend_label.components))
                 elif visualization_type == "scatter":
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]

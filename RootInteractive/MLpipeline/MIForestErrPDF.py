@@ -40,7 +40,13 @@ def _accumulate_predictionNL(predict, X, out,col):
 def simple_predict(predict, X, out, col):
     out[col] = predict(X, check_input=False)
 
-def predictRFStatChunk(rf, X, statDictionary, parallel):
+def _std2(X, out):
+    noise = np.random.permutation(X.shape[1])
+    halflen = X.shape[1] // 2
+    reordered = X[:,noise]
+    np.std(reordered[:,:halflen]-reordered[:,halflen:2*halflen],-1,out=out)
+
+def predictRFStatChunk(rf, X, statDictionary, parallel, n_jobs):
     """
     inspired by https://github.com/scikit-learn/scikit-learn/blob/37ac6788c/sklearn/ensemble/_forest.py#L1410
     This is internal function used in the predictRFStat
@@ -85,6 +91,13 @@ def predictRFStatChunk(rf, X, statDictionary, parallel):
                 for first, last in zip(block_begin, block_end)
                 )
         statOut["std"]=std_out
+    if "std2"  in statDictionary: 
+        std2_out = np.empty(X.shape[0])
+        parallel(
+                delayed(_std2)(allRFTranspose[first:last], std2_out[first:last])
+                for first, last in zip(block_begin, block_end)
+                )
+        statOut["std2"]=std2_out
     if "quantile" in statDictionary:
         statOut["quantile"]={}
         quantiles = np.array(statDictionary["quantile"]) * nEstimators
