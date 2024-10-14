@@ -39,11 +39,11 @@ class AugmentedForestRegressor(RandomForestRegressor):
                  verbose=verbose,
                  warm_start=warm_start)
 
-        # matrix with leaf node for training observation
-        #  in each tree
         self.noise_levels = noise_levels
 
     def _fit_tree(self, tree, X, y, sample_weight, noise_levels):
+        noise = np.random.normal(0,noise_levels)
+        tree.fit(X,y+noise,sample_weight)
         return tree
 
     def fit(self, X, y, sample_weight=None):
