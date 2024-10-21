@@ -2,10 +2,11 @@
 import pandas as pd
 import numpy as np
 import pickle
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import *
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from RootInteractive.MLpipeline.NDFunctionInterface import *
-#from bokeh.io import output_notebook
-from RootInteractive.MLpipeline.RandoForestErrPDF import *
+from RootInteractive.MLpipeline.NDFunctionInterface import *
+from bokeh.io import output_file
+from RootInteractive.MLpipeline.AugmentedForest import AugmentedForestRegressor
 from RootInteractive.MLpipeline.MIForestErrPDF import *
 from RootInteractive.MLpipeline.local_linear_forest import LocalLinearForestRegressor
 
@@ -185,6 +186,6 @@ def makeDashboard(fitter,df):
     return 0
 
 
-appendPrediction(10000)
+#appendPrediction(10000)
 
 #doFitErrRF(400000,1,12,8)
