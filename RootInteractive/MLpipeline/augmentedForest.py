@@ -64,17 +64,44 @@ class AugmentedRandomForestArray:
     # Input parameters include standard options like kernel width
     def __init__(self, n_forests, n_repetitions, n_jobs):
         self.n_jobs = n_jobs
+        self.forests = [RandomForestRegressor(n_repetitions) for i in range(n_forests)]
+        self.estimators_ = []
 
     def fit(self, X, Y, sigma, sample_weight=None):
-        pass
+        total_samples = X.shape[0]
+        indices = np.random.permutation(total_samples)
+        subset_size = total_samples // self.n_estimators
+        if len(sigma) != X.shape[1]:
+            raise ValueError("sigma must have the same length as the number of features in X")
+
+        for i in range(self.n_forests):
+            start_idx = i * subset_size
+            end_idx = (i + 1) * subset_size if i < self.n_forests - 1 else total_samples
+
+            X_train = X[indices[start_idx:end_idx]]
+            Y_train = Y[indices[start_idx:end_idx]]
+
+            # Pre-allocate arrays to hold augmented data
+            augmented_X = np.zeros((self.n_repetitions * X_train.shape[0], X_train.shape[1]))
+            augmented_Y = np.zeros(self.n_repetitions * X_train.shape[0], dtype=Y.dtype)
+
+            # Fill the pre-allocated arrays
+            for j in range(self.n_repetitions):
+                noise = np.random.normal(0, sigma, X_train.shape)
+                augmented_X[j * X_train.shape[0]:(j + 1) * X_train.shape[0], :] = X_train + noise
+                augmented_Y[j * X_train.shape[0]:(j + 1) * X_train.shape[0]] = Y_train
+
+            # Train the RF model on the augmented data
+            self.forests[i].fit(augmented_X, augmented_Y)
+
+        self.estimators_ = [estimator for forest in self.forests for estimator in forest.estimators_]
         # Fit each random forest with augmented input data
 
-    def predict(self):
-        flattened_forest = [estimator for forest in self.estimators for estimator in forest]
-        pass
+    def predict(self, X, n_jobs):
+        return predictRFStat(self, X, {"mean":[]}, n_jobs)["mean"]
         # Use an ensemble of forests for prediction
         # Unlike standard RFStat which uses a single array of trees, this method uses an array of arrays
 
-    def predictRFStat(self, X, statDictionary, n_jobs):
-        pass
+    def predictRFStat(self, X, statDictionary, n_jobs, max_rows=10000):
+        return predictRFStat(self, X, statDictionary, n_jobs, max_rows)
         # Definition for detailed statistical prediction using random forests
