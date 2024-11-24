@@ -92,7 +92,7 @@ def appendPrediction(nPoints):
     statDict={"mean":0,"median":0,"std":0}
     dataIn=df[fitter.data.X_values]
     fitter.Models[0].predict(dataIn)
-    return
+    #return
     #
     yPred0 = fitter.Models[0].predictStat(dataIn, 0, statDict, slice(0,dataIn.shape[0]))
     df["pred0"]=statDict["mean"]
@@ -167,7 +167,6 @@ def makeDashboard(fitter,df):
         "Errors":figureLayoutDescT1
     }
 
-
     widgetParams=[
         ['range', ['A']],
         ['range', ['B']],
@@ -181,11 +180,11 @@ def makeDashboard(fitter,df):
     ]
     widgetLayoutDesc=[[0, 1, 2,3], [4, 5,6,7], {'sizing_mode': 'scale_width'}]
     output_file("test_ErrPdf500000.html")
-    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDescT, tooltips=tooltips,
+    xxx = bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDescT, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=500, histogramArray=histoArray)
     return 0
 
 
-#appendPrediction(10000)
+doFitErrRF(400000,1,12,8)
+appendPrediction(10000)
 
-#doFitErrRF(400000,1,12,8)
