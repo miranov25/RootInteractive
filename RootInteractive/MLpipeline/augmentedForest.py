@@ -66,11 +66,13 @@ class AugmentedRandomForestArray:
         self.n_jobs = n_jobs
         self.forests = [RandomForestRegressor(n_repetitions) for i in range(n_forests)]
         self.estimators_ = []
+        self.n_forests = n_forests
+        self.n_repetitions = n_repetitions
 
     def fit(self, X, Y, sigma, sample_weight=None):
         total_samples = X.shape[0]
         indices = np.random.permutation(total_samples)
-        subset_size = total_samples // self.n_estimators
+        subset_size = total_samples // self.n_forests
         if len(sigma) != X.shape[1]:
             raise ValueError("sigma must have the same length as the number of features in X")
 

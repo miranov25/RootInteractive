@@ -1,17 +1,62 @@
 import numpy as np
+import pandas as pd
+from bokeh.io import output_file
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsNormAll
+from RootInteractive.Tools.compressArray import arrayCompressionRelative16
+from RootInteractive.MLpipeline.AugmentedForest import AugmentedRandomForestArray
 from sklearn.ensemble import RandomForestRegressor
 
-def makeTestExp(n):
-    X = np.random.uniform(0,5,n)
-    noise = np.random.normal(0,.05,[n,2])
-    m1 = np.random.uniform(0,2*np.pi,5)
-    X_smeared = X+noise[0]
-    Y = m1[0]*np.cos(m1[2]*X_smeared+m1[1])*np.exp(m1[3]*X_smeared)+m1[4]+noise[1]
-    Y_true = m1[0]*np.cos(m1[2]*X+m1[1])*np.exp(m1[3]*X)+m1[4]
-    return X,Y,Y_true
+def generateInput(nPoints, outFraction=0.0):
+    """
+    Generate random panda+tree random vectors A,B,C,D
+        * generate function value = A+exp(3B)*sin(6.28C)
+        * generate noise vector
+    """
+    df = pd.DataFrame(np.random.random_sample(size=(nPoints, 4)), columns=list('ABCD'))
+    df["noise"] = np.random.normal(0, 0.2, nPoints)
+    df["noise"] += (np.random.random(nPoints)<outFraction)*np.random.normal(0, 2, nPoints)
+    df["noiseC"] = np.random.normal(0, 0.01, nPoints)
+    df["csin"] = np.sin(6.28 * df["C"])
+    df["ccos"] = np.cos(6.28 * df["C"])
+    df["csinDistorted"] = np.sin(6.28 * (df["C"] + df["noiseC"]))
+    df["valueOrig"] = 3 * df["A"] + np.exp(2 * df["B"]) * df["csin"]
+    df["value"] = 3 * df["A"] + np.exp(2 * df["B"]) * df["csinDistorted"] + df["noise"]
+    df["expB"] =np.exp(2 * df["B"])
+    return df
 
-def fit_testExpAnalyticalOLS(X,Y):
-    m1 = np.zeros(5)
-    m1[4] = np.mean(Y)
-    YNorm = Y-m1[4]
+def makeFits(dfTrain, dfTest):
+    dfNew = dfTest.copy()
+    fitter1 = RandomForestRegressor(100)
+    fitterAugmented =  AugmentedRandomForestArray(10, 10, 4)
+    XTrain = dfTrain[["A","B","C","D"]].to_numpy()
+    yTrain = dfTrain["value"].to_numpy()
+    fitter1.fit(XTrain,yTrain)
+    fitterAugmented.fit(XTrain,yTrain,np.ones(4)*.1)
+    XTest = dfTest[["A","B","C","D"]].to_numpy()
+    dfNew["valuePred"] = fitter1.predict(XTest)
+    dfNew["n_trees"] = 100
+    dfNew["fitter"] = "RandomForestRegressor"
+    return dfNew, fitter1, fitterAugmented
+
+def makeDashboard(df):
+    output_file("test_histogramTemplateMultiYDiff.html")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D", "value", "valueOrig", "valuePred"], multiAxis="varY")
+    widgetsSelect = [
+        ['range', ['A'], {"name":"A"}],
+        ['range', ['B'], {"name":"B"}],
+        ['range', ['C'], {"name":"C"}],
+        ['range', ['D'], {"name":"D"}],
+        ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
+                          jsFunctionArray=jsFunctionArray)
     
+dfTrain = generateInput(100000)
+dfTest = generateInput(10000)
+
+dfNew, fitter1, fitterAugmented = makeFits(dfTrain, dfTest)
+makeDashboard(dfNew)
