@@ -62,12 +62,13 @@ class AugmentedForestRegressor(RandomForestRegressor):
 class AugmentedRandomForestArray:
     # Array of N standard random forests
     # Input parameters include standard options like kernel width
-    def __init__(self, n_forests, n_repetitions, n_jobs):
+    def __init__(self, n_forests, n_repetitions, n_jobs, verbose=0):
         self.n_jobs = n_jobs
         self.forests = [RandomForestRegressor(n_repetitions) for i in range(n_forests)]
         self.estimators_ = []
         self.n_forests = n_forests
         self.n_repetitions = n_repetitions
+        self.verbose = verbose
 
     def fit(self, X, Y, sigma, sample_weight=None):
         total_samples = X.shape[0]
@@ -84,8 +85,8 @@ class AugmentedRandomForestArray:
             Y_train = Y[indices[start_idx:end_idx]]
 
             # Pre-allocate arrays to hold augmented data
-            augmented_X = np.zeros((self.n_repetitions * X_train.shape[0], X_train.shape[1]))
-            augmented_Y = np.zeros(self.n_repetitions * X_train.shape[0], dtype=Y.dtype)
+            augmented_X = np.empty((self.n_repetitions * X_train.shape[0], X_train.shape[1]), dtype=X.dtype)
+            augmented_Y = np.empty(self.n_repetitions * X_train.shape[0], dtype=Y.dtype)
 
             # Fill the pre-allocated arrays
             for j in range(self.n_repetitions):
@@ -99,11 +100,11 @@ class AugmentedRandomForestArray:
         self.estimators_ = [estimator for forest in self.forests for estimator in forest.estimators_]
         # Fit each random forest with augmented input data
 
-    def predict(self, X, n_jobs):
-        return predictRFStat(self, X, {"mean":[]}, n_jobs)["mean"]
+    def predict(self, X):
+        return predictRFStat(self, X, {"mean":[]}, self.n_jobs)["mean"]
         # Use an ensemble of forests for prediction
         # Unlike standard RFStat which uses a single array of trees, this method uses an array of arrays
 
-    def predictRFStat(self, X, statDictionary, n_jobs, max_rows=10000):
-        return predictRFStat(self, X, statDictionary, n_jobs, max_rows)
+    def predictRFStat(self, X, statDictionary, max_rows=10000):
+        return predictRFStat(self, X, statDictionary, self.n_jobs, max_rows)
         # Definition for detailed statistical prediction using random forests

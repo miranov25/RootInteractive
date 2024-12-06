@@ -6,6 +6,7 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArray
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsNormAll
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from RootInteractive.MLpipeline.AugmentedForest import AugmentedRandomForestArray
+from RootInteractive.MLpipeline.MIForestErrPDF import predictRFStat
 from sklearn.ensemble import RandomForestRegressor
 
 def generateInput(nPoints, outFraction=0.0):
@@ -27,36 +28,44 @@ def generateInput(nPoints, outFraction=0.0):
     return df
 
 def makeFits(dfTrain, dfTest):
-    dfNew = dfTest.copy()
     fitter1 = RandomForestRegressor(100)
     fitterAugmented =  AugmentedRandomForestArray(10, 10, 4)
     XTrain = dfTrain[["A","B","C","D"]].to_numpy()
     yTrain = dfTrain["value"].to_numpy()
     fitter1.fit(XTrain,yTrain)
     fitterAugmented.fit(XTrain,yTrain,np.ones(4)*.1)
-    XTest = dfTest[["A","B","C","D"]].to_numpy()
-    dfNew["valuePred"] = fitter1.predict(XTest)
-    dfNew["n_trees"] = 100
-    dfNew["fitter"] = "RandomForestRegressor"
+    XTest = dfTest[["A","B","C","D"]].to_numpy().astype(np.float32)
+    dfFit = dfTest.copy()
+    #dfFit["valuePred"] = fitter1.predict(XTest)
+    dfFit["valuePred"] = predictRFStat(fitter1, XTest, {"mean":[]}, 4)["mean"]
+    dfFit["n_trees"] = 100
+    dfFit["fitter"] = 0
+    dfFitAugmented = dfTest.copy()
+    dfFitAugmented["valuePred"] = fitterAugmented.predict(XTest)
+    dfFitAugmented["n_trees"] = 100
+    dfFitAugmented["fitter"] = 1
+    dfNew = pd.concat([dfFit, dfFitAugmented])
     return dfNew, fitter1, fitterAugmented
 
 def makeDashboard(df):
     output_file("test_histogramTemplateMultiYDiff.html")
-    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D", "value", "valueOrig", "valuePred"], multiAxis="varY")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(variables=["A", "B", "C", "D", "value", "valueOrig", "valuePred"], weights=["fitter==0", "fitter==1", "1"], multiAxis="weights")
     widgetsSelect = [
         ['range', ['A'], {"name":"A"}],
         ['range', ['B'], {"name":"B"}],
         ['range', ['C'], {"name":"C"}],
         ['range', ['D'], {"name":"D"}],
+        ['multiSelect', ['fitter'], {"name":"fitter"}],
         ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
-    widgetLayoutDesc["Select"] = [["A","B"],["C","D"]]
+    widgetLayoutDesc["Select"] = [["A","B"],["C","D"],["fitter"]]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histoArray, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                           jsFunctionArray=jsFunctionArray)
-    
-dfTrain = generateInput(100000)
-dfTest = generateInput(10000)
 
-dfNew, fitter1, fitterAugmented = makeFits(dfTrain, dfTest)
-makeDashboard(dfNew)
+def test_augmentedForest():
+    dfTrain = generateInput(100000)
+    dfTest = generateInput(10000)
+
+    dfNew, fitter1, fitterAugmented = makeFits(dfTrain, dfTest)
+    makeDashboard(dfNew)
