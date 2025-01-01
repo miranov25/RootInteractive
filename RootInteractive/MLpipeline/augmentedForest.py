@@ -62,13 +62,14 @@ class AugmentedForestRegressor(RandomForestRegressor):
 class AugmentedRandomForestArray:
     # Array of N standard random forests
     # Input parameters include standard options like kernel width
-    def __init__(self, n_forests, n_repetitions, n_jobs, verbose=0):
+    def __init__(self, n_forests, n_repetitions, n_jobs, max_depth, verbose=0):
         self.n_jobs = n_jobs
         self.forests = [RandomForestRegressor(n_repetitions) for i in range(n_forests)]
         self.estimators_ = []
         self.n_forests = n_forests
         self.n_repetitions = n_repetitions
         self.verbose = verbose
+        self.max_depth=max_depth
 
     def fit(self, X, Y, sigma, sample_weight=None):
         total_samples = X.shape[0]

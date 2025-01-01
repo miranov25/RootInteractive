@@ -5,18 +5,18 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
 from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsNormAll
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
-from RootInteractive.MLpipeline.AugmentedForest import AugmentedRandomForestArray
+from RootInteractive.MLpipeline.augmentedForest import AugmentedRandomForestArray
 from RootInteractive.MLpipeline.MIForestErrPDF import predictRFStat
 from sklearn.ensemble import RandomForestRegressor
 
-def generateInput(nPoints, outFraction=0.0):
+def generateInput(nPoints, outFraction=0.0, noise=1):
     """
     Generate random panda+tree random vectors A,B,C,D
         * generate function value = A+exp(3B)*sin(6.28C)
         * generate noise vector
     """
     df = pd.DataFrame(np.random.random_sample(size=(nPoints, 4)), columns=list('ABCD'))
-    df["noise"] = np.random.normal(0, 0.2, nPoints)
+    df["noise"] = np.random.normal(0, noise, nPoints)
     df["noise"] += (np.random.random(nPoints)<outFraction)*np.random.normal(0, 2, nPoints)
     df["noiseC"] = np.random.normal(0, 0.01, nPoints)
     df["csin"] = np.sin(6.28 * df["C"])
@@ -28,16 +28,23 @@ def generateInput(nPoints, outFraction=0.0):
     return df
 
 def makeFits(dfTrain, dfTest):
-    fitter1 = RandomForestRegressor(100)
-    fitterAugmented =  AugmentedRandomForestArray(10, 10, 4)
+    # common parameters for test
+    n_estimators=100
+    n_jobs=8
+    max_depth=31
+    n_repetitions=25
+    sigmaAugment = np.array([0.01, 0.01, 0.005, 2.0])
+    #
+    fitter1 = RandomForestRegressor(n_estimators,max_depth=max_depth,n_jobs=n_jobs)
+    fitterAugmented =  AugmentedRandomForestArray(100, n_repetitions=n_repetitions, n_jobs=n_jobs,max_depth=max_depth)
     XTrain = dfTrain[["A","B","C","D"]].to_numpy()
     yTrain = dfTrain["value"].to_numpy()
     fitter1.fit(XTrain,yTrain)
-    fitterAugmented.fit(XTrain,yTrain,np.ones(4)*.1)
+    fitterAugmented.fit(XTrain,yTrain,sigmaAugment)
     XTest = dfTest[["A","B","C","D"]].to_numpy().astype(np.float32)
     dfFit = dfTest.copy()
     #dfFit["valuePred"] = fitter1.predict(XTest)
-    dfFit["valuePred"] = predictRFStat(fitter1, XTest, {"mean":[]}, 4)["mean"]
+    dfFit["valuePred"] = predictRFStat(fitter1, XTest, {"mean":[]}, n_jobs)["mean"]
     dfFit["n_trees"] = 100
     dfFit["fitter"] = 0
     dfFitAugmented = dfTest.copy()
@@ -65,7 +72,7 @@ def makeDashboard(df):
 
 def test_augmentedForest():
     dfTrain = generateInput(100000)
-    dfTest = generateInput(10000)
+    dfTest = generateInput(100000)
 
     dfNew, fitter1, fitterAugmented = makeFits(dfTrain, dfTest)
     makeDashboard(dfNew)
