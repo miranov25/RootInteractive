@@ -1,3 +1,5 @@
+## Augmented kernel XGBOOST  parameter scan
+
 ## Estimating the Standard Deviation of the Mean in the Presence of Correlation
 
 ### Formula for Correlated Measurements:
@@ -119,4 +121,5 @@ The increased standard error reflects the effect of correlation, highlighting th
   It provides a quick estimate of the error when correlations are known and homogeneous.
 - **Alternative Methods for Complex Correlation:**  
   For complex correlations, parametric bootstrapping or block methods offer more accurate uncertainty estimates.
+
 

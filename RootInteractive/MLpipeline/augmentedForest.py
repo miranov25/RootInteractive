@@ -172,7 +172,7 @@ def makeAugmentXGBoost(X, Y, xgbArray, nRepetitions, sigmaVec, sigmaVal, toleran
         nRepetitions (int): Number of times to repeat the augmentation.
         sigmaVec (np.array or list): Standard deviations for Gaussian noise (features).
         sigmaVal (float): Standard deviation for Gaussian noise (target values).
-        tolerance (float): Minimum decrease in RMS to continue training.
+        tolerance (float): Minimum decrease in RMS to continue training as a fraction of the previous RMS
         maxRounds (int): Maximum number of training rounds.
 
     Returns:
@@ -214,6 +214,7 @@ def makeAugmentXGBoost(X, Y, xgbArray, nRepetitions, sigmaVec, sigmaVal, toleran
     pred_stdMedian_history=[]
     pred_stdT_history=[]
     nPoints=X_augmented.shape[0]//nxgb
+    isEarlyStop = False  # Example value for isEarlyStop variable
     for round in range(maxRounds):
         preds = np.zeros((X.shape[0], len(trained_models)))
         # Train each model in the array and collect predictions
@@ -244,9 +245,11 @@ def makeAugmentXGBoost(X, Y, xgbArray, nRepetitions, sigmaVec, sigmaVal, toleran
         print(f"Round {round+1} - RMS Mean: {rms_mean:.4f}, RMS Median: {rms_median:.4f}. Pred std: {pred_std:.4f}  Pred stdT: {pred_stdT:.4f}")
         # Early stopping check
         if len(rms_history) > 3:
-            avg_recent_rms = np.mean(pred_stdT_history[-3:])
-            if pred_stdT_history[-1] > avg_recent_rms + tolerance*avg_recent_rms:
-                print(f"Early stopping at round {round+1} - RMS stabilization. {pred_stdT_history[-1]} - {avg_recent_rms}")
+            avg_recent_rms = np.mean(pred_std_history[-3:])
+            print(f"Avg recent RMS: {avg_recent_rms}  {pred_std_history[-1]}  {avg_recent_rms + tolerance*avg_recent_rms}" )
+            if pred_std_history[-1] > avg_recent_rms + tolerance*avg_recent_rms:
+                print(f"Early stopping at round {round+1} - RMS stabilization. {pred_std_history[-1]} - {avg_recent_rms}")
+                isEarlyStop = True
                 break
 
     # Create DataFrame
@@ -258,4 +261,9 @@ def makeAugmentXGBoost(X, Y, xgbArray, nRepetitions, sigmaVec, sigmaVal, toleran
         'Prediction_Std_Median': pred_stdMedian_history,
         'Prediction_Std_T': pred_stdT_history
     })
-    return trained_models,valPred,dfH,pred_std
+
+    dfH['iter'] = dfH.index  # Add 'iter' as the index
+    dfH['isLast'] = dfH.index == len(dfH) - 1  # True for the last row
+    dfH['isEarlyStop'] = isEarlyStop  # Add 'isEarlyStop' column with the variable's value
+    dfH["avg_recent_rms"]=avg_recent_rms
+    return trained_models,valPred,dfH,rms_values,valPredMedian
