@@ -34,11 +34,14 @@ export class CustomJSNAryFunction extends Model {
 
   initialize(){
     super.initialize()
-    
+    this.initialize_ort(new Uint8Array(atob(this.v_func).split("").map(function (x) {
+      return x.charCodeAt(0)
+    })))
   }
 
   async initialize_ort(bytes: Uint8Array) {
     this._session = await ort.InferrenceSession.create(bytes)
+    this.change.emit()
   }
 
   args_keys: Array<string>
@@ -46,23 +49,13 @@ export class CustomJSNAryFunction extends Model {
 
   effective_fields: Array<string>
 
-  vector_func: Function | null
   _session: any
+
+  _results: any
+  _results_back: any
 
   connect_signals(): void {
     super.connect_signals()
-  }
-
-  update_vfunc(){
-    if(!this.v_func){
-	    this.vector_func = null
-	    return
-    }
-    this.compute_effective_fields(this.v_func)
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
-    this.vector_func = new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output",'"use strict";\n'+this.v_func)
-    this.change.emit()
   }
 
   update_args(){
@@ -71,9 +64,17 @@ export class CustomJSNAryFunction extends Model {
     this.change.emit()
   }
 
-  v_compute(xs: any[], data_source: any, output: any[] | null =null){
-      if(this.vector_func){
-          return this.vector_func(...this.args_values, ...xs, data_source, output)
+  async actually_compute(feeds){
+    this._results = await this._session.run(feeds)
+    this.change.emit()
+  }
+
+  // TODO: Add a get_value function, we want to also support ND functions
+  v_compute(xs: any[], _data_source: any, _output: any[] | null =null){
+      if(this._session){
+          const feeds = Object.fromEntries(this.fields.map((name:string, i:number) => [name, xs[i]]))
+          this.actually_compute(feeds)
+          return this._results
       } else {
           return null
       }
