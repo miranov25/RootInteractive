@@ -3,7 +3,7 @@ from bokeh.models import ColumnDataSource
 
 
 class CDSCompress(ColumnDataSource):
-    __javascript__ = ["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.2/pako.min.js","https://cdnjs.cloudflare.com/ajax/libs/Base64/1.1.0/base64.js"]
+    __javascript__ = ["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.2/pako.min.js"]
     __implementation__ = "CDSCompress.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are

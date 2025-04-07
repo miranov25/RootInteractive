@@ -9,6 +9,7 @@ export namespace CDSAlias {
     mapping: p.Property<Record<string, any>>
     includeOrigColumns: p.Property<boolean>
     columnDependencies: p.Property<any[]>
+    wasmModule: p.Property<string>
   }
 }
 
@@ -31,12 +32,16 @@ export class CDSAlias extends ColumnarDataSource {
 
   _locked_columns: Set<string>
 
+  wasm_memory: WebAssembly.Memory
+  wasm_instance: WebAssembly.Instance
+
   static {
-    this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref})=>({
+    this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref,String})=>({
       source:  [Ref(ColumnarDataSource)],
       mapping:    [ Any, {} ],
       includeOrigColumns: [Boolean, true],
-      columnDependencies: [Array(Any), []]
+      columnDependencies: [Array(Any), []],
+      wasmModule: [String, ""]
     }))
   }
 

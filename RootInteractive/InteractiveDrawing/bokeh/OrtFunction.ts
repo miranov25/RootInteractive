@@ -3,7 +3,7 @@ import * as p from "core/properties"
 
 let ort:any
 
-export namespace OnnxWebRuntimeSession {
+export namespace OrtFunction {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = Model.Props & {
@@ -13,19 +13,19 @@ export namespace OnnxWebRuntimeSession {
   }
 }
 
-export interface CustomJSNAryFunction extends CustomJSNAryFunction.Attrs {}
+export interface OrtFunction extends OrtFunction.Attrs {}
 
-export class CustomJSNAryFunction extends Model {
-  properties: CustomJSNAryFunction.Props
+export class OrtFunction extends Model {
+  properties: OrtFunction.Props
 
-  constructor(attrs?: Partial<CustomJSNAryFunction.Attrs>) {
+  constructor(attrs?: Partial<OrtFunction.Attrs>) {
     super(attrs)
   }
 
-  static __name__ = "CustomJSNAryFunction"
+  static __name__ = "OrtFunction"
 
   static {
-    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable})=>({
+    this.define<OrtFunction.Props>(({Array, String, Any, Nullable})=>({
       parameters:  [Any, {}],
       fields: [Array(String), []],
       v_func:  [Nullable(String), null],
@@ -37,6 +37,7 @@ export class CustomJSNAryFunction extends Model {
     this.initialize_ort(new Uint8Array(atob(this.v_func).split("").map(function (x) {
       return x.charCodeAt(0)
     })))
+    this._dirty_flag = true
   }
 
   async initialize_ort(bytes: Uint8Array) {
@@ -53,6 +54,8 @@ export class CustomJSNAryFunction extends Model {
 
   _results: any
   _results_back: any
+
+  _dirty_flag: boolean
 
   connect_signals(): void {
     super.connect_signals()
