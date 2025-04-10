@@ -69,7 +69,6 @@ export class OrtFunction extends Model {
 
   async actually_compute(feeds){
     this._results = await this._session.run(feeds)
-    this.change.emit()
   }
 
   // TODO: Add a get_value function, we want to also support ND functions
@@ -77,7 +76,7 @@ export class OrtFunction extends Model {
       if(this._session){
           const feeds = Object.fromEntries(this.fields.map((name:string, i:number) => [name, xs[i]]))
           this.actually_compute(feeds)
-          return this._results
+          return _output
       } else {
           return null
       }

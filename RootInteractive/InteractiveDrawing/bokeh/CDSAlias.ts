@@ -77,7 +77,7 @@ export class CDSAlias extends ColumnarDataSource {
     this.connect(this.selected.change, () => this.update_selection())
   }
 
-  compute_function(key: string){
+  async compute_function(key: string){
     const {source, mapping, data, cached_columns, _locked_columns} = this
     const column = mapping[key]
     const len = this.get_length()
