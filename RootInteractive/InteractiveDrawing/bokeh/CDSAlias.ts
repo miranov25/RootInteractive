@@ -32,6 +32,8 @@ export class CDSAlias extends ColumnarDataSource {
 
   _locked_columns: Set<string>
 
+  _pending_columns: Set<string>
+
   wasm_memory: WebAssembly.Memory
   wasm_instance: WebAssembly.Instance
 
@@ -49,6 +51,7 @@ export class CDSAlias extends ColumnarDataSource {
     super.initialize()
     this.cached_columns = new Set()
     this._locked_columns = new Set()
+    this._pending_columns = new Set()
     this.data = {}
    // this.compute_functions()
   }
@@ -122,9 +125,17 @@ export class CDSAlias extends ColumnarDataSource {
         } else {
           field_names = column.fields
         }
-        const fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        let fields: any[] | Record<string, any[]>
+        if(Array.isArray(field_names)){
+          fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        } else {
+
+        }
         let new_column = column.transform.v_compute(fields, this.source, data[key])
-        if(new_column){
+        if(new_column instanceof Promise){
+          new_column = await new_column
+        }
+        if(new_column != null){
             data[key] = new_column
         } else if(data[key] != null){
             new_column = data[key]
@@ -240,7 +251,7 @@ export class CDSAlias extends ColumnarDataSource {
       let should_invalidate = false
       if(column.hasOwnProperty("fields")){
         for(let i=0; i < column.fields.length; i++){
-          if(key == column.fields[i]){
+          if(key === column.fields[i]){
             should_invalidate = true
             break
           }

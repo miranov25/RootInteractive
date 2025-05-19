@@ -1,7 +1,7 @@
 import {Model} from "model"
 import * as p from "core/properties"
 
-let ort:any
+declare const ort:any
 
 export namespace OrtFunction {
   export type Attrs = p.AttrsOf<Props>
@@ -9,7 +9,7 @@ export namespace OrtFunction {
   export type Props = Model.Props & {
     parameters: p.Property<Record<string, any>>
     fields: p.Property<Array<string>>
-    v_func: p.Property<string | null>
+    v_func: p.Property<string>
   }
 }
 
@@ -25,23 +25,28 @@ export class OrtFunction extends Model {
   static __name__ = "OrtFunction"
 
   static {
-    this.define<OrtFunction.Props>(({Array, String, Any, Nullable})=>({
+    this.define<OrtFunction.Props>(({Array, String, Any})=>({
       parameters:  [Any, {}],
       fields: [Array(String), []],
-      v_func:  [Nullable(String), null],
+      v_func:  [String, ""],
     }))
   }
 
   initialize(){
     super.initialize()
-    this.initialize_ort(new Uint8Array(atob(this.v_func).split("").map(function (x) {
+    console.log(ort)
+    window.requestAnimationFrame(() => this.initialize_ort(new Uint8Array(atob(this.v_func).split("").map(function (x) {
       return x.charCodeAt(0)
-    })))
+    }))))
     this._dirty_flag = true
   }
 
   async initialize_ort(bytes: Uint8Array) {
-    this._session = await ort.InferrenceSession.create(bytes)
+    if(!ort){
+      window.requestAnimationFrame(() => this.initialize_ort(bytes))
+      return
+    }
+    this._session = await ort.InferenceSession.create(bytes)
     this.change.emit()
   }
 
@@ -67,16 +72,13 @@ export class OrtFunction extends Model {
     this.change.emit()
   }
 
-  async actually_compute(feeds){
-    this._results = await this._session.run(feeds)
-  }
-
   // TODO: Add a get_value function, we want to also support ND functions
-  v_compute(xs: any[], _data_source: any, _output: any[] | null =null){
+  async v_compute(xs: any[], _data_source: any, _output: any[] | null =null){
       if(this._session){
-          const feeds = Object.fromEntries(this.fields.map((name:string, i:number) => [name, xs[i]]))
-          this.actually_compute(feeds)
-          return _output
+         // const feeds = Object.fromEntries(this.fields.map((name:string, i:number) => [name, xs[i]]))
+          const new_results = await this._session.run(xs)
+          console.log(new_results)
+          return new_results
       } else {
           return null
       }

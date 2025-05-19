@@ -7,4 +7,4 @@ class OrtFunction(Model):
 
     parameters = Dict(String, Any, help="Extra arguments to call the function with")
     fields = List(String, default=[], help="List of positional arguments - might be made optional in the future")
-    v_func = Bytes(help="The ONNX model to use - right now is converted to UInt8Array")
+    v_func = String(help="The ONNX model to use - right now is converted to UInt8Array")
