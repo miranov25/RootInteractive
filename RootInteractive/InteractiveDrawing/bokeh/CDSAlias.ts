@@ -125,12 +125,12 @@ export class CDSAlias extends ColumnarDataSource {
         } else {
           field_names = column.fields
         }
-        let fields: any[] | Record<string, any[]>
-        if(Array.isArray(field_names)){
+        let fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        /*if(Array.isArray(field_names)){
           fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
         } else {
 
-        }
+        }*/
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column instanceof Promise){
           new_column = await new_column
