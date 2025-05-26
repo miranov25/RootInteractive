@@ -102,6 +102,7 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
+        console.time(key)
         if(_locked_columns.has(key)){
           return
         }
@@ -145,6 +146,7 @@ export class CDSAlias extends ColumnarDataSource {
 	    }
             data[key] = new_column
         }
+        console.timeEnd(key)
     } else if(Object.prototype.toString.call(column) === '[object String]'){
       let new_column = this.get_column(column)
       if(new_column == null){
