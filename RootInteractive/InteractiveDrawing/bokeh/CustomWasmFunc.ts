@@ -28,7 +28,7 @@ export class CustomWasmFunc extends Model {
     }))
   }
 
-  compute(xs: any[],  data_source: any, output: number | any[]): number[] {
+  v_compute(xs: any[],  data_source: any, output: number | any[]): number[] {
     const func = this.module.exports[this.func]
     const len = data_source.length
     if (func) {
