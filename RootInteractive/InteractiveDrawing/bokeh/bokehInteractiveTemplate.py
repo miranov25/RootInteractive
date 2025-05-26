@@ -8,9 +8,9 @@ RE_VALID_JS_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
 DEFAULT_WIDGET_PARAMS = [
         # custom selection
-        ['textQuery', {"name": "customSelect0","value":"return 1", "toggleable":True}],
-        ['textQuery', {"name": "customSelect1","value":"return 1", "toggleable":True}],
-        ['textQuery', {"name": "customSelect2","value":"return 1", "toggleable":True}],
+        ['textQuery', {"name": "customSelect0","options":{"value":"return 1"}, "toggleable":True}],
+        ['textQuery', {"name": "customSelect1","options":{"value":"return 1"}, "toggleable":True}],
+        ['textQuery', {"name": "customSelect2","options":{"value":"return 1"}, "toggleable":True}],
         ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
         ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
         ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
