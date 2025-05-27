@@ -6,6 +6,27 @@ import re
 
 RE_VALID_JS_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 
+DEFAULT_WIDGET_PARAMS = [
+        # custom selection
+        ['textQuery', {"name": "customSelect0","options":{"value":"return 1"}, "toggleable":True}],
+        ['textQuery', {"name": "customSelect1","options":{"value":"return 1"}, "toggleable":True}],
+        ['textQuery', {"name": "customSelect2","options":{"value":"return 1"}, "toggleable":True}],
+        ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
+        ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
+        ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
+        # histogram bins 
+        ['spinner', ['nbinsY'], {"name": "nbinsY"}],
+        ['spinner', ['nbinsX'], {"name": "nbinsX"}],
+        ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
+        # transformation
+        ['spinner', ['exponentX'],{"name": "exponentX"}],
+        ['spinner', ['epsilonLog'], {"name": "epsilonLog"}],
+        ['spinner', ['sigmaNRel'],{"name": "sigmaNRel"}],
+        ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
+        ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
+        ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
+    ]
+
 def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None):
     """
     Function to get default RootInteractive variables for the simulated complex data.
@@ -46,26 +67,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     if isinstance(weights, list):
         parameterVars.append("weights")
 
-    widgetParams=[
-        # custom selection
-        ['textQuery', {"name": "customSelect0","value":"return 1"}],
-        ['textQuery', {"name": "customSelect1","value":"return 1"}],
-        ['textQuery', {"name": "customSelect2","value":"return 1"}],
-        ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
-        ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
-        ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
-        # histogram bins 
-        ['spinner', ['nbinsY'], {"name": "nbinsY"}],
-        ['spinner', ['nbinsX'], {"name": "nbinsX"}],
-        ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
-        # transformation
-        ['spinner', ['exponentX'],{"name": "exponentX"}],
-        ['spinner', ['epsilonLog'], {"name": "epsilonLog"}],
-        ['spinner', ['sigmaNRel'],{"name": "sigmaNRel"}],
-        ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
-        ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
-        ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
-    ]
+    widgetParams=DEFAULT_WIDGET_PARAMS.copy()
 
     # histogram selection
     for i, iVar in enumerate(parameterVars):
@@ -354,27 +356,8 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     if isinstance(weights, list):
         parameterVars.append("weights")
 
-    widgetParams=[
-        # custom selection
-        ['textQuery', {"name": "customSelect0","value":"return 1"}],
-        ['textQuery', {"name": "customSelect1","value":"return 1"}],
-        ['textQuery', {"name": "customSelect2","value":"return 1"}],
-        ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
-        ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
-        ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
-        # histogram bins 
-        ['spinner', ['nbinsY'], {"name": "nbinsY"}],
-        ['spinner', ['nbinsX'], {"name": "nbinsX"}],
-        ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
-        ['select', ['diffFuncTransform'], {"name": "diffFunc"}],
-        # transformation
-        ['spinner', ['exponentX'],{"name": "exponentX"}],
-        ['spinner', ['epsilonLog'], {"name": "epsilonLog"}],
-        ['spinner', ['sigmaNRel'],{"name": "sigmaNRel"}],
-        ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
-        ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
-        ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
-    ]
+    widgetParams=DEFAULT_WIDGET_PARAMS.copy()
+    widgetParams.append(['select', ['diffFuncTransform'], {"name": "diffFunc"}])
 
     # histogram selection
     for i, iVar in enumerate(parameterVars):
@@ -688,30 +671,14 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
     if isinstance(weightsRef, list):
         parameterVars.append("weightsRef")
 
-    widgetParams=[
-        # custom selection
-        ['textQuery', {"name": "customSelect0","value":"return 1"}],
-        ['textQuery', {"name": "customSelect1","value":"return 1"}],
-        ['textQuery', {"name": "customSelect2","value":"return 1"}],
-        ['text', ['funCustomForm0'], {"name": "funCustomForm0"}],
-        ['text', ['funCustomForm1'], {"name": "funCustomForm1"}],
-        ['text', ['funCustomForm2'], {"name": "funCustomForm2"}],
-        # histogram bins 
-        ['spinner', ['nbinsY'], {"name": "nbinsY"}],
-        ['spinner', ['nbinsX'], {"name": "nbinsX"}],
-        ['spinner', ['nbinsZ'], {"name": "nbinsZ"}],
+    widgetParams=DEFAULT_WIDGET_PARAMS.copy()
+    widgetParams.extend([
+        # difference functions
         ['select', ['diffFuncTransform'], {"name": "diffFunc"}],
         ['select', ['diffFuncWeightsTransform'], {"name": "diffFuncWeights"}],
-        # transformation
-        ['spinner', ['exponentX'],{"name": "exponentX"}],
-        ['spinner', ['epsilonLog'], {"name": "epsilonLog"}],
-        ['spinner', ['sigmaNRel'],{"name": "sigmaNRel"}],
-        ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
-        ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
-        ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
         # selection on histogram
         ['spinner', ['minEntries'],{"name": "minEntries"}],
-    ]
+    ])
 
     # histogram selection
     for i, iVar in enumerate(parameterVars):

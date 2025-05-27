@@ -43,6 +43,8 @@ from bokeh.palettes import all_palettes
 from RootInteractive.InteractiveDrawing.bokeh.palette import kBird256
 import base64
 
+layoutColumn = column
+
 # tuple of Bokeh markers
 bokehMarkers = ["square", "circle", "triangle", "diamond", "square_cross", "circle_cross", "diamond_cross", "cross",
                 "dash", "hex", "inverted_triangle", "asterisk", "square_x", "x"]
@@ -762,10 +764,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionWidget.update(variables[-1])
             cds_used = optionWidget.get("source", None)
             # By default, uses all named variables from the data source - but they can't be known at this point yet
-            localWidget = TextAreaInput(sizing_mode="scale_width", **optionWidget)
+            localWidget = TextAreaInput(sizing_mode="scale_width", **optionWidget.get("options", {}))
             widgetName = optionWidget.get("name", f"$widget_{len(plotArray)}")
-            plotArray.append(localWidget)
-            plotDict[widgetName] = localWidget
             transform = CustomJSNAryFunction(parameters=customJsArgList, fields=[], func=optionWidget.get("value", "return true"))
             localWidget.js_on_change("value", CustomJS(args={"mapper":transform}, code="""
                 mapper.func = this.value
@@ -774,6 +774,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             aliasDict[cds_used][widgetName] = {"fields": None, "transform": transform}
             memoized_columns[cds_used][widgetName] = {"type":"alias", "name":widgetName}
             widgetFilter = ColumnFilter(field=widgetName, name=widgetName)
+            if "toggleable" in optionWidget:
+                widgetToggle = Toggle(label="disable", active=True, width=70, sizing_mode="stretch_width")
+                localWidget.disabled = True
+                widgetFilter.active = False
+                widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget, "filter":widgetFilter}, code="""
+                    widget.disabled = this.active
+                    filter.active = !this.active
+                    widget.properties.value.change.emit()
+                """))
+                localWidget = layoutColumn([localWidget, widgetToggle], sizing_mode=optionLocal.get("sizing_mode", "inherit"))
+            plotArray.append(localWidget)
+            plotDict[widgetName] = localWidget
             if cds_used not in widgetDict:
                 widgetDict[cds_used] = {"widgetList":[]}
             widgetDict[cds_used]["widgetList"].append({"widget": localWidget, "type": variables[0], "key": widgetName, "filter": widgetFilter})

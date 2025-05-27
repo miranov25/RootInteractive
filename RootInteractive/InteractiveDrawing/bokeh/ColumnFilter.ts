@@ -45,7 +45,9 @@ export class ColumnFilter extends RIFilter {
 
   mark_dirty_source(){
     this.dirty_source = true
-    this.change.emit()
+    if(this.active){
+      this.change.emit()
+    }
   }
 
   public v_compute(): boolean[]{
@@ -53,13 +55,21 @@ export class ColumnFilter extends RIFilter {
     if (!dirty_source){
         return cached_vector
     }
-    let col = source.get_column(field)
-    if(col == null) return []
+    let len = source.get_length() ?? 0
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
-        new_vector = Array(col.length)
+        new_vector = Array(len).fill(true)
     } else {
-        new_vector.length = col.length
+        new_vector.length = len
+    }
+    if(!this.active){
+      return new_vector
+    }
+    let col = source.get_column(field)
+    if(col == null){
+      this.dirty_source = false
+      this.cached_vector = new_vector
+      return new_vector
     }
     for(let i=0; i<col.length; i++){
         new_vector[i] = !!col[i]

@@ -70,40 +70,45 @@ export class LazyIntersectionFilter extends RIFilter {
     }
     this._changed_values = false
     for(const x of this.changed){
-        if(this.old_values.length <= x){
-            this.old_values.length = x+1
-        }
-        if(this.old_values[x] == undefined){
-            this.old_values[x] = []
-        }
-        const values = filters[x].v_compute()
-        while(this.old_values[x].length < values.length / 32 + 1){
-            this.old_values[x].push(-1)
-        }
-        if(this.counts == null){
-            this.counts = Array(values.length).fill(0)
-        }
-        this.counts.length = values.length
-        const invert = filters[x].invert
-        const old_values = this.old_values[x]
-	let mask = 1
+	      let mask = 1
         if(filters[x].active){
+          if(this.old_values.length <= x){
+            this.old_values.length = x+1
+          }
+          if(this.old_values[x] == undefined){
+              this.old_values[x] = []
+          }
+          const old_values = this.old_values[x]
+          const values = filters[x].v_compute()
+          while(this.old_values[x].length < values.length / 32 + 1){
+              this.old_values[x].push(-1)
+          }
+          if(this.counts == null){
+              this.counts = Array(values.length).fill(0)
+          }
+          this.counts.length = values.length
+          const invert = filters[x].invert
           for(let i=0; i < values.length; i++){
             const new_value = values[i]!==invert
-	    let old_count = this.counts[i]
+            let old_count = this.counts[i]
             this.counts[i] += new_value ? 1 : 0
             this.counts[i] -= old_values[i >> 5] & mask ? 1 : 0
-	    this._changed_values ||= (!!old_count !== !!this.counts[i])
-	    if (new_value){
-		    old_values[i >> 5] |= mask
-	    } else {
-		    old_values[i >> 5] &= ~mask
-	    }
-	    mask = mask << 1
-	    if (mask === 0) mask = 1
+            this._changed_values ||= (!!old_count !== !!this.counts[i])
+            if (new_value){
+              old_values[i >> 5] |= mask
+            } else {
+              old_values[i >> 5] &= ~mask
+            }
+            mask = mask << 1
+            if (mask === 0) mask = 1
           }
         } else {
-          for(let i=0; i < values.length; i++){
+          const old_values = this.old_values[x]
+          if(old_values == null){
+            continue
+          }
+          const l = this.counts.length
+          for(let i=0; i < l; i++){
             let old_count = this.counts[i]
             this.counts[i] += 1
             this.counts[i] -= old_values[i >> 5] & mask ? 1 : 0
