@@ -70,7 +70,6 @@ export class HistoNdProfile extends ColumnarDataSource {
         const isOK_column = []
         const cumulative_column: number[] = []
         const cdf_column = []
-        const weights_column = []
         let quantile_columns:Array<Array<number>> = []
         for (let i = 0; i < quantiles.length; i++) {
           quantile_columns.push([])
@@ -302,7 +301,6 @@ export class HistoNdProfile extends ColumnarDataSource {
                 integral_columns[iBox].push(integral)
                 efficiency_columns[iBox].push(integral/entries)
               }
-              weights_column.push(current_weights ?? "None")
             }
           }
           for(let i=offset; i<cumulative_column.length; ++i){
@@ -333,7 +331,6 @@ export class HistoNdProfile extends ColumnarDataSource {
               this.data["bin_top_"+i] = bin_top_filtered[i]
           }
         }
-        this.data["weights"] = weights_column
         this._stale = false
         if(sorted_entries != null){
           source.return_column_to_pool(sorted_entries)
@@ -341,10 +338,23 @@ export class HistoNdProfile extends ColumnarDataSource {
   }
 
   get_column(key: string){
+    if(key == "weights"){
+      return this.get_weights_label()
+    }
     if(this._stale){
       this.update()
     }
     return this.data[key]
+  }
+
+  get_weights_label(){
+    const l = this.source.get_length() / this.source.nbins[this.axis_idx]
+    if(Array.isArray(this.weights)){
+      return this.weights.flatMap((w: string | null) => Array(l).fill(w ?? "None"))
+    } else if(this.weights != null){
+      return Array(l).fill(this.weights)
+    }
+    return Array(l).fill("None")
   }
 
   get_length(){
