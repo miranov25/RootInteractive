@@ -101,6 +101,8 @@ class ColumnEvaluator:
             return self.visit_BoolOp(node)
         elif isinstance(node, ast.IfExp):
             return self.visit_IfExp(node)
+        elif isinstance(node, ast.Subscript):
+            return self.visit_Subscript(node)
         elif isinstance(node, ast.Lambda):
             return self.visit_Lambda(node)
         else:
@@ -140,6 +142,11 @@ class ColumnEvaluator:
             "type": "constant",
             "value": node.n
         }
+    
+    def visit_Subscript(self, node: ast.Subscript):
+        value = self.visit(node.value)
+        sliceValue = self.visit(node.slice)
+        return {}
 
     def visit_Attribute(self, node: ast.Attribute):
         if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
