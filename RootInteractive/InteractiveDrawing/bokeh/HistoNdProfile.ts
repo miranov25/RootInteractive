@@ -226,7 +226,8 @@ export class HistoNdProfile extends ColumnarDataSource {
                     if(sorted_weights == null){
                       // In this case maybe we could use kth value instead
                       while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
-                        quantile_columns[iQuantile].push(quantile(sorted_entries!, quantiles[iQuantile], index_low, index_high))
+                        const q_scaled = (quantiles[iQuantile] * entries - low) / (high - low)
+                        quantile_columns[iQuantile].push(quantile(sorted_entries!, q_scaled, index_low, index_high))
                         iQuantile++
                       }                   
                     } else {
