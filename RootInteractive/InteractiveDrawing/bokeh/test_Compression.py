@@ -217,6 +217,18 @@ def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
         compSize=getSize(arrayC["history"][3])
         print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
+@pytest.mark.unittest
+def test_CompressionSampleSinh(arraySize=10000,scale=255, delta=1e-3):
+    actionArray=[("sqrt_scaling",delta,10,16), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8"),("sqrt_scaling_decode",delta,10)]
+    for coding in ["float32", "float64"]:
+        actionArray[4]=("unzip",coding)
+        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        inputSize=getSize(arrayInput)
+        tic = time.perf_counter()
+        arrayC = compressArray(arrayInput,actionArray, True)
+        toc = time.perf_counter()
+        compSize=getSize(arrayC["history"][2])
+        print("test_CompressionSampleSinh: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
 def testCompressionDecompressionInt8(stop=10, step=1):
     # compress pipeline
@@ -302,3 +314,4 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
 
 #test_CompressionCDSPipeDraw()
+test_CompressionSampleDelta()

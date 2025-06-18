@@ -76,6 +76,45 @@ def roundAbsolute(df, delta, downgrade_type=True):
     return result.astype(type), None
 
 
+def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
+    """
+    roundSqrtScaling - round sqrt scaling of float number in nBits, assuming better lossy compression later
+    :param df:              - input array (for a moment only pandas or numpy)
+    :param sigma0:          - rounding factor
+    :param sigma1:          - scaling factor
+    :param nBits:           - number of significant bits to round
+    :return:                - (rounded array, type of the array)
+    """
+    type = df.dtype
+    if type.kind not in ['f', 'c']:
+        return df
+    if sigma0 <= 0 or sigma1 <= 0:
+        raise ValueError("sigma0 and sigma1 must be positive")
+    quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
+    quantized = np.clip(quantized, -2**(nBits-1), 2**(nBits-1)-1)
+    if nBits <= 8:
+        return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
+    if nBits <= 16:
+        return quantized.astype(np.int16), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
+    return quantized.astype(np.int32), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
+
+
+def decodeSinhScaling(df, sigma0, sigma1):
+    """
+    decodeSinhScaling - decode sqrt scaling of float number in nBits, assuming better lossy compression later
+    :param df:              - input array (for a moment only pandas or numpy)
+    :param sigma0:          - rounding factor
+    :param sigma1:          - scaling factor
+    :return:                - decoded array
+    """
+    type = df.dtype
+    if type.kind not in ['i', 'u']:
+        return df
+    if sigma0 <= 0 or sigma1 <= 0:
+        raise ValueError("sigma0 and sigma1 must be positive")
+    return np.sinh(df * sigma0) * (sigma0 / sigma1)
+
+
 def codeMapDF(df, maxFraction=0.5, doPrint=0):
     """
     Compress data frame using remapping to arrays (working for  panda and vaex)
@@ -128,6 +167,13 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
             currentArray, decode_transform = roundAbsolute(currentArray, *actionParams)
             if decode_transform is not None:
                 arrayInfo["history"].append(("linear", decode_transform))
+        if action == "sqrt_scaling":
+            currentArray, decode_transform = roundSqrtScaling(currentArray, *actionParams)
+            if decode_transform is not None:
+                arrayInfo["history"].append(("sinh", decode_transform))
+        if action == "sqrt_scaling_decode":
+            currentArray = decodeSinhScaling(currentArray, *actionParams)
+            arrayInfo["history"].append(("decodeSinhScaling", actionParams))
         if action == "zip":
             if isinstance(currentArray, pd.Series):
                 currentArray = currentArray.to_numpy()

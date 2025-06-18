@@ -1,7 +1,7 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
-import { kth_value, weighted_kth_value } from "./MathUtils"
+import { quantile, weighted_kth_value } from "./MathUtils"
 
 export namespace HistoNdProfile {
   export type Attrs = p.AttrsOf<Props>
@@ -226,12 +226,8 @@ export class HistoNdProfile extends ColumnarDataSource {
                     if(sorted_weights == null){
                       // In this case maybe we could use kth value instead
                       while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
-                        const k = quantiles[iQuantile] * entries - low
-                        const k_floor = k | 0
-                        //const m = k % 1
-                        kth_value(sorted_entries!, k_floor+index_low, (a,b) => a-b, index_low, index_high)
-                        //TODO: Use lerp not nearest
-                        quantile_columns[iQuantile].push(sorted_entries![k_floor+index_low])
+                        const q_scaled = (quantiles[iQuantile] * entries - low) / (high - low)
+                        quantile_columns[iQuantile].push(quantile(sorted_entries!, q_scaled, index_low, index_high))
                         iQuantile++
                       }                   
                     } else {

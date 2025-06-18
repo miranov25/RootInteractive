@@ -162,13 +162,27 @@ export class CDSCompress extends ColumnDataSource {
         arrayOut=arrayOutNew
       }
       if (action == "linear") {
-        if (actionParams == null)
-        {
+        if (actionParams == null || actionParams.origin == null || actionParams.scale == null) {
           console.error("Not enough parameters");
           continue;
-        }
-        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => actionParams.origin+actionParams.scale*x)
+        } 
+        const origin = actionParams.origin
+        const scale = actionParams.scale
+        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => origin+scale*x)
         arrayOut = arrayOutNew;
+      }
+      if (action == "sinh"){
+        const mu = actionParams.mu
+        const sigma0 = actionParams.sigma0
+        const sigma1 = sigma0 / actionParams.sigma1
+        const dither = actionParams.dither || 0
+        let arrayOutNew = new Array(arrayOut.length)
+        if(dither){
+          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * (x + Math.random() - .5) + mu))
+        } else {
+          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * x + mu))
+        }
+        arrayOut = arrayOutNew
       }
     }
     return arrayOut
