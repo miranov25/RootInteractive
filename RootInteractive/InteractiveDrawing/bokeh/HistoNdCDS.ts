@@ -192,6 +192,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
       this.dim = dim
       this._stale_range = false
+      this._bin_indices_dirty = true
   }
 
   histogram(weights: string | null, weights_transform: ((x:number) => number) | null=null): number[]{
@@ -330,6 +331,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       const nbins = this._nbins[axis_idx]
       const range_min = this._range_min[axis_idx]
       const range_max = this._range_max[axis_idx]
+      console.log("HistoNdCDS: compute_bins", this.name, "axis_idx", axis_idx, "nbins", nbins, "range_min", range_min, "range_max", range_max)
       for(let i=0; i<length; i++){
         const val = column[i]
         // Overflow bins 
