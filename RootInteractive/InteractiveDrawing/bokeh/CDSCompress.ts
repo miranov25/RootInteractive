@@ -124,9 +124,11 @@ export class CDSCompress extends ColumnDataSource {
       const action = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
       const actionParams = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? null : arrayIn.history[i][1]
       if (action == "base64_decode"){
-        arrayOut = atob(arrayOut).split("").map(function (x) {
-          return x.charCodeAt(0)
-        })
+        const s = atob(arrayOut)
+        arrayOut = new Uint8Array(s.length)
+        for (let j = 0; j < s.length; j++) { 
+          arrayOut[j] = s[j].charCodeAt(0)
+        }
       }
       if (action == "inflate") {
         arrayOut = pako.inflate(arrayOut)
@@ -160,9 +162,9 @@ export class CDSCompress extends ColumnDataSource {
       }
       if (action == "code") {
         let size = arrayOut.length
-        let arrayOutNew = new Array()
+        let arrayOutNew = new Array(arrayOut.length)
         for (let i = 0; i < size; i++) {
-          arrayOutNew.push(arrayIn.valueCode[arrayOut[i]])
+          arrayOutNew[i] = arrayIn.valueCode[arrayOut[i]]
         }
         arrayOut=arrayOutNew
       }
@@ -177,7 +179,10 @@ export class CDSCompress extends ColumnDataSource {
         }
         const origin = actionParams.origin
         const scale = actionParams.scale
-        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => origin+scale*x)
+        const arrayOutNew = new Array(arrayOut.length)
+        for (let i = 0; i < arrayOut.length; i++) {
+          arrayOutNew[i] = origin + scale * arrayOut[i]
+        }
         arrayOut = arrayOutNew;
       }
       if (action == "sinh"){
