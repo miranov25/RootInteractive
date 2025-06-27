@@ -127,7 +127,7 @@ export class CDSCompress extends ColumnDataSource {
         const s = atob(arrayOut)
         arrayOut = new Uint8Array(s.length)
         for (let j = 0; j < s.length; j++) { 
-          arrayOut[j] = s[j].charCodeAt(0)
+          arrayOut[j] = s.charCodeAt(j)
         }
       }
       if (action == "inflate") {
