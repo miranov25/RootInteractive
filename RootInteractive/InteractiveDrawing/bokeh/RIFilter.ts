@@ -41,6 +41,10 @@ export class RIFilter extends Model {
     return []
   }
 
+  public as_bits(_arrOut: Int32Array | null): Int32Array | null {
+    return null
+  }
+
   public get_indices(): number[]{
     return []
   }
