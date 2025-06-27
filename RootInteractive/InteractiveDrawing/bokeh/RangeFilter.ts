@@ -32,6 +32,7 @@ export class RangeFilter extends RIFilter {
   }
 
   private cached_vector: boolean[]
+  private cached_values: Int32Array | null
   private dirty_source: boolean
   private dirty_widget: boolean
 
@@ -62,6 +63,36 @@ export class RangeFilter extends RIFilter {
   mark_dirty_source(){
     this.dirty_source = true
 //    this.change.emit()
+  }
+
+  public as_bits(_arrOut: Int32Array): Int32Array | null {
+    if(!this.dirty_source && !this.dirty_widget){
+      return this.cached_values
+    }
+    if(_arrOut == null){
+      _arrOut = new Int32Array(Math.ceil(this.source.get_length()! / 32))
+    }
+    const col = this.source.get_column(this.field) as number[]
+    const [low, high] = this.range
+    const index_low = this.index_low
+    const index_high = this.index_high === -1 ? col.length : this.index_high
+    let has_element = false
+    for(let i=index_low; i<index_high; i++){ 
+      const a = (col[i] >= low) && (col[i] <= high)
+      if(a){
+        has_element = true
+        _arrOut[Math.floor(i / 32)] |= (1 << (i % 32))
+      } else {
+        _arrOut[Math.floor(i / 32)] &= ~(1 << (i % 32))
+      }
+    }
+    if(!has_element){
+      console.warn("Range empty: " + this.field)
+    }
+    this.dirty_source = false
+    this.dirty_widget = false
+    this.cached_values = _arrOut
+    return _arrOut
   }
 
   public v_compute(): boolean[]{
