@@ -1,3 +1,7 @@
+export function lerp(a:number, b:number, t:number){
+    return a + (b - a) * t
+}
+
 export function kth_value(sample:any[], k:number, compare:(a:number, b:number)=>number, begin=0, end=-1){
     // TODO: Use a smarter algorithm
     // This algorithm should be linear average case, but worst case is quadratic
@@ -113,6 +117,38 @@ export function weighted_kth_value(sample:number[], weights: number[], k:number,
       }
     }
   }
+  
+export function quantile(sample:number[], q:number, begin=0, end=-1){
+  // Returns the q-th quantile of the sample
+
+  // q should be in the range [0,1]
+  if(q < 0 || q > 1) throw Error("Quantile out of range: " + q)
+  if(end < 0) end += sample.length + 1
+  if(!(begin >= 0 && begin < end)) {
+    throw Error("Element out of range: " + (begin))
+  }
+  if(end - begin <= 0) return NaN
+  if(end - begin === 1) return sample[begin]
+  if(end - begin === 2) return (sample[begin] + sample[begin+1]) * q
+  const k = begin + (end - begin - 1) * q
+  const k1 = Math.floor(k)
+  if(k === begin) return sample[begin]
+  if(k1 === end - 1) return sample[end - 1]
+  kth_value(sample, k1, (a, b) => a - b, begin, end)
+  if(k % 1 === 0) {
+    return sample[k1]
+  } else {
+    let k2 = Math.ceil(k)
+    let value_k2 = sample[k1 + 1]
+    for(let k3=Math.ceil(k); k3 < end; ++k3){
+      if(sample[k3] < value_k2) {
+        value_k2 = sample[k3]
+        k2 = k3
+      }
+    }
+    return lerp(sample[k1], sample[k2], k-k1)
+  }
+}
   
   // Cholesky decomposition without pivoting - inplace
 // TODO: Perhaps add a version with pivoting too?

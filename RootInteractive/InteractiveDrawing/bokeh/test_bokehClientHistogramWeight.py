@@ -59,3 +59,17 @@ def test_clientHistogramWeightCompressed():
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
                                 arrayCompression=arrayCompressionRelative16)
+
+def test_clientHistogramWeightFixedPoint():
+    output_file("test_bokehClientHistogramWeight_FixedPoint.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                                arrayCompression=[("W.*",[("relative",16),"zip"]),(".*",[("delta",.01), "zip"])])
+
+def test_clientHistogramWeightSinh():
+    output_file("test_bokehClientHistogramWeight_Sinh.html")
+    xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                                arrayCompression=[("W.*",[("sqrt_scaling", .01, .01, 8),"zip"]),(".*",[("delta",.01), "zip"])])
+    
+test_clientHistogramWeightFixedPoint()

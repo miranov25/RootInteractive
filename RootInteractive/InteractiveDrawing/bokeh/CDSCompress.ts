@@ -104,24 +104,31 @@ export class CDSCompress extends ColumnDataSource {
   }
 
   _length: number
+  intermediateData: Record<string, any>
 
   initialize(): void {
     super.initialize()
     console.info("CDSCompress::initialize")
+    this.intermediateData = {}
     this.data = {}
     this._length = -1
   }
 
-  inflateCompressedBokehBase64(arrayIn: any ) {
+  inflateCompressedBokehBase64(arrayIn: any, startIndex: number = -1, earlyExit: boolean = false): any {
     let arrayOut=arrayIn.array
-    for(var i =  arrayIn.history.length-1;i>=0; i--) {
+    if(startIndex < 0){
+      startIndex = arrayIn.history.length || 0;
+    }
+    for(var i = startIndex-1;i>=0; i--) {
       console.log((i + 1) + " --> " + arrayIn.history[i])
       const action = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? arrayIn.history[i] : arrayIn.history[i][0]
       const actionParams = Object.prototype.toString.call(arrayIn.history[i]) === '[object String]' ? null : arrayIn.history[i][1]
       if (action == "base64_decode"){
-        arrayOut = atob(arrayOut).split("").map(function (x) {
-          return x.charCodeAt(0)
-        })
+        const s = atob(arrayOut)
+        arrayOut = new Uint8Array(s.length)
+        for (let j = 0; j < s.length; j++) { 
+          arrayOut[j] = s.charCodeAt(j)
+        }
       }
       if (action == "inflate") {
         arrayOut = pako.inflate(arrayOut)
@@ -155,23 +162,58 @@ export class CDSCompress extends ColumnDataSource {
       }
       if (action == "code") {
         let size = arrayOut.length
-        let arrayOutNew = new Array()
+        let arrayOutNew = new Array(arrayOut.length)
         for (let i = 0; i < size; i++) {
-          arrayOutNew.push(arrayIn.valueCode[arrayOut[i]])
+          arrayOutNew[i] = arrayIn.valueCode[arrayOut[i]]
         }
         arrayOut=arrayOutNew
       }
       if (action == "linear") {
-        if (actionParams == null)
-        {
+        if (actionParams == null || actionParams.origin == null || actionParams.scale == null) {
           console.error("Not enough parameters");
           continue;
+        } 
+        if(earlyExit && actionParams.earlyExit){
+          arrayIn.arrayOut = arrayOut
+          return arrayOut
         }
-        const arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => actionParams.origin+actionParams.scale*x)
+        const origin = actionParams.origin
+        const scale = actionParams.scale
+        const arrayOutNew = new Array(arrayOut.length)
+        for (let i = 0; i < arrayOut.length; i++) {
+          arrayOutNew[i] = origin + scale * arrayOut[i]
+        }
         arrayOut = arrayOutNew;
+      }
+      if (action == "sinh"){
+        const mu = actionParams.mu
+        const sigma0 = actionParams.sigma0
+        const sigma1 = sigma0 / actionParams.sigma1
+        const dither = actionParams.dither || 0
+        let arrayOutNew = new Array(arrayOut.length)
+        if(dither){
+          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * (x + Math.random() - .5) + mu))
+        } else {
+          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * x + mu))
+        }
+        arrayOut = arrayOutNew
       }
     }
     return arrayOut
+  }
+
+  encode_number_to_column(_key: string, value: number) {
+    return value
+  }
+
+  get_intermediate_column(key: string) {
+    // This is used to get the inflated column before applying transformations
+    if (this.intermediateData[key] != null) {
+      return this.intermediateData[key].arrayOut
+    }
+    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], -1, true)
+    this.intermediateData[key] = arrOut
+    return arrOut
   }
 
   get_column(key: string){
