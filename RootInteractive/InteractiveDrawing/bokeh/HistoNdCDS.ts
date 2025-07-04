@@ -60,6 +60,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._stale_range = true
     this.changed_histogram = false
     this.cached_columns = new Set()
+    this.change_selection()
   }
 
   connect_signals(): void {

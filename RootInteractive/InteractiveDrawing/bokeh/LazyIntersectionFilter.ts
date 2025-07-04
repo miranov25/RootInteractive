@@ -19,6 +19,11 @@ export function spread_nibble(x: number): number {
   return y
 }
 
+/*const incrementLUT = [0x00000000, 0x00000001, 0x00000100, 0x00000101, 
+                      0x00010000, 0x00010001, 0x00010100, 0x00010101, 
+                      0x01000000, 0x01000001, 0x01000100, 0x01000101,  
+                      0x01010000, 0x01010001, 0x01010100, 0x01010101]*/
+
 export class LazyIntersectionFilter extends RIFilter {
   properties: LazyIntersectionFilter.Props
 
@@ -86,11 +91,12 @@ export class LazyIntersectionFilter extends RIFilter {
     }
     for(let i=0; i < bits.length; i++){
       const value = bits[i]
+      const old_value_word = old_values[i]
       this._changed_values ||= bits[i] !== old_values[i]
       if(invert){
         for(let j=0; j < 32; j++){
           const new_value = (value & mask) === 0
-          const old_value = (old_values[i] & mask) !== 0
+          const old_value = (old_value_word & mask) === 0
           this.counts[i * 32 + j] += new_value ? 1 : 0
           this.counts[i * 32 + j] -= old_value ? 1 : 0
           mask = mask << 1
@@ -99,7 +105,7 @@ export class LazyIntersectionFilter extends RIFilter {
       } else {
         for(let j=0; j < 32; j++){
           const new_value = (value & mask) !== 0
-          const old_value = (old_values[i] & mask) !== 0
+          const old_value = (old_value_word & mask) !== 0
           this.counts[i * 32 + j] += new_value ? 1 : 0
           this.counts[i * 32 + j] -= old_value ? 1 : 0
           mask = mask << 1
