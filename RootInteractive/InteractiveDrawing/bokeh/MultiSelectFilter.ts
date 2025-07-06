@@ -62,6 +62,43 @@ export class MultiSelectFilter extends RIFilter {
     this.dirty_source = true
   }
 
+  public as_bits(_arrOut: Int32Array | null): Int32Array | null {
+    const {selected, source, mapping, mask, field, how} = this
+    if(_arrOut == null){
+      _arrOut = new Int32Array(Math.ceil(this.source.get_length()! / 32))
+    }
+    let col = source.get_column(field) as number[]
+    const mask_new = selected.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
+    if (how == "whitelist"){
+      const accepted_codes = selected.map((a: string) => mapping[a])
+      for(let i=0; i <col.length; i++){
+        const x = col[i] as number
+        _arrOut[Math.floor(i / 32)] |= ((accepted_codes.indexOf(x) >= 0 ? 1 : 0) << (i % 32))
+      }
+    } else if (how == "any"){
+      for(let i=0; i <col.length; i++){
+        const x = col[i] as number
+        _arrOut[Math.floor(i / 32)] |= (((x & mask_new) != 0 ? 1 : 0) << (i % 32))
+      }
+    } else if(how == "all"){
+      for(let i=0; i <col.length; i++){
+        const x = col[i] as number
+        _arrOut[Math.floor(i / 32)] |= (((x & mask_new) == mask_new ? 1 : 0) << (i % 32))
+      }
+    } else if(how == "neither"){
+      for(let i=0; i <col.length; i++){
+        const x = col[i] as number
+        _arrOut[Math.floor(i / 32)] |= (((x & mask_new) == 0 ? 1 : 0) << (i % 32))
+      }
+    } else if(how == "eq"){
+      for(let i=0; i <col.length; i++){
+        const x = col[i] as number
+        _arrOut[Math.floor(i / 32)] |= ((x == mask_new ? 1 : 0) << (i % 32))
+      }
+    }
+    return _arrOut
+  }
+
   public v_compute(): boolean[]{
     const {dirty_source, dirty_widget, cached_vector, selected, source, mapping, mask, field, how} = this
     if (!dirty_source && !dirty_widget){
