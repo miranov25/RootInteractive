@@ -14,6 +14,10 @@ export namespace CDSAlias {
 
 export interface CDSAlias extends CDSAlias.Attrs {}
 
+function hasGetIntermediate(obj: any): obj is { get_intermediate_column: (key: string) => any } {
+  return typeof obj.get_intermediate_column === "function";
+}
+
 export class CDSAlias extends ColumnarDataSource {
   properties: CDSAlias.Props
 
@@ -181,6 +185,16 @@ export class CDSAlias extends ColumnarDataSource {
       return this.data[key]
     }
     return null
+  }
+
+  get_intermediate_column(key: string) {
+    if(hasGetIntermediate(this.source)){
+      const r = this.source.get_intermediate_column(key)
+      if(r != null){
+        return r
+      }
+    }
+    return this.get_column(key)
   }
 
   update_selection(){
