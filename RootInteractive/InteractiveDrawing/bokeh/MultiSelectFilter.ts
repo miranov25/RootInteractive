@@ -67,6 +67,7 @@ export class MultiSelectFilter extends RIFilter {
     if(_arrOut == null){
       _arrOut = new Int32Array(Math.ceil(this.source.get_length()! / 32))
     }
+    _arrOut.fill(0)
     let col = source.get_column(field) as number[]
     const mask_new = selected.map((a: string) => mapping[a]).reduce((acc: number, cur: number) => acc | cur, 0) & mask
     if (how == "whitelist"){
