@@ -52,9 +52,8 @@ export class HistoNdCDS extends ColumnarDataSource {
 
     this.data = {}
     this.view = null
-    this._bin_indices = []
+    this._bin_indices = null
     this._bin_indices_dirty = true
-    this._do_cache_bins = true
     this.invalidate_cached_bins()
     this.update_nbins()
     this._stale_range = true
@@ -83,7 +82,7 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   public dim: number
 
-  private _bin_indices: number[] // Bin index caching
+  private _bin_indices: Int32Array | null
   private _bin_indices_dirty: boolean
 
   private _range_min: number[]
@@ -93,7 +92,6 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _transform_scale: number[]
   private _strides: number[]
 
-  private _do_cache_bins: boolean
   private _stale_range: boolean
 
   private _unweighted_histogram: number[] | null
@@ -223,7 +221,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     let bincount: number[] = Array(length)
     bincount.fill(0)
     const view_indices = this.view
-    if(this._bin_indices_dirty || this._bin_indices.length != this.source.length){
+    if(this._bin_indices_dirty){
       this._bin_indices = this.compute_bins(sample_array)
       this._bin_indices_dirty = false
     }
@@ -317,12 +315,12 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   getbin(idx: number, _sample: ArrayLike<number>[]): number{
       // Removed during
-      return this._bin_indices[idx]
+      return this._bin_indices![idx]
   }
 
-  compute_bins(sample: ArrayLike<number>[]): number[]{
+  compute_bins(sample: ArrayLike<number>[]): Int32Array {
     const length = this.source.get_length()!
-    const bins = this._bin_indices ? this._bin_indices : new Array(length)
+    const bins = this._bin_indices && this._bin_indices.length >= length ? this._bin_indices : new Int32Array(length)
     bins.fill(0, 0, length)
     for(let axis_idx=0; axis_idx<this._nbins.length; axis_idx++){
       const column = sample[axis_idx]
@@ -362,10 +360,6 @@ export class HistoNdCDS extends ColumnarDataSource {
 
   invalidate_cached_bins(){
     this._bin_indices_dirty = true
-    if(this._do_cache_bins){
-      this._bin_indices.length = this.source.length
-      this._bin_indices.fill(-2, 0, this.source.length)
-    }
   }
 
   get_column(key: string){
@@ -437,7 +431,6 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
-    this._do_cache_bins = false
   }
 
   auto_range_indices(column: ArrayLike<number>, axis_idx: number){
@@ -462,7 +455,6 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     this._range_min[axis_idx] = range_min
     this._range_max[axis_idx] = range_max    
-    this._do_cache_bins = false
   }
 
   public change_selection(){
