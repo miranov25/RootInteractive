@@ -61,6 +61,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         {'name': 'funCustomForm2', "value":"return 1"},
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
+        {"name": "enableDithering", "value":False}
     ]
 
     parameterArray.extend(figureParameters["legend"]['parameterArray'])
@@ -325,6 +326,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
         {'name': 'funCustomForm2', "value":"return 1"},
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
+        {"name": "enableDithering", "value":False},
     ]
 
     transformArray = [
@@ -616,6 +618,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
         {"name": "minEntries", "value":0, "range":[0,1000]},
+        {"name": "enableDithering", "value":False},
     ]
 
     transformArray = [
