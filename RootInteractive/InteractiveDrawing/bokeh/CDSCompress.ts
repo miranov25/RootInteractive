@@ -81,6 +81,7 @@ export namespace CDSCompress {
   export type Props = ColumnDataSource.Props & {
       inputData :    p.Property<any>
       sizeMap :    p.Property<any>
+      enableDithering : p.Property<boolean>
   }
 }
 
@@ -97,9 +98,10 @@ export class CDSCompress extends ColumnDataSource {
 
   static {
 
-    this.define<CDSCompress.Props>(({Any})=>({
+    this.define<CDSCompress.Props>(({Any, Bool})=>({
         inputData:    [ Any, {} ],
-        sizeMap:    [ Any, {} ]
+        sizeMap:    [ Any, {} ],
+        enableDithering: [ Bool, false ]
     }))
   }
 
@@ -179,9 +181,16 @@ export class CDSCompress extends ColumnDataSource {
         }
         const origin = actionParams.origin
         const scale = actionParams.scale
+        const dither = actionParams.dither || this.enableDithering
         const arrayOutNew = new Array(arrayOut.length)
-        for (let i = 0; i < arrayOut.length; i++) {
-          arrayOutNew[i] = origin + scale * arrayOut[i]
+        if(dither){
+          for (let i = 0; i < arrayOut.length; i++) {
+            arrayOutNew[i] = origin + scale * (arrayOut[i] + Math.random() - .5)
+          }
+        } else {
+          for (let i = 0; i < arrayOut.length; i++) {
+            arrayOutNew[i] = origin + scale * arrayOut[i]
+          }
         }
         arrayOut = arrayOutNew;
       }
@@ -189,7 +198,7 @@ export class CDSCompress extends ColumnDataSource {
         const mu = actionParams.mu
         const sigma0 = actionParams.sigma0
         const sigma1 = sigma0 / actionParams.sigma1
-        const dither = actionParams.dither || 0
+        const dither = actionParams.dither || this.enableDithering
         let arrayOutNew = new Array(arrayOut.length)
         if(dither){
           arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * (x + Math.random() - .5) + mu))
