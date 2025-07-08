@@ -98,10 +98,10 @@ export class CDSCompress extends ColumnDataSource {
 
   static {
 
-    this.define<CDSCompress.Props>(({Any, Bool})=>({
+    this.define<CDSCompress.Props>(({Any, Boolean})=>({
         inputData:    [ Any, {} ],
         sizeMap:    [ Any, {} ],
-        enableDithering: [ Bool, false ]
+        enableDithering: [ Boolean, false ]
     }))
   }
 
