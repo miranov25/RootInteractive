@@ -91,7 +91,9 @@ def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
     if sigma0 <= 0 or sigma1 <= 0:
         raise ValueError("sigma0 and sigma1 must be positive")
     quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
-    quantized = np.clip(quantized, -2**(nBits-1), 2**(nBits-1)-1)
+    quantized = np.clip(quantized, -2**(nBits-1)+1, 2**(nBits-1)-1)
+    sentinel = -2**(nBits-1)
+    quantized = np.nan_to_num(quantized, nan=sentinel)
     if nBits <= 8:
         return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
     if nBits <= 16:

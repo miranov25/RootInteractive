@@ -1932,6 +1932,14 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
         if cdsType == "source":
             if iCds.get("arrayCompression", None) is not None:
                 iCds["cdsOrig"] = CDSCompress(name=cdsName)
+                dither = iCds.get("enableDithering", False)
+                if isinstance(dither, str):
+                    if paramDict.get(dither, {}).get("value", False):
+                        dither = True
+                    paramDict[dither]["subscribed_events"].append(["value", CustomJS(args={"cds":iCds["cdsOrig"]}, code="""
+                        cds.enableDithering = this.value
+                                                    """)])
+                iCds["cdsOrig"].enableDithering = dither
             else:
                 iCds["cdsOrig"] = ColumnDataSource(name=cdsName)
         elif cdsType == "projection":

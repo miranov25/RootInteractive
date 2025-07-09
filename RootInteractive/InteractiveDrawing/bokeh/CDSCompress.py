@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, Float, Int, List, Any, Dict
+from bokeh.core.properties import Instance, String, Float, Int, List, Any, Dict, Bool
 from bokeh.models import ColumnDataSource
 
 
@@ -15,4 +15,5 @@ class CDSCompress(ColumnDataSource):
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
     inputData=Dict(String, Any)
     sizeMap=Dict(String, Any)
+    enableDithering=Bool(False, help="Enable dithering for the compressed data. False = no dithering, True = dithering enabled")
     print("Import ", __implementation__)
