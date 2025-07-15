@@ -55,11 +55,11 @@ def roundAbsolute(df, delta, downgrade_type=True):
     type=df.dtype
     if delta == 0:
         raise ZeroDivisionError(df, delta)
-    if type.kind not in ['f', 'c', 'i', 'u']:
-        return df
+    if type.kind not in ['f', 'c']:
+        return df, None
     if type.kind in ['i','u'] and delta == 1:
         # delta == 1 for integer means no change
-        return df
+        return df, None
     quantized = np.rint(df / delta)
     result = quantized * delta
     deltaMean = (df - result).mean()
