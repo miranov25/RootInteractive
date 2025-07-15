@@ -35,7 +35,7 @@ widgetParams = [
     ['range', ['B']],
     ['range', ['C']],
     ['multiSelect', ['D']],
-    ['range', ['index'], {"index": True}],
+    ['toggle', ['enableDithering']],
 ]
 widgetLayoutDesc = [[0, 1], [2, 3, 4], {'sizing_mode': 'scale_width'}]
 
@@ -49,27 +49,31 @@ tooltips = [("VarA", "(@A)"), ("VarB", "(@B)")]
 df,a,b,c,d=makePanda(0.02,0.1)
 df['D']=df["A"]-df["B"]
 
+parameterArray = [{"name": "enableDithering", "value":False}]
+
 def test_clientHistogramWeight():
     output_file("test_bokehClientHistogramWeight.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
+                                parameterArray=parameterArray, enableDithering="enableDithering",
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
 
 def test_clientHistogramWeightCompressed():
     output_file("test_bokehClientHistogramWeight_Compressed.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                                parameterArray=parameterArray, enableDithering="enableDithering",
                                 arrayCompression=arrayCompressionRelative16)
 
 def test_clientHistogramWeightFixedPoint():
     output_file("test_bokehClientHistogramWeight_FixedPoint.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
-                                arrayCompression=[("W.*",[("relative",16),"zip"]),(".*",[("delta",.01), "zip"])])
+                                parameterArray=parameterArray, enableDithering="enableDithering",
+                                arrayCompression=[("W.*",[("relative",16),"zip"]),(".*",[("delta",.015), "zip"])])
 
 def test_clientHistogramWeightSinh():
     output_file("test_bokehClientHistogramWeight_Sinh.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
+                                parameterArray=parameterArray, enableDithering="enableDithering",
                                 arrayCompression=[("W.*",[("sqrt_scaling", .01, .01, 8),"zip"]),(".*",[("delta",.01), "zip"])])
-    
-test_clientHistogramWeightFixedPoint()
