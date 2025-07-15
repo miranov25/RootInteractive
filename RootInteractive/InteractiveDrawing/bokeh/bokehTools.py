@@ -387,7 +387,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         sourceArray = histogramArray
 
-    sourceArray = [{"data": dfQuery, "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"], "meta":options.get("meta", None)}] + sourceArray
+    sourceArray = [{"data": dfQuery, "enableDithering":options.get("enableDithering", False), "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"], "meta":options.get("meta", None)}] + sourceArray
 
     paramDict = {}
     for param in parameterArray:
@@ -1934,11 +1934,13 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                 iCds["cdsOrig"] = CDSCompress(name=cdsName)
                 dither = iCds.get("enableDithering", False)
                 if isinstance(dither, str):
+                    paramDict[dither]["subscribed_events"].append(["active", CustomJS(args={"cds":iCds["cdsOrig"]}, code="""
+                        cds.enableDithering = this.active
+                                                    """)])
                     if paramDict.get(dither, {}).get("value", False):
                         dither = True
-                    paramDict[dither]["subscribed_events"].append(["value", CustomJS(args={"cds":iCds["cdsOrig"]}, code="""
-                        cds.enableDithering = this.value
-                                                    """)])
+                    else:
+                        dither = False
                 iCds["cdsOrig"].enableDithering = dither
             else:
                 iCds["cdsOrig"] = ColumnDataSource(name=cdsName)

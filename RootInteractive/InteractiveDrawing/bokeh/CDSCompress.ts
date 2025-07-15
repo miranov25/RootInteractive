@@ -235,7 +235,7 @@ export class CDSCompress extends ColumnDataSource {
   }
 
   toggle_dithering() {
-    for (const key in this.invalidateOnDitheringToggle){
+    for (const key of this.invalidateOnDitheringToggle){
       this.freshColumns.delete(key)
     }
     if(this.invalidateOnDitheringToggle.size > 0){
