@@ -1933,7 +1933,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             if iCds.get("arrayCompression", None) is not None:
                 iCds["cdsOrig"] = CDSCompress(name=cdsName)
                 dither = iCds.get("enableDithering", False)
-                if isinstance(dither, str):
+                if isinstance(dither, str) and dither in paramDict:
                     paramDict[dither]["subscribed_events"].append(["active", CustomJS(args={"cds":iCds["cdsOrig"]}, code="""
                         cds.enableDithering = this.active
                                                     """)])
@@ -1941,7 +1941,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                         dither = True
                     else:
                         dither = False
-                iCds["cdsOrig"].enableDithering = dither
+                iCds["cdsOrig"].enableDithering = dither if isinstance(dither, bool) else False
             else:
                 iCds["cdsOrig"] = ColumnDataSource(name=cdsName)
         elif cdsType == "projection":
