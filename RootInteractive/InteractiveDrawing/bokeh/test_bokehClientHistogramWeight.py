@@ -54,26 +54,26 @@ parameterArray = [{"name": "enableDithering", "value":False}]
 def test_clientHistogramWeight():
     output_file("test_bokehClientHistogramWeight.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
-                                parameterArray=parameterArray, enableDithering="enableDithering",
+                                parameterArray=parameterArray,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray)
 
 def test_clientHistogramWeightCompressed():
     output_file("test_bokehClientHistogramWeight_Compressed.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
-                                parameterArray=parameterArray, enableDithering="enableDithering",
+                                parameterArray=parameterArray,
                                 arrayCompression=arrayCompressionRelative16)
 
 def test_clientHistogramWeightFixedPoint():
     output_file("test_bokehClientHistogramWeight_FixedPoint.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
-                                parameterArray=parameterArray, enableDithering="enableDithering",
+                                parameterArray=parameterArray,
                                 arrayCompression=[("W.*",[("relative",16),"zip"]),(".*",[("delta",.015), "zip"])])
 
 def test_clientHistogramWeightSinh():
     output_file("test_bokehClientHistogramWeight_Sinh.html")
     xxx = bokehDrawSA.fromArray(df, "A>0", figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips,
                                 widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", histogramArray=histogramArray,
-                                parameterArray=parameterArray, enableDithering="enableDithering",
+                                parameterArray=parameterArray,
                                 arrayCompression=[("W.*",[("sqrt_scaling", .01, .01, 8),"zip"]),(".*",[("delta",.01), "zip"])])

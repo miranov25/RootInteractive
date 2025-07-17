@@ -387,7 +387,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     else:
         sourceArray = histogramArray
 
-    sourceArray = [{"data": dfQuery, "enableDithering":options.get("enableDithering", False), "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"], "meta":options.get("meta", None)}] + sourceArray
+    sourceArray = [{"data": dfQuery, "enableDithering":options.get("enableDithering", "enableDithering"), "arrayCompression": options["arrayCompression"], "name":None, "tooltips": options["tooltips"], "meta":options.get("meta", None)}] + sourceArray
 
     paramDict = {}
     for param in parameterArray:
