@@ -25,6 +25,8 @@ DEFAULT_WIDGET_PARAMS = [
         ['select', ['yAxisTransform'], {"name": "yAxisTransform"}],
         ['select', ['xAxisTransform'], {"name": "xAxisTransform"}],
         ['select', ['zAxisTransform'], {"name": "zAxisTransform"}],
+        # dithering
+        ['toggle', ['enableDithering'], {"name": "enableDithering"}],
     ]
 
 def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None):
@@ -59,6 +61,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
         {'name': 'funCustomForm2', "value":"return 1"},
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
+        {"name": "enableDithering", "value":False}
     ]
 
     parameterArray.extend(figureParameters["legend"]['parameterArray'])
@@ -94,7 +97,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ"], parameterVars, {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "enableDithering"], parameterVars, {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","epsilonLog","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
@@ -323,6 +326,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
         {'name': 'funCustomForm2', "value":"return 1"},
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
+        {"name": "enableDithering", "value":False},
     ]
 
     transformArray = [
@@ -384,7 +388,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "diffFunc"], parameterVars, {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "diffFunc", "enableDithering"], parameterVars, {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","epsilonLog","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]
@@ -614,6 +618,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
         #
         {"name": "sigmaNRel", "value":3.35, "range":[1,5]},
         {"name": "minEntries", "value":0, "range":[0,1000]},
+        {"name": "enableDithering", "value":False},
     ]
 
     transformArray = [
@@ -709,7 +714,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
     widgetLayoutDesc={
         "Select": [],
         "Custom":[["customSelect0","customSelect1","customSelect2"],["funCustomForm0","funCustomForm1","funCustomForm2"]],
-        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "diffFunc", "diffFuncWeights", "minEntries"], parameterVars, {'sizing_mode': 'scale_width'}],
+        "Histograms":[["nbinsX","nbinsY", "nbinsZ", "diffFunc", "diffFuncWeights", "minEntries", "enableDithering"], parameterVars, {'sizing_mode': 'scale_width'}],
         "Transform":[["exponentX","epsilonLog","xAxisTransform", "yAxisTransform","zAxisTransform"],{'sizing_mode': 'scale_width'}],
         "Legend": figureParameters['legend']['widgetLayout'],
         "Markers":["markerSize"]

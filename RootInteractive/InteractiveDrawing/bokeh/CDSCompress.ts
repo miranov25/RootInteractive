@@ -75,12 +75,21 @@ function swap(buffer: ArrayBuffer, dtype: string) {
   }
 }
 
+/*function encodeArcsinh(x: number, mu: number, sigma0: number, sigma1: number): number {
+  return Math.asinh((x - mu) / sigma1) / sigma0;
+}*/
+
+function to_fixed_point(x: number, scale: number, origin: number): number {
+  return Math.round((x - origin) / scale);
+}
+
 export namespace CDSCompress {
   export type Attrs = p.AttrsOf<Props>
 
   export type Props = ColumnDataSource.Props & {
       inputData :    p.Property<any>
       sizeMap :    p.Property<any>
+      enableDithering : p.Property<boolean>
   }
 }
 
@@ -97,24 +106,34 @@ export class CDSCompress extends ColumnDataSource {
 
   static {
 
-    this.define<CDSCompress.Props>(({Any})=>({
+    this.define<CDSCompress.Props>(({Any, Boolean})=>({
         inputData:    [ Any, {} ],
-        sizeMap:    [ Any, {} ]
+        sizeMap:    [ Any, {} ],
+        enableDithering: [ Boolean, false ]
     }))
   }
 
   _length: number
   intermediateData: Record<string, any>
+  freshColumns: Set<string>
+  invalidateOnDitheringToggle: Set<string>
 
   initialize(): void {
     super.initialize()
     console.info("CDSCompress::initialize")
     this.intermediateData = {}
     this.data = {}
+    this.freshColumns = new Set<string>()
+    this.invalidateOnDitheringToggle = new Set<string>()
     this._length = -1
   }
 
-  inflateCompressedBokehBase64(arrayIn: any, startIndex: number = -1, earlyExit: boolean = false): any {
+  connect_signals(): void {
+    super.connect_signals()
+    this.connect(this.properties.enableDithering.change, () => this.toggle_dithering())
+  }
+
+  inflateCompressedBokehBase64(arrayIn: any, key: string, startIndex: number = -1, earlyExit: boolean = false): any {
     let arrayOut=arrayIn.array
     if(startIndex < 0){
       startIndex = arrayIn.history.length || 0;
@@ -173,15 +192,23 @@ export class CDSCompress extends ColumnDataSource {
           console.error("Not enough parameters");
           continue;
         } 
-        if(earlyExit && actionParams.earlyExit){
+        if(earlyExit){
           arrayIn.arrayOut = arrayOut
-          return arrayOut
+          return {"arrayOut": arrayOut, "dtype": arrayIn.dtype, "byteorder": arrayIn.byteorder, "encode": (x: number) => to_fixed_point(x, actionParams.scale, actionParams.origin)}
         }
         const origin = actionParams.origin
         const scale = actionParams.scale
-        const arrayOutNew = new Array(arrayOut.length)
-        for (let i = 0; i < arrayOut.length; i++) {
-          arrayOutNew[i] = origin + scale * arrayOut[i]
+        const dither = actionParams.dither || this.enableDithering
+        const arrayOutNew = new Float64Array(arrayOut.length)
+        this.invalidateOnDitheringToggle.add(key)
+        if(dither){
+          for (let i = 0; i < arrayOut.length; i++) {
+            arrayOutNew[i] = origin + scale * (arrayOut[i] + Math.random() - .5)
+          }
+        } else {
+          for (let i = 0; i < arrayOut.length; i++) {
+            arrayOutNew[i] = origin + scale * arrayOut[i]
+          }
         }
         arrayOut = arrayOutNew;
       }
@@ -189,8 +216,9 @@ export class CDSCompress extends ColumnDataSource {
         const mu = actionParams.mu
         const sigma0 = actionParams.sigma0
         const sigma1 = sigma0 / actionParams.sigma1
-        const dither = actionParams.dither || 0
+        const dither = actionParams.dither || this.enableDithering
         let arrayOutNew = new Array(arrayOut.length)
+        this.invalidateOnDitheringToggle.add(key)
         if(dither){
           arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * (x + Math.random() - .5) + mu))
         } else {
@@ -206,22 +234,33 @@ export class CDSCompress extends ColumnDataSource {
     return value
   }
 
+  toggle_dithering() {
+    for (const key of this.invalidateOnDitheringToggle){
+      this.freshColumns.delete(key)
+    }
+    if(this.invalidateOnDitheringToggle.size > 0){
+      this.invalidateOnDitheringToggle.clear()
+      this.change.emit()
+    }
+  }
+
   get_intermediate_column(key: string) {
     // This is used to get the inflated column before applying transformations
     if (this.intermediateData[key] != null) {
       return this.intermediateData[key].arrayOut
     }
-    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], -1, true)
+    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], key, -1, true)
     this.intermediateData[key] = arrOut
     return arrOut
   }
 
   get_column(key: string){
-    if (this.data[key] != null) {
+    if (this.freshColumns.has(key)) {
       return this.data[key];
     }
-    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key]);
+    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], key);
     this.data[key]=arrOut;
+    this.freshColumns.add(key);
     if(this._length === -1) this._length = arrOut.length
     if(arrOut.length !== this._length){
       throw Error("Corrupted length of column " + key + ": " + arrOut.length + " expected: " + this._length)
