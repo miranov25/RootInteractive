@@ -32,7 +32,7 @@ onx = convert_sklearn(clr, initial_types=initial_type)
 y_pred_skl = clr.predict(X_test)
 
 s = onx.SerializeToString()
-onx_b64 = base64.b64encode(s)
+onx_b64 = base64.b64encode(s).decode('utf-8')
 
 X_test_T = X_test.T
 
@@ -56,7 +56,7 @@ def test_onnx_base64():
             "out_idx": 0,
             "fields": {"float_input":["A","B","C","D"]}
         }
-    })
+    }, columnDependencies=[ort_func_js])
 
     print(cds.data)
     output_file("test_ort_web.html", "Test ONNX runtime web")
