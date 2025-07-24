@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from bokeh.plotting import output_file
 import base64
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -8,6 +7,9 @@ from sklearn.linear_model import LogisticRegression
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from bokeh.models.sources import ColumnDataSource
+from bokeh.plotting import output_file, figure
+from bokeh.io import show
+from bokeh.models.layouts import Column
 
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
@@ -52,13 +54,16 @@ def test_onnx_base64():
         "y_pred_client":{
             "transform":ort_func_js,
             "out_idx": 0,
-            "fields": ["A","B","C","D"]
+            "fields": {"float_input":["A","B","C","D"]}
         }
     })
 
-    
-
     print(cds.data)
     output_file("test_ort_web.html", "Test ONNX runtime web")
+    f_skl = figure(title="Reference true vs predicted by scikit learn", width=800, height=600)
+    f_skl.scatter(x="y_true", y="y_pred_skl", source=cds_derived)
+    f_client = figure(title="ONNX Runtime Client", width=800, height=600)
+    f_client.scatter(x="y_true", y="y_pred_client", source=cds_derived, color="red", legend_label="Predicted by ONNX")
+    show(Column(f_skl, f_client))
 
 test_onnx_base64()
