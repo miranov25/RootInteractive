@@ -14,6 +14,7 @@ from bokeh.models.layouts import Column
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
+from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from RootInteractive.InteractiveDrawing.bokeh.OrtFunction import OrtFunction
 
@@ -58,12 +59,14 @@ def test_onnx_base64():
         }
     }, columnDependencies=[ort_func_js])
 
+    cds_shown = DownsamplerCDS(source=cds_derived)
+
     print(cds.data)
     output_file("test_ort_web.html", "Test ONNX runtime web")
     f_skl = figure(title="Reference true vs predicted by scikit learn", width=800, height=600)
-    f_skl.scatter(x="y_true", y="y_pred_skl", source=cds_derived)
+    f_skl.scatter(x="y_true", y="y_pred_skl", source=cds_shown, color="blue", legend_label="Predicted by scikit learn")
     f_client = figure(title="ONNX Runtime Client", width=800, height=600)
-    f_client.scatter(x="y_true", y="y_pred_client", source=cds_derived, color="red", legend_label="Predicted by ONNX")
+    f_client.scatter(x="y_true", y="y_pred_client", source=cds_shown, color="red", legend_label="Predicted by ONNX")
     show(Column(f_skl, f_client))
 
 test_onnx_base64()
