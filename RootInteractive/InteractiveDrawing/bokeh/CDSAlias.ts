@@ -80,7 +80,7 @@ export class CDSAlias extends ColumnarDataSource {
     this.connect(this.selected.change, () => this.update_selection())
   }
 
-  async compute_function(key: string){
+  compute_function(key: string){
     const {source, mapping, data, cached_columns, _locked_columns} = this
     const column = mapping[key]
     const len = this.get_length()
@@ -119,21 +119,38 @@ export class CDSAlias extends ColumnarDataSource {
           return
         }
         _locked_columns.add(key)
-        let field_names
+        let field_names: string[] | Record<string, string | string[]>
         if (column.fields === "auto"){
           field_names = column.transform.get_fields()
         } else {
           field_names = column.fields
         }
-        let fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
-        /*if(Array.isArray(field_names)){
+        //let fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        let fields: any
+        if(Array.isArray(field_names)){
           fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
         } else {
-
-        }*/
+          const field_names_obj = field_names as Record<string, string | string[]>
+          fields = Object.keys(field_names_obj).reduce((acc: any, x: string) => {
+            const single_field = field_names_obj[x]
+            if(Array.isArray(single_field)){
+              acc[x] = single_field.map((y: string) => isNaN(Number(y)) ? this.get_column(y)! : Array(len).fill(Number(y)))
+              return acc
+            } else {
+               acc[x] = isNaN(Number(single_field)) ? this.get_column(single_field)! : Array(len).fill(Number(single_field))
+            }
+            return acc
+          }, {})
+        }
         let new_column = column.transform.v_compute(fields, this.source, data[key])
         if(new_column instanceof Promise){
-          new_column = await new_column
+          new_column.then((new_column: any) => {
+            data[key] = new_column
+            cached_columns.add(key)
+            _locked_columns.delete(key)
+            this.change.emit()
+          })
+          return
         }
         if(new_column != null){
             data[key] = new_column
