@@ -87,7 +87,7 @@ export class OrtFunction extends Model {
   }
 
   // TODO: Add a get_value function, we want to also support ND functions
-  async v_compute(xs: Record<string, any>, _data_source: any, _output: any[] | null =null){
+  async v_compute(xs: Record<string, any>, _data_source: any, _output: any[] | null =null, y: string = "output_label"): Promise<any[] | null> {
       if(this._session){
         console.log(xs)
         const xs_tensors = Object.keys(xs).reduce((acc: Record<string, any>, key: string) => {
@@ -106,12 +106,12 @@ export class OrtFunction extends Model {
             console.log(this._session.inputNames)
             console.log(this._session.outputNames)
             console.log(xs_tensors)
-            const new_results = await this._session.run(xs_tensors, ["output_label"])
+            const new_results = await this._session.run(xs_tensors, [y])
             console.log(new_results)
-            if(new_results["output_label"].data instanceof BigInt64Array){
-              return Array.from(new_results["output_label"].data).map(x => Number(x))
+            if(new_results[y].data instanceof BigInt64Array){
+              return Array.from(new_results[y].data).map(x => Number(x))
             }
-            return new_results["output_label"].data as any[]
+            return new_results[y].data as any[]
           } catch (error) {
             console.error("Error during ONNX inference:", error)
             return null
