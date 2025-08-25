@@ -447,6 +447,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             variables = i.get("variables", [])
         customJsArgList = {}
         transform = None
+        out = None
         if not isinstance(i, dict):
             if len(i) == 2:
                 i = {"name":i[0], "expr":i[1]}
@@ -456,6 +457,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if "parameters" in i:
             for j in i["parameters"]:
                 customJsArgList[j] = paramDict[j]["value"]
+        if "out" in i:
+            out = i["out"]
         if "transform" in i and i["transform"] in jsFunctionDict:
             transform = jsFunctionDict[i["transform"]]
         elif "v_func" in i:
@@ -511,6 +514,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if source not in aliasDict:
             aliasDict[source] = {}
         aliasDict[source][i["name"]] = {"fields": fields, "transform": transform}
+        if out is not None:
+            aliasDict[source][i["name"]]["out"] = out
         if parameters is not None:
             for j in parameters:
                 paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
