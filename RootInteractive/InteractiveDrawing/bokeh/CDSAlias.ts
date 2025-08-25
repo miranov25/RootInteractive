@@ -150,6 +150,9 @@ export class CDSAlias extends ColumnarDataSource {
           new_column = column.transform.v_compute(fields, this.source, data[key])
         }
         if(new_column instanceof Promise){
+          if(data[key] == null){
+            data[key] = new Array(len).fill(.0)
+          }
           new_column.then((new_column: any) => {
             data[key] = new_column
             cached_columns.add(key)
