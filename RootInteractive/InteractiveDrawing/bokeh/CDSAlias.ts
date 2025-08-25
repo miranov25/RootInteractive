@@ -142,7 +142,13 @@ export class CDSAlias extends ColumnarDataSource {
             return acc
           }, {})
         }
-        let new_column = column.transform.v_compute(fields, this.source, data[key])
+        let new_column
+        if(column.hasOwnProperty("out")){
+          const out = column.out
+          new_column = column.transform.v_compute(fields, this.source, data[key], out)
+        } else {
+          new_column = column.transform.v_compute(fields, this.source, data[key])
+        }
         if(new_column instanceof Promise){
           new_column.then((new_column: any) => {
             data[key] = new_column
@@ -156,7 +162,9 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = new_column
         } else if(data[key] != null){
             new_column = data[key]
-            new_column.length = source.get_length()
+            if(!Array.isArray(new_column) || new_column.length != len){
+                new_column = new Array(len).fill(.0)
+            }
             const nvars = fields.length
             let row = new Array(nvars)
 	    try {

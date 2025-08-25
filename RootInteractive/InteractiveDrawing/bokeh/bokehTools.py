@@ -34,6 +34,8 @@ from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
+from RootInteractive.InteractiveDrawing.bokeh.OrtFunction import OrtFunction
+
 import numpy as np
 import pandas as pd
 import re
@@ -406,6 +408,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     for i in jsFunctionArray:
         customJsArgList = {}
         transformType = i.get("type", "customJS")
+        if transformType == "onnx":
+            jsFunctionDict[i["name"]] = OrtFunction(v_func=i["v_func"])
+            break
         if transformType == "linearFit":
             iFitter = jsFunctionDict[i["name"]] = ClientLinearFitter(varY=i["varY"], source=getOrMakeCdsFull(cdsDict, paramDict, i.get("source", None)), alpha=i.get("alpha", 0), weights=i.get("weights", None))
             if isinstance(i["varX"], str):
