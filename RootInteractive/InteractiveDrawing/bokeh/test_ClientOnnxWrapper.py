@@ -77,13 +77,13 @@ def test_onnx_bokehDrawArray():
         [["A"], ["B"], {"size":10, "color":"blue", "legend_label":"Predicted by scikit learn"}],
         [["A"], ["y_pred_client"], {"size":10, "color":"red", "legend_label":"Predicted by ONNX"}]
     ]
-    widgetParams = []
+    widgetParams = [["multiSelect", ["y_pred_skl"]]]
     parameterArray = []
     jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
     aliasArray = [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
     figureLayoutDesc=[[0,1, {"height":400}], {"sizing_mode":"scale_width"}]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
-                          jsFunctionArray=jsFunctionArray, widgetLayout = [],
+                          jsFunctionArray=jsFunctionArray, widgetLayout = [[0]],
                            aliasArray=aliasArray)
 
 test_onnx_bokehDrawArray()
