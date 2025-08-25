@@ -12,11 +12,11 @@ from bokeh.io import show
 from bokeh.models.layouts import Column
 
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
-from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from RootInteractive.InteractiveDrawing.bokeh.OrtFunction import OrtFunction
+
 
 # Prepare model
 iris = load_iris()
@@ -40,9 +40,7 @@ X_test_T = X_test.T
 print(X_test_T)
 print(y_test)
 
-def test_onnx_base64():
-    ort_func_js = OrtFunction(v_func = onx_b64)
-    cds = ColumnDataSource(data={
+df = pd.DataFrame({
         "A": X_test_T[0],
         "B": X_test_T[1],
         "C": X_test_T[2],
@@ -51,10 +49,14 @@ def test_onnx_base64():
         "y_pred_skl": y_pred_skl
     })
 
+def test_onnx_base64():
+    ort_func_js = OrtFunction(v_func = onx_b64)
+    cds = ColumnDataSource(data=df)
+
     cds_derived = CDSAlias(source=cds, mapping={
         "y_pred_client":{
             "transform":ort_func_js,
-            "out_idx": 0,
+            "out": "output_label",
             "fields": {"float_input":["A","B","C","D"]}
         }
     }, columnDependencies=[ort_func_js])
@@ -69,4 +71,19 @@ def test_onnx_base64():
     f_client.scatter(x="y_true", y="y_pred_client", source=cds_shown, color="red", legend_label="Predicted by ONNX")
     show(Column(f_skl, f_client))
 
-test_onnx_base64()
+def test_onnx_bokehDrawArray():
+    output_file("test_ort_web_bokehDrawSA.html", "Test ONNX runtime web")
+    figureArray = [
+        [["A"], ["B"], {"size":10, "color":"blue", "legend_label":"Predicted by scikit learn"}],
+        [["A"], ["y_pred_client"], {"size":10, "color":"red", "legend_label":"Predicted by ONNX"}]
+    ]
+    widgetParams = []
+    parameterArray = []
+    jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
+    aliasArray = [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
+    figureLayoutDesc=[[0,1, {"height":400}], {"sizing_mode":"scale_width"}]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          jsFunctionArray=jsFunctionArray, widgetLayout = [],
+                           aliasArray=aliasArray)
+
+test_onnx_bokehDrawArray()
