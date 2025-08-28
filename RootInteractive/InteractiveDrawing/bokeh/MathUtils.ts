@@ -152,11 +152,11 @@ export function quantile(sample:number[], q:number, begin=0, end=-1){
   
   // Cholesky decomposition without pivoting - inplace
 // TODO: Perhaps add a version with pivoting too?
-export function chol(X: number[], nRows: number){
+export function chol(X: number[], nRows: number, eps=1e-6){
   let iRow = 0
   let jRow, kRow
   for(let i=0; i < nRows; ++i){
-    const pivotDiag = 1/X[i+iRow]
+    const pivotDiag =X[i+iRow] < eps ? 0 : 1/X[i+iRow]
     jRow = iRow+i+1
     for(let j=i+1; j < nRows; ++j) {
       const pivotRow = pivotDiag*X[i+jRow]
