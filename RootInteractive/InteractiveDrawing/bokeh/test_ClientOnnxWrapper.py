@@ -16,7 +16,8 @@ from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from RootInteractive.InteractiveDrawing.bokeh.OrtFunction import OrtFunction
-
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsDiff
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
 
 # Prepare model
 iris = load_iris()
@@ -74,7 +75,7 @@ def test_onnx_base64():
 def test_onnx_bokehDrawArray():
     output_file("test_ort_web_bokehDrawSA.html", "Test ONNX runtime web")
     figureArray = [
-        [["A"], ["B"], {"size":10, "color":"blue", "legend_label":"Predicted by scikit learn"}],
+        [["A"], ["y_pred_skl"], {"size":10, "color":"blue", "legend_label":"Predicted by scikit learn"}],
         [["A"], ["y_pred_client"], {"size":10, "color":"red", "legend_label":"Predicted by ONNX"}]
     ]
     widgetParams = [["multiSelect", ["y_pred_skl"]]]
@@ -85,5 +86,16 @@ def test_onnx_bokehDrawArray():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = [[0]],
                            aliasArray=aliasArray)
+    
+def test_onnx_templateWeights():
+    output_file("test_ort_web_template.html", "Test ONNX runtime web - using template")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_skl", "y_pred_client", "y_pred_skl == y_pred_client"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
+    jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
+    aliasArray += [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
+    widgetParams = mergeFigureArrays(widgetParams, [["multiSelect", ["y_pred_skl"]]])
+    widgetLayoutDesc["Select"] = [0]
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
+                           aliasArray=aliasArray)
 
-test_onnx_bokehDrawArray()
+test_onnx_templateWeights()
