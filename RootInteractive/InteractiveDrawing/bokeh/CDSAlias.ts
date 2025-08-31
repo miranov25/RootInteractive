@@ -157,6 +157,27 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = new_column
             cached_columns.add(key)
             _locked_columns.delete(key)
+            // Brute force invalidation of all columns that depend on this one
+            const candidate_columns = Object.keys(this.mapping)
+            for(const new_key of candidate_columns){
+                const column = this.mapping[new_key]
+                let should_invalidate = false
+                if(column.hasOwnProperty("fields")){
+                  for(let i=0; i < column.fields.length; i++){
+                    if(key === column.fields[i]){
+                      should_invalidate = true
+                      break
+                    }
+                  }
+                } else if(Object.prototype.toString.call(column) === '[object String]'){
+                  if(key === column){
+                    should_invalidate = true
+                  }
+                }
+                if(should_invalidate){
+                  this.invalidate_column(new_key, false)
+                }
+              }
             this.change.emit()
           })
           return
