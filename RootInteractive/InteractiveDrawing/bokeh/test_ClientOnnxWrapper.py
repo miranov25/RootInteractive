@@ -92,7 +92,7 @@ def test_onnx_templateWeights():
     jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
     aliasArray += [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
     widgetParams = mergeFigureArrays(widgetParams, [["multiSelect", ["y_pred_skl"]]])
-    widgetLayoutDesc["Select"] += [3]
+    widgetLayoutDesc["Select"] += [6]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
                            aliasArray=aliasArray)
@@ -128,7 +128,7 @@ def test_onnx_multimodels():
          """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]}
     ]
     widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"]],["range",["B"]]])
-    widgetLayoutDesc["Select"] += [[3,4]]
+    widgetLayoutDesc["Select"] += [[6,7]]
     bokehDrawSA.fromArray(df2, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
                            aliasArray=aliasArray)
