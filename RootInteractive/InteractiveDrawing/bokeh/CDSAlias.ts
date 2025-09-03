@@ -178,6 +178,7 @@ export class CDSAlias extends ColumnarDataSource {
                   this.invalidate_column(new_key, false)
                 }
               }
+              console.timeEnd(key)
             this.change.emit()
           })
           return

@@ -53,7 +53,7 @@ df = pd.DataFrame({
 
 df2_train = pd.DataFrame(np.random.random_sample(size=(5000, 4)), columns=list('ABCD'))
 df2_train["y"] = df2_train.A + (df2_train.B + 1) * np.arcsin(df2_train.C) + np.random.normal(0, 0.1, df2_train.shape[0])
-df2 = pd.DataFrame(np.random.random_sample(size=(10000, 4)), columns=list('ABCD'))
+df2 = pd.DataFrame(np.random.random_sample(size=(1000000, 4)), columns=list('ABCD'))
 df2["y_true"] = df2.A + (df2.B + 1) * np.arcsin(df2.C) + np.random.normal(0, 0.1, df2.shape[0])
 rfr = RandomForestRegressor(n_estimators=10, max_depth=3)
 rfr.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
@@ -91,8 +91,8 @@ def test_onnx_templateWeights():
     aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_skl", "y_pred_client", "y_pred_skl == y_pred_client"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
     jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
     aliasArray += [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
-    widgetParams = mergeFigureArrays(widgetParams, [["multiSelect", ["y_pred_skl"]]])
-    widgetLayoutDesc["Select"] += [6]
+    widgetParams = mergeFigureArrays(widgetParams, [["multiSelect", ["y_pred_skl"],{"name":"y_pred_skl"}]])
+    widgetLayoutDesc["Select"] += ["y_pred_skl"]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
                            aliasArray=aliasArray)
@@ -127,8 +127,8 @@ def test_onnx_multimodels():
             return $output
          """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]}
     ]
-    widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"]],["range",["B"]]])
-    widgetLayoutDesc["Select"] += [[6,7]]
+    widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"],{"name":"A"}],["range",["B"],{"name":"B"}]])
+    widgetLayoutDesc["Select"] += [["A","B"]]
     bokehDrawSA.fromArray(df2, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
                            aliasArray=aliasArray)
