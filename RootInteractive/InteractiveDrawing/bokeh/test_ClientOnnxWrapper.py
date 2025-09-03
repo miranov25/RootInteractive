@@ -3,7 +3,8 @@ import pandas as pd
 import base64
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.ensemble import RandomForestRegressor
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from bokeh.models.sources import ColumnDataSource
@@ -50,27 +51,25 @@ df = pd.DataFrame({
         "y_pred_skl": y_pred_skl
     })
 
-def test_onnx_base64():
-    ort_func_js = OrtFunction(v_func = onx_b64)
-    cds = ColumnDataSource(data=df)
+df2_train = pd.DataFrame(np.random.random_sample(size=(5000, 4)), columns=list('ABCD'))
+df2_train["y"] = df2_train.A + (df2_train.B + 1) * np.arcsin(df2_train.C) + np.random.normal(0, 0.1, df2_train.shape[0])
+df2 = pd.DataFrame(np.random.random_sample(size=(10000, 4)), columns=list('ABCD'))
+df2["y_true"] = df2.A + (df2.B + 1) * np.arcsin(df2.C) + np.random.normal(0, 0.1, df2.shape[0])
+rfr = RandomForestRegressor(n_estimators=10, max_depth=3)
+rfr.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
+df2["y_pred_server_rfr"] = rfr.predict(df2[["A", "B", "C", "D"]])
+initial_type = [('float_input', FloatTensorType([None, 4]))]
+onx_rfr = convert_sklearn(rfr, initial_types=initial_type)
+s = onx_rfr.SerializeToString()
+onx_rfr_b64 = base64.b64encode(s).decode('utf-8')
+ridgeReg = Ridge(alpha=0.1)
+ridgeReg.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
+df2["y_pred_server_ridge"] = ridgeReg.predict(df2[["A", "B", "C", "D"]])
+initial_type = [('float_input', FloatTensorType([None, 4]))]
+onx_ridge = convert_sklearn(ridgeReg, initial_types=initial_type)
+s = onx_ridge.SerializeToString()
+onx_ridge_b64 = base64.b64encode(s).decode('utf-8')
 
-    cds_derived = CDSAlias(source=cds, mapping={
-        "y_pred_client":{
-            "transform":ort_func_js,
-            "out": "output_label",
-            "fields": {"float_input":["A","B","C","D"]}
-        }
-    }, columnDependencies=[ort_func_js])
-
-    cds_shown = DownsamplerCDS(source=cds_derived)
-
-    print(cds.data)
-    output_file("test_ort_web.html", "Test ONNX runtime web")
-    f_skl = figure(title="Reference true vs predicted by scikit learn", width=800, height=600)
-    f_skl.scatter(x="y_true", y="y_pred_skl", source=cds_shown, color="blue", legend_label="Predicted by scikit learn")
-    f_client = figure(title="ONNX Runtime Client", width=800, height=600)
-    f_client.scatter(x="y_true", y="y_pred_client", source=cds_shown, color="red", legend_label="Predicted by ONNX")
-    show(Column(f_skl, f_client))
 
 def test_onnx_bokehDrawArray():
     output_file("test_ort_web_bokehDrawSA.html", "Test ONNX runtime web")
@@ -93,9 +92,45 @@ def test_onnx_templateWeights():
     jsFunctionArray = [{"name": "ort_func_js","v_func":onx_b64,"type":"onnx"}]
     aliasArray += [{"name": "y_pred_client","transform":"ort_func_js","variables": {"float_input":["A","B","C","D"]},"out":"output_label"}]
     widgetParams = mergeFigureArrays(widgetParams, [["multiSelect", ["y_pred_skl"]]])
-    widgetLayoutDesc["Select"] = [0]
+    widgetLayoutDesc["Select"] += [3]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
                           jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
                            aliasArray=aliasArray)
+    
+def test_onnx_multimodels():
+    output_file("test_ort_web_multimodels.html", "Test ONNX runtime web - using multiple models")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_server_rfr", "y_pred_server_ridge", "y_pred_client_rfr", "y_pred_client_ridge", "y_pred_customjs_ridge", "y_pred_server_rfr == y_pred_client_rfr"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
+    jsFunctionArray = [
+        {"name": "ort_func_js_rfr","v_func":onx_rfr_b64,"type":"onnx"},
+        {"name": "ort_func_js_ridge","v_func":onx_ridge_b64,"type":"onnx"}
+    ]
+    aliasArray += [
+        {"name": "y_pred_client_rfr","transform":"ort_func_js_rfr","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
+        {"name": "y_pred_client_ridge","transform":"ort_func_js_ridge","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
+        {"name": "y_pred_customjs_ridge","v_func":"""
+            if($output == null || $output.length !== A.length){
+                $output = new Float64Array(A.length)
+            }
+            $output.fill(intercept)
+            for(let i=0; i<$output.length; i++){
+                $output[i] += coefs[0]*A[i]
+            }
+            for(let i=0; i<$output.length; i++){
+                $output[i] += coefs[1]*B[i]
+            }
+            for(let i=0; i<$output.length; i++){
+                $output[i] += coefs[2]*C[i]
+            }
+            for(let i=0; i<$output.length; i++){
+                $output[i] += coefs[3]*D[i]
+            }
+            return $output
+         """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]}
+    ]
+    widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"]],["range",["B"]]])
+    widgetLayoutDesc["Select"] += [[3,4]]
+    bokehDrawSA.fromArray(df2, None, figureArray, widgetParams, layout=figureLayoutDesc, parameterArray=parameterArray,
+                          jsFunctionArray=jsFunctionArray, widgetLayout = widgetLayoutDesc, histogramArray=histoArray, 
+                           aliasArray=aliasArray)
 
-test_onnx_templateWeights()
+test_onnx_multimodels()
