@@ -52,9 +52,9 @@ df = pd.DataFrame({
     })
 
 df2_train = pd.DataFrame(np.random.random_sample(size=(50000, 4)), columns=list('ABCD'))
-df2_train["y"] = df2_train.A - .7 * df2_train.B + np.random.normal(0, 0.1, df2_train.shape[0])
+df2_train["y"] = df2_train.A - df2_train.B + np.random.normal(0, 0.05, df2_train.shape[0])
 df2 = pd.DataFrame(np.random.random_sample(size=(1000000, 4)), columns=list('ABCD'))
-df2["y_true"] = df2.A - .7 * df2.B + np.random.normal(0, 0.1, df2.shape[0])
+df2["y_true"] = df2.A - df2.B + np.random.normal(0, 0.05, df2.shape[0])
 rfr = RandomForestRegressor(n_estimators=10, max_depth=3)
 rfr.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
 df2["y_pred_server_rf10"] = rfr.predict(df2[["A", "B", "C", "D"]])
@@ -105,7 +105,9 @@ def test_onnx_templateWeights():
     
 def test_onnx_multimodels():
     output_file("test_ort_web_multimodels.html", "Test ONNX runtime web - using multiple models")
-    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_server_rf10", "y_pred_server_rf50", "y_pred_server_ridge", "y_pred_client_rf10", "y_pred_client_rf50", "y_pred_client_ridge", "y_pred_customjs_ridge", "y_pred_server_rf10 == y_pred_client_rf10"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D",
+            "y_true", "y_pred_server_rf10", "y_pred_server_rf50", "y_pred_server_ridge", "y_pred_client_rf10", "y_pred_client_rf50", "y_pred_client_ridge",
+            "y_pred_customjs_ridge", "y_pred_customjs_ridge_naive", "y_pred_server_rf10 == y_pred_client_rf10"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
     jsFunctionArray = [
         {"name": "ort_func_js_rf10","v_func":onx_rfr_b64,"type":"onnx"},
         {"name": "ort_func_js_rf50","v_func":onx_rfr50_b64,"type":"onnx"},
@@ -133,7 +135,8 @@ def test_onnx_multimodels():
                 $output[i] += coefs[3]*D[i]
             }
             return $output
-         """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]}
+         """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]},
+         {"name":"y_pred_customjs_ridge_naive","func":"return intercept + coefs[0]*A + coefs[1]*B + coefs[2]*C + coefs[3]*D","parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "variables":["A","B","C","D"]}
     ]
     widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"],{"name":"A"}],["range",["B"],{"name":"B"}]])
     widgetLayoutDesc["Select"] += [["A","B"]]
