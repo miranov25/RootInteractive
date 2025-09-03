@@ -105,9 +105,7 @@ export class OrtFunction extends Model {
           try {
             console.log(this._session.inputNames)
             console.log(this._session.outputNames)
-            console.log(xs_tensors)
             const new_results = await this._session.run(xs_tensors, [y])
-            console.log(new_results)
             if(new_results[y].data instanceof BigInt64Array){
               return Array.from(new_results[y].data).map(x => Number(x))
             }

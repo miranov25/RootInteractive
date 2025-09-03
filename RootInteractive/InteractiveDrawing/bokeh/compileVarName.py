@@ -21,7 +21,8 @@ JAVASCRIPT_GLOBALS = {
     "arctan2": "Math.atan2",
     "arccosh": "Math.acosh",
     "arcsinh": "Math.asinh",
-    "arctanh": "Math.atanh"
+    "arctanh": "Math.atanh",
+    "parseInt": "parseInt",
 }
 
 JAVASCRIPT_N_ARGS = {
@@ -41,7 +42,8 @@ JAVASCRIPT_N_ARGS = {
     "arctan2": 2,
     "arccosh": 1,
     "arcsinh": 1,
-    "arctanh": 1
+    "arctanh": 1,
+    "parseInt": 1
 }
 
 math_functions = {

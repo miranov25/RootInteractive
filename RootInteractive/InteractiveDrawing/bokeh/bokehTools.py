@@ -410,7 +410,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         transformType = i.get("type", "customJS")
         if transformType == "onnx":
             jsFunctionDict[i["name"]] = OrtFunction(v_func=i["v_func"])
-            break
+            continue
         if transformType == "linearFit":
             iFitter = jsFunctionDict[i["name"]] = ClientLinearFitter(varY=i["varY"], source=getOrMakeCdsFull(cdsDict, paramDict, i.get("source", None)), alpha=i.get("alpha", 0), weights=i.get("weights", None))
             if isinstance(i["varX"], str):
@@ -455,8 +455,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 i = {"name":i[0], "expr":i[1], "context": i[2]}
         aliasSet.add(i["name"])
         if "parameters" in i:
-            for j in i["parameters"]:
-                customJsArgList[j] = paramDict[j]["value"]
+            if isinstance(i["parameters"], list):
+                for j in i["parameters"]:
+                    customJsArgList[j] = paramDict[j]["value"]
+            elif isinstance(i["parameters"], dict):
+                for j, jv in i["parameters"].items():
+                    customJsArgList[j] = jv
         if "out" in i:
             out = i["out"]
         if "transform" in i and i["transform"] in jsFunctionDict:
@@ -517,11 +521,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if out is not None:
             aliasDict[source][i["name"]]["out"] = out
         if parameters is not None:
-            for j in parameters:
-                paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
-        mapper.parameters[param] = this.value
-        mapper.update_args()
-                """)])
+            if isinstance(parameters, list):
+                for j in parameters:
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
+            mapper.parameters[param] = this.value
+            mapper.update_args()
+                    """)])
 
     plotArray = []
     colorAll = all_palettes[options['colors']] if isinstance(options['colors'], str) else options['colors']
