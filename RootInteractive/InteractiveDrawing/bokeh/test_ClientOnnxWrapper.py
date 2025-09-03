@@ -51,17 +51,23 @@ df = pd.DataFrame({
         "y_pred_skl": y_pred_skl
     })
 
-df2_train = pd.DataFrame(np.random.random_sample(size=(5000, 4)), columns=list('ABCD'))
-df2_train["y"] = df2_train.A + (df2_train.B + 1) * np.arcsin(df2_train.C) + np.random.normal(0, 0.1, df2_train.shape[0])
+df2_train = pd.DataFrame(np.random.random_sample(size=(50000, 4)), columns=list('ABCD'))
+df2_train["y"] = df2_train.A - .7 * df2_train.B + np.random.normal(0, 0.1, df2_train.shape[0])
 df2 = pd.DataFrame(np.random.random_sample(size=(1000000, 4)), columns=list('ABCD'))
-df2["y_true"] = df2.A + (df2.B + 1) * np.arcsin(df2.C) + np.random.normal(0, 0.1, df2.shape[0])
+df2["y_true"] = df2.A - .7 * df2.B + np.random.normal(0, 0.1, df2.shape[0])
 rfr = RandomForestRegressor(n_estimators=10, max_depth=3)
 rfr.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
-df2["y_pred_server_rfr"] = rfr.predict(df2[["A", "B", "C", "D"]])
+df2["y_pred_server_rf10"] = rfr.predict(df2[["A", "B", "C", "D"]])
 initial_type = [('float_input', FloatTensorType([None, 4]))]
 onx_rfr = convert_sklearn(rfr, initial_types=initial_type)
 s = onx_rfr.SerializeToString()
 onx_rfr_b64 = base64.b64encode(s).decode('utf-8')
+rfr50 = RandomForestRegressor(n_estimators=50, max_depth=5)
+rfr50.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
+df2["y_pred_server_rf50"] = rfr50.predict(df2[["A", "B", "C", "D"]])
+onx_rfr50 = convert_sklearn(rfr50, initial_types=initial_type)
+s = onx_rfr50.SerializeToString()
+onx_rfr50_b64 = base64.b64encode(s).decode('utf-8')
 ridgeReg = Ridge(alpha=0.1)
 ridgeReg.fit(df2_train[["A", "B", "C", "D"]], df2_train["y"])
 df2["y_pred_server_ridge"] = ridgeReg.predict(df2[["A", "B", "C", "D"]])
@@ -99,13 +105,15 @@ def test_onnx_templateWeights():
     
 def test_onnx_multimodels():
     output_file("test_ort_web_multimodels.html", "Test ONNX runtime web - using multiple models")
-    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_server_rfr", "y_pred_server_ridge", "y_pred_client_rfr", "y_pred_client_ridge", "y_pred_customjs_ridge", "y_pred_server_rfr == y_pred_client_rfr"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
+    aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc = getDefaultVarsDiff(variables=["A", "B", "C", "D", "y_true", "y_pred_server_rf10", "y_pred_server_rf50", "y_pred_server_ridge", "y_pred_client_rf10", "y_pred_client_rf50", "y_pred_client_ridge", "y_pred_customjs_ridge", "y_pred_server_rf10 == y_pred_client_rf10"], weights=[None, "A>.5", "B>C"], multiAxis="weights")
     jsFunctionArray = [
-        {"name": "ort_func_js_rfr","v_func":onx_rfr_b64,"type":"onnx"},
+        {"name": "ort_func_js_rf10","v_func":onx_rfr_b64,"type":"onnx"},
+        {"name": "ort_func_js_rf50","v_func":onx_rfr50_b64,"type":"onnx"},
         {"name": "ort_func_js_ridge","v_func":onx_ridge_b64,"type":"onnx"}
     ]
     aliasArray += [
-        {"name": "y_pred_client_rfr","transform":"ort_func_js_rfr","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
+        {"name": "y_pred_client_rf10","transform":"ort_func_js_rf10","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
+        {"name": "y_pred_client_rf50","transform":"ort_func_js_rf50","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
         {"name": "y_pred_client_ridge","transform":"ort_func_js_ridge","variables": {"float_input":["A","B","C","D"]},"out":"variable"},
         {"name": "y_pred_customjs_ridge","v_func":"""
             if($output == null || $output.length !== A.length){
