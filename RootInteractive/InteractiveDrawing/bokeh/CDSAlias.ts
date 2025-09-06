@@ -9,6 +9,7 @@ export namespace CDSAlias {
     mapping: p.Property<Record<string, any>>
     includeOrigColumns: p.Property<boolean>
     columnDependencies: p.Property<any[]>
+    wasmModule: p.Property<string>
   }
 }
 
@@ -31,12 +32,18 @@ export class CDSAlias extends ColumnarDataSource {
 
   _locked_columns: Set<string>
 
+  _pending_columns: Set<string>
+
+  wasm_memory: WebAssembly.Memory
+  wasm_instance: WebAssembly.Instance
+
   static {
-    this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref})=>({
+    this.define<CDSAlias.Props>(({Any, Boolean, Array, Ref,String})=>({
       source:  [Ref(ColumnarDataSource)],
       mapping:    [ Any, {} ],
       includeOrigColumns: [Boolean, true],
-      columnDependencies: [Array(Any), []]
+      columnDependencies: [Array(Any), []],
+      wasmModule: [String, ""]
     }))
   }
 
@@ -44,6 +51,7 @@ export class CDSAlias extends ColumnarDataSource {
     super.initialize()
     this.cached_columns = new Set()
     this._locked_columns = new Set()
+    this._pending_columns = new Set()
     this.data = {}
    // this.compute_functions()
   }
@@ -111,19 +119,77 @@ export class CDSAlias extends ColumnarDataSource {
           return
         }
         _locked_columns.add(key)
-        let field_names
+        let field_names: string[] | Record<string, string | string[]>
         if (column.fields === "auto"){
           field_names = column.transform.get_fields()
         } else {
           field_names = column.fields
         }
-        const fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
-        let new_column = column.transform.v_compute(fields, this.source, data[key])
-        if(new_column){
+        //let fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        let fields: any
+        if(Array.isArray(field_names)){
+          fields = field_names.map((x: string) => isNaN(Number(x)) ? this.get_column(x)! : Array(len).fill(Number(x)))
+        } else {
+          const field_names_obj = field_names as Record<string, string | string[]>
+          fields = Object.keys(field_names_obj).reduce((acc: any, x: string) => {
+            const single_field = field_names_obj[x]
+            if(Array.isArray(single_field)){
+              acc[x] = single_field.map((y: string) => isNaN(Number(y)) ? this.get_column(y)! : Array(len).fill(Number(y)))
+              return acc
+            } else {
+               acc[x] = isNaN(Number(single_field)) ? this.get_column(single_field)! : Array(len).fill(Number(single_field))
+            }
+            return acc
+          }, {})
+        }
+        let new_column
+        if(column.hasOwnProperty("out")){
+          const out = column.out
+          new_column = column.transform.v_compute(fields, this.source, data[key], out)
+        } else {
+          new_column = column.transform.v_compute(fields, this.source, data[key])
+        }
+        if(new_column instanceof Promise){
+          if(data[key] == null){
+            data[key] = new Array(len).fill(.0)
+          }
+          new_column.then((new_column: any) => {
+            data[key] = new_column
+            cached_columns.add(key)
+            _locked_columns.delete(key)
+            // Brute force invalidation of all columns that depend on this one
+            const candidate_columns = Object.keys(this.mapping)
+            for(const new_key of candidate_columns){
+                const column = this.mapping[new_key]
+                let should_invalidate = false
+                if(column.hasOwnProperty("fields")){
+                  for(let i=0; i < column.fields.length; i++){
+                    if(key === column.fields[i]){
+                      should_invalidate = true
+                      break
+                    }
+                  }
+                } else if(Object.prototype.toString.call(column) === '[object String]'){
+                  if(key === column){
+                    should_invalidate = true
+                  }
+                }
+                if(should_invalidate){
+                  this.invalidate_column(new_key, false)
+                }
+              }
+              console.timeEnd(key)
+            this.change.emit()
+          })
+          return
+        }
+        if(new_column != null){
             data[key] = new_column
         } else if(data[key] != null){
             new_column = data[key]
-            new_column.length = source.get_length()
+            if(!Array.isArray(new_column) || new_column.length != len){
+                new_column = new Array(len).fill(.0)
+            }
             const nvars = fields.length
             let row = new Array(nvars)
 	    try {
@@ -235,7 +301,7 @@ export class CDSAlias extends ColumnarDataSource {
       let should_invalidate = false
       if(column.hasOwnProperty("fields")){
         for(let i=0; i < column.fields.length; i++){
-          if(key == column.fields[i]){
+          if(key === column.fields[i]){
             should_invalidate = true
             break
           }

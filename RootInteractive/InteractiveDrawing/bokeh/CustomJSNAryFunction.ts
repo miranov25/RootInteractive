@@ -25,12 +25,13 @@ export class CustomJSNAryFunction extends Model {
   static __name__ = "CustomJSNAryFunction"
 
   static {
-    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable, Boolean})=>({
+    this.define<CustomJSNAryFunction.Props>(({Array, String, Any, Nullable, Boolean, Int})=>({
       parameters:  [Any, {}],
       fields: [Array(String), []],
       func:    [ Nullable(String), null ],
       v_func:  [Nullable(String), null],
-      auto_fields: [Boolean, false]
+      auto_fields: [Boolean, false],
+      n_out: [Int, 1]
     }))
   }
 

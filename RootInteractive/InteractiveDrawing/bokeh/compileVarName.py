@@ -21,7 +21,8 @@ JAVASCRIPT_GLOBALS = {
     "arctan2": "Math.atan2",
     "arccosh": "Math.acosh",
     "arcsinh": "Math.asinh",
-    "arctanh": "Math.atanh"
+    "arctanh": "Math.atanh",
+    "parseInt": "parseInt",
 }
 
 JAVASCRIPT_N_ARGS = {
@@ -41,7 +42,8 @@ JAVASCRIPT_N_ARGS = {
     "arctan2": 2,
     "arccosh": 1,
     "arcsinh": 1,
-    "arctanh": 1
+    "arctanh": 1,
+    "parseInt": 1
 }
 
 math_functions = {
@@ -160,8 +162,17 @@ class ColumnEvaluator:
                     "type": "alias"
                 }
             elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
-                for i in self.aliasDict[self.context][node.attr]["fields"]:
-                    self.dependencies.add((self.context, i))
+                if isinstance(self.aliasDict[self.context][node.attr]["fields"], list):
+                    for i in self.aliasDict[self.context][node.attr]["fields"]:
+                        self.dependencies.add((self.context, i))
+                elif isinstance(self.aliasDict[self.context][node.attr]["fields"], dict):
+                    for i in self.aliasDict[self.context][node.attr]["fields"].values():
+                        if isinstance(i, list):
+                            for j in i:
+                                self.dependencies.add((self.context, j))
+                        else:
+                            self.dependencies.add((self.context, i))
+                        
             self.aliasDependencies[node.attr] = node.attr
             return {
                 "name": node.attr,
