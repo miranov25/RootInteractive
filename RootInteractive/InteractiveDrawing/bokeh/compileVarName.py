@@ -148,7 +148,19 @@ class ColumnEvaluator:
     def visit_Subscript(self, node: ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        return {}
+        if sliceValue["type"] != "constant":
+            raise NotImplementedError("Only constant subscripts are supported on the client")
+        if value["type"] == "parameter":
+            self.isSource = False
+            param_name = value["name"]
+            index = sliceValue["value"]
+            self.paramDependencies.add(param_name)
+            return {
+                "name": self.code,
+                "implementation": f"{param_name}[{index}]",
+                "type": "parameter_element"
+            }
+        raise NotImplementedError("Subscripted expressions are only supported for parameters on the client")
 
     def visit_Attribute(self, node: ast.Attribute):
         if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
