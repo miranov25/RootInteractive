@@ -66,6 +66,13 @@ math_functions = {
     "arctanh": np.arctanh
 }
 
+resize_out_boilerplate = """
+const len = data_source.get_length();
+if($output == null || $output.length !== len){
+    $output = new Array(len).fill(0, len);
+}
+"""
+
 class ColumnEvaluator:
     # This class walks the Python abstract syntax tree of the expressions to detect its dependencies
     def __init__(self, context, cdsDict, paramDict, funcDict, code, aliasDict, firstGeneratedID=0):
@@ -74,6 +81,7 @@ class ColumnEvaluator:
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
+        self.dependencies_table = set()
         self.paramDependencies = set()
         self.aliasDependencies = {}
         self.firstGeneratedID = firstGeneratedID
@@ -225,18 +233,20 @@ class ColumnEvaluator:
                 self.helper_idx += 1
             return {
                 "name": node.attr,
-                "implementation": self.aliasDependencies[attrChainStr],
+                "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
                 "type": "column"
             }
         if not isinstance(node.value, ast.Name):
             raise ValueError("Column data source name cannot be a function call")
         if node.value.id != "self":
-            if self.context is not None:
-                if node.value.id != self.context:
-                    raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
-            self.context = node.value.id
+            if self.context is not None:
+                if node.value.id != self.context:
+                    self.dependencies_table.add((node.value.id, node.attr))
+                    # raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
+            else:
+                self.context = node.value.id
         if self.context in self.cdsDict and self.cdsDict[self.context]["type"] == "stack":
             self.isSource = False
             if node.attr != "$source_index":
@@ -261,7 +271,7 @@ class ColumnEvaluator:
             is_boolean = False
         return {
             "name": node.attr,
-            "implementation": node.attr,
+            "implementation": node.attr+"{index_suffix}",
             "type": "column",
             "is_boolean": is_boolean
         }
@@ -307,7 +317,7 @@ class ColumnEvaluator:
             # Detect if parameter is a lambda here? 
             return {
                 "name": node.id,
-                "implementation": node.id,
+                "implementation": node.id if "options" not in self.paramDict[node.id] else node.id+"{index_suffix}",
                 "type": "paramTensor" if isinstance(self.paramDict[node.id]["value"], list) else "parameter"
             }
         if node.id in [self.context, "self"]:
@@ -324,7 +334,7 @@ class ColumnEvaluator:
                     "attrChain": [node.id]
                 }
         attrNode = ast.Attribute(value=ast.Name(id="self", ctx=ast.Load()), attr=node.id)
-        return self.visit(attrNode)
+        return self.visit_Attribute(attrNode)
     
     def visit_Name_histogram(self, id: str):
         self.isSource = False
@@ -351,14 +361,10 @@ class ColumnEvaluator:
             isOK = True
         if not isOK:
             raise KeyError("Column " + id + " not found in histogram " + histogram["name"])
-            #return {
-            #    "error": KeyError,
-            #    "msg": "Column " + id + " not found in histogram " + histogram["name"]
-            #}
         self.aliasDependencies[id] = id
         return {
             "name": id,
-            "implementation": id,
+            "implementation": id+"{index_suffix}",
             "type": "column"
         }        
 
@@ -397,8 +403,6 @@ class ColumnEvaluator:
             operator_infix = " % "
         elif isinstance(op, ast.LShift):
             operator_infix = " << "
-        elif isinstance(op, ast.RShift):
-            operator_infix = " >> "
         elif isinstance(op, ast.RShift):
             operator_infix = " >> "
         elif isinstance(op, ast.BitOr):
@@ -508,12 +512,30 @@ class ColumnEvaluator:
             "n_args": len(args),
             "implementation": f"(({impl_args})=>({impl_body}))"
         }
-
+    
+    def make_vfunc(self, body: str):
+        a = resize_out_boilerplate
+        a += "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a += f"""
+for(let $i=0; $i<$output.length; $i++){{
+    $output[$i] = {body.replace("{index_suffix}", "[$i]")}
+    }}
+return $output;
+            """
+        return a
+    
+    def make_scalar_func(self, body: str):
+        a = "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a += f"""
+        return {body.replace("{index_suffix}", "")};
+            """
+        return a
+    
 def checkColumn(columnKey, tableKey, cdsDict):
     return False
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDict: dict = {}, funcDict: dict = {},
-                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set()):
+                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set(), vfunc_feature_flag: bool = True):
     if variableNames is None or len(variableNames) == 0:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -562,7 +584,6 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     if i_context not in aliasDict:
                         aliasDict[i_context] = {}
                     columnName = column["name"]
-                    func = "return "+column["implementation"]
                     variablesAlias = list(evaluator.aliasDependencies.keys())
                     fieldsAlias = list(evaluator.aliasDependencies.values())
                     parameters = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
@@ -582,7 +603,12 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     if is_customjs_func:
                         transform = funcDict[queryAST.body.func.id]
                     else:
-                        transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
+                        if vfunc_feature_flag:
+                            func = evaluator.make_vfunc(column["implementation"])
+                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, v_func=func)
+                        else:
+                            func = evaluator.make_scalar_func(column["implementation"])
+                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
@@ -605,7 +631,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                 dependency_columns = [i[1] for i in direct_dependencies]
                 dependency_tables = [i[0] for i in direct_dependencies]
                 _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
-                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
+                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)}, vfunc_feature_flag)
                 used_names.update(sources_local)
             if i_context in memoizedColumns:
                 memoizedColumns[i_context][i_var] = column

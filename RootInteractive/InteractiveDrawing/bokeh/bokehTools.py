@@ -482,7 +482,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             evaluator = ColumnEvaluator(context, cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
             result = evaluator.visit(exprTree.body)
             if result["type"] == "javascript":
-                func = "return "+result["implementation"]
+                func = evaluator.make_vfunc(result["implementation"])
                 fields = list(evaluator.aliasDependencies.values())
                 parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
                 variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
@@ -499,7 +499,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     variablesAlias.append(paramDict[j]["value"])
                     fields.append(j)
                     nvars_local = nvars_local+1
-                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), func=func)
+                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), v_func=func)
                 fields = variablesAlias
             else:
                 aliasDict[i["name"]] = result["name"]
@@ -2245,12 +2245,12 @@ def make_transform(transform, paramDict, aliasDict, cdsDict, jsFunctionDict, par
         if transform_parsed["type"] == "js_lambda":
             if transform_parsed["n_args"] == 1:
                 transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
-                    return xs.map({transform_parsed["implementation"]});
+                    return xs.map({evaluator.make_scalar_func(transform_parsed["implementation"])});
                 """)
             elif transform_parsed["n_args"] == 2:
                 transform_customjs = CustomJSTransform(args=transform_parameters, v_func=f"""
                     const ys = data_source.get_column(varY);
-                    return xs.map((x, i) => ({transform_parsed["implementation"]}{"(x, ys[i])" if orientation==1 else "(ys[i],x)"}));
+                    return xs.map((x, i) => ({evaluator.make_scalar_func(transform_parsed["implementation"])}{"(x, ys[i])" if orientation==1 else "(ys[i],x)"}));
                 """)
         elif transform_parsed["type"] == "parameter":
             if "options" not in paramDict[transform_parsed["name"]]:
