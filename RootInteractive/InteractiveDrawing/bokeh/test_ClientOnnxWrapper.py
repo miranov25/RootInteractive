@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import base64
+import timeit
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, Ridge
@@ -76,6 +77,10 @@ onx_ridge = convert_sklearn(ridgeReg, initial_types=initial_type)
 s = onx_ridge.SerializeToString()
 onx_ridge_b64 = base64.b64encode(s).decode('utf-8')
 
+print(timeit.timeit("rfr.predict(df2[['A', 'B', 'C', 'D']])", globals=globals(), number=1))
+print(timeit.timeit("rfr50.predict(df2[['A', 'B', 'C', 'D']])", globals=globals(), number=1))
+print(timeit.timeit("ridgeReg.predict(df2[['A', 'B', 'C', 'D']])", globals=globals(), number=1))
+
 
 def test_onnx_bokehDrawArray():
     output_file("test_ort_web_bokehDrawSA.html", "Test ONNX runtime web")
@@ -136,7 +141,11 @@ def test_onnx_multimodels():
             }
             return $output
          """, "parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "fields":["A","B","C","D"]},
-         {"name":"y_pred_customjs_ridge_naive","func":"return intercept + coefs[0]*A + coefs[1]*B + coefs[2]*C + coefs[3]*D","parameters":{"intercept":ridgeReg.intercept_, "coefs":ridgeReg.coef_}, "variables":["A","B","C","D"]}
+         {"name":"y_pred_customjs_ridge_naive","expr":"intercept + coefs[0]*A + coefs[1]*B + coefs[2]*C + coefs[3]*D"}
+    ]
+    parameterArray += [
+        {"name":"intercept","value":ridgeReg.intercept_},
+        {"name":"coefs","value":ridgeReg.coef_}
     ]
     widgetParams = mergeFigureArrays(widgetParams, [["range", ["A"],{"name":"A"}],["range",["B"],{"name":"B"}]])
     widgetLayoutDesc["Select"] += [["A","B"]]
