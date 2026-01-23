@@ -28,7 +28,7 @@ export class CustomWasmFunc extends Model {
     }))
   }
 
-  v_compute(xs: any[],  data_source: any, output: number | any[]): number[] {
+  v_compute(xs: any[],  data_source: any, output: number | any[]): number | number[] {
     const func = this.module.exports[this.func]
     const len = data_source.length
     if (func) {
@@ -53,6 +53,7 @@ export class CustomWasmFunc extends Model {
       } else {
         console.error("WASM function execution failed")
       }
+      return output_ptr
     } else {
       console.error("WASM function not found")
       return []
