@@ -61,7 +61,6 @@ def test_compileVarName():
     queryAST = ast.parse(expr1, mode="eval")
     column_expr1 = evaluator1.visit(queryAST.body)
 
-    print(evaluator1.aliasDependencies.values())
     assert evaluator1.aliasDependencies == {'a': 'a', 'b': 'b', 'c': 'c'}
 
     A_encoded = {}
@@ -69,7 +68,9 @@ def test_compileVarName():
         b64_bytes = base64.b64encode(A[i]).decode('utf-8')
         A_encoded[i] = {"data": b64_bytes, "dtype": "float64", "length": len(A[i])}
 
-    A_encoded['expr1'] = column_expr1
+    func = evaluator1.make_vfunc(column_expr1["implementation"])
+
+    A_encoded['expr1'] = {"func":func, "args": list(evaluator1.aliasDependencies.keys())}
 
     data_exported = {"data": {"A":A_encoded}, "test_cases": [{"type":"EQ","lhs": "expr1", "rhs": "expr1_ref","epsilon": 1e-10,"table":"A"}]}
 
