@@ -5,12 +5,21 @@ const data = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 
 function shallow_compare_absolute(A,B,delta){
     if(A === B) return true
-    if(A.length !== B.length) return false
-    return A.reduce((acc,cur,idx)=>(acc*idx+Math.abs(cur-B[idx]))/(idx+1), 0) <= delta
+    if(!A || !B || A.length !== B.length) return false
+    let m = 0;
+    for (let i = 0; i < A.length; i++) {
+        const d = Math.abs(A[i] - B[i]);
+        if (d > m) m = d;
+        if (m > delta) return false;
+    }
+    return true;
 }
 
 function decodeBase64ToFloat64Array(b64_string){
     const binary_string = Buffer.from(b64_string, 'base64');
+    if (binary_string.length % 8 !== 0) {
+        throw new Error(`Invalid float64 payload length ${binary_string.length} (not divisible by 8)`);
+    }
     const float_array = new Float64Array(binary_string.buffer, binary_string.byteOffset, binary_string.length / Float64Array.BYTES_PER_ELEMENT);
     return float_array;
 }
@@ -21,7 +30,6 @@ function decodeColumn(column, data_source=null){
     }
     if(typeof column === "object" && column.func && column.args){
         const args_decoded = column.args.map(arg=>data_source.getColumn(arg));
-        console.log("Executing function with args:", args_decoded);
         const func = new Function(...column.args, "$output", "data_source", column.func);
         return func(...args_decoded, null, data_source);
     }
