@@ -53,15 +53,20 @@ for(const table_name in data.data){
 }
 
 for(const test_case of data.test_cases){
-    const table = data.data[test_case.table];
-    const lhs_data = table.getColumn(test_case.lhs);
-    const rhs_data = table.getColumn(test_case.rhs);
-    const delta = test_case.epsilon || 1e-10;
-    if(!shallow_compare_absolute(lhs_data, rhs_data, delta)){
-        console.error(`Test case failed:
-lhs: ${test_case.lhs}
-rhs: ${test_case.rhs}
-delta: ${delta}`);
+    if(test_case.type === "EQ"){
+        const table = data.data[test_case.table];
+        const lhs_data = table.getColumn(test_case.lhs);
+        const rhs_data = table.getColumn(test_case.rhs);
+        const delta = test_case.epsilon || 1e-10;
+        if(!shallow_compare_absolute(lhs_data, rhs_data, delta)){
+            console.error(`Test case failed:
+    lhs: ${test_case.lhs}
+    rhs: ${test_case.rhs}
+    delta: ${delta}`);
+            process.exit(1);
+        }
+    } else {
+        console.error(`Unknown test case type: ${test_case.type}`);
         process.exit(1);
     }
 }
