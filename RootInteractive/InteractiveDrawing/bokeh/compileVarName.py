@@ -177,50 +177,11 @@ class ColumnEvaluator:
 
     def visit_Attribute(self, node: ast.Attribute):
         if not isinstance(node.value, ast.Name):
-            raise NotImplementedError("Chained attributes are only supported for data sources on the client")
-        value = node.value.id
-        if value == "self":
-            value = self.context
-        if value in self.aliasDict and node.attr in self.aliasDict[self.context]:
-            # We have an alias in aliasDict
-            self.isSource = False
-            if "expr" in self.aliasDict[self.context][node.attr]:
-                self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]["expr"]))
-                return {
-                    "name": node.attr,
-                    "implementation": node.attr,
-                    "type": "alias"
-                }
-            elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
-                if isinstance(self.aliasDict[self.context][node.attr]["fields"], list):
-                    for i in self.aliasDict[self.context][node.attr]["fields"]:
-                        self.dependencies.add((self.context, i))
-                elif isinstance(self.aliasDict[self.context][node.attr]["fields"], dict):
-                    for i in self.aliasDict[self.context][node.attr]["fields"].values():
-                        if isinstance(i, list):
-                            for j in i:
-                                self.dependencies.add((self.context, j))
-                        else:
-                            self.dependencies.add((self.context, i))
-                        
-            self.aliasDependencies[node.attr] = node.attr
-            return {
-                "name": node.attr,
-                "implementation": node.attr,
-                "type": "alias"
-            }
-        if self.cdsDict[value]["type"] == "join":
+            raise NotImplementedError("Chained attributes are not supported yet: " + self.code + ' ' + ast.dump(node))
+        if self.cdsDict[self.context]["type"] == "join" and node.value.id != "self":
+            value = node.value.id if isinstance(node.value, ast.Name) else None
             # In this case, we can have chained attributes
-            attrChain = []
-            if isinstance(node.value, ast.Attribute) or isinstance(node.value, ast.Name):
-                attrChain = self.visit(node.value)["attrChain"]
-            if node.attr in self.cdsDict[value]:
-                return {
-                    "name": node.attr,
-                    "implementation": node.attr,
-                    "type": "table",
-                    "attrChain": attrChain + [node.attr]
-                }
+            attrChain = [value]
             self.isSource = False
             cds = self.cdsDict[self.context]
             # Joins always depend on the join key
@@ -234,6 +195,7 @@ class ColumnEvaluator:
             if(cds_used < len(attrChain)):
                 if attrChain[cds_used] in [cds["left"], cds["right"]]:
                     self.dependencies.add((attrChain[cds_used], node.attr))
+            self.dependencies.add((value, node.attr))
             if attrChain[0] == "self":
                 attrChainStr = '.'.join(attrChain[1:] + [node.attr])
             else:
@@ -246,7 +208,10 @@ class ColumnEvaluator:
                 "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
                 "type": "column"
             }
-        if node.value.id != "self":
+        value = node.value.id
+        if value == "self":
+            value = self.context
+        else:
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
             if self.context is not None:
@@ -255,6 +220,34 @@ class ColumnEvaluator:
                     # raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
             else:
                 self.context = node.value.id
+        if value in self.aliasDict and node.attr in self.aliasDict[value]:
+            # We have an alias in aliasDict
+            self.isSource = False
+            if "expr" in self.aliasDict[value][node.attr]:
+                self.dependencies.add((value, self.aliasDict[value][node.attr]["expr"]))
+                return {
+                    "name": node.attr,
+                    "implementation": node.attr,
+                    "type": "alias"
+                }
+            elif self.aliasDict[value][node.attr].get("fields", None) is not None:
+                if isinstance(self.aliasDict[value][node.attr]["fields"], list):
+                    for i in self.aliasDict[value][node.attr]["fields"]:
+                        self.dependencies.add((value, i))
+                elif isinstance(self.aliasDict[value][node.attr]["fields"], dict):
+                    for i in self.aliasDict[value][node.attr]["fields"].values():
+                        if isinstance(i, list):
+                            for j in i:
+                                self.dependencies.add((value, j))
+                        else:
+                            self.dependencies.add((value, i))
+                        
+            self.aliasDependencies[node.attr] = node.attr
+            return {
+                "name": node.attr,
+                "implementation": node.attr,
+                "type": "alias"
+            }
         if value in self.cdsDict and self.cdsDict[value]["type"] == "stack":
             self.isSource = False
             if node.attr != "$source_index":
