@@ -156,8 +156,6 @@ class ColumnEvaluator:
     def visit_Subscript(self, node: ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        if sliceValue["type"] != "constant":
-            raise NotImplementedError("Only constant subscripts are supported on the client")
         if value["type"] == "parameter":
             self.isSource = False
             param_name = value["name"]
@@ -168,10 +166,22 @@ class ColumnEvaluator:
                 "implementation": f"{param_name}[{index}]",
                 "type": "parameter_element"
             }
+        self.isSource = False
+        slice_index = sliceValue["implementation"]
+        return {
+            "name": self.code,
+            "implementation": f"{value['implementation'].replace('{index_suffix}', '')}[{slice_index}]",
+            "type": "subscript"
+            }
         raise NotImplementedError("Subscripted expressions are only supported for parameters on the client")
 
     def visit_Attribute(self, node: ast.Attribute):
-        if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
+        if not isinstance(node.value, ast.Name):
+            raise NotImplementedError("Chained attributes are only supported for data sources on the client")
+        value = node.value.id
+        if value == "self":
+            value = self.context
+        if value in self.aliasDict and node.attr in self.aliasDict[self.context]:
             # We have an alias in aliasDict
             self.isSource = False
             if "expr" in self.aliasDict[self.context][node.attr]:
@@ -199,12 +209,12 @@ class ColumnEvaluator:
                 "implementation": node.attr,
                 "type": "alias"
             }
-        if self.cdsDict[self.context]["type"] == "join":
+        if self.cdsDict[value]["type"] == "join":
             # In this case, we can have chained attributes
             attrChain = []
             if isinstance(node.value, ast.Attribute) or isinstance(node.value, ast.Name):
                 attrChain = self.visit(node.value)["attrChain"]
-            if node.attr in self.cdsDict:
+            if node.attr in self.cdsDict[value]:
                 return {
                     "name": node.attr,
                     "implementation": node.attr,
@@ -236,8 +246,6 @@ class ColumnEvaluator:
                 "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
                 "type": "column"
             }
-        if not isinstance(node.value, ast.Name):
-            raise ValueError("Column data source name cannot be a function call")
         if node.value.id != "self":
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
@@ -247,26 +255,27 @@ class ColumnEvaluator:
                     # raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
             else:
                 self.context = node.value.id
-        if self.context in self.cdsDict and self.cdsDict[self.context]["type"] == "stack":
+        if value in self.cdsDict and self.cdsDict[value]["type"] == "stack":
             self.isSource = False
             if node.attr != "$source_index":
-                for i in self.cdsDict[self.context]["sources_all"]:
+                for i in self.cdsDict[value]["sources_all"]:
                     self.dependencies.add((i, node.attr))
-        if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
+        if self.cdsDict[value]["type"] in ["histogram", "histo2d", "histoNd"]:
             return self.visit_Name_histogram(node.attr)
-        if self.cdsDict[self.context]["type"] == "projection":
+        if self.cdsDict[value]["type"] == "projection":
             self.isSource = False
-            projection = self.cdsDict[self.context]
+            projection = self.cdsDict[value]
             self.dependencies.add((projection["source"], "bin_count"))
-        if "data" in self.cdsDict[self.context] and node.attr not in self.cdsDict[self.context]["data"]:
-            raise KeyError("Column " + node.attr + " not found in data source " + str(self.cdsDict[self.context]["name"]))
+        if "data" in self.cdsDict[value] and node.attr not in self.cdsDict[value]["data"]:
+            raise KeyError("Column " + node.attr + " not found in data source " + str(self.cdsDict[value]["name"]))
             #return {
             #    "error": KeyError,
-            #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
-            #}           
-        self.aliasDependencies[node.attr] = node.attr
+            #    "msg": "Column " + id + " not found in data source " + self.cdsDict[value]["name"]
+            #}   
+        if value == self.context:        
+            self.aliasDependencies[node.attr] = node.attr
         try:
-            is_boolean = "data" in self.cdsDict[self.context] and self.cdsDict[self.context]["data"][node.attr].dtype.kind == "b"
+            is_boolean = "data" in self.cdsDict[value] and self.cdsDict[value]["data"][node.attr].dtype.kind == "b"
         except AttributeError:
             is_boolean = False
         return {
@@ -515,8 +524,9 @@ class ColumnEvaluator:
     
     def make_vfunc(self, body: str):
         a = resize_out_boilerplate
-        a += "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a += "\n".join([f"const {i[1]} = {i[0]}.getColumn(\"{i[1]}\");" for i in self.dependencies_table])
         a += f"""
+"use strict";
 for(let $i=0; $i<$output.length; $i++){{
     $output[$i] = {body.replace("{index_suffix}", "[$i]")}
     }}
@@ -525,7 +535,7 @@ return $output;
         return a
     
     def make_scalar_func(self, body: str):
-        a = "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a = "\n".join([f"const {i[1]} = {i[0]}.getColumn(\"{i[1]}\");" for i in self.dependencies_table])
         a += f"""
         return {body.replace("{index_suffix}", "")};
             """
