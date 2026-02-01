@@ -538,7 +538,7 @@ def checkColumn(columnKey, tableKey, cdsDict):
     return False
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDict: dict = {}, funcDict: dict = {},
-                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set(), vfunc_feature_flag: bool = True):
+                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set()):
     if variableNames is None or len(variableNames) == 0:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -606,12 +606,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     if is_customjs_func:
                         transform = funcDict[queryAST.body.func.id]
                     else:
-                        if vfunc_feature_flag:
-                            func = evaluator.make_vfunc(column["implementation"])
-                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, v_func=func)
-                        else:
-                            func = evaluator.make_scalar_func(column["implementation"])
-                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
+                        func = evaluator.make_vfunc(column["implementation"])
+                        transform = CustomJSNAryFunction(parameters=parameters | {i:cdsDict[i]["cdsFull"] for i in evaluator.dependencies_table}, fields=fieldsAlias, v_func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
@@ -634,7 +630,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                 dependency_columns = [i[1] for i in direct_dependencies]
                 dependency_tables = [i[0] for i in direct_dependencies]
                 _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
-                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)}, vfunc_feature_flag)
+                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
                 used_names.update(sources_local)
             if i_context in memoizedColumns:
                 memoizedColumns[i_context][i_var] = column
