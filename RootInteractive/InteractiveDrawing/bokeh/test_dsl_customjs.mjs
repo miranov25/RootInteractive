@@ -38,11 +38,11 @@ function decodeColumn(column, data_source=null, context={}){
         return int_array;
     }
     if(typeof column === "object" && column.func && column.args){
-        const args_decoded = column.args.map(arg=>data_source.getColumn(arg));
+        const args_decoded = column.args.map(arg=>data_source.get_column(arg));
         const ctx_keys = Object.keys(column.context || {});
-        const ctx_args = Object.keys(column.context || {}).map(key=>column.context[key]);
+        const ctx_args = ctx_keys.map(key=>column.context[key]);
         const func = new Function(...column.args, ...ctx_keys, "$output", "data_source", column.func);
-        return func(...args_decoded, ...ctx_args.map(key=>resolvePath(key, context)), null, data_source);
+        return func(...args_decoded, ...ctx_args.map(path=>resolvePath(path, context)), null, data_source);
     }
     return column;
 }
@@ -59,12 +59,12 @@ function resolvePath(path, context){
 function DataFrame(data, context={}){
     this.data = data;
     this.context = context;
-    this.getColumn = function(col_name){
+    this.get_column = function(col_name){
         return decodeColumn(this.data[col_name], this, this.context);
     }
     this.get_length = function(){
         const first_key = Object.keys(this.data)[0];
-        const col = this.getColumn(first_key);
+        const col = this.get_column(first_key);
         return col.length;
     }
 }
@@ -76,8 +76,8 @@ for(const table_name in data.data){
 for(const test_case of data.test_cases){
     if(test_case.type === "EQ"){
         const table = data.data[test_case.table];
-        const lhs_data = table.getColumn(test_case.lhs);
-        const rhs_data = table.getColumn(test_case.rhs);
+        const lhs_data = table.get_column(test_case.lhs);
+        const rhs_data = table.get_column(test_case.rhs);
         const delta = test_case.epsilon || 1e-10;
         if(!shallow_compare_absolute(lhs_data, rhs_data, delta)){
             console.error(`Test case failed:
