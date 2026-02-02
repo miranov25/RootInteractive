@@ -40,7 +40,7 @@ figureArray = [
 ]
 
 widgetParams = [
-    ["multiSelect", ["A",1,2,3,4]]
+    ["range", ["A"]]
 ]
 
 figureLayout = [[0,1, {"height":200}], [2, {"height":50}], {"sizing_mode":"scale_width"}]
@@ -69,4 +69,4 @@ def test_gather():
     ]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, sourceArray=sourceArrayGather, layout=figureLayout, widgetLayout=widgetDesc)
 
-test_gather()
+test_join()
