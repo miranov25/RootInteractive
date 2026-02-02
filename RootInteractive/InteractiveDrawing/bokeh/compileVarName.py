@@ -67,6 +67,7 @@ math_functions = {
 }
 
 resize_out_boilerplate = """
+"use strict";
 const len = data_source.get_length();
 if($output == null || $output.length !== len){
     $output = new Array(len).fill(0, len);
@@ -81,7 +82,7 @@ class ColumnEvaluator:
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
-        self.dependencies_table = set()
+        self.dependencies_table = {}
         self.paramDependencies = set()
         self.aliasDependencies = {}
         self.firstGeneratedID = firstGeneratedID
@@ -156,8 +157,6 @@ class ColumnEvaluator:
     def visit_Subscript(self, node: ast.Subscript):
         value = self.visit(node.value)
         sliceValue = self.visit(node.slice)
-        if sliceValue["type"] != "constant":
-            raise NotImplementedError("Only constant subscripts are supported on the client")
         if value["type"] == "parameter":
             self.isSource = False
             param_name = value["name"]
@@ -166,53 +165,85 @@ class ColumnEvaluator:
             return {
                 "name": self.code,
                 "implementation": f"{param_name}[{index}]",
-                "type": "parameter_element"
+                "type": "parameter_element",
+                "table": sliceValue.get("table", None)
             }
-        raise NotImplementedError("Subscripted expressions are only supported for parameters on the client")
+        self.isSource = False
+        slice_index = sliceValue["implementation"]
+        return {
+            "name": self.code,
+            "implementation": f"{value['implementation'].replace('{index_suffix}', '')}[{slice_index}]",
+            "type": "javascript",
+            "table": sliceValue.get("table", None)
+            }
 
     def visit_Attribute(self, node: ast.Attribute):
-        if self.context in self.aliasDict and node.attr in self.aliasDict[self.context]:
+        value_n = self.visit(node.value)
+        if value_n.get("type", None) != "table":
+            raise NotImplementedError("Attribute access is only supported on data sources and joins")
+        value = value_n["attrChain"][0]
+        if value == "self":
+            value = self.context
+        else:
+            if value not in self.cdsDict:
+                raise KeyError("Data source not found: " + node.value.id)
+        if self.cdsDict[value]["type"] == "join":
+            if node.attr in [self.cdsDict[value]["left"], self.cdsDict[value]["right"]]:
+                return {
+                    "name": value,
+                    "implementation": value,
+                    "type": "table",
+                    "attrChain": value_n["attrChain"] + [node.attr]
+                }
+        if value != self.context:
+            tmp_name = f"$tmp_{self.helper_idx}"
+            self.dependencies_table[(value, node.attr)] = tmp_name
+            self.helper_idx += 1
+            if self.cdsDict[self.context]["type"] == "join" and value in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
+                value = self.context
+        else:
+            tmp_name = node.attr
+        if value in self.aliasDict and node.attr in self.aliasDict[value]:
             # We have an alias in aliasDict
             self.isSource = False
-            if "expr" in self.aliasDict[self.context][node.attr]:
-                self.dependencies.add((self.context, self.aliasDict[self.context][node.attr]["expr"]))
+            if "expr" in self.aliasDict[value][node.attr]:
+                self.dependencies.add((value, self.aliasDict[value][node.attr]["expr"]))
                 return {
                     "name": node.attr,
-                    "implementation": node.attr,
-                    "type": "alias"
+                    "implementation": tmp_name,
+                    "type": "alias",
+                    "table": value
                 }
-            elif self.aliasDict[self.context][node.attr].get("fields", None) is not None:
-                if isinstance(self.aliasDict[self.context][node.attr]["fields"], list):
-                    for i in self.aliasDict[self.context][node.attr]["fields"]:
-                        self.dependencies.add((self.context, i))
-                elif isinstance(self.aliasDict[self.context][node.attr]["fields"], dict):
-                    for i in self.aliasDict[self.context][node.attr]["fields"].values():
+            elif self.aliasDict[value][node.attr].get("fields", None) is not None:
+                if isinstance(self.aliasDict[value][node.attr]["fields"], list):
+                    for i in self.aliasDict[value][node.attr]["fields"]:
+                        self.dependencies.add((value, i))
+                elif isinstance(self.aliasDict[value][node.attr]["fields"], dict):
+                    for i in self.aliasDict[value][node.attr]["fields"].values():
                         if isinstance(i, list):
                             for j in i:
-                                self.dependencies.add((self.context, j))
+                                self.dependencies.add((value, j))
                         else:
-                            self.dependencies.add((self.context, i))
+                            self.dependencies.add((value, i))
                         
-            self.aliasDependencies[node.attr] = node.attr
+            self.aliasDependencies[node.attr] = tmp_name
             return {
                 "name": node.attr,
-                "implementation": node.attr,
-                "type": "alias"
+                "implementation": tmp_name,
+                "type": "alias",
+                "table": value
             }
-        if self.cdsDict[self.context]["type"] == "join":
+        if self.cdsDict[value]["type"] == "join":
+            if value != self.context:
+                tmp_name = f"$tmp_{self.helper_idx}"
+                self.dependencies_table[(value, node.attr)] = tmp_name
+                self.helper_idx += 1
+            else:
+                tmp_name = node.attr
             # In this case, we can have chained attributes
-            attrChain = []
-            if isinstance(node.value, ast.Attribute) or isinstance(node.value, ast.Name):
-                attrChain = self.visit(node.value)["attrChain"]
-            if node.attr in self.cdsDict:
-                return {
-                    "name": node.attr,
-                    "implementation": node.attr,
-                    "type": "table",
-                    "attrChain": attrChain + [node.attr]
-                }
             self.isSource = False
-            cds = self.cdsDict[self.context]
+            cds = self.cdsDict[value]
+            attrChain = value_n["attrChain"]
             # Joins always depend on the join key
             for i in cds["left_on"]:
                 self.dependencies.add((cds["left"], i))
@@ -234,46 +265,40 @@ class ColumnEvaluator:
             return {
                 "name": node.attr,
                 "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
-                "type": "column"
+                "type": "column",
+                "table": value
             }
-        if not isinstance(node.value, ast.Name):
-            raise ValueError("Column data source name cannot be a function call")
-        if node.value.id != "self":
-            if node.value.id not in self.cdsDict:
-                raise KeyError("Data source not found: " + node.value.id)
-            if self.context is not None:
-                if node.value.id != self.context:
-                    self.dependencies_table.add((node.value.id, node.attr))
-                    # raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
-            else:
-                self.context = node.value.id
-        if self.context in self.cdsDict and self.cdsDict[self.context]["type"] == "stack":
+        if value in self.cdsDict and self.cdsDict[value]["type"] == "stack":
             self.isSource = False
             if node.attr != "$source_index":
-                for i in self.cdsDict[self.context]["sources_all"]:
+                for i in self.cdsDict[value]["sources_all"]:
                     self.dependencies.add((i, node.attr))
-        if self.cdsDict[self.context]["type"] in ["histogram", "histo2d", "histoNd"]:
-            return self.visit_Name_histogram(node.attr)
-        if self.cdsDict[self.context]["type"] == "projection":
+        if self.cdsDict[value]["type"] in ["histogram", "histo2d", "histoNd"]:
+            return self.visit_Name_histogram(node.attr, value)
+        if self.cdsDict[value]["type"] == "projection":
             self.isSource = False
-            projection = self.cdsDict[self.context]
+            projection = self.cdsDict[value]
             self.dependencies.add((projection["source"], "bin_count"))
-        if "data" in self.cdsDict[self.context] and node.attr not in self.cdsDict[self.context]["data"]:
-            raise KeyError("Column " + node.attr + " not found in data source " + str(self.cdsDict[self.context]["name"]))
+        if "data" in self.cdsDict[value] and node.attr not in self.cdsDict[value]["data"]:
+            raise KeyError("Column " + node.attr + " not found in data source " + str(self.cdsDict[value]["name"]))
             #return {
             #    "error": KeyError,
-            #    "msg": "Column " + id + " not found in data source " + self.cdsDict[self.context]["name"]
-            #}           
-        self.aliasDependencies[node.attr] = node.attr
+            #    "msg": "Column " + id + " not found in data source " + self.cdsDict[value]["name"]
+            #}   
+        if value == self.context:        
+            self.aliasDependencies[node.attr] = tmp_name
+        else:
+            self.dependencies.add((value, node.attr))
         try:
-            is_boolean = "data" in self.cdsDict[self.context] and self.cdsDict[self.context]["data"][node.attr].dtype.kind == "b"
+            is_boolean = "data" in self.cdsDict[value] and self.cdsDict[value]["data"][node.attr].dtype.kind == "b"
         except AttributeError:
             is_boolean = False
         return {
             "name": node.attr,
-            "implementation": node.attr+"{index_suffix}",
+            "implementation": tmp_name+"{index_suffix}",
             "type": "column",
-            "is_boolean": is_boolean
+            "is_boolean": is_boolean,
+            "table": value
         }
 
     def visit_Name(self, node: ast.Name):
@@ -284,7 +309,8 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "type": "auto"
+                "type": "auto",
+                "table": self.context
             }
         if self.locals and node.id in self.locals[-1]:
             return {
@@ -326,6 +352,12 @@ class ColumnEvaluator:
                 "type": "table",
                 "attrChain": [node.id]
             }
+        if node.id in self.cdsDict:
+                return {
+                    "name": node.id,
+                    "type": "table",
+                    "attrChain": [node.id]
+                }
         if self.cdsDict[self.context]["type"] == "join":
             if node.id in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
                 return {
@@ -336,9 +368,9 @@ class ColumnEvaluator:
         attrNode = ast.Attribute(value=ast.Name(id="self", ctx=ast.Load()), attr=node.id)
         return self.visit_Attribute(attrNode)
     
-    def visit_Name_histogram(self, id: str):
+    def visit_Name_histogram(self, id: str, context: str):
         self.isSource = False
-        histogram = self.cdsDict[self.context]
+        histogram = self.cdsDict[context]
         histoSource = histogram.get("source", None)
         for i in histogram["variables"]:
             self.dependencies.add((histoSource, i))
@@ -347,7 +379,7 @@ class ColumnEvaluator:
         if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
             self.dependencies.add((histoSource, histogram["histograms"][id]["weights"]))
         isOK = (id == "bin_count")
-        if self.cdsDict[self.context]["type"] == "histogram":
+        if self.cdsDict[context]["type"] == "histogram":
             if id in ["bin_bottom", "bin_center", "bin_top"]:
                 isOK = True
         else:
@@ -365,7 +397,9 @@ class ColumnEvaluator:
         return {
             "name": id,
             "implementation": id+"{index_suffix}",
-            "type": "column"
+            "type": "column",
+            "is_boolean": False,
+            "table": context
         }        
 
     def eval_fallback(self, node):
@@ -422,11 +456,13 @@ class ColumnEvaluator:
             "name": self.code,
             "type": "javascript",
             "implementation": implementation,
-            "is_boolean": is_boolean
+            "is_boolean": is_boolean,
+            "table": self.merge_cds(left.get("table", None), right.get("table", None))
         }
         
     def visit_UnaryOp(self, node: ast.UnaryOp):
         op = node.op
+        operand = self.visit(node.operand)
         if isinstance(op, ast.UAdd):
             operator_prefix = "+"
         elif isinstance(op, ast.USub):
@@ -435,21 +471,26 @@ class ColumnEvaluator:
             operator_prefix = "!"
         elif isinstance(op, ast.Invert):
             operator_prefix = "~"
-        implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
+        implementation = f"{operator_prefix}({operand['implementation']})"
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "table": operand.get("table", None)
         }
 
     def visit_Compare(self, node:ast.Compare):
-        js_comparisons = []      
+        js_comparisons = []
+        rhs_last = None    
+        cds = None  
         for i, op in enumerate(node.ops): 
             if i==0:
-                lhs = self.visit(node.left)["implementation"]
+                lhs = self.visit(node.left)
+                cds = lhs.get("table", None)
             else:
-                lhs = self.visit(node.comparators[i-1])["implementation"]
-            rhs = self.visit(node.comparators[i])["implementation"]
+                lhs = rhs_last
+            rhs = self.visit(node.comparators[i])
+            cds = self.merge_cds(cds, rhs.get("table", None))
             if isinstance(op, ast.Eq):
                 op_infix = " === "
             elif isinstance(op, ast.NotEq):
@@ -464,13 +505,15 @@ class ColumnEvaluator:
                 op_infix = " >= "
             else:
                 raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
-            js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
+            js_comparisons.append(f"(({lhs['implementation']}){op_infix}({rhs['implementation']}))")
+            rhs_last = rhs
         implementation = " && ".join(js_comparisons)
         return {
             "name": self.code,
             "type": "javascript",
             "implementation": implementation,
-            "is_boolean": True
+            "is_boolean": True,
+            "table": cds
         }
     
     def visit_BoolOp(self, node:ast.BoolOp):
@@ -487,14 +530,16 @@ class ColumnEvaluator:
         }
 
     def visit_IfExp(self, node:ast.IfExp):
-        test = self.visit(node.test)["implementation"]
-        body = self.visit(node.body)["implementation"]
-        orelse = self.visit(node.orelse)["implementation"]
-        implementation = f"({test})?({body}):({orelse})"
+        test = self.visit(node.test)
+        body = self.visit(node.body)
+        orelse = self.visit(node.orelse)
+
+        implementation = f"({test['implementation']})?({body['implementation']}):({orelse['implementation']})"
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "table": self.merge_cds(body.get("table", None), orelse.get("table", None))
         }
 
     def visit_Lambda(self, node:ast.Lambda):
@@ -513,9 +558,18 @@ class ColumnEvaluator:
             "implementation": f"(({impl_args})=>({impl_body}))"
         }
     
+    def merge_cds(self, lhs, rhs):
+        if lhs is None:
+            return rhs
+        if rhs is None:
+            return lhs
+        if lhs == rhs:
+            return lhs
+        raise NotImplementedError("Merging different CDS not implemented yet")
+
     def make_vfunc(self, body: str):
         a = resize_out_boilerplate
-        a += "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a += "\n".join([f"const {self.dependencies_table[i]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table.keys()])
         a += f"""
 for(let $i=0; $i<$output.length; $i++){{
     $output[$i] = {body.replace("{index_suffix}", "[$i]")}
@@ -525,7 +579,7 @@ return $output;
         return a
     
     def make_scalar_func(self, body: str):
-        a = "\n".join([f"const {i[1]} = {i[0]}.getColumn({i[1]});" for i in self.dependencies_table])
+        a = "\n".join([f"const {self.dependencies_table[i]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table.keys()])
         a += f"""
         return {body.replace("{index_suffix}", "")};
             """
@@ -535,7 +589,7 @@ def checkColumn(columnKey, tableKey, cdsDict):
     return False
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDict: dict = {}, funcDict: dict = {},
-                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set(), vfunc_feature_flag: bool = True):
+                     memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set()):
     if variableNames is None or len(variableNames) == 0:
         return variableNames, context, memoizedColumns, set()
     if not isinstance(variableNames, list):
@@ -574,7 +628,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
             queryAST = ast.parse(i_var, mode="eval")
             evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
             column = evaluator.visit(queryAST.body)
-            i_context = evaluator.context
+            i_context = column.get("table", i_context)
             if column["type"] == "javascript":
                 # Make the column on the server if possible both on server and on client
                 # Possibly only do this if lossy compression causes numerical instability?
@@ -603,12 +657,8 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                     if is_customjs_func:
                         transform = funcDict[queryAST.body.func.id]
                     else:
-                        if vfunc_feature_flag:
-                            func = evaluator.make_vfunc(column["implementation"])
-                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, v_func=func)
-                        else:
-                            func = evaluator.make_scalar_func(column["implementation"])
-                            transform = CustomJSNAryFunction(parameters=parameters, fields=fieldsAlias, func=func)
+                        func = evaluator.make_vfunc(column["implementation"])
+                        transform = CustomJSNAryFunction(parameters=parameters | {i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table.keys()}, fields=fieldsAlias, v_func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []
@@ -631,7 +681,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                 dependency_columns = [i[1] for i in direct_dependencies]
                 dependency_tables = [i[0] for i in direct_dependencies]
                 _, _, memoizedColumns, sources_local = getOrMakeColumns(dependency_columns, dependency_tables, cdsDict, paramDict, funcDict, 
-                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)}, vfunc_feature_flag)
+                                                                        memoizedColumns, aliasDict, forbiddenColumns | {(i_context, i_var)})
                 used_names.update(sources_local)
             if i_context in memoizedColumns:
                 memoizedColumns[i_context][i_var] = column
