@@ -67,6 +67,7 @@ math_functions = {
 }
 
 resize_out_boilerplate = """
+"use strict";
 const len = data_source.get_length();
 if($output == null || $output.length !== len){
     $output = new Array(len).fill(0, len);
@@ -164,21 +165,22 @@ class ColumnEvaluator:
             return {
                 "name": self.code,
                 "implementation": f"{param_name}[{index}]",
-                "type": "parameter_element"
+                "type": "parameter_element",
+                "table": sliceValue.get("table", None)
             }
         self.isSource = False
         slice_index = sliceValue["implementation"]
         return {
             "name": self.code,
             "implementation": f"{value['implementation'].replace('{index_suffix}', '')}[{slice_index}]",
-            "type": "subscript"
+            "type": "javascript",
+            "table": sliceValue.get("table", None)
             }
-        raise NotImplementedError("Subscripted expressions are only supported for parameters on the client")
 
     def visit_Attribute(self, node: ast.Attribute):
         if not isinstance(node.value, ast.Name):
             raise NotImplementedError("Chained attributes are not supported yet: " + self.code + ' ' + ast.dump(node))
-        if self.cdsDict[self.context]["type"] == "join" and node.value.id != "self":
+        if self.cdsDict[self.context]["type"] == "join" and node.value.id in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
             value = node.value.id if isinstance(node.value, ast.Name) else None
             # In this case, we can have chained attributes
             attrChain = [value]
@@ -206,7 +208,8 @@ class ColumnEvaluator:
             return {
                 "name": node.attr,
                 "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
-                "type": "column"
+                "type": "column",
+                "table": value
             }
         value = node.value.id
         if value == "self":
@@ -214,12 +217,8 @@ class ColumnEvaluator:
         else:
             if node.value.id not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
-            if self.context is not None:
-                if node.value.id != self.context:
-                    self.dependencies_table.add((node.value.id, node.attr))
-                    # raise ValueError("Incompatible data sources: " + node.value.id + "." + node.attr + ", " + self.context)
-            else:
-                self.context = node.value.id
+        if value != self.context:
+            self.dependencies_table.add((value, node.attr))
         if value in self.aliasDict and node.attr in self.aliasDict[value]:
             # We have an alias in aliasDict
             self.isSource = False
@@ -228,7 +227,8 @@ class ColumnEvaluator:
                 return {
                     "name": node.attr,
                     "implementation": node.attr,
-                    "type": "alias"
+                    "type": "alias",
+                    "table": value
                 }
             elif self.aliasDict[value][node.attr].get("fields", None) is not None:
                 if isinstance(self.aliasDict[value][node.attr]["fields"], list):
@@ -246,7 +246,8 @@ class ColumnEvaluator:
             return {
                 "name": node.attr,
                 "implementation": node.attr,
-                "type": "alias"
+                "type": "alias",
+                "table": value
             }
         if value in self.cdsDict and self.cdsDict[value]["type"] == "stack":
             self.isSource = False
@@ -254,7 +255,7 @@ class ColumnEvaluator:
                 for i in self.cdsDict[value]["sources_all"]:
                     self.dependencies.add((i, node.attr))
         if self.cdsDict[value]["type"] in ["histogram", "histo2d", "histoNd"]:
-            return self.visit_Name_histogram(node.attr)
+            return self.visit_Name_histogram(node.attr, value)
         if self.cdsDict[value]["type"] == "projection":
             self.isSource = False
             projection = self.cdsDict[value]
@@ -267,6 +268,8 @@ class ColumnEvaluator:
             #}   
         if value == self.context:        
             self.aliasDependencies[node.attr] = node.attr
+        else:
+            self.dependencies.add((value, node.attr))
         try:
             is_boolean = "data" in self.cdsDict[value] and self.cdsDict[value]["data"][node.attr].dtype.kind == "b"
         except AttributeError:
@@ -275,7 +278,8 @@ class ColumnEvaluator:
             "name": node.attr,
             "implementation": node.attr+"{index_suffix}",
             "type": "column",
-            "is_boolean": is_boolean
+            "is_boolean": is_boolean,
+            "table": value
         }
 
     def visit_Name(self, node: ast.Name):
@@ -286,7 +290,8 @@ class ColumnEvaluator:
             return {
                 "name": node.id,
                 "implementation": node.id,
-                "type": "auto"
+                "type": "auto",
+                "table": self.context
             }
         if self.locals and node.id in self.locals[-1]:
             return {
@@ -338,9 +343,9 @@ class ColumnEvaluator:
         attrNode = ast.Attribute(value=ast.Name(id="self", ctx=ast.Load()), attr=node.id)
         return self.visit_Attribute(attrNode)
     
-    def visit_Name_histogram(self, id: str):
+    def visit_Name_histogram(self, id: str, context: str):
         self.isSource = False
-        histogram = self.cdsDict[self.context]
+        histogram = self.cdsDict[context]
         histoSource = histogram.get("source", None)
         for i in histogram["variables"]:
             self.dependencies.add((histoSource, i))
@@ -349,7 +354,7 @@ class ColumnEvaluator:
         if "histograms" in histogram and id in histogram["histograms"] and histogram["histograms"][id] is not None and "weights" in histogram["histograms"][id]:
             self.dependencies.add((histoSource, histogram["histograms"][id]["weights"]))
         isOK = (id == "bin_count")
-        if self.cdsDict[self.context]["type"] == "histogram":
+        if self.cdsDict[context]["type"] == "histogram":
             if id in ["bin_bottom", "bin_center", "bin_top"]:
                 isOK = True
         else:
@@ -367,7 +372,9 @@ class ColumnEvaluator:
         return {
             "name": id,
             "implementation": id+"{index_suffix}",
-            "type": "column"
+            "type": "column",
+            "is_boolean": False,
+            "table": context
         }        
 
     def eval_fallback(self, node):
@@ -424,11 +431,13 @@ class ColumnEvaluator:
             "name": self.code,
             "type": "javascript",
             "implementation": implementation,
-            "is_boolean": is_boolean
+            "is_boolean": is_boolean,
+            "table": self.merge_cds(left.get("table", None), right.get("table", None))
         }
         
     def visit_UnaryOp(self, node: ast.UnaryOp):
         op = node.op
+        operand = self.visit(node.operand)
         if isinstance(op, ast.UAdd):
             operator_prefix = "+"
         elif isinstance(op, ast.USub):
@@ -437,21 +446,26 @@ class ColumnEvaluator:
             operator_prefix = "!"
         elif isinstance(op, ast.Invert):
             operator_prefix = "~"
-        implementation = f"{operator_prefix}({self.visit(node.operand)['implementation']})"
+        implementation = f"{operator_prefix}({operand['implementation']})"
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "table": operand.get("table", None)
         }
 
     def visit_Compare(self, node:ast.Compare):
-        js_comparisons = []      
+        js_comparisons = []
+        rhs_last = None    
+        cds = None  
         for i, op in enumerate(node.ops): 
             if i==0:
-                lhs = self.visit(node.left)["implementation"]
+                lhs = self.visit(node.left)
+                cds = lhs.get("table", None)
             else:
-                lhs = self.visit(node.comparators[i-1])["implementation"]
-            rhs = self.visit(node.comparators[i])["implementation"]
+                lhs = rhs_last
+            rhs = self.visit(node.comparators[i])
+            cds = self.merge_cds(cds, rhs.get("table", None))
             if isinstance(op, ast.Eq):
                 op_infix = " === "
             elif isinstance(op, ast.NotEq):
@@ -466,13 +480,15 @@ class ColumnEvaluator:
                 op_infix = " >= "
             else:
                 raise NotImplementedError(f"Binary operator {ast.dump(op)} not implemented for expressions on the client")
-            js_comparisons.append(f"(({lhs}){op_infix}({rhs}))")
+            js_comparisons.append(f"(({lhs['implementation']}){op_infix}({rhs['implementation']}))")
+            rhs_last = rhs
         implementation = " && ".join(js_comparisons)
         return {
             "name": self.code,
             "type": "javascript",
             "implementation": implementation,
-            "is_boolean": True
+            "is_boolean": True,
+            "table": cds
         }
     
     def visit_BoolOp(self, node:ast.BoolOp):
@@ -489,14 +505,16 @@ class ColumnEvaluator:
         }
 
     def visit_IfExp(self, node:ast.IfExp):
-        test = self.visit(node.test)["implementation"]
-        body = self.visit(node.body)["implementation"]
-        orelse = self.visit(node.orelse)["implementation"]
-        implementation = f"({test})?({body}):({orelse})"
+        test = self.visit(node.test)
+        body = self.visit(node.body)
+        orelse = self.visit(node.orelse)
+
+        implementation = f"({test['implementation']})?({body['implementation']}):({orelse['implementation']})"
         return {
             "name": self.code,
             "type": "javascript",
-            "implementation": implementation
+            "implementation": implementation,
+            "table": self.merge_cds(body.get("table", None), orelse.get("table", None))
         }
 
     def visit_Lambda(self, node:ast.Lambda):
@@ -515,11 +533,19 @@ class ColumnEvaluator:
             "implementation": f"(({impl_args})=>({impl_body}))"
         }
     
+    def merge_cds(self, lhs, rhs):
+        if lhs is None:
+            return rhs
+        if rhs is None:
+            return lhs
+        if lhs == rhs:
+            return lhs
+        raise NotImplementedError("Merging different CDS not implemented yet")
+
     def make_vfunc(self, body: str):
         a = resize_out_boilerplate
-        a += "\n".join([f"const {i[1]} = {i[0]}.getColumn(\"{i[1]}\");" for i in self.dependencies_table])
+        a += "\n".join([f"const {i[1]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table])
         a += f"""
-"use strict";
 for(let $i=0; $i<$output.length; $i++){{
     $output[$i] = {body.replace("{index_suffix}", "[$i]")}
     }}
@@ -528,7 +554,7 @@ return $output;
         return a
     
     def make_scalar_func(self, body: str):
-        a = "\n".join([f"const {i[1]} = {i[0]}.getColumn(\"{i[1]}\");" for i in self.dependencies_table])
+        a = "\n".join([f"const {i[1]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table])
         a += f"""
         return {body.replace("{index_suffix}", "")};
             """
@@ -577,7 +603,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
             queryAST = ast.parse(i_var, mode="eval")
             evaluator = ColumnEvaluator(i_context, cdsDict, paramDict, funcDict, i_var, aliasDict)
             column = evaluator.visit(queryAST.body)
-            i_context = evaluator.context
+            i_context = column.get("table", i_context)
             if column["type"] == "javascript":
                 # Make the column on the server if possible both on server and on client
                 # Possibly only do this if lossy compression causes numerical instability?
@@ -607,7 +633,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         transform = funcDict[queryAST.body.func.id]
                     else:
                         func = evaluator.make_vfunc(column["implementation"])
-                        transform = CustomJSNAryFunction(parameters=parameters | {i:cdsDict[i]["cdsFull"] for i in evaluator.dependencies_table}, fields=fieldsAlias, v_func=func)
+                        transform = CustomJSNAryFunction(parameters=parameters | {i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table}, fields=fieldsAlias, v_func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []

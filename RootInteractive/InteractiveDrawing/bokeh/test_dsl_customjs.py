@@ -107,4 +107,5 @@ def test_compileVarName():
 
     print("All compileVarName tests passed")
 
-test_compileVarName()
+if __name__ == "__main__":
+    test_compileVarName()
