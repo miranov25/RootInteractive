@@ -82,7 +82,7 @@ class ColumnEvaluator:
         self.funcDict = funcDict
         self.context = context
         self.dependencies = set()
-        self.dependencies_table = set()
+        self.dependencies_table = {}
         self.paramDependencies = set()
         self.aliasDependencies = {}
         self.firstGeneratedID = firstGeneratedID
@@ -178,47 +178,31 @@ class ColumnEvaluator:
             }
 
     def visit_Attribute(self, node: ast.Attribute):
-        if not isinstance(node.value, ast.Name):
-            raise NotImplementedError("Chained attributes are not supported yet: " + self.code + ' ' + ast.dump(node))
-        if self.cdsDict[self.context]["type"] == "join" and node.value.id in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
-            value = node.value.id if isinstance(node.value, ast.Name) else None
-            # In this case, we can have chained attributes
-            attrChain = [value]
-            self.isSource = False
-            cds = self.cdsDict[self.context]
-            # Joins always depend on the join key
-            for i in cds["left_on"]:
-                self.dependencies.add((cds["left"], i))
-            for i in cds["right_on"]:
-                self.dependencies.add((cds["right"], i))
-            cds_used = 0
-            if attrChain[0] == self.context:
-                cds_used = 1
-            if(cds_used < len(attrChain)):
-                if attrChain[cds_used] in [cds["left"], cds["right"]]:
-                    self.dependencies.add((attrChain[cds_used], node.attr))
-            self.dependencies.add((value, node.attr))
-            if attrChain[0] == "self":
-                attrChainStr = '.'.join(attrChain[1:] + [node.attr])
-            else:
-                attrChainStr = '.'.join(attrChain + [node.attr])
-            if attrChainStr not in self.aliasDependencies:
-                self.aliasDependencies[attrChainStr] = "$parameter_" + str(self.helper_idx)
-                self.helper_idx += 1
-            return {
-                "name": node.attr,
-                "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
-                "type": "column",
-                "table": value
-            }
-        value = node.value.id
+        value_n = self.visit(node.value)
+        if value_n.get("type", None) != "table":
+            raise NotImplementedError("Attribute access is only supported on data sources and joins")
+        value = value_n["attrChain"][0]
         if value == "self":
             value = self.context
         else:
-            if node.value.id not in self.cdsDict:
+            if value not in self.cdsDict:
                 raise KeyError("Data source not found: " + node.value.id)
+        if self.cdsDict[value]["type"] == "join":
+            if node.attr in [self.cdsDict[value]["left"], self.cdsDict[value]["right"]]:
+                return {
+                    "name": value,
+                    "implementation": value,
+                    "type": "table",
+                    "attrChain": value_n["attrChain"] + [node.attr]
+                }
         if value != self.context:
-            self.dependencies_table.add((value, node.attr))
+            tmp_name = f"$tmp_{self.helper_idx}"
+            self.dependencies_table[(value, node.attr)] = tmp_name
+            self.helper_idx += 1
+            if self.cdsDict[self.context]["type"] == "join" and value in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
+                value = self.context
+        else:
+            tmp_name = node.attr
         if value in self.aliasDict and node.attr in self.aliasDict[value]:
             # We have an alias in aliasDict
             self.isSource = False
@@ -226,7 +210,7 @@ class ColumnEvaluator:
                 self.dependencies.add((value, self.aliasDict[value][node.attr]["expr"]))
                 return {
                     "name": node.attr,
-                    "implementation": node.attr,
+                    "implementation": tmp_name,
                     "type": "alias",
                     "table": value
                 }
@@ -242,11 +226,46 @@ class ColumnEvaluator:
                         else:
                             self.dependencies.add((value, i))
                         
-            self.aliasDependencies[node.attr] = node.attr
+            self.aliasDependencies[node.attr] = tmp_name
             return {
                 "name": node.attr,
-                "implementation": node.attr,
+                "implementation": tmp_name,
                 "type": "alias",
+                "table": value
+            }
+        if self.cdsDict[value]["type"] == "join":
+            if value != self.context:
+                tmp_name = f"$tmp_{self.helper_idx}"
+                self.dependencies_table[(value, node.attr)] = tmp_name
+                self.helper_idx += 1
+            else:
+                tmp_name = node.attr
+            # In this case, we can have chained attributes
+            self.isSource = False
+            cds = self.cdsDict[value]
+            attrChain = value_n["attrChain"]
+            # Joins always depend on the join key
+            for i in cds["left_on"]:
+                self.dependencies.add((cds["left"], i))
+            for i in cds["right_on"]:
+                self.dependencies.add((cds["right"], i))
+            cds_used = 0
+            if attrChain[0] == self.context:
+                cds_used = 1
+            if(cds_used < len(attrChain)):
+                if attrChain[cds_used] in [cds["left"], cds["right"]]:
+                    self.dependencies.add((attrChain[cds_used], node.attr))
+            if attrChain[0] == "self":
+                attrChainStr = '.'.join(attrChain[1:] + [node.attr])
+            else:
+                attrChainStr = '.'.join(attrChain + [node.attr])
+            if attrChainStr not in self.aliasDependencies:
+                self.aliasDependencies[attrChainStr] = "$parameter_" + str(self.helper_idx)
+                self.helper_idx += 1
+            return {
+                "name": node.attr,
+                "implementation": self.aliasDependencies[attrChainStr]+"{index_suffix}",
+                "type": "column",
                 "table": value
             }
         if value in self.cdsDict and self.cdsDict[value]["type"] == "stack":
@@ -267,7 +286,7 @@ class ColumnEvaluator:
             #    "msg": "Column " + id + " not found in data source " + self.cdsDict[value]["name"]
             #}   
         if value == self.context:        
-            self.aliasDependencies[node.attr] = node.attr
+            self.aliasDependencies[node.attr] = tmp_name
         else:
             self.dependencies.add((value, node.attr))
         try:
@@ -276,7 +295,7 @@ class ColumnEvaluator:
             is_boolean = False
         return {
             "name": node.attr,
-            "implementation": node.attr+"{index_suffix}",
+            "implementation": tmp_name+"{index_suffix}",
             "type": "column",
             "is_boolean": is_boolean,
             "table": value
@@ -333,6 +352,12 @@ class ColumnEvaluator:
                 "type": "table",
                 "attrChain": [node.id]
             }
+        if node.id in self.cdsDict:
+                return {
+                    "name": node.id,
+                    "type": "table",
+                    "attrChain": [node.id]
+                }
         if self.cdsDict[self.context]["type"] == "join":
             if node.id in [self.cdsDict[self.context]["left"], self.cdsDict[self.context]["right"]]:
                 return {
@@ -544,7 +569,7 @@ class ColumnEvaluator:
 
     def make_vfunc(self, body: str):
         a = resize_out_boilerplate
-        a += "\n".join([f"const {i[1]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table])
+        a += "\n".join([f"const {self.dependencies_table[i]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table.keys()])
         a += f"""
 for(let $i=0; $i<$output.length; $i++){{
     $output[$i] = {body.replace("{index_suffix}", "[$i]")}
@@ -554,7 +579,7 @@ return $output;
         return a
     
     def make_scalar_func(self, body: str):
-        a = "\n".join([f"const {i[1]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table])
+        a = "\n".join([f"const {self.dependencies_table[i]} = {i[0]}.get_column(\"{i[1]}\");" for i in self.dependencies_table.keys()])
         a += f"""
         return {body.replace("{index_suffix}", "")};
             """
@@ -633,7 +658,7 @@ def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDic
                         transform = funcDict[queryAST.body.func.id]
                     else:
                         func = evaluator.make_vfunc(column["implementation"])
-                        transform = CustomJSNAryFunction(parameters=parameters | {i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table}, fields=fieldsAlias, v_func=func)
+                        transform = CustomJSNAryFunction(parameters=parameters | {i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table.keys()}, fields=fieldsAlias, v_func=func)
                     for j in parameters:
                         if "subscribed_events" not in paramDict[j]:
                             paramDict[j]["subscribed_events"] = []

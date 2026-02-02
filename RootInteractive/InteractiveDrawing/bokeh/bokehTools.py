@@ -499,7 +499,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     variablesAlias.append(paramDict[j]["value"])
                     fields.append(j)
                     nvars_local = nvars_local+1
-                transform = CustomJSNAryFunction(parameters=customJsArgList, fields=fields.copy(), v_func=func)
+                transform = CustomJSNAryFunction(parameters={**customJsArgList, **{i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table.keys()}}, fields=fields.copy(), v_func=func)
                 fields = variablesAlias
             else:
                 aliasDict[i["name"]] = result["name"]
@@ -1197,11 +1197,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         if cdsValue["type"] == "source":
             sent_data = {}
             for key, value in memoized_columns[cdsKey].items():
-                if (cdsKey, key) in sources:
+                if (cdsKey, value["name"]) in sources:
                     if value["type"] == "server_derived_column":
-                        sent_data[key] = value["value"]
+                        sent_data[value["name"]] = value["value"]
                     elif value["type"] == "column":
-                        sent_data[key] = cdsValue["data"][key]
+                        sent_data[value["name"]] = cdsValue["data"][value["name"]]
             cdsOrig = cdsValue["cdsOrig"]
             if cdsValue['arrayCompression'] is not None:
                 print("compressCDSPipe")
