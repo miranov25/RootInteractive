@@ -56,6 +56,11 @@ PARALLEL_WORKERS=6
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DATE_SHORT=$(date +%Y%m%d)
 
+# P0-3 FIX: Initialize counters at top to avoid unbound variable errors
+TOTAL_PASSED=0
+TOTAL_FAILED=0
+TOTAL_SKIPPED=0
+
 # Colors (if terminal supports it)
 if [[ -t 1 ]] && command -v tput &>/dev/null; then
     RED=$(tput setaf 1)
@@ -198,10 +203,6 @@ REPORT_FILES=()
 
 if [[ $MATRIX_ONLY -eq 0 ]]; then
     print_header "Phase 1: Running Tests"
-    
-    TOTAL_PASSED=0
-    TOTAL_FAILED=0
-    TOTAL_SKIPPED=0
     
     for test_dir in "${TEST_DIRS[@]}"; do
         if [[ ! -d "$test_dir" ]]; then
@@ -383,7 +384,8 @@ echo ""
 echo "Compare runs: diff test_logs/bokeh_<date1>/summary.txt test_logs/bokeh_<date2>/summary.txt"
 echo ""
 
-if [[ $TOTAL_FAILED -gt 0 ]]; then
+# P0-3 FIX: Only check TOTAL_FAILED if we actually ran tests
+if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -gt 0 ]]; then
     exit 1
 fi
 exit 0

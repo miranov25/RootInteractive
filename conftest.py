@@ -8,11 +8,12 @@ Fixes:
 3. Keeps output_file() working normally
 
 Phase: 0.1.A
-Date: 2026-02-02
+Date: 2026-02-03
 """
 
 import pytest
 import os
+import warnings
 
 
 # =============================================================================
@@ -30,6 +31,7 @@ def pytest_configure(config):
     
     # -------------------------------------------------------------------------
     # Replace show() with save() so HTML files are created but browser doesn't open
+    # P0-4 FIX: Use warnings.warn() instead of silent pass
     # -------------------------------------------------------------------------
     try:
         import bokeh.io
@@ -40,8 +42,9 @@ def pytest_configure(config):
             if obj is not None:
                 try:
                     bokeh_save(obj)
-                except Exception:
-                    pass  # Ignore save errors silently
+                except Exception as e:
+                    # P0-4 FIX: Do NOT silently swallow - warn so errors are visible
+                    warnings.warn(f"Bokeh save() failed: {e}", RuntimeWarning)
         
         bokeh.io.show = show_as_save
         
