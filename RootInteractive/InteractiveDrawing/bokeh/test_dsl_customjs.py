@@ -104,7 +104,7 @@ def test_compileVarName():
     func2 = evaluator2.make_vfunc(column_expr2["implementation"])
 
     A_encoded['expr1'] = {"func":func, "args": list(evaluator1.aliasDependencies.keys())}
-    A_encoded['expr2'] = {"func":func2, "args": list(evaluator2.aliasDependencies.keys()), "context": {i[0]:i[0] for i in evaluator2.dependencies_table}}
+    A_encoded['expr2'] = {"func":func2, "args": list(evaluator2.aliasDependencies.keys()), "context": {i[0]:i[0] for i in evaluator2.dependencies_table.keys()}}
 
     data_exported = {"data": {"A":A_encoded, "dfB":dfB_encoded}, "test_cases": [
         {"type":"EQ","lhs": "expr1", "rhs": "expr1_ref","epsilon": 1e-10,"table":"A"},
