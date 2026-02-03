@@ -5,6 +5,7 @@ import json
 import ast
 import base64
 
+import pytest
 import numpy as np
 
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
@@ -21,10 +22,18 @@ def helper_test_command(command, expected_output):
     except AssertionError as e:
         print(e)
 
+
+@pytest.mark.feature("JOIN.cross_table")
+@pytest.mark.backend("node")
+@pytest.mark.layer("unit")
 def test_nodejs():
     helper_test_command(['node', '-e', 'console.log(1 + 1)'], '2')
     helper_test_command(['node', '-e', 'console.log("Hello, World!")'], 'Hello, World!')
 
+
+@pytest.mark.feature("DSL.math_functions")
+@pytest.mark.backend("node")
+@pytest.mark.layer("unit")
 def test_mathutils():
     return 0
     temp_dir = tempfile.gettempdir()
@@ -44,7 +53,17 @@ def test_mathutils():
         print("All mathutils tests passed")
     else:
         raise RuntimeError(result.stderr)
-    
+
+
+@pytest.mark.feature("DSL.arithmetic_expr")
+@pytest.mark.feature("DSL.gather_operation")
+@pytest.mark.feature("DSL.custom_js_func")
+@pytest.mark.feature("ENC.base64.float64")
+@pytest.mark.feature("ENC.base64.int32")
+@pytest.mark.feature("JOIN.cross_table")
+@pytest.mark.backend("node")
+@pytest.mark.layer("integration")
+@pytest.mark.cross_backend
 def test_compileVarName():
     rng = np.random.default_rng(5669)
     A = {'a': rng.random(100), 'b': rng.random(100), 'c': rng.random(100),

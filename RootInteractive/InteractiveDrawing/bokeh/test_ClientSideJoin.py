@@ -1,9 +1,11 @@
-from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
-from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
-from RootInteractive.Tools.compressArray import arrayCompressionRelative16
+import pytest
 import numpy as np
 import pandas as pd
 from bokeh.plotting import output_file
+
+from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
+from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 
 output_file("test_join.html")
 
@@ -45,11 +47,24 @@ widgetParams = [
 
 figureLayout = [[0,1, {"height":200}], [2, {"height":50}], {"sizing_mode":"scale_width"}]
 widgetDesc = [[0]]
+
+
+@pytest.mark.feature("JOIN.cdsjoin.basic")
+@pytest.mark.feature("JOIN.cdsjoin.index0")
+@pytest.mark.backend("browser")
+@pytest.mark.layer("integration")
+@pytest.mark.regression("PR-371")
 def test_join():
+    """Test CDSJoin with index join including index-0 (PR #371 regression)."""
     output_file("test_join_inner.html")
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, sourceArray=sourceArray, layout=figureLayout, widgetLayout=widgetDesc)
 
+
+@pytest.mark.feature("DSL.gather_operation")
+@pytest.mark.backend("browser")
+@pytest.mark.layer("integration")
 def test_gather():
+    """Test gather notation (df2.Y[A] syntax)."""
     output_file("test_gather.html")
     sourceArrayGather = [
         {
@@ -69,4 +84,6 @@ def test_gather():
     ]
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, sourceArray=sourceArrayGather, layout=figureLayout, widgetLayout=widgetDesc)
 
-test_join()
+
+# Remove standalone call - tests should only run via pytest
+# test_join()

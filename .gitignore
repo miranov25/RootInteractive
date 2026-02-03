@@ -15,3 +15,28 @@ test_*.html
 *.orig
 workspace.xml
 .iws
+
+# Claude/AI installation directory
+files/
+
+# macOS
+.DS_Store
+
+# Python
+*.egg-info/
+__pycache__/
+*.pyc
+.eggs/
+
+# Node
+node_modules/
+package-lock.json
+
+# IDE
+.idea/
+.vscode/
+
+# Temporary files
+*.zip
+*.diff
+ctx_raw/
