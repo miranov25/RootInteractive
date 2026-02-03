@@ -61,6 +61,32 @@ TOTAL_PASSED=0
 TOTAL_FAILED=0
 TOTAL_SKIPPED=0
 
+# =============================================================================
+# P1-1 FIX: Dependency Check
+# =============================================================================
+
+check_dependencies() {
+    local missing=0
+    
+    # Check pytest-json-report
+    if ! python3 -c "import pytest_jsonreport" 2>/dev/null; then
+        echo "⚠️  pytest-json-report not installed"
+        echo "   Install with: pip install pytest-json-report"
+        missing=1
+    fi
+    
+    # Check pytest-xdist (only if parallel requested)
+    if [[ $PARALLEL_WORKERS -gt 1 ]]; then
+        if ! python3 -c "import xdist" 2>/dev/null; then
+            echo "⚠️  pytest-xdist not installed, falling back to sequential execution"
+            echo "   Install with: pip install pytest-xdist"
+            PARALLEL_WORKERS=1
+        fi
+    fi
+    
+    return $missing
+}
+
 # Colors (if terminal supports it)
 if [[ -t 1 ]] && command -v tput &>/dev/null; then
     RED=$(tput setaf 1)
@@ -185,6 +211,9 @@ print_error() {
 # =============================================================================
 
 cd "$PROJECT_ROOT"
+
+# P1-1 FIX: Check dependencies before running
+check_dependencies
 
 print_header "RootInteractive Test Runner"
 echo "Project root: $PROJECT_ROOT"

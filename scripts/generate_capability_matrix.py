@@ -29,9 +29,38 @@ Features:
     - Generates both Markdown and JSON output (P1-4 fix)
     - Supports --from-reports for pre-run reports (P1-5)
 
+MARKER REQUIREMENTS (P1-4 Documentation):
+========================================
+This generator only supports the CANONICAL marker form:
+
+    @pytest.mark.feature("CATEGORY.feature_id")
+    def test_something():
+        ...
+
+Requirements:
+    - Must be on single line, immediately above test function
+    - Must use string literal (not variable reference)
+    - Feature ID format: CATEGORY.feature_id (e.g., "DSL.arithmetic_expr")
+    - CATEGORY must be uppercase letters only
+    - feature_id can contain letters, numbers, underscores, dots
+
+SUPPORTED examples:
+    @pytest.mark.feature("DSL.arithmetic_expr")
+    @pytest.mark.feature("JOIN.cdsjoin.basic")
+    @pytest.mark.feature("ENC.base64.float64")
+
+NOT SUPPORTED (will be missed):
+    - Multiline decorators
+    - Variable feature IDs: @pytest.mark.feature(FEATURE_CONSTANT)
+    - Parametrized/indirect markers
+    - Markers inside comments or docstrings
+
+For feature taxonomy definitions, see:
+    RootInteractive/InteractiveDrawing/bokeh/feature_taxonomy.py
+
 Phase: 0.1.A
 Date: 2026-02-02
-Version: 1.0
+Version: 1.1
 """
 
 import subprocess
