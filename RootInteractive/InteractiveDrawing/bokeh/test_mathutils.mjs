@@ -1,4 +1,11 @@
-import MathUtils from "./MathUtils.js"
+import { pathToFileURL } from "url";
+import path from "path";
+
+const tempdir = process.argv[2];
+
+const file = path.join(tempdir, "MathUtils.js");
+
+const MathUtils = await import(pathToFileURL(file).href);
 
 function shallow_compare_absolute(A,B,delta){
 	if(A === B) return true
@@ -44,5 +51,4 @@ function test_unbinned_quantile(){
 
 test_chol()
 test_unbinned_quantile()
-
-throw new Error("All tests passed")
+console.log("All MathUtils tests passed")

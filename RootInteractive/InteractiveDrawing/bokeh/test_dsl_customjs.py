@@ -35,16 +35,16 @@ def test_nodejs():
 @pytest.mark.backend("node")
 @pytest.mark.layer("unit")
 def test_mathutils():
-    return 0
     temp_dir = tempfile.gettempdir()
     cwd = pathlib.Path(__file__).parent.resolve()
-    subprocess.run(['npx', 'tsc',
-                    '--outDir', temp_dir,
-                    '--module', 'ES2020',
+    tsc = cwd / 'node_modules' / '.bin' / 'tsc.cmd' if subprocess.os.name == 'nt' else cwd / 'node_modules' / '.bin' / 'tsc'
+    subprocess.run([str(tsc),
+                    '--module', 'None',
                     '--target', 'ES2020',
-                    f'{cwd}/mathutils.ts'], check=True)
+                    '--outDir', str(temp_dir),
+                    f'{cwd}/MathUtils.ts'], check=True)
     result = subprocess.run(['node', '--experimental-modules',
-                             f'{temp_dir}/mathutils.js'],
+                             f'{cwd}/test_mathutils.mjs', str(temp_dir)],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True)
@@ -127,4 +127,4 @@ def test_compileVarName():
     print("All compileVarName tests passed")
 
 if __name__ == "__main__":
-    test_compileVarName()
+    test_mathutils()
