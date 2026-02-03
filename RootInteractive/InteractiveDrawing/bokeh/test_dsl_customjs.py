@@ -11,26 +11,6 @@ import numpy as np
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 from RootInteractive.Tools.compressArray import compressArray
 
-def helper_test_command(command, expected_output):
-    try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        output = result.stdout.strip()
-        assert output == expected_output, f"Expected '{expected_output}', but got '{output}'"
-        print(f"Test passed for command: {' '.join(command)}")
-    except subprocess.CalledProcessError as e:
-        print(f"Command '{' '.join(command)}' failed with error: {e.stderr.strip()}")
-    except AssertionError as e:
-        print(e)
-
-
-@pytest.mark.feature("JOIN.cross_table")
-@pytest.mark.backend("node")
-@pytest.mark.layer("unit")
-def test_nodejs():
-    helper_test_command(['node', '-e', 'console.log(1 + 1)'], '2')
-    helper_test_command(['node', '-e', 'console.log("Hello, World!")'], 'Hello, World!')
-
-
 @pytest.mark.feature("DSL.math_functions")
 @pytest.mark.backend("node")
 @pytest.mark.layer("unit")
