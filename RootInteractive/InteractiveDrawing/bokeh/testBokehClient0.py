@@ -12,10 +12,10 @@ def testBokehClient0():
     s1 = ColumnDataSource(data=dict(x=x, y=y))
     s2 = ColumnDataSource(data=dict(x=x, y=y))
 
-    #p = figure(plot_width=400, plot_height=400)
+    #p = figure(width=400, height=400)
     #p.line('x', 'y', source=s1, line_width=3, line_alpha=0.6)
 
-    p2 = figure(plot_width=400, plot_height=400)
+    p2 = figure(width=400, height=400)
     p2.line('x', 'y', source=s2, line_width=3, line_alpha=0.6)
 
     sliderMax = Slider(start=0.1, end=10, value=5, step=.1, title="Max")

@@ -537,6 +537,77 @@ def generate_matrix(
                 lines.append(f"- ... and {len(failed) - 5} more")
             lines.append("")
     
+    # ==========================================================================
+    # Test Coverage Details (for manual verification)
+    # ==========================================================================
+    lines.extend([
+        "---",
+        "",
+        "## Test Coverage Details",
+        "",
+        "Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff **ALL** tests pass.",
+        "",
+    ])
+    
+    for feature_id, info in sorted(taxonomy.items()):
+        name = info.get("name", feature_id)
+        feature_test_list = feature_tests.get(feature_id, [])
+        test_count = len(feature_test_list)
+        
+        lines.append("<details>")
+        lines.append(f"<summary><strong>{feature_id}</strong> — {name} ({test_count} tests)</summary>")
+        lines.append("")
+        
+        if feature_test_list:
+            for nodeid in sorted(feature_test_list):
+                # Try to get outcome for this test
+                outcome = None
+                
+                # Strategy 1: Exact match
+                outcome = test_outcomes.get(nodeid)
+                
+                # Strategy 2: Match with full path prefix
+                if outcome is None:
+                    for key, val in test_outcomes.items():
+                        if key.endswith(nodeid):
+                            outcome = val
+                            break
+                
+                # Strategy 3: Match just the test name part
+                if outcome is None:
+                    test_name = nodeid.split("::")[-1]
+                    for key, val in test_outcomes.items():
+                        if key.endswith("::" + test_name):
+                            outcome = val
+                            break
+                
+                # Status emoji based on outcome
+                if outcome == "passed":
+                    status_emoji = "✅"
+                elif outcome == "failed":
+                    status_emoji = "❌"
+                elif outcome == "error":
+                    status_emoji = "💥"
+                elif outcome == "skipped":
+                    status_emoji = "⏭️"
+                elif outcome == "xfailed":
+                    status_emoji = "⚠️"
+                elif outcome == "xpassed":
+                    status_emoji = "🔄"
+                else:
+                    status_emoji = "❓"
+                
+                lines.append(f"- {status_emoji} `{nodeid}`")
+        else:
+            if info.get("planned"):
+                lines.append("*Feature planned, not yet implemented*")
+            else:
+                lines.append("*No tests with @pytest.mark.feature marker*")
+        
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+    
     # Summary section
     total = sum(counts.values())
     lines.extend([
