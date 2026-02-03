@@ -126,6 +126,7 @@ export class CDSCompress extends ColumnDataSource {
           return {"arrayOut": arrayOut, "dtype": arrayIn.dtype, "byteorder": arrayIn.byteorder, "encode": (x: number) => to_fixed_point(x, actionParams.scale, actionParams.origin)}
         }
         arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.dither || this.enableDithering, this.name + "_" + key)
+        this.invalidateOnDitheringToggle.add(key)
       }
       if (action == "sinh"){
         const mu = actionParams.mu
