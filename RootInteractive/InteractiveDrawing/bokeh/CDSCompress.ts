@@ -1,79 +1,8 @@
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
-//import * as pako from './pako/'
-//declare var Buffer : any
+
+import {BYTE_ORDER, swap, decodeFixedPointArray} from "./SerializationUtils"
 declare const  pako : any
-//const pako = require('pako');
-//declare namespace pako {
-//  function inflate(arrayOut:Uint8Array): Uint8Array;
-//}
-
-const is_little_endian = (() => {
-  const buf = new ArrayBuffer(4);
-  const buf8 = new Uint8Array(buf);
-  const buf32 = new Uint32Array(buf);
-  buf32[1] = 0x0a0b0c0d;
-  let little_endian = true;
-  if (buf8[4] == 0x0a && buf8[5] == 0x0b && buf8[6] == 0x0c && buf8[7] == 0x0d) {
-      little_endian = false;
-  }
-  return little_endian;
-})();
-
-const BYTE_ORDER = is_little_endian ? "little" : "big";
-
-function swap16(buffer: ArrayBuffer) {
-  const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 2) {
-      const t = x[i];
-      x[i] = x[i + 1];
-      x[i + 1] = t;
-  }
-}
-function swap32(buffer: ArrayBuffer) {
-  const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 4) {
-      let t = x[i];
-      x[i] = x[i + 3];
-      x[i + 3] = t;
-      t = x[i + 1];
-      x[i + 1] = x[i + 2];
-      x[i + 2] = t;
-  }
-}
-function swap64(buffer: ArrayBuffer) {
-  const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 8) {
-      let t = x[i];
-      x[i] = x[i + 7];
-      x[i + 7] = t;
-      t = x[i + 1];
-      x[i + 1] = x[i + 6];
-      x[i + 6] = t;
-      t = x[i + 2];
-      x[i + 2] = x[i + 5];
-      x[i + 5] = t;
-      t = x[i + 3];
-      x[i + 3] = x[i + 4];
-      x[i + 4] = t;
-  }
-}
-function swap(buffer: ArrayBuffer, dtype: string) {
-  switch (dtype) {
-      case "uint16":
-      case "int16":
-          swap16(buffer);
-          break;
-      case "uint32":
-      case "int32":
-      case "float32":
-          swap32(buffer);
-          break;
-      case "float64":
-          swap64(buffer);
-          break;
-  }
-}
 
 /*function encodeArcsinh(x: number, mu: number, sigma0: number, sigma1: number): number {
   return Math.asinh((x - mu) / sigma1) / sigma0;
@@ -196,21 +125,8 @@ export class CDSCompress extends ColumnDataSource {
           arrayIn.arrayOut = arrayOut
           return {"arrayOut": arrayOut, "dtype": arrayIn.dtype, "byteorder": arrayIn.byteorder, "encode": (x: number) => to_fixed_point(x, actionParams.scale, actionParams.origin)}
         }
-        const origin = actionParams.origin
-        const scale = actionParams.scale
-        const dither = actionParams.dither || this.enableDithering
-        const arrayOutNew = new Float64Array(arrayOut.length)
+        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.dither || this.enableDithering, "default")
         this.invalidateOnDitheringToggle.add(key)
-        if(dither){
-          for (let i = 0; i < arrayOut.length; i++) {
-            arrayOutNew[i] = origin + scale * (arrayOut[i] + Math.random() - .5)
-          }
-        } else {
-          for (let i = 0; i < arrayOut.length; i++) {
-            arrayOutNew[i] = origin + scale * arrayOut[i]
-          }
-        }
-        arrayOut = arrayOutNew;
       }
       if (action == "sinh"){
         const mu = actionParams.mu
