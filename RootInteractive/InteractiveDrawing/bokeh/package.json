@@ -1,0 +1,14 @@
+{
+  "name": "RootInteractive-test",
+  "version": "0.0.1",
+  "description": "Test harness for RootInteractive bokeh extensions - this is not the RootInteractive package itself",
+  "keywords": [],
+  "repository": {},
+  "type":"module",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
