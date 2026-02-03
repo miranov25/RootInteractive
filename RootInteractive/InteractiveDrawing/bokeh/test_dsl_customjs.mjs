@@ -86,6 +86,9 @@ for(const test_case of data.test_cases){
     delta: ${delta}`);
             process.exit(1);
         }
+        console.log(`Test case passed:
+    lhs: ${test_case.lhs}
+    rhs: ${test_case.rhs}`);
     } else if(test_case.type === "ACTION"){
         const {key, new_value} = test_case;
         const key_splits = key.split(".");
