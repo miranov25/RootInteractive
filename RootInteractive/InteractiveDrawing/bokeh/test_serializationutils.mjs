@@ -27,6 +27,19 @@ function allclose(A,B,abs_tol,rel_tol,nan_equal=false){
     return true;
 }
 
+function allclose_abs(A,B,abs_tol){
+    if(A === B) return true
+    if(!A || !B || A.length !== B.length) return false
+    for(let i=0; i<A.length; i++){
+        const a = A[i];
+        const b = B[i];
+        if(Math.abs(a - b) > abs_tol){
+            return false;
+        }
+    }
+    return true;
+}
+
 function test_fixedToFloat64Array(){
     const fixed_array = new Int32Array([1000, 2000, -3000, 4000]);
     const scale = 0.01;
@@ -38,5 +51,23 @@ function test_fixedToFloat64Array(){
     }
 }
 
+function test_fixedToFloat64Array_no_math_random(){
+    const fixed_array = new Int32Array([1000, 2000, -3000, 4000]);
+    const scale = 0.01;
+    const offset = 5.0;
+    const expected = new Float64Array([15.0, 25.0, -25.0, 45.0]);
+    const original = Math.random;
+    Math.random = () => { throw new Error("Math.random called"); };
+    try {
+        const result = SerializationUtils.decodeFixedPointArray(fixed_array, scale, offset, true, "test-seed");
+        if(!allclose_abs(result, expected, .005 + 1e-8)){
+            throw new Error(`fixedToFloat64Array no math random test failed. Expected ${expected} but got ${result}`);
+        }
+    } finally {
+        Math.random = original;
+    }
+}
+
 test_fixedToFloat64Array();
+test_fixedToFloat64Array_no_math_random();
 console.log("All SerializationUtils tests passed");
