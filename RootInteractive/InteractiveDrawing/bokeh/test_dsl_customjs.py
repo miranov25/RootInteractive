@@ -11,40 +11,19 @@ import numpy as np
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import ColumnEvaluator
 from RootInteractive.Tools.compressArray import compressArray
 
-def helper_test_command(command, expected_output):
-    try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        output = result.stdout.strip()
-        assert output == expected_output, f"Expected '{expected_output}', but got '{output}'"
-        print(f"Test passed for command: {' '.join(command)}")
-    except subprocess.CalledProcessError as e:
-        print(f"Command '{' '.join(command)}' failed with error: {e.stderr.strip()}")
-    except AssertionError as e:
-        print(e)
-
-
-@pytest.mark.feature("JOIN.cross_table")
-@pytest.mark.backend("node")
-@pytest.mark.layer("unit")
-def test_nodejs():
-    helper_test_command(['node', '-e', 'console.log(1 + 1)'], '2')
-    helper_test_command(['node', '-e', 'console.log("Hello, World!")'], 'Hello, World!')
-
-
 @pytest.mark.feature("DSL.math_functions")
 @pytest.mark.backend("node")
 @pytest.mark.layer("unit")
 def test_mathutils():
-    return 0
     temp_dir = tempfile.gettempdir()
     cwd = pathlib.Path(__file__).parent.resolve()
-    subprocess.run(['npx', 'tsc',
-                    '--outDir', temp_dir,
-                    '--module', 'ES2020',
+    subprocess.run(["node", "node_modules/typescript/bin/tsc",
+                    '--module', 'None',
                     '--target', 'ES2020',
-                    f'{cwd}/mathutils.ts'], check=True)
+                    '--outDir', str(temp_dir),
+                    f'{cwd}/MathUtils.ts'], check=True, cwd=cwd)
     result = subprocess.run(['node', '--experimental-modules',
-                             f'{temp_dir}/mathutils.js'],
+                             f'{cwd}/test_mathutils.mjs', str(temp_dir)],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True)
@@ -104,7 +83,7 @@ def test_compileVarName():
     func2 = evaluator2.make_vfunc(column_expr2["implementation"])
 
     A_encoded['expr1'] = {"func":func, "args": list(evaluator1.aliasDependencies.keys())}
-    A_encoded['expr2'] = {"func":func2, "args": list(evaluator2.aliasDependencies.keys()), "context": {i[0]:i[0] for i in evaluator2.dependencies_table}}
+    A_encoded['expr2'] = {"func":func2, "args": list(evaluator2.aliasDependencies.keys()), "context": {i[0]:i[0] for i in evaluator2.dependencies_table.keys()}}
 
     data_exported = {"data": {"A":A_encoded, "dfB":dfB_encoded}, "test_cases": [
         {"type":"EQ","lhs": "expr1", "rhs": "expr1_ref","epsilon": 1e-10,"table":"A"},
@@ -127,4 +106,4 @@ def test_compileVarName():
     print("All compileVarName tests passed")
 
 if __name__ == "__main__":
-    test_compileVarName()
+    test_mathutils()
