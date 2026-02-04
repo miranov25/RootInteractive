@@ -112,3 +112,21 @@ export function decodeFixedPointArray(array: number[], scale: number, origin: nu
     }
     return decodedArray;
 }
+
+export function to_fixed_point(x: number, scale: number, origin: number): number {
+  return Math.round((x - origin) / scale);
+}
+
+export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, dither: boolean = false, seedString: string = "default") {
+  const seed = seedFromString(seedString);
+  const decodedArray = new Float64Array(array.length);
+  const sigmaRatio = sigma0 / sigma1;
+    for (let i = 0; i < array.length; i++) {
+        if (dither) {
+            decodedArray[i] = sigmaRatio * Math.sinh(sigma0 * (array[i] + noiseSigned(seed, i)) + mu);
+        } else {
+            decodedArray[i] = sigmaRatio * Math.sinh(sigma0 * array[i] + mu);
+        }
+    }
+    return decodedArray;
+}

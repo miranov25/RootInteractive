@@ -1,7 +1,7 @@
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 
-import {BYTE_ORDER, swap, decodeFixedPointArray} from "./SerializationUtils"
+import {BYTE_ORDER, swap, decodeFixedPointArray, decodeSinhArray} from "./SerializationUtils"
 declare const  pako : any
 
 /*function encodeArcsinh(x: number, mu: number, sigma0: number, sigma1: number): number {
@@ -129,18 +129,8 @@ export class CDSCompress extends ColumnDataSource {
         this.invalidateOnDitheringToggle.add(key)
       }
       if (action == "sinh"){
-        const mu = actionParams.mu
-        const sigma0 = actionParams.sigma0
-        const sigma1 = sigma0 / actionParams.sigma1
-        const dither = actionParams.dither || this.enableDithering
-        let arrayOutNew = new Array(arrayOut.length)
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.dither || this.enableDithering, this.name + "_" + key)
         this.invalidateOnDitheringToggle.add(key)
-        if(dither){
-          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * (x + Math.random() - .5) + mu))
-        } else {
-          arrayOutNew = (Array.from(arrayOut) as number[]).map((x: number) => sigma1 * Math.sinh(sigma0 * x + mu))
-        }
-        arrayOut = arrayOutNew
       }
     }
     return arrayOut
