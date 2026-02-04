@@ -5,11 +5,12 @@ Bokeh-specific pytest configuration and fixtures.
 Markers are registered at repo level (../../../conftest.py).
 This file provides bokeh-specific fixtures and feature ID validation.
 
-Phase: 0.1.A
-Date: 2026-02-02
+Phase: 0.1.A -> 0.1.B
+Date: 2026-02-03
 """
 
 import pytest
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +22,44 @@ from pathlib import Path
 _this_dir = Path(__file__).parent
 if str(_this_dir) not in sys.path:
     sys.path.insert(0, str(_this_dir))
+
+
+# =============================================================================
+# NODE.JS DEPENDENCY CHECK
+# =============================================================================
+
+def _check_npm_dependencies():
+    """
+    Check if node_modules exists, run npm install if needed.
+    
+    This ensures TypeScript and other Node.js dependencies are available
+    for cross-backend tests (test_compression_integration.py, etc.)
+    """
+    node_modules = _this_dir / "node_modules"
+    package_json = _this_dir / "package.json"
+    
+    if package_json.exists() and not node_modules.exists():
+        print(f"\n[conftest] node_modules not found, running npm install in {_this_dir}...")
+        try:
+            result = subprocess.run(
+                ["npm", "install"],
+                cwd=str(_this_dir),
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode == 0:
+                print("[conftest] npm install completed successfully")
+            else:
+                print(f"[conftest] npm install failed: {result.stderr}")
+        except FileNotFoundError:
+            print("[conftest] npm not found - Node.js tests may fail")
+        except subprocess.TimeoutExpired:
+            print("[conftest] npm install timed out")
+
+
+# Run dependency check at import time
+_check_npm_dependencies()
 
 
 # =============================================================================
@@ -97,7 +136,6 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture
 def node_available():
     """Check if Node.js is available for cross-backend tests."""
-    import subprocess
     try:
         result = subprocess.run(
             ["node", "--version"],
@@ -108,6 +146,13 @@ def node_available():
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
+
+
+@pytest.fixture
+def typescript_available():
+    """Check if TypeScript compiler is available."""
+    tsc_path = _this_dir / "node_modules" / "typescript" / "bin" / "tsc"
+    return tsc_path.exists()
 
 
 @pytest.fixture
