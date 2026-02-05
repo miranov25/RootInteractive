@@ -9,6 +9,7 @@ import pandas as pd
 from RootInteractive.Tools.compressArray import compressArray
 
 @pytest.mark.feature("ENC.compression.delta")
+@pytest.mark.feature("ENC.compression.sinh")
 @pytest.mark.backend("node")
 @pytest.mark.layer("unit")
 def test_serializationutils():

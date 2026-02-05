@@ -68,6 +68,22 @@ function test_fixedToFloat64Array_no_math_random(){
     }
 }
 
+/*
+atol = sigma0 * (sigma0 / sigma1) / 2  # Base tolerance
+rtol = sigma0 / 2  # Relative component for large values
+*/
+function test_sinhToFloat64Array(){
+    const array_orig = new Float64Array([15.0, 25.0, NaN, 0, -1e6, -1]);
+    const sigma0 = 1e-3;
+    const sigma1 = 10;
+    const quantized = SerializationUtils.quantizeSinhArray(array_orig, sigma0, sigma1, 16);
+    const array_new = SerializationUtils.decodeSinhArray(quantized.array, 0, sigma0, sigma1, quantized.nanSentinel);
+    if(!allclose(array_orig, array_new, sigma0 * (sigma0 / sigma1) / 2, sigma0 / 2, true)){
+        throw new Error(`sinhToFloat64Array test failed. Expected ${array_orig} but got ${array_new}`)
+    }
+}
+
 test_fixedToFloat64Array();
 test_fixedToFloat64Array_no_math_random();
+test_sinhToFloat64Array();
 console.log("All SerializationUtils tests passed");

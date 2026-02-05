@@ -117,11 +117,15 @@ export function to_fixed_point(x: number, scale: number, origin: number): number
   return Math.round((x - origin) / scale);
 }
 
-export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, dither: boolean = false, seedString: string = "default") {
+export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, nanSentinel: number|null = null, dither: boolean = false, seedString: string = "default") {
   const seed = seedFromString(seedString);
   const decodedArray = new Float64Array(array.length);
   const sigmaRatio = sigma0 / sigma1;
     for (let i = 0; i < array.length; i++) {
+        if(nanSentinel != null && array[i] === nanSentinel){
+          decodedArray[i] = NaN
+          continue
+        }
         if (dither) {
             decodedArray[i] = sigmaRatio * Math.sinh(sigma0 * (array[i] + noiseSigned(seed, i)) + mu);
         } else {
@@ -129,4 +133,30 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
         }
     }
     return decodedArray;
+}
+
+/*
+    if sigma0 <= 0 or sigma1 <= 0:
+        raise ValueError("sigma0 and sigma1 must be positive")
+    quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
+    quantized = np.clip(quantized, -2**(nBits-1)+1, 2**(nBits-1)-1)
+    sentinel = -2**(nBits-1)
+    quantized = np.nan_to_num(quantized, nan=sentinel)
+    */
+export function quantizeSinhArray(array: number[], sigma0: number, sigma1: number, nBits: number){
+  if(sigma0 <= 0 || sigma1 <= 0){
+    throw "Sigma cannot be negtive";
+  }
+  const invSigma0 = 1/sigma0;
+  const sigmaRatio = sigma1*invSigma0;
+  const encodedArray = new Int32Array(array.length);
+  const nanSentinel = -(2**(nBits-1))
+  for(let i=0; i < array.length; i++){
+    let quantized = Math.round(Math.asinh(array[i]*sigmaRatio)*invSigma0)
+    quantized = quantized < -(2**(nBits-1)) ? -(2**(nBits-1)) : quantized;
+    quantized = quantized > 2**(nBits-1)-1 ? 2**(nBits-1)-1 : quantized;
+    quantized = isNaN(quantized) ? nanSentinel : quantized;
+    encodedArray[i] = quantized;
+  }
+  return {"array": encodedArray, "nanSentinel": nanSentinel}
 }
