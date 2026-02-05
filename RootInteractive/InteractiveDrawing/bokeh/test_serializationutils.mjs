@@ -1,5 +1,6 @@
 import { pathToFileURL } from "url";
 import path from "path";
+import zlib from "zlib";
 
 const tempdir = process.argv[2];
 
@@ -40,6 +41,25 @@ function allclose_abs(A,B,abs_tol){
     return true;
 }
 
+function nan_equal(A,B){
+    if(A === B) return true
+    if(!A || !B || A.length !== B.length) return false
+    for(let i=0; i<A.length; i++){
+        const a = A[i];
+        const b = B[i];
+        if(Number.isNaN(a) || Number.isNaN(b)){
+            if(!(Number.isNaN(a) && Number.isNaN(b))){
+                return false;
+            }
+        } else {
+            if (a !== b) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 function test_fixedToFloat64Array(){
     const fixed_array = new Int32Array([1000, 2000, -3000, 4000]);
     const scale = 0.01;
@@ -68,10 +88,6 @@ function test_fixedToFloat64Array_no_math_random(){
     }
 }
 
-/*
-atol = sigma0 * (sigma0 / sigma1) / 2  # Base tolerance
-rtol = sigma0 / 2  # Relative component for large values
-*/
 function test_sinhToFloat64Array(){
     const array_orig = new Float64Array([15.0, 25.0, NaN, 0, -1e6, -1]);
     const sigma0 = 1e-3;
@@ -83,7 +99,26 @@ function test_sinhToFloat64Array(){
     }
 }
 
+function test_simpleRoundtripLossless(){
+    const array_orig = new Float64Array([15.0, 25.0, NaN, 0, -1e6, -1]);
+    const pipeline = [["array","float64"], ["inflate"], ["base64_decode"]];
+    const compressed = zlib.deflateSync(array_orig).toString('base64');
+    console.log(compressed)
+    const env = {
+        "builtins": {
+            "inflate": zlib.inflateSync
+        },
+        "byteorder": SerializationUtils.BYTE_ORDER,
+        "enableDithering": false
+    }
+    const array_new = SerializationUtils.decodeArray(compressed, pipeline, env)
+    if(!nan_equal(array_new, array_orig)){
+        throw new Error(`simpleRoundtripLossless test failed. Expected ${array_orig} but got ${array_new}`)
+    }
+}
+
 test_fixedToFloat64Array();
 test_fixedToFloat64Array_no_math_random();
 test_sinhToFloat64Array();
+test_simpleRoundtripLossless();
 console.log("All SerializationUtils tests passed");
