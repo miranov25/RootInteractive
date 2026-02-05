@@ -95,10 +95,10 @@ def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
     sentinel = -2**(nBits-1)
     quantized = np.nan_to_num(quantized, nan=sentinel)
     if nBits <= 8:
-        return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
+        return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
     if nBits <= 16:
-        return quantized.astype(np.int16), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
-    return quantized.astype(np.int32), {"sigma0": sigma0, "sigma1": sigma1, "mu":0}
+        return quantized.astype(np.int16), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
+    return quantized.astype(np.int32), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
 
 
 def decodeSinhScaling(df, sigma0, sigma1):

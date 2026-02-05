@@ -129,7 +129,7 @@ export class CDSCompress extends ColumnDataSource {
         this.invalidateOnDitheringToggle.add(key)
       }
       if (action == "sinh"){
-        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.dither || this.enableDithering, this.name + "_" + key)
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.nanSentinel || null, actionParams.dither || this.enableDithering, this.name + "_" + key)
         this.invalidateOnDitheringToggle.add(key)
       }
     }
