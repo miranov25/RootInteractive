@@ -135,14 +135,6 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
     return decodedArray;
 }
 
-/*
-    if sigma0 <= 0 or sigma1 <= 0:
-        raise ValueError("sigma0 and sigma1 must be positive")
-    quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
-    quantized = np.clip(quantized, -2**(nBits-1)+1, 2**(nBits-1)-1)
-    sentinel = -2**(nBits-1)
-    quantized = np.nan_to_num(quantized, nan=sentinel)
-    */
 export function quantizeSinhArray(array: number[], sigma0: number, sigma1: number, nBits: number){
   if(sigma0 <= 0 || sigma1 <= 0){
     throw "Sigma cannot be negtive";
@@ -160,3 +152,80 @@ export function quantizeSinhArray(array: number[], sigma0: number, sigma1: numbe
   }
   return {"array": encodedArray, "nanSentinel": nanSentinel}
 }
+
+export function decodeArray(arrayIn: any, instructions: any, env: any){
+  const inflate = env.builtins.inflate
+  const enableDithering = env.enableDithering
+  const seed = env.seed
+
+  let arrayOut = arrayIn
+
+  for(let i=instructions.length-1; i>=0; i--){
+      const action = Object.prototype.toString.call(instructions[i]) === '[object String]' ? instructions[i] : instructions[i][0]
+      const actionParams = Object.prototype.toString.call(instructions[i]) === '[object String]' ? null : instructions[i][1]
+
+      console.log(action, actionParams)
+
+      if (action == "base64_decode"){
+        const s = atob(arrayOut)
+        arrayOut = new Uint8Array(s.length)
+        for (let j = 0; j < s.length; j++) { 
+          arrayOut[j] = s.charCodeAt(j)
+        }
+        console.log("base64 decode")
+        console.log(arrayOut)
+      }
+      if (action == "inflate") {
+        arrayOut = inflate(arrayOut)
+        console.log("inflate")
+        console.log(arrayOut)
+      }
+      if(action == "array"){
+        const dtype = actionParams
+        if(env.byteorder !== BYTE_ORDER){
+          swap(arrayOut.buffer, dtype)
+        }
+        if (dtype == "int8"){
+          arrayOut = new Int8Array(arrayOut.buffer)
+        }
+        if (dtype == "int16"){
+          arrayOut = new Int16Array(arrayOut.buffer)
+        }
+        if (dtype == "uint16"){
+          arrayOut = new Uint16Array(arrayOut.buffer)
+        }
+        if (dtype == "int32"){
+          arrayOut = new Int32Array(arrayOut.buffer)
+        }
+        if (dtype == "uint32"){
+          arrayOut = new Uint32Array(arrayOut.buffer)
+        }
+        if (dtype == "float32"){
+          arrayOut = new Float32Array(arrayOut.buffer)
+          arrayOut = new Float64Array(arrayOut)
+        }
+        if (dtype == "float64"){
+          arrayOut = new Float64Array(arrayOut.buffer)
+        }
+        console.log(arrayOut)
+      }
+      if (action == "code") {
+        let size = arrayOut.length
+        let arrayOutNew = new Array(arrayOut.length)
+        for (let j = 0; j < size; j++) {
+          arrayOutNew[j] = actionParams.valueCode[arrayOut[j]]
+        }
+        arrayOut=arrayOutNew
+      }
+      if (action == "linear") {
+        const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
+        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, dither, seed)
+      }
+      if (action == "sinh"){
+        const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.nanSentinel || null, dither, seed)
+      }
+  }
+  return arrayOut
+}
+  

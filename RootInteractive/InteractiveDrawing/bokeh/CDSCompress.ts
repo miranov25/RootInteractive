@@ -1,7 +1,7 @@
 import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 
-import {BYTE_ORDER, swap, decodeFixedPointArray, decodeSinhArray} from "./SerializationUtils"
+import {BYTE_ORDER, swap, decodeFixedPointArray, decodeSinhArray, decodeArray} from "./SerializationUtils"
 declare const  pako : any
 
 /*function encodeArcsinh(x: number, mu: number, sigma0: number, sigma1: number): number {
@@ -20,6 +20,26 @@ export namespace CDSCompress {
       sizeMap :    p.Property<any>
       enableDithering : p.Property<boolean>
   }
+}
+
+
+function collect_column_deps(actionArray: any[]){
+  let deps = new Set<string>()
+  for(let i=0; i<actionArray.length; i++){
+    let action = actionArray[i]
+    if(Object.prototype.toString.call(action) === '[object String]'){
+      continue
+    }
+    const actionParams = action[1]
+    action = action[0]
+    if(action === "linear" || action === "sinh"){
+      if(actionParams.dither == null || actionParams.dither === "toggle"){
+        console.log("adding dither toggle dependency")
+        deps.add("dither")
+      }
+    }
+  }
+  return deps
 }
 
 export interface CDSCompress extends CDSCompress.Attrs {}
@@ -63,6 +83,7 @@ export class CDSCompress extends ColumnDataSource {
   }
 
   inflateCompressedBokehBase64(arrayIn: any, key: string, startIndex: number = -1, earlyExit: boolean = false): any {
+    // Kept while refactor is in progress, will be removed soon
     let arrayOut=arrayIn.array
     if(startIndex < 0){
       startIndex = arrayIn.history.length || 0;
@@ -126,11 +147,9 @@ export class CDSCompress extends ColumnDataSource {
           return {"arrayOut": arrayOut, "dtype": arrayIn.dtype, "byteorder": arrayIn.byteorder, "encode": (x: number) => to_fixed_point(x, actionParams.scale, actionParams.origin)}
         }
         arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.dither || this.enableDithering, this.name + "_" + key)
-        this.invalidateOnDitheringToggle.add(key)
       }
       if (action == "sinh"){
         arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.nanSentinel || null, actionParams.dither || this.enableDithering, this.name + "_" + key)
-        this.invalidateOnDitheringToggle.add(key)
       }
     }
     return arrayOut
@@ -151,7 +170,7 @@ export class CDSCompress extends ColumnDataSource {
   }
 
   get_intermediate_column(key: string) {
-    // This is used to get the inflated column before applying transformations
+    // This is used to get the inflated column before applying transformations, keeping while refactor is in progress
     if (this.intermediateData[key] != null) {
       return this.intermediateData[key].arrayOut
     }
@@ -164,7 +183,14 @@ export class CDSCompress extends ColumnDataSource {
     if (this.freshColumns.has(key)) {
       return this.data[key];
     }
-    const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], key);
+    const deps = collect_column_deps(this.inputData[key].history);
+    const builtins = {"inflate": pako.inflate}
+    const env = {"builtins": builtins, "enableDithering": this.enableDithering, "seed": this.name+"_"+key, "dtype": this.inputData[key].dtype, "byteorder": this.inputData[key].byteorder}
+    const arrOut = decodeArray(this.inputData[key].array, this.inputData[key].history, env)
+    //const arrOut = this.inflateCompressedBokehBase64(this.inputData[key], key)
+    if(deps.has("dither")){
+      this.invalidateOnDitheringToggle.add(key)
+    }
     this.data[key]=arrOut;
     this.freshColumns.add(key);
     if(this._length === -1) this._length = arrOut.length
