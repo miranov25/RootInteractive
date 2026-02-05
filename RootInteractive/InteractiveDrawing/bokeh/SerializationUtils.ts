@@ -164,48 +164,43 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
       const action = Object.prototype.toString.call(instructions[i]) === '[object String]' ? instructions[i] : instructions[i][0]
       const actionParams = Object.prototype.toString.call(instructions[i]) === '[object String]' ? null : instructions[i][1]
 
-      console.log(action, actionParams)
-
       if (action == "base64_decode"){
         const s = atob(arrayOut)
         arrayOut = new Uint8Array(s.length)
         for (let j = 0; j < s.length; j++) { 
           arrayOut[j] = s.charCodeAt(j)
         }
-        console.log("base64 decode")
-        console.log(arrayOut)
       }
       if (action == "inflate") {
         arrayOut = inflate(arrayOut)
-        console.log("inflate")
-        console.log(arrayOut)
       }
       if(action == "array"){
         const dtype = actionParams
+        const ab = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + arrayOut.byteLength)
         if(env.byteorder !== BYTE_ORDER){
-          swap(arrayOut.buffer, dtype)
+          swap(ab.buffer, dtype)
         }
         if (dtype == "int8"){
-          arrayOut = new Int8Array(arrayOut.buffer)
+          arrayOut = new Int8Array(ab)
         }
         if (dtype == "int16"){
-          arrayOut = new Int16Array(arrayOut.buffer)
+          arrayOut = new Int16Array(ab)
         }
         if (dtype == "uint16"){
-          arrayOut = new Uint16Array(arrayOut.buffer)
+          arrayOut = new Uint16Array(ab)
         }
         if (dtype == "int32"){
-          arrayOut = new Int32Array(arrayOut.buffer)
+          arrayOut = new Int32Array(ab)
         }
         if (dtype == "uint32"){
-          arrayOut = new Uint32Array(arrayOut.buffer)
+          arrayOut = new Uint32Array(ab)
         }
         if (dtype == "float32"){
-          arrayOut = new Float32Array(arrayOut.buffer)
+          arrayOut = new Float32Array(ab)
           arrayOut = new Float64Array(arrayOut)
         }
         if (dtype == "float64"){
-          arrayOut = new Float64Array(arrayOut.buffer)
+          arrayOut = new Float64Array(ab)
         }
         console.log(arrayOut)
       }
