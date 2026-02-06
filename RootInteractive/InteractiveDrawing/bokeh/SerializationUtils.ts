@@ -157,7 +157,7 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
 
 export function quantizeSinhArray(array: number[], sigma0: number, sigma1: number, nBits: number){
   if(sigma0 <= 0 || sigma1 <= 0){
-    throw "Sigma cannot be negtive";
+    throw "Sigma cannot be negative";
   }
   const invSigma0 = 1/sigma0;
   const sigmaRatio = sigma1*invSigma0;

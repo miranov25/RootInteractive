@@ -61,8 +61,10 @@ def roundAbsolute(df, delta, downgrade_type=True):
         # delta == 1 for integer means no change
         return df, None
     if not np.any(np.isfinite(df)):
-        out = np.where(np.isnan(df), 0, -1)
-        out = np.where(np.isposinf(out), 1, out).astype(np.int8)
+        out = np.zeros(len(df), dtype=np.int8)
+        out[np.isnan(df)] = 0
+        out[np.isposinf(df)] = 1
+        out[np.isneginf(df)] = -1
         return out, {"scale": 1, "origin": 0, "sentinels": {"nan":0, "neginf":-1, "posinf":1}}
     quantized = np.rint(df / delta)
     result = quantized * delta

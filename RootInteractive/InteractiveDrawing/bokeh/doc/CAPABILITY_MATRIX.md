@@ -1,6 +1,6 @@
 # CAPABILITY_MATRIX
 
-**Generated:** 2026-02-03 01:04:36
+**Generated:** 2026-02-06 19:17:08
 
 **Generator:** `scripts/generate_capability_matrix.py`
 
@@ -38,10 +38,13 @@
 
 | Feature | Priority | Status | Backend | Layer | Tests |
 |---------|----------|--------|---------|-------|-------|
-| `ENC.base64.float64` | P0 | ✅ Working | python, node | unit | 1 test |
-| `ENC.base64.int32` | P0 | ✅ Working | python, node | unit | 1 test |
-| `ENC.compression.relative` | P1 | 📋 Planned | python, node | integration | - |
-| `ENC.compression.zip` | P2 | 📋 Planned | python, node | integration | - |
+| `ENC.base64.float64` | P0 | ✅ Working | python, node | unit | 5 tests |
+| `ENC.base64.int32` | P0 | ✅ Working | python, node | unit | 5 tests |
+| `ENC.compression.delta` | P1 | 🧨 Broken | python, node | integration | 2 tests |
+| `ENC.compression.relative` | P1 | ✅ Working | python, node | invariance | 1 test |
+| `ENC.compression.roundtrip` | P0 | ✅ Working | python, node | invariance | 4 tests |
+| `ENC.compression.sinh` | P1 | 🧨 Broken | python, node | invariance | 2 tests |
+| `ENC.compression.zip` | P2 | 🧨 Broken | python, node | invariance | 5 tests |
 
 
 ## HIST
@@ -63,8 +66,21 @@
 | `JOIN.cdsjoin.basic` | P0 | ✅ Working | browser | integration | 1 test |
 | `JOIN.cdsjoin.index0` | P0 | ✅ Working | browser | integration | 1 test |
 | `JOIN.cdsjoin.outer` | P1 | 📋 Planned | browser | integration | - |
-| `JOIN.cross_table` | P0 | ✅ Working | python, node | integration | 2 tests |
+| `JOIN.cross_table` | P0 | ✅ Working | python, node | integration | 1 test |
 
+
+---
+
+## 🧨 Broken Features Detail
+
+**Delta/Absolute compression:**
+- `test_compression_integration.py::test_serializationutils`
+
+**Sinh/Sqrt scaling compression:**
+- `test_compression_integration.py::test_serializationutils`
+
+**ZIP compression:**
+- `test_compression_integration.py::test_serializationutils`
 
 ---
 
@@ -109,30 +125,68 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>ENC.base64.float64</strong> — Float64Array encoding (1 tests)</summary>
+<summary><strong>ENC.base64.float64</strong> — Float64Array encoding (5 tests)</summary>
 
+- ✅ `test_compression_integration.py::test_compression_delta`
+- ✅ `test_compression_integration.py::test_compression_relative16`
+- ✅ `test_compression_integration.py::test_compression_simple`
+- ✅ `test_compression_integration.py::test_compression_sinh`
 - ✅ `test_dsl_customjs.py::test_compileVarName`
 
 </details>
 
 <details>
-<summary><strong>ENC.base64.int32</strong> — Int32Array encoding (1 tests)</summary>
+<summary><strong>ENC.base64.int32</strong> — Int32Array encoding (5 tests)</summary>
 
+- ✅ `test_compression_integration.py::test_compression_delta`
+- ✅ `test_compression_integration.py::test_compression_relative16`
+- ✅ `test_compression_integration.py::test_compression_simple`
+- ✅ `test_compression_integration.py::test_compression_sinh`
 - ✅ `test_dsl_customjs.py::test_compileVarName`
 
 </details>
 
 <details>
-<summary><strong>ENC.compression.relative</strong> — Relative compression (0 tests)</summary>
+<summary><strong>ENC.compression.delta</strong> — Delta/Absolute compression (2 tests)</summary>
 
-*Feature planned, not yet implemented*
+- ✅ `test_compression_integration.py::test_compression_delta`
+- ❌ `test_compression_integration.py::test_serializationutils`
 
 </details>
 
 <details>
-<summary><strong>ENC.compression.zip</strong> — ZIP compression (0 tests)</summary>
+<summary><strong>ENC.compression.relative</strong> — Relative compression (1 tests)</summary>
 
-*Feature planned, not yet implemented*
+- ✅ `test_compression_integration.py::test_compression_relative16`
+
+</details>
+
+<details>
+<summary><strong>ENC.compression.roundtrip</strong> — Compression roundtrip (4 tests)</summary>
+
+- ✅ `test_compression_integration.py::test_compression_delta`
+- ✅ `test_compression_integration.py::test_compression_relative16`
+- ✅ `test_compression_integration.py::test_compression_simple`
+- ✅ `test_compression_integration.py::test_compression_sinh`
+
+</details>
+
+<details>
+<summary><strong>ENC.compression.sinh</strong> — Sinh/Sqrt scaling compression (2 tests)</summary>
+
+- ✅ `test_compression_integration.py::test_compression_sinh`
+- ❌ `test_compression_integration.py::test_serializationutils`
+
+</details>
+
+<details>
+<summary><strong>ENC.compression.zip</strong> — ZIP compression (5 tests)</summary>
+
+- ✅ `test_compression_integration.py::test_compression_delta`
+- ✅ `test_compression_integration.py::test_compression_relative16`
+- ✅ `test_compression_integration.py::test_compression_simple`
+- ✅ `test_compression_integration.py::test_compression_sinh`
+- ❌ `test_compression_integration.py::test_serializationutils`
 
 </details>
 
@@ -172,10 +226,9 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>JOIN.cross_table</strong> — Multi-CDS cross-table (2 tests)</summary>
+<summary><strong>JOIN.cross_table</strong> — Multi-CDS cross-table (1 tests)</summary>
 
 - ✅ `test_dsl_customjs.py::test_compileVarName`
-- ✅ `test_dsl_customjs.py::test_nodejs`
 
 </details>
 
@@ -185,13 +238,13 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Working | 9 | 60.0% |
-| 🧨 Broken | 0 | 0.0% |
+| ✅ Working | 11 | 61.1% |
+| 🧨 Broken | 3 | 16.7% |
 | ⚠️ Known Issue | 0 | 0.0% |
-| 📋 Planned | 6 | 40.0% |
+| 📋 Planned | 4 | 22.2% |
 | ❌ No Tests | 0 | 0.0% |
 | ❓ Unknown | 0 | 0.0% |
-| **Total** | **15** | **100%** |
+| **Total** | **18** | **100%** |
 
 ---
 
