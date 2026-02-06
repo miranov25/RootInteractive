@@ -60,21 +60,6 @@ def test_compression_simple():
                     '--outDir', str(temp_dir),
                     f'{cwd}/SerializationUtils.ts'], check=True, cwd=cwd) 
     
-
-    """
-        const env = {
-        builtins: {
-            "inflate": zlib.inflateSync
-        },
-        seed: meta.name,
-        enableDithering: meta.enableDithering,
-        byteorder: meta.byteorder
-    }
-    const decoded_array = SerializationUtils.decodeArray(data_compressed, pipeline, env)
-    if(!allclose(decoded_array, decoded_ref, meta.abs_tol, meta.rel_tol, meta.nan_equal)){
-        throw new Error(`${meta.name} test failed. Expected ${array_orig} but got ${array_new}`)
-    }
-    """
     arrayCompression = ["zip", "base64"]
     compressed = {i: compressArray(testcase, arrayCompression) for i, testcase in TEST_CASES.items()}
     data_exported = [{
