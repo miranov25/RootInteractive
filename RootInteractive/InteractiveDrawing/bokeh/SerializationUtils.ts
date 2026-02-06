@@ -100,10 +100,22 @@ function decodeFixedPointDithered(value: number, scale: number, origin: number, 
   return origin + scale * (value + noiseSigned(seed, index));
 }
 
-export function decodeFixedPointArray(array: number[], scale: number, origin: number, dither: boolean = false, seedString: string = "default") {
+export function decodeFixedPointArray(array: number[], scale: number, origin: number, sentinels: any = {}, dither: boolean = false, seedString: string = "default") {
   const seed = seedFromString(seedString);
   const decodedArray = new Float64Array(array.length);
     for (let i = 0; i < array.length; i++) {
+        if(sentinels.nan != null && array[i] === sentinels.nan){
+          decodedArray[i] = NaN
+          continue
+        }
+        if(sentinels.posinf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = Infinity
+          continue
+        }
+        if(sentinels.neginf != null && array[i] === sentinels.neginf){
+          decodedArray[i] = -Infinity
+          continue
+        }
         if (dither) {
             decodedArray[i] = decodeFixedPointDithered(array[i], scale, origin, seed, i);
         } else {
@@ -117,11 +129,23 @@ export function to_fixed_point(x: number, scale: number, origin: number): number
   return Math.round((x - origin) / scale);
 }
 
-export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, dither: boolean = false, seedString: string = "default") {
+export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, sentinels: any = {}, dither: boolean = false, seedString: string = "default") {
   const seed = seedFromString(seedString);
   const decodedArray = new Float64Array(array.length);
   const sigmaRatio = sigma0 / sigma1;
     for (let i = 0; i < array.length; i++) {
+        if(sentinels.nan != null && array[i] === sentinels.nan){
+          decodedArray[i] = NaN
+          continue
+        }
+        if(sentinels.posinf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = Infinity
+          continue
+        }
+        if(sentinels.neginf != null && array[i] === sentinels.neginf){
+          decodedArray[i] = -Infinity
+          continue
+        }
         if (dither) {
             decodedArray[i] = sigmaRatio * Math.sinh(sigma0 * (array[i] + noiseSigned(seed, i)) + mu);
         } else {
@@ -130,3 +154,94 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
     }
     return decodedArray;
 }
+
+export function quantizeSinhArray(array: number[], sigma0: number, sigma1: number, nBits: number){
+  if(sigma0 <= 0 || sigma1 <= 0){
+    throw "Sigma cannot be negtive";
+  }
+  const invSigma0 = 1/sigma0;
+  const sigmaRatio = sigma1*invSigma0;
+  const encodedArray = new Int32Array(array.length);
+  const nanSentinel = -(2**(nBits-1))
+  const posinfSentinel = 2**(nBits-1)-1
+  const neginfSentinel = -(2**(nBits-1))+1
+  for(let i=0; i < array.length; i++){
+    let quantized = Math.round(Math.asinh(array[i]*sigmaRatio)*invSigma0)
+    quantized = quantized < neginfSentinel ? neginfSentinel : quantized;
+    quantized = quantized > posinfSentinel ? posinfSentinel : quantized;
+    quantized = isNaN(quantized) ? nanSentinel : quantized;
+    encodedArray[i] = quantized;
+  }
+  return {"array": encodedArray, "sentinels": {"nan": nanSentinel, "posinf":posinfSentinel, "neginf":neginfSentinel}}
+}
+
+export function decodeArray(arrayIn: any, instructions: any, env: any){
+  const inflate = env.builtins.inflate
+  const enableDithering = env.enableDithering
+  const seed = env.seed
+
+  let arrayOut = arrayIn
+
+  for(let i=instructions.length-1; i>=0; i--){
+      const action = Object.prototype.toString.call(instructions[i]) === '[object String]' ? instructions[i] : instructions[i][0]
+      const actionParams = Object.prototype.toString.call(instructions[i]) === '[object String]' ? null : instructions[i][1]
+
+      if (action == "base64_decode"){
+        const s = atob(arrayOut)
+        arrayOut = new Uint8Array(s.length)
+        for (let j = 0; j < s.length; j++) { 
+          arrayOut[j] = s.charCodeAt(j)
+        }
+      }
+      if (action == "inflate") {
+        arrayOut = inflate(arrayOut)
+      }
+      if(action == "array"){
+        const dtype = actionParams
+        const ab = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + arrayOut.byteLength)
+        if(env.byteorder !== BYTE_ORDER){
+          swap(ab.buffer, dtype)
+        }
+        if (dtype == "int8"){
+          arrayOut = new Int8Array(ab)
+        }
+        if (dtype == "int16"){
+          arrayOut = new Int16Array(ab)
+        }
+        if (dtype == "uint16"){
+          arrayOut = new Uint16Array(ab)
+        }
+        if (dtype == "int32"){
+          arrayOut = new Int32Array(ab)
+        }
+        if (dtype == "uint32"){
+          arrayOut = new Uint32Array(ab)
+        }
+        if (dtype == "float32"){
+          arrayOut = new Float32Array(ab)
+          arrayOut = new Float64Array(arrayOut)
+        }
+        if (dtype == "float64"){
+          arrayOut = new Float64Array(ab)
+        }
+      }
+      if (action == "code") {
+        let size = arrayOut.length
+        let arrayOutNew = new Array(arrayOut.length)
+        for (let j = 0; j < size; j++) {
+          arrayOutNew[j] = actionParams.valueCode[arrayOut[j]]
+        }
+        arrayOut=arrayOutNew
+      }
+      if (action == "linear") {
+        const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
+        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.sentinels || {}, dither, seed)
+      }
+      if (action == "sinh"){
+        const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.sentinels || {}, dither, seed)
+      }
+  }
+  return arrayOut
+}
+  
