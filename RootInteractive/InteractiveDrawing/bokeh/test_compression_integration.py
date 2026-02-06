@@ -1,15 +1,29 @@
 import subprocess
 import tempfile
 import pathlib
+import json
+import base64
+import sys
 
 import pytest
 import numpy as np
-import pandas as pd
 
 from RootInteractive.Tools.compressArray import compressArray
+    
+rng = np.random.default_rng(42)
+TEST_CASES = {
+    "default": rng.random(100) + .5,
+    "integers": rng.integers(0,100,100).astype(np.int32),
+    "all_nan": np.array([np.nan] * 100)
+}
+
+test_b64 = {i: base64.b64encode(TEST_CASES[i]).decode('utf-8') for i in TEST_CASES.keys()}
+dtypes = {i: testcase.dtype.name for i, testcase in TEST_CASES.items()}
+lengths = {i: len(testcase) for i, testcase in TEST_CASES.items()}
 
 @pytest.mark.feature("ENC.compression.delta")
 @pytest.mark.feature("ENC.compression.sinh")
+@pytest.mark.feature("ENC.compression.zip")
 @pytest.mark.backend("node")
 @pytest.mark.layer("unit")
 def test_serializationutils():
@@ -30,6 +44,62 @@ def test_serializationutils():
         print("All serializationutils tests passed")
     else:
         raise RuntimeError(result.stderr)
+    
+@pytest.mark.feature("ENC.base64.float64")
+@pytest.mark.feature("ENC.base64.int32")
+@pytest.mark.feature("ENC.compression.zip")
+@pytest.mark.feature("ENC.compression.roundtrip")
+@pytest.mark.backend("node")
+@pytest.mark.layer("integration")
+def test_compression_simple():
+    temp_dir = tempfile.gettempdir()
+    cwd = pathlib.Path(__file__).parent.resolve()
+    subprocess.run(["node", "node_modules/typescript/bin/tsc",
+                    '--module', 'None',
+                    '--target', 'ES2020',
+                    '--outDir', str(temp_dir),
+                    f'{cwd}/SerializationUtils.ts'], check=True, cwd=cwd) 
+    
+
+    """
+        const env = {
+        builtins: {
+            "inflate": zlib.inflateSync
+        },
+        seed: meta.name,
+        enableDithering: meta.enableDithering,
+        byteorder: meta.byteorder
+    }
+    const decoded_array = SerializationUtils.decodeArray(data_compressed, pipeline, env)
+    if(!allclose(decoded_array, decoded_ref, meta.abs_tol, meta.rel_tol, meta.nan_equal)){
+        throw new Error(`${meta.name} test failed. Expected ${array_orig} but got ${array_new}`)
+    }
+    """
+    arrayCompression = ["zip", "base64"]
+    compressed = {i: compressArray(testcase, arrayCompression) for i, testcase in TEST_CASES.items()}
+    data_exported = [{
+        "meta":{
+            "name": i,
+            "enableDithering": False,
+            "byteorder": sys.byteorder,
+            "dtype": dtypes[i],
+            "length": lengths[i],
+            "abs_tol": 0,
+            "rel_tol": 0,
+            "nan_equal": True
+        },
+        "pipeline": compressed[i]["history"],
+        "data_compressed": compressed[i]["array"],
+        "data_ref": test_b64[i]
+    } for i, testcase in TEST_CASES.items()]
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_json_file:
+        json.dump(data_exported, temp_json_file)
+        temp_json_file.flush()
+        result = subprocess.run(['node', f'{cwd}/test_serialization_integration.mjs', str(temp_dir), temp_json_file.name])
+        print(result.stdout)
+        if result.returncode != 0:
+            raise RuntimeError("JavaScript test failed")
 
 if __name__ == "__main__":
-    test_serializationutils()
+    #test_serializationutils()
+    test_compression_simple()
