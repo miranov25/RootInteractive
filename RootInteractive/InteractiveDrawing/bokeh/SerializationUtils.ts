@@ -224,7 +224,6 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
         if (dtype == "float64"){
           arrayOut = new Float64Array(ab)
         }
-        console.log(arrayOut)
       }
       if (action == "code") {
         let size = arrayOut.length
