@@ -79,7 +79,7 @@ function test_fixedToFloat64Array_no_math_random(){
     const original = Math.random;
     Math.random = () => { throw new Error("Math.random called"); };
     try {
-        const result = SerializationUtils.decodeFixedPointArray(fixed_array, scale, offset, true, "test-seed");
+        const result = SerializationUtils.decodeFixedPointArray(fixed_array, scale, offset, {}, true, "test-seed");
         if(!allclose_abs(result, expected, .005 + 1e-8)){
             throw new Error(`fixedToFloat64Array no math random test failed. Expected ${expected} but got ${result}`);
         }
@@ -96,6 +96,23 @@ function test_sinhToFloat64Array(){
     const array_new = SerializationUtils.decodeSinhArray(quantized.array, 0, sigma0, sigma1, quantized.sentinels);
     if(!allclose(array_orig, array_new, sigma0 * (sigma0 / sigma1) / 2, sigma0 / 2, true)){
         throw new Error(`sinhToFloat64Array test failed. Expected ${array_orig} but got ${array_new}`)
+    }
+}
+
+function test_sinhToFloat64Array_dither(){
+    const array_orig = new Float64Array([15.0, 25.0, NaN, 0, -1e6, -1, Infinity, -Infinity]);
+    const sigma0 = 1e-3;
+    const sigma1 = 10;
+    const quantized = SerializationUtils.quantizeSinhArray(array_orig, sigma0, sigma1, 16);
+    const original = Math.random
+    Math.random = () => { throw new Error("Math.random called"); };
+    try {
+        const array_new = SerializationUtils.decodeSinhArray(quantized.array, 0, sigma0, sigma1, quantized.sentinels, true, "test-seed");
+        if(!allclose(array_orig, array_new, sigma0 * (sigma0 / sigma1), sigma0, true)){
+            throw new Error(`sinhToFloat64Array_dither test failed. Expected ${array_orig} but got ${array_new}, abs_tol=${sigma0 * (sigma0 / sigma1)}, rel_tol=${sigma0}`)
+        }
+    } finally {
+        Math.random = original;
     }
 }
 
@@ -119,5 +136,6 @@ function test_simpleRoundtripLossless(){
 test_fixedToFloat64Array();
 test_fixedToFloat64Array_no_math_random();
 test_sinhToFloat64Array();
+test_sinhToFloat64Array_dither()
 test_simpleRoundtripLossless();
 console.log("All SerializationUtils tests passed");
