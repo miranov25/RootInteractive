@@ -112,7 +112,7 @@ export function decodeFixedPointArray(array: number[], scale: number, origin: nu
           decodedArray[i] = Infinity
           continue
         }
-        if(sentinels.neginf != null && array[i] === sentinels.posinf){
+        if(sentinels.neginf != null && array[i] === sentinels.neginf){
           decodedArray[i] = -Infinity
           continue
         }
@@ -142,7 +142,7 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
           decodedArray[i] = Infinity
           continue
         }
-        if(sentinels.neginf != null && array[i] === sentinels.posinf){
+        if(sentinels.neginf != null && array[i] === sentinels.neginf){
           decodedArray[i] = -Infinity
           continue
         }
