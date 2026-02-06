@@ -39,6 +39,7 @@ def run_test_in_node(data, temp_dir):
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 def test_serializationutils():
+    cwd = pathlib.Path(__file__).parent.resolve()
     temp_dir = tempfile.gettempdir()
     subprocess.run(["node", "node_modules/typescript/bin/tsc",
                     '--module', 'None',
@@ -201,7 +202,7 @@ def test_compression_sinh():
 
 
 if __name__ == "__main__":
-    #test_serializationutils()
+    test_serializationutils()
     #test_compression_simple()
     #test_compression_relative16()
-    test_compression_sinh()
+    #test_compression_sinh()
