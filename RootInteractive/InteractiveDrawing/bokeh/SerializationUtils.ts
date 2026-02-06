@@ -100,10 +100,22 @@ function decodeFixedPointDithered(value: number, scale: number, origin: number, 
   return origin + scale * (value + noiseSigned(seed, index));
 }
 
-export function decodeFixedPointArray(array: number[], scale: number, origin: number, dither: boolean = false, seedString: string = "default") {
+export function decodeFixedPointArray(array: number[], scale: number, origin: number, sentinels: any = {}, dither: boolean = false, seedString: string = "default") {
   const seed = seedFromString(seedString);
   const decodedArray = new Float64Array(array.length);
     for (let i = 0; i < array.length; i++) {
+        if(sentinels.nan != null && array[i] === sentinels.nan){
+          decodedArray[i] = NaN
+          continue
+        }
+        if(sentinels.posinf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = Infinity
+          continue
+        }
+        if(sentinels.neginf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = -Infinity
+          continue
+        }
         if (dither) {
             decodedArray[i] = decodeFixedPointDithered(array[i], scale, origin, seed, i);
         } else {
@@ -117,13 +129,21 @@ export function to_fixed_point(x: number, scale: number, origin: number): number
   return Math.round((x - origin) / scale);
 }
 
-export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, nanSentinel: number|null = null, dither: boolean = false, seedString: string = "default") {
+export function decodeSinhArray(array: number[], mu: number, sigma0: number, sigma1: number, sentinels: any = {}, dither: boolean = false, seedString: string = "default") {
   const seed = seedFromString(seedString);
   const decodedArray = new Float64Array(array.length);
   const sigmaRatio = sigma0 / sigma1;
     for (let i = 0; i < array.length; i++) {
-        if(nanSentinel != null && array[i] === nanSentinel){
+        if(sentinels.nan != null && array[i] === sentinels.nan){
           decodedArray[i] = NaN
+          continue
+        }
+        if(sentinels.posinf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = Infinity
+          continue
+        }
+        if(sentinels.neginf != null && array[i] === sentinels.posinf){
+          decodedArray[i] = -Infinity
           continue
         }
         if (dither) {
@@ -143,14 +163,16 @@ export function quantizeSinhArray(array: number[], sigma0: number, sigma1: numbe
   const sigmaRatio = sigma1*invSigma0;
   const encodedArray = new Int32Array(array.length);
   const nanSentinel = -(2**(nBits-1))
+  const posinfSentinel = 2**(nBits-1)-1
+  const neginfSentinel = -(2**(nBits-1))+1
   for(let i=0; i < array.length; i++){
     let quantized = Math.round(Math.asinh(array[i]*sigmaRatio)*invSigma0)
-    quantized = quantized < -(2**(nBits-1)) ? -(2**(nBits-1)) : quantized;
-    quantized = quantized > 2**(nBits-1)-1 ? 2**(nBits-1)-1 : quantized;
+    quantized = quantized < neginfSentinel ? neginfSentinel : quantized;
+    quantized = quantized > posinfSentinel ? posinfSentinel : quantized;
     quantized = isNaN(quantized) ? nanSentinel : quantized;
     encodedArray[i] = quantized;
   }
-  return {"array": encodedArray, "nanSentinel": nanSentinel}
+  return {"array": encodedArray, "sentinels": {"nan": nanSentinel, "posinf":posinfSentinel, "neginf":neginfSentinel}}
 }
 
 export function decodeArray(arrayIn: any, instructions: any, env: any){
@@ -214,11 +236,11 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
       }
       if (action == "linear") {
         const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
-        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, dither, seed)
+        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.sentinels || {}, dither, seed)
       }
       if (action == "sinh"){
         const dither = actionParams.dither == "true" || (enableDithering && (actionParams.dither === "toggle" || actionParams.dither == null))
-        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.nanSentinel || null, dither, seed)
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.sentinels || {}, dither, seed)
       }
   }
   return arrayOut

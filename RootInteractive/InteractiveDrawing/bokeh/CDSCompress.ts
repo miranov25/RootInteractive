@@ -146,10 +146,10 @@ export class CDSCompress extends ColumnDataSource {
           arrayIn.arrayOut = arrayOut
           return {"arrayOut": arrayOut, "dtype": arrayIn.dtype, "byteorder": arrayIn.byteorder, "encode": (x: number) => to_fixed_point(x, actionParams.scale, actionParams.origin)}
         }
-        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.dither || this.enableDithering, this.name + "_" + key)
+        arrayOut = decodeFixedPointArray(Array.from(arrayOut) as number[], actionParams.scale, actionParams.origin, actionParams.sentinels || {}, actionParams.dither || this.enableDithering, this.name + "_" + key)
       }
       if (action == "sinh"){
-        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.nanSentinel || null, actionParams.dither || this.enableDithering, this.name + "_" + key)
+        arrayOut = decodeSinhArray(Array.from(arrayOut) as number[], actionParams.mu, actionParams.sigma0, actionParams.sigma1, actionParams.sentinels || {}, actionParams.dither || this.enableDithering, this.name + "_" + key)
       }
     }
     return arrayOut

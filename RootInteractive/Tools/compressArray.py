@@ -65,13 +65,21 @@ def roundAbsolute(df, delta, downgrade_type=True):
     deltaMean = (df - result).mean()
     if downgrade_type:
         dfMin = np.nanmin(quantized)
-        quantized = np.where(np.isnan(df), -1, quantized-dfMin)
+        dfMax = np.nanmax(quantized)
+        dfCenter = np.ceil(dfMin + (dfMax - dfMin) * .5)
+        allFinite = np.all(np.isfinite(quantized))
+        quantized = quantized-dfCenter
         rangeSize = np.max(quantized)
-        if rangeSize <= 0x7f:
-            return quantized.astype(np.int8), {"scale":delta, "origin":dfMin*delta-deltaMean}
-        if rangeSize <= 0x7fff:
-            return quantized.astype(np.int16), {"scale":delta, "origin":dfMin*delta-deltaMean}
-        return quantized.astype(np.int32), {"scale":delta, "origin":dfMin*delta-deltaMean}
+        if rangeSize < 0x7f:
+            out = quantized.astype(np.int8)
+            sentinels = {"nan": -0x80, "neginf": -0x7f, "posinf":0x7f}
+        elif rangeSize < 0x7fff:
+            out = quantized.astype(np.int16)
+            sentinels = {"nan": -0x8000, "neginf": -0x7fff, "posinf":0x7fff}
+        else:
+            out = quantized.astype(np.int32)
+            sentinels = {"nan": -0x80000000, "neginf": -0x7fffffff, "posinf":0x7fffffff}
+        return out, {"scale":delta, "origin":dfCenter*delta-deltaMean, "sentinels": {} if allFinite else sentinels}
     result -= deltaMean
     return result.astype(type), None
 
@@ -91,14 +99,16 @@ def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
     if sigma0 <= 0 or sigma1 <= 0:
         raise ValueError("sigma0 and sigma1 must be positive")
     quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
-    quantized = np.clip(quantized, -2**(nBits-1)+1, 2**(nBits-1)-1)
+    neginf = -2**(nBits-1)+1
+    posinf = 2**(nBits-1)-1
+    quantized = np.clip(quantized, neginf, posinf)
     sentinel = -2**(nBits-1)
     quantized = np.nan_to_num(quantized, nan=sentinel)
     if nBits <= 8:
-        return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
+        return quantized.astype(np.int8), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "sentinels": {"nan": sentinel, "neginf": neginf, "posinf":posinf}}
     if nBits <= 16:
-        return quantized.astype(np.int16), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
-    return quantized.astype(np.int32), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "nanSentinel":sentinel}
+        return quantized.astype(np.int16), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "sentinels": {"nan": sentinel, "neginf": neginf, "posinf":posinf}}
+    return quantized.astype(np.int32), {"sigma0": sigma0, "sigma1": sigma1, "mu":0, "sentinels": {"nan": sentinel, "neginf": neginf, "posinf":posinf}}
 
 
 def decodeSinhScaling(df, sigma0, sigma1):
