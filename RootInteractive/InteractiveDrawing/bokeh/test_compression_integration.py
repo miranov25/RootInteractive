@@ -14,7 +14,8 @@ rng = np.random.default_rng(42)
 TEST_CASES = {
     "default": rng.random(100) + .5,
     "integers": rng.integers(0,100,100).astype(np.int32),
-    "all_nan": np.array([np.nan] * 100)
+    "all_nan": np.array([np.nan] * 100),
+    "has_infinity": np.array([0.1,1e7,-14,np.nan,np.inf,-np.inf]).astype(np.float64)
 }
 
 test_b64 = {i: base64.b64encode(TEST_CASES[i]).decode('utf-8') for i in TEST_CASES.keys()}
@@ -128,5 +129,5 @@ def test_compression_relative16():
 
 if __name__ == "__main__":
     #test_serializationutils()
-    #test_compression_simple()
-    test_compression_relative16()
+    test_compression_simple()
+    #test_compression_relative16()
