@@ -108,7 +108,7 @@ def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
     """
     type = df.dtype
     if type.kind not in ['f', 'c']:
-        return df
+        return df, None
     if sigma0 <= 0 or sigma1 <= 0:
         raise ValueError("sigma0 and sigma1 must be positive")
     quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
