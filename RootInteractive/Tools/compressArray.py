@@ -60,26 +60,39 @@ def roundAbsolute(df, delta, downgrade_type=True):
     if type.kind in ['i','u'] and delta == 1:
         # delta == 1 for integer means no change
         return df, None
+    if not np.any(np.isfinite(df)):
+        out = np.where(np.isnan(df), 0, -1)
+        out = np.where(np.isposinf(out), 1, out).astype(np.int8)
+        return out, {"scale": 1, "origin": 0, "sentinels": {"nan":0, "neginf":-1, "posinf":1}}
     quantized = np.rint(df / delta)
     result = quantized * delta
-    deltaMean = (df - result).mean()
+    deltaMean = (df - result)[np.isfinite(df)].mean()
     if downgrade_type:
-        dfMin = np.nanmin(quantized)
-        dfMax = np.nanmax(quantized)
+        dfMin = np.nanmin(quantized[np.isfinite(quantized)])
+        dfMax = np.nanmax(quantized[np.isfinite(quantized)])
         dfCenter = np.ceil(dfMin + (dfMax - dfMin) * .5)
         allFinite = np.all(np.isfinite(quantized))
         quantized = quantized-dfCenter
         rangeSize = np.max(quantized)
         if rangeSize < 0x7f:
+            quantized = np.where(np.isnan(quantized), -0x80, quantized)
+            quantized = np.where(np.isposinf(quantized), 0x7f, quantized)
+            quantized = np.where(np.isneginf(quantized), -0x7f, quantized)
             out = quantized.astype(np.int8)
             sentinels = {"nan": -0x80, "neginf": -0x7f, "posinf":0x7f}
         elif rangeSize < 0x7fff:
+            quantized = np.where(np.isnan(quantized), -0x8000, quantized)
+            quantized = np.where(np.isposinf(quantized), 0x7fff, quantized)
+            quantized = np.where(np.isneginf(quantized), -0x7fff, quantized)
             out = quantized.astype(np.int16)
             sentinels = {"nan": -0x8000, "neginf": -0x7fff, "posinf":0x7fff}
         else:
+            quantized = np.where(np.isnan(quantized), -0x80000000, quantized)
+            quantized = np.where(np.isposinf(quantized), 0x7fffffff, quantized)
+            quantized = np.where(np.isneginf(quantized), -0x7fffffff, quantized)
             out = quantized.astype(np.int32)
             sentinels = {"nan": -0x80000000, "neginf": -0x7fffffff, "posinf":0x7fffffff}
-        return out, {"scale":delta, "origin":dfCenter*delta-deltaMean, "sentinels": {} if allFinite else sentinels}
+        return out, {"scale":delta, "origin":dfCenter*delta+deltaMean, "sentinels": {} if allFinite else sentinels}
     result -= deltaMean
     return result.astype(type), None
 
