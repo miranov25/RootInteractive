@@ -126,8 +126,44 @@ def test_compression_relative16():
     } for i, testcase in TEST_CASES.items()]    
     run_test_in_node(data_exported, temp_dir)
 
+@pytest.mark.feature("ENC.base64.float64")
+@pytest.mark.feature("ENC.base64.int32")
+@pytest.mark.feature("ENC.compression.zip")
+@pytest.mark.feature("ENC.compression.roundtrip")
+@pytest.mark.feature("ENC.compression.delta")
+@pytest.mark.backend("node")
+@pytest.mark.layer("invariance")
+def test_compression_delta():
+    temp_dir = tempfile.gettempdir()
+    cwd = pathlib.Path(__file__).parent.resolve()
+    subprocess.run(["node", "node_modules/typescript/bin/tsc",
+                    '--module', 'None',
+                    '--target', 'ES2020',
+                    '--outDir', str(temp_dir),
+                    f'{cwd}/SerializationUtils.ts'], check=True, cwd=cwd) 
+    
+    arrayCompression = [("delta", .3), "zip", "base64"]
+    compressed = {i: compressArray(testcase, arrayCompression) for i, testcase in TEST_CASES.items()}
+    data_exported = [{
+        "meta":{
+            "name": i,
+            "enableDithering": False,
+            "byteorder": sys.byteorder,
+            "dtype": dtypes[i],
+            "length": lengths[i],
+            "abs_tol": .15,
+            "rel_tol": 1e-10,
+            "nan_equal": True
+        },
+        "pipeline": compressed[i]["history"],
+        "data_compressed": compressed[i]["array"],
+        "data_ref": test_b64[i]
+    } for i, testcase in TEST_CASES.items()]    
+    run_test_in_node(data_exported, temp_dir)
+
 
 if __name__ == "__main__":
     #test_serializationutils()
-    test_compression_simple()
+    #test_compression_simple()
     #test_compression_relative16()
+    test_compression_delta()
