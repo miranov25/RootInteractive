@@ -200,10 +200,13 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
         const dtype = actionParams
         const ab = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + arrayOut.byteLength)
         if(env.byteorder !== BYTE_ORDER){
-          swap(ab.buffer, dtype)
+          swap(ab, dtype)
         }
         if (dtype == "int8"){
           arrayOut = new Int8Array(ab)
+        }
+        if (dtype == "uint8"){
+          arrayOut = new Uint8Array(ab)
         }
         if (dtype == "int16"){
           arrayOut = new Int16Array(ab)

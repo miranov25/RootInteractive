@@ -9,12 +9,12 @@ Usage:
 
 IMPORTANT: Feature IDs are IMMUTABLE. If renaming needed, use FEATURE_ALIASES.
 
-Phase: 0.1.A
-Date: 2026-02-02
-Version: 1.0
+Phase: 0.1.B
+Date: 2026-02-06
+Version: 1.1
 """
 
-FEATURE_TAXONOMY_VERSION = "1.0"
+FEATURE_TAXONOMY_VERSION = "1.1"
 
 # =============================================================================
 # FEATURE ALIASES (for backward compatibility if renaming needed)
@@ -90,8 +90,9 @@ FEATURE_TAXONOMY = {
         "description": "Relative compression round-trip (roundRelativeBinary)",
         "priority": "P1",
         "backends": ["python", "node"],
-        "layer": "invariance",
-        "proof": "test_compression_integration.py::test_compression_relative16",
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
     },
     "ENC.compression.delta": {
         "name": "Delta/Absolute compression",
@@ -107,16 +108,18 @@ FEATURE_TAXONOMY = {
         "description": "Arcsinh transform compression round-trip (roundSqrtScaling)",
         "priority": "P1",
         "backends": ["python", "node"],
-        "layer": "invariance",
-        "proof": "test_compression_integration.py::test_compression_sinh",
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
     },
     "ENC.compression.zip": {
         "name": "ZIP compression",
         "description": "ZIP compression round-trip (zlib)",
         "priority": "P2",
         "backends": ["python", "node"],
-        "layer": "invariance",
-        "proof": "test_compression_integration.py::test_compression_simple",
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
     },
     "ENC.compression.roundtrip": {
         "name": "Compression roundtrip",
@@ -124,7 +127,8 @@ FEATURE_TAXONOMY = {
         "priority": "P0",
         "backends": ["python", "node"],
         "layer": "invariance",
-        "proof": "test_compression_integration.py::test_compression_simple",
+        "proof": None,
+        "planned": True,
     },
 
     # =========================================================================

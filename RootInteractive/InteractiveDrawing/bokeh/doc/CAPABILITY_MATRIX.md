@@ -1,6 +1,6 @@
 # CAPABILITY_MATRIX
 
-**Generated:** 2026-02-06 19:17:08
+**Generated:** 2026-02-06 21:59:25
 
 **Generator:** `scripts/generate_capability_matrix.py`
 
@@ -40,11 +40,11 @@
 |---------|----------|--------|---------|-------|-------|
 | `ENC.base64.float64` | P0 | ✅ Working | python, node | unit | 5 tests |
 | `ENC.base64.int32` | P0 | ✅ Working | python, node | unit | 5 tests |
-| `ENC.compression.delta` | P1 | 🧨 Broken | python, node | integration | 2 tests |
-| `ENC.compression.relative` | P1 | ✅ Working | python, node | invariance | 1 test |
+| `ENC.compression.delta` | P1 | ✅ Working | python, node | integration | 2 tests |
+| `ENC.compression.relative` | P1 | ✅ Working | python, node | integration | 1 test |
 | `ENC.compression.roundtrip` | P0 | ✅ Working | python, node | invariance | 4 tests |
-| `ENC.compression.sinh` | P1 | 🧨 Broken | python, node | invariance | 2 tests |
-| `ENC.compression.zip` | P2 | 🧨 Broken | python, node | invariance | 5 tests |
+| `ENC.compression.sinh` | P1 | ✅ Working | python, node | integration | 2 tests |
+| `ENC.compression.zip` | P2 | ✅ Working | python, node | integration | 5 tests |
 
 
 ## HIST
@@ -68,19 +68,6 @@
 | `JOIN.cdsjoin.outer` | P1 | 📋 Planned | browser | integration | - |
 | `JOIN.cross_table` | P0 | ✅ Working | python, node | integration | 1 test |
 
-
----
-
-## 🧨 Broken Features Detail
-
-**Delta/Absolute compression:**
-- `test_compression_integration.py::test_serializationutils`
-
-**Sinh/Sqrt scaling compression:**
-- `test_compression_integration.py::test_serializationutils`
-
-**ZIP compression:**
-- `test_compression_integration.py::test_serializationutils`
 
 ---
 
@@ -150,7 +137,7 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 <summary><strong>ENC.compression.delta</strong> — Delta/Absolute compression (2 tests)</summary>
 
 - ✅ `test_compression_integration.py::test_compression_delta`
-- ❌ `test_compression_integration.py::test_serializationutils`
+- ✅ `test_compression_integration.py::test_serializationutils`
 
 </details>
 
@@ -175,7 +162,7 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 <summary><strong>ENC.compression.sinh</strong> — Sinh/Sqrt scaling compression (2 tests)</summary>
 
 - ✅ `test_compression_integration.py::test_compression_sinh`
-- ❌ `test_compression_integration.py::test_serializationutils`
+- ✅ `test_compression_integration.py::test_serializationutils`
 
 </details>
 
@@ -186,7 +173,7 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 - ✅ `test_compression_integration.py::test_compression_relative16`
 - ✅ `test_compression_integration.py::test_compression_simple`
 - ✅ `test_compression_integration.py::test_compression_sinh`
-- ❌ `test_compression_integration.py::test_serializationutils`
+- ✅ `test_compression_integration.py::test_serializationutils`
 
 </details>
 
@@ -238,8 +225,8 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Working | 11 | 61.1% |
-| 🧨 Broken | 3 | 16.7% |
+| ✅ Working | 14 | 77.8% |
+| 🧨 Broken | 0 | 0.0% |
 | ⚠️ Known Issue | 0 | 0.0% |
 | 📋 Planned | 4 | 22.2% |
 | ❌ No Tests | 0 | 0.0% |
