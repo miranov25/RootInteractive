@@ -415,6 +415,169 @@ echo ""
 
 # P0-3 FIX: Only check TOTAL_FAILED if we actually ran tests
 if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -gt 0 ]]; then
+    print_error "Some tests failed — see logs above"
+fi
+
+# =============================================================================
+# Phase Diff — save for reviewers
+# =============================================================================
+
+PHASE_TAG="PHASE_BEGIN_RootInteractive"
+DIFF_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
+    print_header "Phase Changes (since $PHASE_TAG)"
+    DIFF_STAT=$(git diff --stat "$PHASE_TAG"..HEAD 2>/dev/null)
+    COMMIT_COUNT=$(git rev-list --count "$PHASE_TAG"..HEAD 2>/dev/null)
+
+    if [[ -n "$DIFF_STAT" ]]; then
+        echo "Commits since phase start: $COMMIT_COUNT"
+        echo ""
+        echo "$DIFF_STAT"
+
+        # Save diffs for reviewers
+        DIFF_PHASE="$LOG_BASE_DIR/diff_to_phase_${DIFF_TIMESTAMP}.txt"
+        DIFF_LAST="$LOG_BASE_DIR/diff_last_commit_${DIFF_TIMESTAMP}.txt"
+
+        git diff "$PHASE_TAG"..HEAD > "$DIFF_PHASE"
+        git diff HEAD~1..HEAD > "$DIFF_LAST"
+
+        echo ""
+        echo "Full diff: git diff $PHASE_TAG..HEAD"
+        echo "Log:       git log --oneline $PHASE_TAG..HEAD"
+    else
+        echo "No changes since $PHASE_TAG"
+    fi
+else
+    print_error "Tag $PHASE_TAG not found — PHASE REVIEW NOT POSSIBLE (P0 violation per Organization-structure-v1_16.md)"
+    echo "  Create with: git tag -f $PHASE_TAG && git push origin $PHASE_TAG -f"
+    echo ""
+    echo "  ⚠️  Without this tag, reviewers cannot verify git diff to phase start."
+    echo "  ⚠️  Phase approval without diff review is a P0 process violation."
+fi
+
+# =============================================================================
+# File listing (for easy upload to reviewers)
+# =============================================================================
+
+print_header "Files"
+
+for test_dir in "${TEST_DIRS[@]}"; do
+    dir_name=$(basename "$test_dir")
+    latest_link="$LOG_BASE_DIR/${dir_name}_latest"
+    if [[ -L "$latest_link" ]]; then
+        latest_dir="$LOG_BASE_DIR/$(readlink "$latest_link")"
+        [[ -f "$latest_dir/test.log" ]] && echo "  Log:       $PROJECT_ROOT/$latest_dir/test.log"
+        [[ -f "$latest_dir/summary.txt" ]] && echo "  Summary:   $PROJECT_ROOT/$latest_dir/summary.txt"
+        [[ -f "$latest_dir/report.json" ]] && echo "  JSON:      $PROJECT_ROOT/$latest_dir/report.json"
+    fi
+done
+
+[[ -f "$MATRIX_OUTPUT" ]] && echo "  Matrix:    $PROJECT_ROOT/$MATRIX_OUTPUT"
+[[ -f "$DIFF_PHASE" ]] && echo "  Diff tag:  $PROJECT_ROOT/$DIFF_PHASE"
+[[ -f "$DIFF_LAST" ]] && echo "  Diff HEAD: $PROJECT_ROOT/$DIFF_LAST"
+
+# =============================================================================
+# Package reviewer.zip — all review artifacts in one file
+# =============================================================================
+# Uses a staging directory with prefixed filenames to avoid collisions
+# (e.g. bokeh_test.log vs Tools_test.log)
+
+REVIEWER_ZIP="$LOG_BASE_DIR/reviewer_${TIMESTAMP}.zip"
+REVIEWER_STAGE="$LOG_BASE_DIR/.reviewer_stage_$$"
+rm -rf "$REVIEWER_STAGE"
+mkdir -p "$REVIEWER_STAGE"
+
+REVIEWER_COUNT=0
+
+# Collect test logs and summaries (prefix with dir name to avoid collisions)
+for test_dir in "${TEST_DIRS[@]}"; do
+    dir_name=$(basename "$test_dir")
+    latest_link="$LOG_BASE_DIR/${dir_name}_latest"
+    if [[ -L "$latest_link" ]]; then
+        latest_dir="$LOG_BASE_DIR/$(readlink "$latest_link")"
+        for f in test.log summary.txt report.json; do
+            if [[ -f "$latest_dir/$f" ]]; then
+                cp "$latest_dir/$f" "$REVIEWER_STAGE/${dir_name}_${f}"
+                REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+            fi
+        done
+    fi
+done
+
+# Collect matrix (unique name, no prefix needed)
+if [[ -f "$MATRIX_OUTPUT" ]]; then
+    cp "$MATRIX_OUTPUT" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
+    REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+fi
+
+# Collect diffs
+if [[ -n "${DIFF_PHASE:-}" ]] && [[ -f "$DIFF_PHASE" ]]; then
+    cp "$DIFF_PHASE" "$REVIEWER_STAGE/$(basename "$DIFF_PHASE")"
+    REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+fi
+if [[ -n "${DIFF_LAST:-}" ]] && [[ -f "$DIFF_LAST" ]]; then
+    cp "$DIFF_LAST" "$REVIEWER_STAGE/$(basename "$DIFF_LAST")"
+    REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+fi
+
+# Add git log
+if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
+    git log --oneline "$PHASE_TAG"..HEAD > "$REVIEWER_STAGE/git_log.txt" 2>/dev/null
+    if [[ -s "$REVIEWER_STAGE/git_log.txt" ]]; then
+        REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+    else
+        rm -f "$REVIEWER_STAGE/git_log.txt"
+    fi
+fi
+
+if [[ $REVIEWER_COUNT -gt 0 ]]; then
+    # Create zip from staging directory (flat structure, no path issues)
+    (cd "$REVIEWER_STAGE" && zip -q "$PROJECT_ROOT/$REVIEWER_ZIP" *)
+    if [[ -f "$REVIEWER_ZIP" ]]; then
+        rm -f "$LOG_BASE_DIR/reviewer_latest.zip"
+        ln -sf "reviewer_${TIMESTAMP}.zip" "$LOG_BASE_DIR/reviewer_latest.zip"
+        print_header "Reviewer Package"
+        echo "  ${BOLD}$PROJECT_ROOT/$REVIEWER_ZIP${RESET}"
+        echo "  ($REVIEWER_COUNT files)"
+        echo ""
+        echo "  Upload this single file to a reviewer session."
+    else
+        print_error "Failed to create reviewer.zip"
+    fi
+else
+    print_warning "No files to package for reviewer.zip"
+fi
+
+# Cleanup staging
+rm -rf "$REVIEWER_STAGE"
+
+# =============================================================================
+# Phase Closure Helper
+# =============================================================================
+# Per Organization-structure-v1_16.md §PHASE_BEGIN Tag Convention:
+# After phase approval, PHASE_BEGIN_<project> must be moved to HEAD
+# to mark the start of the next phase.
+
+if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -eq 0 ]] && [[ $TOTAL_PASSED -gt 0 ]]; then
+    if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
+        TAG_COMMIT=$(git rev-parse "$PHASE_TAG" 2>/dev/null)
+        HEAD_COMMIT=$(git rev-parse HEAD 2>/dev/null)
+        if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+            print_header "Phase Closure"
+            echo "  All tests passed. If this phase is approved, move the tag:"
+            echo ""
+            echo "    git tag -f $PHASE_TAG && git push origin $PHASE_TAG -f"
+            echo ""
+            echo "  This marks HEAD as the start of the next phase."
+        fi
+    fi
+fi
+
+echo ""
+
+# Exit with failure if tests failed
+if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -gt 0 ]]; then
     exit 1
 fi
 exit 0
