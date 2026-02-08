@@ -9,12 +9,12 @@ Usage:
 
 IMPORTANT: Feature IDs are IMMUTABLE. If renaming needed, use FEATURE_ALIASES.
 
-Phase: 0.1.B
-Date: 2026-02-06
-Version: 1.1
+Phase: 0.1.D
+Date: 2026-02-07
+Version: 1.2
 """
 
-FEATURE_TAXONOMY_VERSION = "1.1"
+FEATURE_TAXONOMY_VERSION = "1.2"
 
 # =============================================================================
 # FEATURE ALIASES (for backward compatibility if renaming needed)
@@ -202,6 +202,114 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "test_Alias.py",
         "planned": True,
+    },
+
+    # =========================================================================
+    # WASM Operations (Phase 0.1.D)
+    # =========================================================================
+    "WASM.cross_backend_invariance": {
+        "name": "WASM cross-backend invariance",
+        "description": "WASM results match numpy reference at IEEE-754 precision",
+        "priority": "P0",
+        "backends": ["python", "node"],
+        "layer": "invariance",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness",
+    },
+    "WASM.scalar_vector_consistency": {
+        "name": "WASM scalar-vector consistency",
+        "description": "WASM scalar and vector modes produce bit-identical results",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "invariance",
+        "proof": "test_wasm_invariance.py::test_wasm_scalar_vector_consistency",
+    },
+    "WASM.special_values": {
+        "name": "WASM IEEE-754 special values",
+        "description": "NaN/±Inf handling in WASM matches numpy",
+        "priority": "P1",
+        "backends": ["python", "node"],
+        "layer": "invariance",
+        "proof": "test_wasm_invariance.py::test_wasm_special_values",
+    },
+    "WASM.compile": {
+        "name": "WASM compilation",
+        "description": "C++ to WASM compilation via emscripten",
+        "priority": "P0",
+        "backends": ["native"],
+        "layer": "build",
+        "proof": "wasm/Makefile",
+    },
+    "WASM.scalar.arithmetic": {
+        "name": "WASM scalar arithmetic",
+        "description": "Scalar evaluation of basic arithmetic (fun1, fun2)",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[scalar-fun1]",
+    },
+    "WASM.scalar.transcendental": {
+        "name": "WASM scalar transcendental",
+        "description": "Scalar evaluation of transcendentals (fun3, fun5)",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[scalar-fun3]",
+    },
+    "WASM.scalar.conditional": {
+        "name": "WASM scalar conditional",
+        "description": "Scalar evaluation of conditionals (fun4)",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[scalar-fun4]",
+    },
+    "WASM.vector.arithmetic": {
+        "name": "WASM vector arithmetic",
+        "description": "Vector evaluation of basic arithmetic via WASM memory",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[vector-fun1]",
+    },
+    "WASM.vector.transcendental": {
+        "name": "WASM vector transcendental",
+        "description": "Vector evaluation of transcendentals via WASM memory",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[vector-fun3]",
+    },
+    "WASM.vector.conditional": {
+        "name": "WASM vector conditional",
+        "description": "Vector evaluation of conditionals via WASM memory",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "unit",
+        "proof": "test_wasm_invariance.py::test_wasm_correctness[vector-fun4]",
+    },
+    "WASM.benchmark.scalar_overhead": {
+        "name": "WASM benchmark scalar overhead",
+        "description": "Per-call scalar overhead measurement (ns/call)",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "benchmark",
+        "proof": "bench_wasm_vs_js.mjs",
+    },
+    "WASM.benchmark.vector_crossover": {
+        "name": "WASM benchmark vector crossover",
+        "description": "N-based JS/WASM crossover measurement",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "benchmark",
+        "proof": "bench_wasm_vs_js.mjs",
+    },
+    "WASM.benchmark.memory_fraction": {
+        "name": "WASM benchmark memory fraction",
+        "description": "Memory copy fraction of total WASM time",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "benchmark",
+        "proof": "bench_wasm_vs_js.mjs",
     },
 }
 
