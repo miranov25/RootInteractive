@@ -1,6 +1,6 @@
 # CAPABILITY_MATRIX
 
-**Generated:** 2026-02-06 21:59:25
+**Generated:** 2026-02-09 00:30:43
 
 **Generator:** `scripts/generate_capability_matrix.py`
 
@@ -67,6 +67,40 @@
 | `JOIN.cdsjoin.index0` | P0 | ✅ Working | browser | integration | 1 test |
 | `JOIN.cdsjoin.outer` | P1 | 📋 Planned | browser | integration | - |
 | `JOIN.cross_table` | P0 | ✅ Working | python, node | integration | 1 test |
+
+
+## ONNX
+
+| Feature | Priority | Status | Backend | Layer | Tests |
+|---------|----------|--------|---------|-------|-------|
+| `ONNX.benchmark.inference` | P1 | ❌ No Tests | node | benchmark | - |
+| `ONNX.benchmark.load_time` | P2 | ❌ No Tests | node | benchmark | - |
+| `ONNX.export.linear` | P0 | ✅ Working | python | export | 3 tests |
+| `ONNX.export.neural_net` | P0 | ✅ Working | python | export | 3 tests |
+| `ONNX.export.tree_ensemble` | P0 | ✅ Working | python | export | 3 tests |
+| `ONNX.invariance.classification` | P0 | ✅ Working | python, node | invariance | 6 tests |
+| `ONNX.invariance.cross_runtime` | P0 | ✅ Working | python, node | invariance | 2 tests |
+| `ONNX.invariance.sklearn_vs_ort` | P0 | ✅ Working | python | invariance | 8 tests |
+| `ONNX.special_values` | P1 | ✅ Working | python, node | invariance | 12 tests |
+
+
+## WASM
+
+| Feature | Priority | Status | Backend | Layer | Tests |
+|---------|----------|--------|---------|-------|-------|
+| `WASM.benchmark.memory_fraction` | P2 | ❌ No Tests | node | benchmark | - |
+| `WASM.benchmark.scalar_overhead` | P2 | ❌ No Tests | node | benchmark | - |
+| `WASM.benchmark.vector_crossover` | P2 | ❌ No Tests | node | benchmark | - |
+| `WASM.compile` | P0 | ❌ No Tests | native | build | - |
+| `WASM.cross_backend_invariance` | P0 | ✅ Working | python, node | invariance | 2 tests |
+| `WASM.scalar.arithmetic` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.scalar.conditional` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.scalar.transcendental` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.scalar_vector_consistency` | P0 | ✅ Working | node | invariance | 1 test |
+| `WASM.special_values` | P1 | ✅ Working | python, node | invariance | 1 test |
+| `WASM.vector.arithmetic` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.vector.conditional` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.vector.transcendental` | P0 | ❌ No Tests | node | unit | - |
 
 
 ---
@@ -219,19 +253,204 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 
 </details>
 
+<details>
+<summary><strong>ONNX.benchmark.inference</strong> — ONNX inference latency (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>ONNX.benchmark.load_time</strong> — ONNX model load time (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>ONNX.export.linear</strong> — ONNX export linear models (3 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_classification_labels_sklearn_vs_python_ort`
+- ❓ `test_invariance_onnx.py::test_regression_sklearn_vs_python_ort`
+- ✅ `test_invariance_onnx.py::test_smoke_all_models`
+
+</details>
+
+<details>
+<summary><strong>ONNX.export.neural_net</strong> — ONNX export neural networks (3 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_classification_labels_sklearn_vs_python_ort`
+- ❓ `test_invariance_onnx.py::test_regression_sklearn_vs_python_ort`
+- ✅ `test_invariance_onnx.py::test_smoke_all_models`
+
+</details>
+
+<details>
+<summary><strong>ONNX.export.tree_ensemble</strong> — ONNX export tree ensembles (3 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_classification_labels_sklearn_vs_python_ort`
+- ❓ `test_invariance_onnx.py::test_regression_sklearn_vs_python_ort`
+- ✅ `test_invariance_onnx.py::test_smoke_all_models`
+
+</details>
+
+<details>
+<summary><strong>ONNX.invariance.classification</strong> — ONNX classification invariance (6 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_classification_labels_sklearn_vs_nodejs_ort`
+- ❓ `test_invariance_onnx.py::test_classification_labels_sklearn_vs_python_ort`
+- ❓ `test_invariance_onnx.py::test_classification_proba_python_ort_vs_nodejs_ort`
+- ❓ `test_onnx_invariance.py::test_classification_labels_sklearn_vs_nodejs_ort`
+- ❓ `test_onnx_invariance.py::test_classification_labels_sklearn_vs_python_ort`
+- ❓ `test_onnx_invariance.py::test_classification_proba_python_ort_vs_nodejs_ort`
+
+</details>
+
+<details>
+<summary><strong>ONNX.invariance.cross_runtime</strong> — ONNX cross-runtime invariance (2 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_regression_python_ort_vs_nodejs_ort`
+- ❓ `test_onnx_invariance.py::test_regression_python_ort_vs_nodejs_ort`
+
+</details>
+
+<details>
+<summary><strong>ONNX.invariance.sklearn_vs_ort</strong> — ONNX sklearn↔ORT invariance (8 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_classification_proba_sklearn_vs_python_ort`
+- ✅ `test_invariance_onnx.py::test_python_three_way_consistency`
+- ❓ `test_invariance_onnx.py::test_regression_sklearn_vs_nodejs_ort`
+- ❓ `test_invariance_onnx.py::test_regression_sklearn_vs_python_ort`
+- ❓ `test_onnx_invariance.py::test_classification_proba_sklearn_vs_python_ort`
+- ✅ `test_onnx_invariance.py::test_python_three_way_consistency`
+- ❓ `test_onnx_invariance.py::test_regression_sklearn_vs_nodejs_ort`
+- ❓ `test_onnx_invariance.py::test_regression_sklearn_vs_python_ort`
+
+</details>
+
+<details>
+<summary><strong>ONNX.special_values</strong> — ONNX IEEE-754 special values (12 tests)</summary>
+
+- ❓ `test_invariance_onnx.py::test_special_values_linear_inf`
+- ❓ `test_invariance_onnx.py::test_special_values_linear_nan`
+- ✅ `test_invariance_onnx.py::test_special_values_mixed_all_models`
+- ❓ `test_invariance_onnx.py::test_special_values_mlp_nan`
+- ❓ `test_invariance_onnx.py::test_special_values_tree_inf`
+- ❓ `test_invariance_onnx.py::test_special_values_tree_nan`
+- ❓ `test_onnx_invariance.py::test_special_values_linear_inf`
+- ❓ `test_onnx_invariance.py::test_special_values_linear_nan`
+- ✅ `test_onnx_invariance.py::test_special_values_mixed_all_models`
+- ❓ `test_onnx_invariance.py::test_special_values_mlp_nan`
+- ❓ `test_onnx_invariance.py::test_special_values_tree_inf`
+- ❓ `test_onnx_invariance.py::test_special_values_tree_nan`
+
+</details>
+
+<details>
+<summary><strong>WASM.benchmark.memory_fraction</strong> — WASM benchmark memory fraction (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.benchmark.scalar_overhead</strong> — WASM benchmark scalar overhead (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.benchmark.vector_crossover</strong> — WASM benchmark vector crossover (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.compile</strong> — WASM compilation (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.cross_backend_invariance</strong> — WASM cross-backend invariance (2 tests)</summary>
+
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
+- ✅ `test_wasm_invariance.py::test_wasm_invariance_all`
+
+</details>
+
+<details>
+<summary><strong>WASM.scalar.arithmetic</strong> — WASM scalar arithmetic (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.scalar.conditional</strong> — WASM scalar conditional (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.scalar.transcendental</strong> — WASM scalar transcendental (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.scalar_vector_consistency</strong> — WASM scalar-vector consistency (1 tests)</summary>
+
+- ✅ `test_wasm_invariance.py::test_wasm_scalar_vector_consistency`
+
+</details>
+
+<details>
+<summary><strong>WASM.special_values</strong> — WASM IEEE-754 special values (1 tests)</summary>
+
+- ❓ `test_wasm_invariance.py::test_wasm_special_values`
+
+</details>
+
+<details>
+<summary><strong>WASM.vector.arithmetic</strong> — WASM vector arithmetic (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.vector.conditional</strong> — WASM vector conditional (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
+<details>
+<summary><strong>WASM.vector.transcendental</strong> — WASM vector transcendental (0 tests)</summary>
+
+*No tests with @pytest.mark.feature marker*
+
+</details>
+
 ---
 
 ## Summary
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Working | 14 | 77.8% |
+| ✅ Working | 24 | 60.0% |
 | 🧨 Broken | 0 | 0.0% |
 | ⚠️ Known Issue | 0 | 0.0% |
-| 📋 Planned | 4 | 22.2% |
-| ❌ No Tests | 0 | 0.0% |
+| 📋 Planned | 4 | 10.0% |
+| ❌ No Tests | 12 | 30.0% |
 | ❓ Unknown | 0 | 0.0% |
-| **Total** | **18** | **100%** |
+| **Total** | **40** | **100%** |
 
 ---
 

@@ -191,6 +191,9 @@ def assert_allclose_with_report(actual, expected, atol, rtol, label, model_name)
 # ============================================================
 
 @pytest.mark.feature("ONNX.invariance.sklearn_vs_ort")
+@pytest.mark.feature("ONNX.export.linear")
+@pytest.mark.feature("ONNX.export.tree_ensemble")
+@pytest.mark.feature("ONNX.export.neural_net")
 @pytest.mark.parametrize("model_name", REGRESSION_MODELS)
 def test_regression_sklearn_vs_python_ort(model_name):
     """TC-ONNX-01,04,07,10: sklearn predictions ↔ Python ORT predictions."""
@@ -261,6 +264,9 @@ def test_regression_python_ort_vs_nodejs_ort(model_name):
 # ============================================================
 
 @pytest.mark.feature("ONNX.invariance.classification")
+@pytest.mark.feature("ONNX.export.linear")
+@pytest.mark.feature("ONNX.export.tree_ensemble")
+@pytest.mark.feature("ONNX.export.neural_net")
 @pytest.mark.parametrize("model_name", CLASSIFICATION_MODELS)
 def test_classification_labels_sklearn_vs_python_ort(model_name):
     """TC-ONNX-13,16,19: Classification labels sklearn ↔ Python ORT (exact)."""
@@ -502,6 +508,9 @@ def test_special_values_mixed_all_models():
 # TC-ONNX-SMOKE: Quick smoke test (all models, <30s)
 # ============================================================
 
+@pytest.mark.feature("ONNX.export.linear")
+@pytest.mark.feature("ONNX.export.tree_ensemble")
+@pytest.mark.feature("ONNX.export.neural_net")
 def test_smoke_all_models():
     """TC-ONNX-SMOKE: Quick validation — all 7 models, Python ORT only, N=100."""
     rng = np.random.default_rng(777)
