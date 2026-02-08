@@ -1,0 +1,17 @@
+{
+  "name": "rootinteractive-onnx-tests",
+  "version": "0.1.0",
+  "description": "Phase 0.1.E: ONNX cross-backend invariance tests for RootInteractive",
+  "type": "module",
+  "scripts": {
+    "test": "node test_cross_backend_onnx.mjs",
+    "bench": "node bench_inference_onnx.mjs"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.17.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}
