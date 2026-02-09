@@ -1211,7 +1211,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if isinstance(valueCompressed["array"], bytes):
                         cdsCompress0[keyCompressed]["array"] = base64.b64encode(valueCompressed["array"]).decode("utf-8")
                         cdsCompress0[keyCompressed]["actionArray"].append("base64")
-                        cdsCompress0[keyCompressed]["history"].append("base64_decode")
+                        cdsCompress0[keyCompressed]["decodeProgram"].insert(0,"base64_decode")
                 cdsOrig.inputData = cdsCompress0
                 cdsOrig.sizeMap = sizeMap
             else:

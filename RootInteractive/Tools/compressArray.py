@@ -50,6 +50,10 @@ def removeInt64(column):
     return column
 
 
+def fitsInRange(dfMin, dfMax, minval, maxval, useSentinels):
+    return dfMin >= minval + 2*useSentinels and dfMax  <= maxval - useSentinels
+
+
 def roundAbsolute(df, delta, downgrade_type=True):
     # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
@@ -69,20 +73,23 @@ def roundAbsolute(df, delta, downgrade_type=True):
     quantized = np.rint(df / delta)
     result = quantized * delta
     deltaMean = (df - result)[np.isfinite(df)].mean()
+    quantized = np.rint((df-deltaMean) / delta)
     if downgrade_type:
         dfMin = np.nanmin(quantized[np.isfinite(quantized)])
         dfMax = np.nanmax(quantized[np.isfinite(quantized)])
         dfCenter = np.ceil(dfMin + (dfMax - dfMin) * .5)
         allFinite = np.all(np.isfinite(quantized))
         quantized = quantized-dfCenter
-        rangeSize = np.max(quantized)
-        if rangeSize < 0x7f:
+        useSentinels = 0 if allFinite else 1
+        dfMin -= dfCenter
+        dfMax -= dfCenter
+        if fitsInRange(dfMin, dfMax, -0x80, 0x7f, useSentinels):
             quantized = np.where(np.isnan(quantized), -0x80, quantized)
             quantized = np.where(np.isposinf(quantized), 0x7f, quantized)
             quantized = np.where(np.isneginf(quantized), -0x7f, quantized)
             out = quantized.astype(np.int8)
             sentinels = {"nan": -0x80, "neginf": -0x7f, "posinf":0x7f}
-        elif rangeSize < 0x7fff:
+        elif fitsInRange(dfMin, dfMax, -0x8000, 0x7fff, useSentinels):
             quantized = np.where(np.isnan(quantized), -0x8000, quantized)
             quantized = np.where(np.isposinf(quantized), 0x7fff, quantized)
             quantized = np.where(np.isneginf(quantized), -0x7fff, quantized)
@@ -179,6 +186,7 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
     arrayInfo = {"actionArray": actionArray.copy(), "history": []}
     currentArray = inputArray
     counter=0
+    decodeProgram = []
     for actionTuple in actionArray:
         if isinstance(actionTuple, tuple):
             action = actionTuple[0]
@@ -193,63 +201,89 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
         if action == "delta":
             currentArray, decode_transform = roundAbsolute(currentArray, *actionParams)
             if decode_transform is not None:
-                arrayInfo["history"].append(("linear", decode_transform))
+                decodeProgram.append(("linear", decode_transform))
         if action == "sqrt_scaling":
             currentArray, decode_transform = roundSqrtScaling(currentArray, *actionParams)
             if decode_transform is not None:
-                arrayInfo["history"].append(("sinh", decode_transform))
+                decodeProgram.append(("sinh", decode_transform))
         if action == "sqrt_scaling_decode":
             currentArray = decodeSinhScaling(currentArray, *actionParams)
-            arrayInfo["history"].append(("decodeSinhScaling", actionParams))
+            decodeProgram.append(("decodeSinhScaling", actionParams))
         if action == "zip":
-            if isinstance(currentArray, pd.Series):
-                currentArray = currentArray.to_numpy()
-            arrayInfo["dtype"] = currentArray.dtype.name
-            arrayInfo["history"].append(("array", currentArray.dtype.name))
+            if not isinstance(currentArray, bytes):
+                if isinstance(currentArray, pd.Series):
+                    currentArray = currentArray.to_numpy()
+                arrayInfo["dtype"] = currentArray.dtype.name
+                decodeProgram.append(("array", currentArray.dtype.name))
             currentArray = zlib.compress(currentArray)
-            arrayInfo["history"].append("inflate")
+            decodeProgram.append("inflate")
         if action == "unzip":
-            currentArray = np.frombuffer(zlib.decompress(currentArray),dtype=arrayInfo["dtype"])
+            currentArray = zlib.decompress(currentArray)
+            if actionParams:
+                currentArray = np.frombuffer(currentArray, dtype=actionParams[0])
         if action == "removeInt64":
             currentArray = removeInt64(currentArray)
         if action == "base64":
             currentArray = base64.b64encode(currentArray).decode("utf-8")
-            arrayInfo["history"].append("base64_decode")
+            decodeProgram.append("base64_decode")
         if action == "base64_decode":
             currentArray = base64.b64decode(currentArray)
         if action == "code":
-            # Skip for normal number types, these can be unpacked in an easier way.
             # Do not send int64 arrays to the client, it will not work
-            if currentArray.dtype.kind not in ['O', 'S', 'U']:
-                arrayInfo["skipCode"] = True
-                continue
-            arrayInfo["history"].append("code")
-            arrayInfo["skipCode"] = False
+            # Also using pandas for the unique() function
+            maxFraction = actionParams[0] if actionParams else .5
+            currentArray = pd.Series(currentArray)
             values = currentArray.unique()
-            dictValues = {}
-            dictValuesI = {}
-            for i, value in enumerate(values):
-                dictValues[value] = i
-                dictValuesI[i] = value
-                arrayInfo["valueCode"] = dictValuesI
-            if values.size < 2 ** 8:
-                currentArray = currentArray.map(dictValues).astype("int8")
-            elif values.size < 2 ** 16:
-                currentArray = currentArray.map(dictValues).astype("int16")
+            if values.size < maxFraction * currentArray.shape[0]:
+                dictValues = {}
+                for i, value in enumerate(values):
+                    dictValues[value] = i
+                if values.size < 2 ** 8:
+                    currentArray = currentArray.map(dictValues).astype("int8")
+                elif values.size < 2 ** 16:
+                    currentArray = currentArray.map(dictValues).astype("int16")
+                else:
+                    currentArray = currentArray.map(dictValues).astype("int32")
+                dtype0 = currentArray.dtype
+                dtype1 = values.dtype
+                if dtype1.kind == 'O':
+                    decodeProgram.append(("code", {values: values}))
+                    arrayInfo["valueCode"] = values
+                    continue
+                bytes0 = currentArray.to_numpy().tobytes()
+                bytes1 = values.tobytes()
+                currentArray = bytes0 + bytes1
+                decodeDope = {"dtype0":dtype0.name, "dtype1":dtype1.name, "len0":len(bytes0), "len1":len(bytes1), "version":1}
+                arrayInfo["decodeDope"] = decodeDope
+                decodeProgram.append(("code", decodeDope))
             else:
-                currentArray = currentArray.map(dictValues).astype("int32")
+                arrayInfo["skipCode"] = True
         if action == "decode":
-            if not arrayInfo["skipCode"]:
-                arrayAsPanda=pd.Series(currentArray)      # TODO - numpy does not have map function better solution to fine
-                currentArray = arrayAsPanda.map(arrayInfo["valueCode"])
+            if not arrayInfo.get("skipCode", False):
+                if "valueCode" in arrayInfo:
+                    currentArray = arrayInfo["valueCode"][currentArray]
+                elif "decodeDope" in arrayInfo:
+                    decodeDope = arrayInfo["decodeDope"]
+                    len0 = decodeDope["len0"]
+                    len1 = decodeDope["len1"]
+                    bytes0 = currentArray[:len0]
+                    bytes1 = currentArray[len0:len0+len1]
+                    arrayCodes = np.frombuffer(bytes0, dtype=decodeDope["dtype0"])
+                    arrayValues = np.frombuffer(bytes1, dtype=decodeDope["dtype1"])
+                    currentArray = arrayValues[arrayCodes]
         if action == "astype":
             currentArray = currentArray.astype(actionParams[0])
+        if action == "array":
+            currentArray = np.frombuffer(currentArray, dtype=actionParams[0])
+        if action == "snap_size":
+            arrayInfo["snap_size"] = getSize((currentArray, decodeProgram))
         if verbosity & 2:
             print(actionTuple)
             print(len(currentArray))
         counter+=1
     arrayInfo["byteorder"] = sys.byteorder
     arrayInfo["array"] = currentArray
+    arrayInfo["decodeProgram"] = decodeProgram[::-1]
     return arrayInfo
 
 

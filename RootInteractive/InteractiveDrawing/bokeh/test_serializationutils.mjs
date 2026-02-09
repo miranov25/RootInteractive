@@ -118,7 +118,7 @@ function test_sinhToFloat64Array_dither(){
 
 function test_simpleRoundtripLossless(){
     const array_orig = new Float64Array([15.0, 25.0, NaN, 0, -1e6, -1, Infinity, -Infinity]);
-    const pipeline = [["array","float64"], ["inflate"], ["base64_decode"]];
+    const pipeline = [["base64_decode"],["inflate"],["array","float64"]];
     const compressed = zlib.deflateSync(array_orig).toString('base64');
     const env = {
         "builtins": {
