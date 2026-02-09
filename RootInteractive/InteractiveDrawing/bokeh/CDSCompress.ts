@@ -99,7 +99,7 @@ export class CDSCompress extends ColumnDataSource {
     const deps = collect_column_deps(this.inputData[key].decodeProgram);
     const builtins = {"inflate": pako.inflate}
     const env = {"builtins": builtins, "enableDithering": this.enableDithering, "seed": this.name+"_"+key, "dtype": this.inputData[key].dtype, "byteorder": this.inputData[key].byteorder}
-    const arrOut = decodeArray(this.inputData[key].array, this.inputData[key].history, env)
+    const arrOut = decodeArray(this.inputData[key].array, this.inputData[key].decodeProgram, env)
     if(deps.has("dither")){
       this.invalidateOnDitheringToggle.add(key)
     }

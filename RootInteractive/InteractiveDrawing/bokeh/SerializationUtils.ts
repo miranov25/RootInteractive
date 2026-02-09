@@ -204,6 +204,31 @@ export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dty
   throw new Error(`Unknown dtype: ${dtype}`)
 }
 
+function makeTypedArray(n_elems: number, dtype: string){
+  if (dtype == "int8"){
+    return new Int8Array(n_elems)
+  }
+  if (dtype == "int16"){
+    return new Int16Array(n_elems)
+  }
+  if (dtype == "uint16"){
+    return new Uint16Array(n_elems)
+  }
+  if (dtype == "int32"){
+    return new Int32Array(n_elems)
+  }
+  if (dtype == "uint32"){
+    return new Uint32Array(n_elems)
+  }
+  if (dtype == "float32"){
+    return new Float64Array(n_elems)
+  }
+  if (dtype == "float64"){
+    return new Float64Array(n_elems)
+  }
+  throw new Error(`Unknown dtype: ${dtype}`)
+}
+
 export function decodeArray(arrayIn: any, instructions: any, env: any){
   const inflate = env.builtins.inflate
   const enableDithering = env.enableDithering
@@ -214,6 +239,8 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
   for(let i=0; i<instructions.length; i++){
       const action = Object.prototype.toString.call(instructions[i]) === '[object String]' ? instructions[i] : instructions[i][0]
       const actionParams = Object.prototype.toString.call(instructions[i]) === '[object String]' ? null : instructions[i][1]
+      console.log(action, actionParams)
+      console.log(i)
 
       if (action == "base64_decode"){
         const s = atob(arrayOut)
@@ -232,13 +259,15 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
       }
       if (action == "code") {
         if (actionParams.version){
+          console.log(actionParams)
           const {len0, dtype0, len1, dtype1} = actionParams
           const ab0 = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + len0)
           const arrayCode = interpretArray(ab0, env.byteorder, dtype0)
           const size = arrayCode.length
+          console.log(size)
           const ab1 = arrayOut.buffer.slice(arrayOut.byteOffset + len0, arrayOut.byteOffset + len0 + len1)
           const valueCode = interpretArray(ab1, env.byteorder, dtype1)
-          let arrayOutNew = new Array(size)
+          let arrayOutNew = makeTypedArray(size, dtype1)
           for (let j = 0; j < size; j++) {
             arrayOutNew[j] = valueCode[arrayCode[j]]
           }
