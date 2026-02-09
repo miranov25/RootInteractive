@@ -19,6 +19,7 @@ import re
 #           3. Use coding with smaller entropy
 #   }
 
+rng = np.random.default_rng(42)
 
 def simulatePandaDCA(fastTest=False):
     """
@@ -170,7 +171,7 @@ def test_CompressionSample0(arraySize=10000,scale=255):
     actionArray=[("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
         actionArray[3]=("unzip",coding)
-        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
@@ -182,7 +183,7 @@ def test_CompressionSample0(arraySize=10000,scale=255):
 def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
     actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","float32")]
     for coding in ["float32", "float64"]:
-        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
@@ -194,7 +195,7 @@ def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
 def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
-        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
@@ -207,7 +208,7 @@ def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
 def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("code",.5), ("zip",0), "snap_size", ("base64",0), ("base64_decode",0),("unzip"),("decode",0)]
     for coding in ["float32", "float64"]:
-        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
@@ -223,7 +224,7 @@ def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
 def test_CompressionSampleSinh(arraySize=10000,scale=255, sigma0=1e-3, sigma1=10):
     actionArray=[("sqrt_scaling",sigma0,sigma1,16), ("zip",0), "snap_size", ("base64",0), ("base64_decode",0),("unzip","int16"),("sqrt_scaling_decode",sigma0,sigma1)]
     for coding in ["float32", "float64"]:
-        arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
+        arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
