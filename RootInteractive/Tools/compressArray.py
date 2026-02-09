@@ -50,6 +50,10 @@ def removeInt64(column):
     return column
 
 
+def fitsInRange(df, min, max, useSentinels):
+    return df.all((df >= min + 2*useSentinels) & (df <= max - useSentinels))
+
+
 def roundAbsolute(df, delta, downgrade_type=True):
     # This should probably also downgrade the type if safe to do so instead of upgrading back
     type=df.dtype
@@ -62,7 +66,7 @@ def roundAbsolute(df, delta, downgrade_type=True):
         return df, None
     if not np.any(np.isfinite(df)):
         out = np.where(np.isnan(df), 0, -1)
-        out = np.where(np.isposinf(out), 1, out).astype(np.int8)
+        out = np.where(np.isposinf(df), 1, out).astype(np.int8)
         return out, {"scale": 1, "origin": 0, "sentinels": {"nan":0, "neginf":-1, "posinf":1}}
     quantized = np.rint(df / delta)
     result = quantized * delta
@@ -74,14 +78,14 @@ def roundAbsolute(df, delta, downgrade_type=True):
         dfCenter = np.ceil(dfMin + (dfMax - dfMin) * .5)
         allFinite = np.all(np.isfinite(quantized))
         quantized = quantized-dfCenter
-        rangeSize = np.max(quantized)
-        if rangeSize < 0x7f:
+        useSentinels = 0 if allFinite else 1
+        if fitsInRange(df, -0x80, 0x7f, useSentinels):
             quantized = np.where(np.isnan(quantized), -0x80, quantized)
             quantized = np.where(np.isposinf(quantized), 0x7f, quantized)
             quantized = np.where(np.isneginf(quantized), -0x7f, quantized)
             out = quantized.astype(np.int8)
             sentinels = {"nan": -0x80, "neginf": -0x7f, "posinf":0x7f}
-        elif rangeSize < 0x7fff:
+        elif fitsInRange(df, -0x8000, 0x7fff, useSentinels):
             quantized = np.where(np.isnan(quantized), -0x8000, quantized)
             quantized = np.where(np.isposinf(quantized), 0x7fff, quantized)
             quantized = np.where(np.isneginf(quantized), -0x7fff, quantized)
