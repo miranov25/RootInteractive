@@ -142,7 +142,7 @@ def test_CompressionSequence0(arraySize=10000):
 def test_CompressionSequenceRel(arraySize=255,nBits=5):
     actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
-        actionArray[4]=("unzip",coding)
+        actionArray[4]=("unzip",coding) if coding != "float64" else ("unzip", "float32")
         arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
@@ -153,16 +153,16 @@ def test_CompressionSequenceRel(arraySize=255,nBits=5):
 
 @pytest.mark.unittest
 def test_CompressionSequenceAbs(arraySize=255,delta=0.1):
-    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
+    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0), "unzip"]
     for coding in ["int8","int16", "int32", "int64", "float32", "float64"]:
-        actionArray[4]=("unzip",coding)
         arrayInput=pd.Series(np.arange(0,arraySize,1,dtype=coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
+        arrayOut = np.frombuffer(arrayC["array"], arrayC["decodeProgram"][2][1])
         toc = time.perf_counter()
         compSize=getSize(arrayC["history"][2])
-        print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayC["array"]-arrayInput).sum()/inputSize))
+        print("test_CompressionSequenceRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (arrayOut-arrayInput).sum()/inputSize))
 
 
 @pytest.mark.unittest
@@ -180,9 +180,8 @@ def test_CompressionSample0(arraySize=10000,scale=255):
 
 @pytest.mark.unittest
 def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
-    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
+    actionArray=[("relative",nBits), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","float32")]
     for coding in ["float32", "float64"]:
-        actionArray[4]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
@@ -195,7 +194,6 @@ def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
 def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
     actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
-        actionArray[4]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
@@ -204,30 +202,34 @@ def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSampleDelta: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
-@pytest.mark.unittest
+@pytest.mark.feature("ENC.compression.delta")
+@pytest.mark.layer("unit")
 def test_CompressionSampleDeltaCode(arraySize=10000,scale=255, delta=1):
-    actionArray=[("delta",delta), ("code",0), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8"),("decode",0)]
+    actionArray=[("delta",delta), ("code",.5), ("zip",0), "snap_size", ("base64",0), ("base64_decode",0),("unzip"),("decode",0)]
     for coding in ["float32", "float64"]:
-        #actionArray[5]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
         toc = time.perf_counter()
-        compSize=getSize(arrayC["history"][3])
-        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
+        compSize=arrayC["snap_size"]
+        actionParams = arrayC["decodeProgram"][-1][1]
+        decodedArray = arrayC["array"] * delta + actionParams["origin"]
+        assert np.max(np.abs(decodedArray-arrayInput)) <= delta/2 + 1e-6
+        print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((decodedArray-arrayInput)**2).sum()/arraySize)))
 
-@pytest.mark.unittest
-def test_CompressionSampleSinh(arraySize=10000,scale=255, delta=1e-3):
-    actionArray=[("sqrt_scaling",delta,10,16), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8"),("sqrt_scaling_decode",delta,10)]
+@pytest.mark.feature("ENC.compression.sinh")
+@pytest.mark.layer("unit")
+def test_CompressionSampleSinh(arraySize=10000,scale=255, sigma0=1e-3, sigma1=10):
+    actionArray=[("sqrt_scaling",sigma0,sigma1,16), ("zip",0), "snap_size", ("base64",0), ("base64_decode",0),("unzip","int16"),("sqrt_scaling_decode",sigma0,sigma1)]
     for coding in ["float32", "float64"]:
-        actionArray[4]=("unzip",coding)
         arrayInput=pd.Series((np.random.random_sample(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
         toc = time.perf_counter()
-        compSize=getSize(arrayC["history"][2])
+        compSize=arrayC["snap_size"]
+        np.testing.assert_allclose(arrayC["array"], arrayInput, rtol=sigma0, atol=.5 * sigma0 * sigma0 / sigma1 )
         print("test_CompressionSampleSinh: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
 
 def testCompressionDecompressionInt8(stop=10, step=1):
@@ -314,4 +316,3 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
 
 #test_CompressionCDSPipeDraw()
-test_CompressionSampleDelta()
