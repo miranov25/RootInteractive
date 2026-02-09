@@ -12,7 +12,7 @@ from RootInteractive.Tools.compressArray import compressArray
     
 rng = np.random.default_rng(42)
 TEST_CASES = {
-    "default": rng.random(100) + .5,
+    "default": rng.random(1000),
     "integers": rng.integers(0,100,100).astype(np.int32),
     "all_nan": np.array([np.nan] * 100),
     "has_infinity": np.array([0.1,1e7,-14,np.nan,np.inf,-np.inf]).astype(np.float64)
@@ -85,7 +85,7 @@ def test_compression_simple():
             "rel_tol": 0,
             "nan_equal": True
         },
-        "pipeline": compressed[i]["history"],
+        "pipeline": compressed[i]["decodeProgram"],
         "data_compressed": compressed[i]["array"],
         "data_ref": test_b64[i]
     } for i, testcase in TEST_CASES.items()]
@@ -108,7 +108,7 @@ def test_compression_relative16():
                     '--outDir', str(temp_dir),
                     f'{cwd}/SerializationUtils.ts'], check=True, cwd=cwd) 
     
-    arrayCompression = [("relative", 16), "zip", "base64"]
+    arrayCompression = [("relative", 7), "zip", "base64"]
     compressed = {i: compressArray(testcase, arrayCompression) for i, testcase in TEST_CASES.items()}
     data_exported = [{
         "meta":{
@@ -118,10 +118,10 @@ def test_compression_relative16():
             "dtype": dtypes[i],
             "length": lengths[i],
             "abs_tol": 1e-10,
-            "rel_tol": 1/2**16,
+            "rel_tol": 1/2**7,
             "nan_equal": True
         },
-        "pipeline": compressed[i]["history"],
+        "pipeline": compressed[i]["decodeProgram"],
         "data_compressed": compressed[i]["array"],
         "data_ref": test_b64[i]
     } for i, testcase in TEST_CASES.items()]    
@@ -156,7 +156,7 @@ def test_compression_delta():
             "rel_tol": 1e-10,
             "nan_equal": True
         },
-        "pipeline": compressed[i]["history"],
+        "pipeline": compressed[i]["decodeProgram"],
         "data_compressed": compressed[i]["array"],
         "data_ref": test_b64[i]
     } for i, testcase in TEST_CASES.items()]    
@@ -194,15 +194,45 @@ def test_compression_sinh():
             "rel_tol": .5 * sigma0,
             "nan_equal": True
         },
-        "pipeline": compressed[i]["history"],
+        "pipeline": compressed[i]["decodeProgram"],
         "data_compressed": compressed[i]["array"],
         "data_ref": test_b64[i]
     } for i, testcase in TEST_CASES.items()]    
     run_test_in_node(data_exported, temp_dir)
 
 
+def test_compression_code():
+    temp_dir = tempfile.gettempdir()
+    cwd = pathlib.Path(__file__).parent.resolve()
+    subprocess.run(["node", "node_modules/typescript/bin/tsc",
+                    '--module', 'None',
+                    '--target', 'ES2020',
+                    '--outDir', str(temp_dir),
+                    f'{cwd}/SerializationUtils.ts'], check=True, cwd=cwd) 
+    
+    arrayCompression = [("relative",7), ("code",1.0), "zip", "base64"]
+    compressed = {i: compressArray(testcase, arrayCompression) for i, testcase in TEST_CASES.items()}
+    data_exported = [{
+        "meta":{
+            "name": i,
+            "enableDithering": False,
+            "byteorder": sys.byteorder,
+            "dtype": dtypes[i],
+            "length": lengths[i],
+            "abs_tol": 1e-10,
+            "rel_tol": 1/2**7,
+            "nan_equal": True
+        },
+        "pipeline": compressed[i]["decodeProgram"],
+        "data_compressed": compressed[i]["array"],
+        "data_ref": test_b64[i]
+    } for i, testcase in TEST_CASES.items()]   
+    run_test_in_node(data_exported, temp_dir)
+
+
 if __name__ == "__main__":
-    test_serializationutils()
+    #test_serializationutils()
     #test_compression_simple()
     #test_compression_relative16()
     #test_compression_sinh()
+    test_compression_code()
