@@ -245,8 +245,6 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
   for(let i=0; i<instructions.length; i++){
       const action = Object.prototype.toString.call(instructions[i]) === '[object String]' ? instructions[i] : instructions[i][0]
       const actionParams = Object.prototype.toString.call(instructions[i]) === '[object String]' ? null : instructions[i][1]
-      console.log(action, actionParams)
-      console.log(i)
 
       if (action == "base64_decode"){
         const s = atob(arrayOut)
@@ -265,12 +263,10 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
       }
       if (action == "code") {
         if (actionParams.version){
-          console.log(actionParams)
           const {len0, dtype0, len1, dtype1} = actionParams
           const ab0 = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + len0)
           const arrayCode = interpretArray(ab0, env.byteorder, dtype0)
           const size = arrayCode.length
-          console.log(size)
           const ab1 = arrayOut.buffer.slice(arrayOut.byteOffset + len0, arrayOut.byteOffset + len0 + len1)
           const valueCode = interpretArray(ab1, env.byteorder, dtype1)
           let arrayOutNew = makeTypedArray(size, dtype1)
