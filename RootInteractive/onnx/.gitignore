@@ -1,0 +1,23 @@
+# Generated artifacts — regenerate with: python generate_models.py
+models/*.onnx
+reference_data/*.json
+
+# Benchmark output — regenerate with: node bench_inference_onnx.mjs
+bench_results/*.json
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Logs
+*.log
+
+# Old-named files (superseded by rename)
+test_onnx_invariance.py
+test_onnx_cross_backend.mjs
+bench_onnx.mjs

@@ -157,7 +157,7 @@ export function decodeSinhArray(array: number[], mu: number, sigma0: number, sig
 
 export function quantizeSinhArray(array: number[], sigma0: number, sigma1: number, nBits: number){
   if(sigma0 <= 0 || sigma1 <= 0){
-    throw "Sigma cannot be negtive";
+    throw "Sigma cannot be negative";
   }
   const invSigma0 = 1/sigma0;
   const sigmaRatio = sigma1*invSigma0;
@@ -181,6 +181,9 @@ export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dty
   }
   if (dtype == "int8"){
     return new Int8Array(ab)
+  }
+  if (dtype == "uint8"){
+    return new Uint8Array(ab)
   }
   if (dtype == "int16"){
     return new Int16Array(ab)
@@ -207,6 +210,9 @@ export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dty
 function makeTypedArray(n_elems: number, dtype: string){
   if (dtype == "int8"){
     return new Int8Array(n_elems)
+  }
+  if (dtype == "uint8"){
+    return new Uint8Array(n_elems)
   }
   if (dtype == "int16"){
     return new Int16Array(n_elems)

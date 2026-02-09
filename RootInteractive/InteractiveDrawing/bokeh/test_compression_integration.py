@@ -27,10 +27,12 @@ def run_test_in_node(data, temp_dir):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_json_file:
         json.dump(data, temp_json_file)
         temp_json_file.flush()
-        result = subprocess.run(['node', f'{cwd}/test_serialization_integration.mjs', str(temp_dir), temp_json_file.name])
-        print(result.stdout)
+        result = subprocess.run(['node', f'{cwd}/test_serialization_integration.mjs', str(temp_dir), temp_json_file.name],
+                                capture_output=True, text=True)
         if result.returncode != 0:
-            raise RuntimeError("JavaScript test failed")
+            print(result.stdout)
+            print(result.stderr)
+            raise RuntimeError(f"JavaScript test failed:\n{result.stderr}")
 
 
 @pytest.mark.feature("ENC.compression.delta")
@@ -41,6 +43,7 @@ def run_test_in_node(data, temp_dir):
 def test_serializationutils():
     cwd = pathlib.Path(__file__).parent.resolve()
     temp_dir = tempfile.gettempdir()
+    cwd = pathlib.Path(__file__).parent.resolve()
     subprocess.run(["node", "node_modules/typescript/bin/tsc",
                     '--module', 'None',
                     '--target', 'ES2020',

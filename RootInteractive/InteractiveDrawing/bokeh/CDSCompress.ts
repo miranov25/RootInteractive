@@ -25,7 +25,7 @@ function collect_column_deps(actionArray: any[]){
     action = action[0]
     if(action === "linear" || action === "sinh"){
       if(actionParams.dither == null || actionParams.dither === "toggle"){
-        console.log("adding dither toggle dependency")
+        console.debug("adding dither toggle dependency")
         deps.add("dither")
       }
     }
