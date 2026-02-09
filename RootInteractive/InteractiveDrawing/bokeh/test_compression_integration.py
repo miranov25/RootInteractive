@@ -190,7 +190,7 @@ def test_compression_sinh():
             "byteorder": sys.byteorder,
             "dtype": dtypes[i],
             "length": lengths[i],
-            "abs_tol": .5 * sigma0 * sigma0 * sigma1,
+            "abs_tol": .5 * sigma0 * sigma0 / sigma1,
             "rel_tol": .5 * sigma0,
             "nan_equal": True
         },
@@ -201,6 +201,13 @@ def test_compression_sinh():
     run_test_in_node(data_exported, temp_dir)
 
 
+@pytest.mark.feature("ENC.base64.float64")
+@pytest.mark.feature("ENC.base64.int32")
+@pytest.mark.feature("ENC.compression.zip")
+@pytest.mark.feature("ENC.compression.roundtrip")
+@pytest.mark.feature("ENC.compression.relative")
+@pytest.mark.backend("node")
+@pytest.mark.layer("invariance")
 def test_compression_code():
     temp_dir = tempfile.gettempdir()
     cwd = pathlib.Path(__file__).parent.resolve()
@@ -234,5 +241,5 @@ if __name__ == "__main__":
     #test_serializationutils()
     #test_compression_simple()
     #test_compression_relative16()
-    #test_compression_sinh()
-    test_compression_code()
+    test_compression_sinh()
+    #test_compression_code()
