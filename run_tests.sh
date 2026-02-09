@@ -43,6 +43,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 TEST_DIRS=(
     "RootInteractive/InteractiveDrawing/bokeh"
     "RootInteractive/Tools"
+    "RootInteractive/onnx"
 )
 
 # Output locations

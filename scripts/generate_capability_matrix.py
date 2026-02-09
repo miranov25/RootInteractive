@@ -721,7 +721,8 @@ Examples:
         nargs="*",
         default=[
             "RootInteractive/InteractiveDrawing/bokeh/test_*.py",
-            "RootInteractive/Tools/test_*.py"
+            "RootInteractive/Tools/test_*.py",
+            "RootInteractive/onnx/test_*.py"
         ],
         help="Test file pattern(s) (default: bokeh and Tools directories)"
     )

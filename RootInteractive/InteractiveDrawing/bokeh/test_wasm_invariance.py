@@ -147,6 +147,12 @@ def run_js_tests(test_cases):
 # TC-WASM-01..10: Correctness tests (5 functions × scalar + vector)
 # ============================================================
 @pytest.mark.feature("WASM.cross_backend_invariance")
+@pytest.mark.feature("WASM.scalar.arithmetic")
+@pytest.mark.feature("WASM.scalar.transcendental")
+@pytest.mark.feature("WASM.scalar.conditional")
+@pytest.mark.feature("WASM.vector.arithmetic")
+@pytest.mark.feature("WASM.vector.transcendental")
+@pytest.mark.feature("WASM.vector.conditional")
 @pytest.mark.parametrize("func_name", list(FUNCTION_REGISTRY.keys()))
 @pytest.mark.parametrize("mode", ["scalar", "vector"])
 def test_wasm_correctness(func_name, mode):
@@ -224,6 +230,7 @@ def test_wasm_special_values(func_name, mode):
 # All-in-one (legacy compatibility with prototype)
 # ============================================================
 @pytest.mark.feature("WASM.cross_backend_invariance")
+@pytest.mark.feature("WASM.compile")
 def test_wasm_invariance_all():
     """Run all 5 functions × 2 modes in a single Node.js invocation.
     Faster than parametrized tests (one process), useful for quick smoke test."""

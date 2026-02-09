@@ -311,6 +311,82 @@ FEATURE_TAXONOMY = {
         "layer": "benchmark",
         "proof": "bench_wasm_vs_js.mjs",
     },
+
+    # =========================================================================
+    # ONNX Inference (Phase 0.1.E)
+    # =========================================================================
+    "ONNX.export.linear": {
+        "name": "ONNX export linear models",
+        "description": "sklearn Ridge/LogisticRegression → ONNX via skl2onnx (LinearRegressor/LinearClassifier operators)",
+        "priority": "P0",
+        "backends": ["python"],
+        "layer": "export",
+        "proof": "onnx/generate_models.py",
+    },
+    "ONNX.export.tree_ensemble": {
+        "name": "ONNX export tree ensembles",
+        "description": "sklearn RandomForest Regressor/Classifier → ONNX (TreeEnsembleRegressor/Classifier operators)",
+        "priority": "P0",
+        "backends": ["python"],
+        "layer": "export",
+        "proof": "onnx/generate_models.py",
+    },
+    "ONNX.export.neural_net": {
+        "name": "ONNX export neural networks",
+        "description": "sklearn MLP Regressor/Classifier → ONNX (MatMul, Relu, Add, Softmax operators)",
+        "priority": "P0",
+        "backends": ["python"],
+        "layer": "export",
+        "proof": "onnx/generate_models.py",
+    },
+    "ONNX.invariance.sklearn_vs_ort": {
+        "name": "ONNX sklearn↔ORT invariance",
+        "description": "sklearn predictions match Python onnxruntime within float32 tolerance for all 7 models",
+        "priority": "P0",
+        "backends": ["python"],
+        "layer": "invariance",
+        "proof": "onnx/test_invariance_onnx.py::test_regression_sklearn_vs_python_ort",
+    },
+    "ONNX.invariance.cross_runtime": {
+        "name": "ONNX cross-runtime invariance",
+        "description": "Python ORT and Node.js ORT produce identical results (within float32 ULP) for same .onnx model",
+        "priority": "P0",
+        "backends": ["python", "node"],
+        "layer": "invariance",
+        "proof": "onnx/test_invariance_onnx.py::test_regression_python_ort_vs_nodejs_ort",
+    },
+    "ONNX.invariance.classification": {
+        "name": "ONNX classification invariance",
+        "description": "Classification labels (exact) and probabilities (float32 tolerance) match across all 3 backends",
+        "priority": "P0",
+        "backends": ["python", "node"],
+        "layer": "invariance",
+        "proof": "onnx/test_invariance_onnx.py::test_classification_labels_sklearn_vs_python_ort",
+    },
+    "ONNX.special_values": {
+        "name": "ONNX IEEE-754 special values",
+        "description": "NaN/±Inf handling verified across backends — linear propagation, tree cross-backend match, MLP NaN propagation",
+        "priority": "P1",
+        "backends": ["python", "node"],
+        "layer": "invariance",
+        "proof": "onnx/test_invariance_onnx.py::test_special_values_mixed_all_models",
+    },
+    "ONNX.benchmark.load_time": {
+        "name": "ONNX model load time",
+        "description": "Cold and warm model load time for all 7 models (all <36ms cold, <1ms warm)",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "benchmark",
+        "proof": "onnx/bench_inference_onnx.mjs",
+    },
+    "ONNX.benchmark.inference": {
+        "name": "ONNX inference latency",
+        "description": "Per-model inference latency N=1 to 1M. Linear: interactive at N=1M (<10ms). Tree/MLP: batch at N=1M.",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "benchmark",
+        "proof": "onnx/bench_inference_onnx.mjs",
+    },
 }
 
 
