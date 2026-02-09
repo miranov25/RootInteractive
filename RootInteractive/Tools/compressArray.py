@@ -216,7 +216,7 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
         if action == "unzip":
             currentArray = zlib.decompress(currentArray)
             if actionParams:
-                np.frombuffer(currentArray, dtype=actionParams[0])
+                currentArray = np.frombuffer(currentArray, dtype=actionParams[0])
         if action == "removeInt64":
             currentArray = removeInt64(currentArray)
         if action == "base64":
