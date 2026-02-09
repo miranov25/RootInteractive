@@ -1,6 +1,6 @@
 # CAPABILITY_MATRIX
 
-**Generated:** 2026-02-09 00:30:43
+**Generated:** 2026-02-09 00:39:42
 
 **Generator:** `scripts/generate_capability_matrix.py`
 
@@ -91,16 +91,16 @@
 | `WASM.benchmark.memory_fraction` | P2 | ❌ No Tests | node | benchmark | - |
 | `WASM.benchmark.scalar_overhead` | P2 | ❌ No Tests | node | benchmark | - |
 | `WASM.benchmark.vector_crossover` | P2 | ❌ No Tests | node | benchmark | - |
-| `WASM.compile` | P0 | ❌ No Tests | native | build | - |
+| `WASM.compile` | P0 | ✅ Working | native | build | 1 test |
 | `WASM.cross_backend_invariance` | P0 | ✅ Working | python, node | invariance | 2 tests |
-| `WASM.scalar.arithmetic` | P0 | ❌ No Tests | node | unit | - |
-| `WASM.scalar.conditional` | P0 | ❌ No Tests | node | unit | - |
-| `WASM.scalar.transcendental` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.scalar.arithmetic` | P0 | ✅ Working | node | unit | 1 test |
+| `WASM.scalar.conditional` | P0 | ✅ Working | node | unit | 1 test |
+| `WASM.scalar.transcendental` | P0 | ✅ Working | node | unit | 1 test |
 | `WASM.scalar_vector_consistency` | P0 | ✅ Working | node | invariance | 1 test |
 | `WASM.special_values` | P1 | ✅ Working | python, node | invariance | 1 test |
-| `WASM.vector.arithmetic` | P0 | ❌ No Tests | node | unit | - |
-| `WASM.vector.conditional` | P0 | ❌ No Tests | node | unit | - |
-| `WASM.vector.transcendental` | P0 | ❌ No Tests | node | unit | - |
+| `WASM.vector.arithmetic` | P0 | ✅ Working | node | unit | 1 test |
+| `WASM.vector.conditional` | P0 | ✅ Working | node | unit | 1 test |
+| `WASM.vector.transcendental` | P0 | ✅ Working | node | unit | 1 test |
 
 
 ---
@@ -368,9 +368,9 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>WASM.compile</strong> — WASM compilation (0 tests)</summary>
+<summary><strong>WASM.compile</strong> — WASM compilation (1 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
+- ✅ `test_wasm_invariance.py::test_wasm_invariance_all`
 
 </details>
 
@@ -383,23 +383,23 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>WASM.scalar.arithmetic</strong> — WASM scalar arithmetic (0 tests)</summary>
+<summary><strong>WASM.scalar.arithmetic</strong> — WASM scalar arithmetic (1 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
-
-</details>
-
-<details>
-<summary><strong>WASM.scalar.conditional</strong> — WASM scalar conditional (0 tests)</summary>
-
-*No tests with @pytest.mark.feature marker*
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
 
 </details>
 
 <details>
-<summary><strong>WASM.scalar.transcendental</strong> — WASM scalar transcendental (0 tests)</summary>
+<summary><strong>WASM.scalar.conditional</strong> — WASM scalar conditional (1 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
+
+</details>
+
+<details>
+<summary><strong>WASM.scalar.transcendental</strong> — WASM scalar transcendental (1 tests)</summary>
+
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
 
 </details>
 
@@ -418,23 +418,23 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>WASM.vector.arithmetic</strong> — WASM vector arithmetic (0 tests)</summary>
+<summary><strong>WASM.vector.arithmetic</strong> — WASM vector arithmetic (1 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
-
-</details>
-
-<details>
-<summary><strong>WASM.vector.conditional</strong> — WASM vector conditional (0 tests)</summary>
-
-*No tests with @pytest.mark.feature marker*
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
 
 </details>
 
 <details>
-<summary><strong>WASM.vector.transcendental</strong> — WASM vector transcendental (0 tests)</summary>
+<summary><strong>WASM.vector.conditional</strong> — WASM vector conditional (1 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
+
+</details>
+
+<details>
+<summary><strong>WASM.vector.transcendental</strong> — WASM vector transcendental (1 tests)</summary>
+
+- ❓ `test_wasm_invariance.py::test_wasm_correctness`
 
 </details>
 
@@ -444,11 +444,11 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Working | 24 | 60.0% |
+| ✅ Working | 31 | 77.5% |
 | 🧨 Broken | 0 | 0.0% |
 | ⚠️ Known Issue | 0 | 0.0% |
 | 📋 Planned | 4 | 10.0% |
-| ❌ No Tests | 12 | 30.0% |
+| ❌ No Tests | 5 | 12.5% |
 | ❓ Unknown | 0 | 0.0% |
 | **Total** | **40** | **100%** |
 
