@@ -48,7 +48,7 @@ function shuffle(n: number, arrayOut: number[], seed: number){
       continue
     }
     arrayOut[i] = i
-    arrayOut[i] = x
+    arrayOut[i] = arrayOut[x]
     arrayOut[x] = i
     i++
   }
