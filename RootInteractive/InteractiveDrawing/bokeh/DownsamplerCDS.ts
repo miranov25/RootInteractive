@@ -13,6 +13,38 @@ export namespace DownsamplerCDS {
   }
 }
 
+function nextpoweroftwo(x: number){
+  let y=1; while(y<=x){y <<= 1} return y
+}
+
+function hash32(x: number) {
+  x |= 0;
+  x ^= x >>> 16;
+  x = Math.imul(x, 0x7feb352d);
+  x ^= x >>> 15;
+  x = Math.imul(x, 0x846ca68b);
+  x ^= x >>> 16;
+  return x >>> 0;
+}
+
+function noise(seed: number, idx: number){
+  return hash32(seed ^ Math.imul(idx, 0x9e3779b9))
+}
+
+function shuffle(n: number, arrayOut: number[], seed: number){
+  let j=0
+  for(let i=0; i<n; j++){
+    const x = (nextpoweroftwo(i) - 1) & noise(seed,j)
+    if(x > i){
+      continue
+    }
+    arrayOut[i] = i
+    arrayOut[i] = x
+    arrayOut[x] = i
+    i++
+  }
+}
+
 export interface DownsamplerCDS extends DownsamplerCDS.Attrs {}
 
 export class DownsamplerCDS extends ColumnDataSource {
@@ -64,12 +96,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     const {_indices, source} = this
     _indices.length = source.get_length()!
     // Fisher-Yates random permutation
-    for(let i=0; i <_indices.length; ++i){
-      let random_index = (Math.random()*(i+1)) | 0
-      _indices[i] = i
-      _indices[i] = _indices[random_index]
-      _indices[random_index] = i
-    }
+    shuffle(_indices.length, _indices, 42)
   }
 
   connect_signals(): void {
