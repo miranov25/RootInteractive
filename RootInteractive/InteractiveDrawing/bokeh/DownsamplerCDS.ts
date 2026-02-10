@@ -28,10 +28,10 @@ function hash32(x: number) {
 }
 
 function noise(seed: number, idx: number){
-  return hash32(seed ^ Math.imul(idx, 0x9e3779b9))
+  return hash32(seed ^ Math.imul(idx, 0x9e3779b9)) >> 3 // Discarding the least significant 3 bits as they have low entropy
 }
 
-export function seedFromString(s: string) {
+function seedFromString(s: string) {
   let h = 2166136261; 
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -105,7 +105,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     const {_indices, source, name} = this
     _indices.length = source.get_length()!
     // Fisher-Yates random permutation
-    const seed = seedFromString(name)
+    const seed = seedFromString(name ?? "default")
     shuffle(_indices.length, _indices, seed)
   }
 
