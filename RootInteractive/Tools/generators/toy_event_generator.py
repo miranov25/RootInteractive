@@ -15,9 +15,12 @@ Usage:
 Phase: 0.1.F
 """
 
+import json
 import numpy as np
 import pandas as pd
 from typing import Tuple, Optional
+
+__version__ = "0.1.0"
 
 # ============================================================================
 # Detector geometry (ALICE-realistic radii)
@@ -41,6 +44,7 @@ N_TPC = len(LAYERS_TPC)
 # Physics model
 # ============================================================================
 
+# Reference implementation — production path is vectorized in generate_event_display()
 def helix_position(
     pt: float,
     eta: float,
@@ -227,7 +231,7 @@ def generate_event_display(
     cl_r = np.sqrt(cl_x**2 + cl_y**2)
     cl_phi_cluster = np.arctan2(cl_y, cl_x)
 
-    cl_detector = np.where(cl_layer < N_ITS, "ITS", "TPC")
+    cl_detector = np.where(cl_layer < N_ITS, "ITS", "TPC")  # String for readability; future: pd.Categorical
     cl_Q = rng.gamma(2.0, 1.0, total_clusters) * 100.0
 
     clusters_df = pd.DataFrame({
@@ -306,11 +310,37 @@ def merge_all(
 # Parquet cache (generate once, load fast)
 # ============================================================================
 
+_DEFAULT_PARAMS = {
+    "n_events": 100,
+    "tracks_per_event": (3, 10),
+    "pt_range": (0.3, 5.0),
+    "eta_range": (-1.0, 1.0),
+    "b_field": 0.5,
+    "seed": 42,
+}
+
+
+def _make_metadata(n_events, **kwargs):
+    """Build metadata dict from generation parameters."""
+    params = {**_DEFAULT_PARAMS, "n_events": n_events, **kwargs}
+    # Convert numpy arrays / tuples to JSON-serializable lists
+    if "layers" in params and params["layers"] is not None:
+        params["layers"] = list(float(x) for x in params["layers"])
+    else:
+        params["layers"] = None
+    for key in ("tracks_per_event", "pt_range", "eta_range"):
+        if key in params:
+            params[key] = list(params[key])
+    params["generator_version"] = __version__
+    return params
+
+
 def save_tables(
     events_df: pd.DataFrame,
     tracks_df: pd.DataFrame,
     clusters_df: pd.DataFrame,
     path: str,
+    metadata: Optional[dict] = None,
 ) -> None:
     """
     Save 3 DataFrames as parquet files in directory.
@@ -319,12 +349,16 @@ def save_tables(
         {path}/events.parquet
         {path}/tracks.parquet
         {path}/clusters.parquet
+        {path}/metadata.json  (if metadata provided)
     """
     import os
     os.makedirs(path, exist_ok=True)
     events_df.to_parquet(os.path.join(path, "events.parquet"))
     tracks_df.to_parquet(os.path.join(path, "tracks.parquet"))
     clusters_df.to_parquet(os.path.join(path, "clusters.parquet"))
+    if metadata is not None:
+        with open(os.path.join(path, "metadata.json"), "w") as f:
+            json.dump(metadata, f, indent=2)
 
 
 def load_tables(
@@ -352,15 +386,45 @@ def generate_or_load(
     """
     Generate and cache, or load from existing cache.
 
-    If {path}/events.parquet exists and force=False, loads from cache.
-    Otherwise generates, saves to {path}/, and returns.
+    If cache exists and force=False, validates stored metadata against
+    requested parameters. Raises ValueError on mismatch (use force=True
+    to regenerate). Missing metadata (legacy cache) triggers a warning
+    but loads anyway.
     """
     import os
+    import warnings
     cache_file = os.path.join(path, "events.parquet")
+    meta_file = os.path.join(path, "metadata.json")
+    requested = _make_metadata(n_events, **kwargs)
+
     if os.path.exists(cache_file) and not force:
+        # Validate metadata
+        if os.path.exists(meta_file):
+            with open(meta_file) as f:
+                stored = json.load(f)
+            # Compare all params except generator_version
+            mismatches = []
+            for key in requested:
+                if key == "generator_version":
+                    continue
+                if key in stored and stored[key] != requested[key]:
+                    mismatches.append(f"  {key}: cached={stored[key]}, requested={requested[key]}")
+            if mismatches:
+                raise ValueError(
+                    f"Cache parameter mismatch in '{path}':\n"
+                    + "\n".join(mismatches)
+                    + "\nUse force=True to regenerate."
+                )
+        else:
+            warnings.warn(
+                f"Cache at '{path}' has no metadata.json (legacy cache). "
+                "Loading without validation. Re-generate with force=True to add metadata.",
+                stacklevel=2,
+            )
         return load_tables(path)
+
     events, tracks, clusters = generate_event_display(n_events=n_events, **kwargs)
-    save_tables(events, tracks, clusters, path)
+    save_tables(events, tracks, clusters, path, metadata=requested)
     return events, tracks, clusters
 
 

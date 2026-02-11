@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from .toy_event_generator import (
+from toy_event_generator import (
     generate_event_display,
     generate_event_display_its_only,
     generate_event_display_tpc_only,
@@ -18,6 +18,7 @@ from .toy_event_generator import (
     save_tables,
     load_tables,
     generate_or_load,
+    _make_metadata,
     LAYERS_ALL,
     LAYERS_ITS,
     N_ITS,
@@ -207,13 +208,21 @@ def test_save_load_roundtrip(sample_data, tmp_path):
     """save_tables → load_tables returns identical DataFrames."""
     events, tracks, clusters = sample_data
     cache_dir = str(tmp_path / "cache")
+    metadata = _make_metadata(n_events=10, seed=42)
 
-    save_tables(events, tracks, clusters, cache_dir)
+    save_tables(events, tracks, clusters, cache_dir, metadata=metadata)
     e2, t2, c2 = load_tables(cache_dir)
 
     pd.testing.assert_frame_equal(events, e2)
     pd.testing.assert_frame_equal(tracks, t2)
     pd.testing.assert_frame_equal(clusters, c2)
+
+    # Verify metadata.json was written
+    import json, os
+    with open(os.path.join(cache_dir, "metadata.json")) as f:
+        stored = json.load(f)
+    assert stored["n_events"] == 10
+    assert stored["seed"] == 42
 
 
 def test_generate_or_load(tmp_path):
@@ -224,6 +233,7 @@ def test_generate_or_load(tmp_path):
     e1, t1, c1 = generate_or_load(cache_dir, n_events=5, seed=42)
     assert len(e1) == 5
     assert (tmp_path / "gen_cache" / "events.parquet").exists()
+    assert (tmp_path / "gen_cache" / "metadata.json").exists()
 
     # Second call: loads from cache (same result)
     e2, t2, c2 = generate_or_load(cache_dir, n_events=5, seed=42)
@@ -234,3 +244,27 @@ def test_generate_or_load(tmp_path):
     # Force regenerate
     e3, _, _ = generate_or_load(cache_dir, n_events=5, seed=99, force=True)
     assert not e1['vertex_x'].equals(e3['vertex_x'])
+
+
+def test_cache_parameter_mismatch(tmp_path):
+    """Cache with different parameters raises ValueError."""
+    cache_dir = str(tmp_path / "mismatch_cache")
+
+    # Generate with n_events=10
+    generate_or_load(cache_dir, n_events=10, seed=42)
+
+    # Load with n_events=20 → should raise
+    with pytest.raises(ValueError, match="Cache parameter mismatch"):
+        generate_or_load(cache_dir, n_events=20, seed=42)
+
+    # Load with different seed → should raise
+    with pytest.raises(ValueError, match="Cache parameter mismatch"):
+        generate_or_load(cache_dir, n_events=10, seed=99)
+
+    # Load with correct params → should work
+    e, _, _ = generate_or_load(cache_dir, n_events=10, seed=42)
+    assert len(e) == 10
+
+    # Force bypasses validation
+    e2, _, _ = generate_or_load(cache_dir, n_events=20, seed=99, force=True)
+    assert len(e2) == 20
