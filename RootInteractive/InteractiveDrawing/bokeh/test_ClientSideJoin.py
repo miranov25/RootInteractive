@@ -98,14 +98,6 @@ def test_gather_realistic():
         {"name": "events", "data": events},
         {"name": "tracks", "data": tracks}
     ]
-    """
-    events_df : DataFrame
-        Event-level data (event_id, vertex, n_tracks).
-    tracks_df : DataFrame
-        Track-level data (event_id, track_id, global_track_id, pt, eta, phi, charge).
-    clusters_df : DataFrame
-        Cluster-level data (event_id, track_id, cluster_id, x, y, z, r, ...).
-    """
     aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, \
         histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
             variables=list(clusters.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
@@ -120,7 +112,7 @@ def test_gather_realistic():
         ["n_tracks", "pt", "eta"]
     ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
-    widgetLayoutDesc["selection"] = selectionTab
+    widgetLayoutDesc["Select"] = selectionTab
     bokehDrawSA.fromArray(clusters, None, figureArray, widgetParams, sourceArray=histoArray + cdsArray, layout=figureLayoutDesc,
                            widgetLayout=widgetLayoutDesc, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
                            parameterArray=parameterArray, jsFunctionArray=jsFunctionArray)
