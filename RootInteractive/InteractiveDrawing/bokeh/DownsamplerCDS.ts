@@ -118,6 +118,7 @@ export class DownsamplerCDS extends ColumnDataSource {
       this.connect(this.filter.change, () => {this.invalidate()})
     }
     this.connect(this.properties.watched.change, () => {this.toggle_watched()})
+    this.connect(this.properties.nPoints.change, () => {this.invalidate()})
   }
 
   update(){

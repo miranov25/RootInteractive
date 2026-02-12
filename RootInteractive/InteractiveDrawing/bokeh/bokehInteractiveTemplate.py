@@ -29,7 +29,7 @@ DEFAULT_WIDGET_PARAMS = [
         ['toggle', ['enableDithering'], {"name": "enableDithering"}],
     ]
 
-def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None):
+def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weights=None, multiAxis=None, scatter=False):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -289,10 +289,17 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
+    if scatter:
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
+        widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
+        widgetLayoutDesc["Markers"].append(["nPointRender"])
+        parameterArray.append({"name":"nPointRender", "value":10000})
+
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
 
-def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, multiAxis=None):
+def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, multiAxis=None, scatter=False):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -574,10 +581,17 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
+    if scatter:
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
+        widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
+        widgetLayoutDesc["Markers"].append(["nPointRender"])
+        parameterArray.append({"name":"nPointRender", "value":10000})
+
     print("Default RootInteractive variables are defined.")
     return aliasArray, transformArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
 
-def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, weightsRef=None, multiAxis=None):
+def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, weightsRef=None, multiAxis=None, scatter=False):
     """
     Function to get default RootInteractive variables for the simulated complex data.
     :return: aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
@@ -1006,6 +1020,13 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
+
+    if scatter:
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
+        widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
+        widgetLayoutDesc["Markers"].append(["nPointRender"])
+        parameterArray.append({"name":"nPointRender", "value":10000})
 
     print("Default RootInteractive variables are defined.")
     return aliasArray, transformArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc    

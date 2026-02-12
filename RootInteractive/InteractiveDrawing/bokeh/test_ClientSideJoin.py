@@ -93,7 +93,7 @@ def test_gather():
 @pytest.mark.layer("integration")
 def test_gather_realistic():
     output_file("test_gather_realistic.html")
-    (events, tracks, clusters) = generate_event_display()
+    (events, tracks, clusters) = generate_event_display(1000)
     cdsArray = [
         {"name": "events", "data": events},
         {"name": "tracks", "data": tracks}
@@ -102,7 +102,7 @@ def test_gather_realistic():
         histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
             variables=list(clusters.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
                                            "tracks.pt[track_id]", "tracks.eta[track_id]", "tracks.phi[track_id]", "tracks.charge[track_id]"], 
-            multiAxis="weights")
+            multiAxis="weights", scatter=True)
     widgetsSelect = [
         ['range', ['events.n_tracks[event_id]', events["n_tracks"].min(), events["n_tracks"].max()], {"name":"n_tracks", "bins":20}],
         ['range', ['tracks.pt[track_id]', tracks["pt"].min(), tracks["pt"].max()], {"name":"pt", "bins":20}],
@@ -115,7 +115,7 @@ def test_gather_realistic():
     widgetLayoutDesc["Select"] = selectionTab
     bokehDrawSA.fromArray(clusters, None, figureArray, widgetParams, sourceArray=histoArray + cdsArray, layout=figureLayoutDesc,
                            widgetLayout=widgetLayoutDesc, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
-                           parameterArray=parameterArray, jsFunctionArray=jsFunctionArray)
+                           parameterArray=parameterArray, jsFunctionArray=jsFunctionArray, nPointRender="nPointRender")
 
 
 # Remove standalone call - tests should only run via pytest

@@ -247,7 +247,7 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
                 dtype0 = currentArray.dtype
                 dtype1 = values.dtype
                 if dtype1.kind == 'O':
-                    decodeProgram.append(("code", {"values": values}))
+                    decodeProgram.append(("code", {"valueCode": values}))
                     arrayInfo["valueCode"] = values
                     continue
                 bytes0 = currentArray.to_numpy().tobytes()
