@@ -98,9 +98,11 @@ def test_gather_realistic():
         {"name": "events", "data": events},
         {"name": "tracks", "data": tracks}
     ]
+    clustersJoin = clusters.join(tracks, on="track_id", rsuffix="_track")
+    clustersJoin = clusters.join(events, on="event_id", rsuffix="_event")
     aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, \
         histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
-            variables=list(clusters.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
+            variables=list(clustersJoin.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
                                            "tracks.pt[track_id]", "tracks.eta[track_id]", "tracks.phi[track_id]", "tracks.charge[track_id]"], 
             multiAxis="weights", scatter=True)
     widgetsSelect = [
@@ -113,8 +115,8 @@ def test_gather_realistic():
     ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
     widgetLayoutDesc["Select"] = selectionTab
-    bokehDrawSA.fromArray(clusters, None, figureArray, widgetParams, sourceArray=histoArray + cdsArray, layout=figureLayoutDesc,
-                           widgetLayout=widgetLayoutDesc, aliasArray=aliasArray, arrayCompression=arrayCompressionRelative16,
+    bokehDrawSA.fromArray(clustersJoin, None, figureArray, widgetParams, sourceArray=histoArray + cdsArray, layout=figureLayoutDesc,
+                           widgetLayout=widgetLayoutDesc, aliasArray=aliasArray, arrayCompression=[(".*",["zip", "base64"])],
                            parameterArray=parameterArray, jsFunctionArray=jsFunctionArray, nPointRender="nPointRender")
 
 
