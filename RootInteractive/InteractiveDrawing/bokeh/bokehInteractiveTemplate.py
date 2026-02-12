@@ -290,12 +290,12 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     if scatter:
-        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender", **figureGlobalOption}])
         figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
         widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
         widgetLayoutDesc["Markers"].append(["nPointRender"])
         parameterArray.append({"name":"nPointRender", "value":10000})
-
+        
     print("Default RootInteractive variables are defined.")
     return aliasArray, variables, parameterArray, widgetParams, widgetLayoutDesc, histoArray, figureArray, figureLayoutDesc
 
@@ -582,7 +582,7 @@ def getDefaultVarsNormAll(variables=None, defaultVariables={}, weights=None, mul
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     if scatter:
-        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender", **figureGlobalOption}])
         figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
         widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
         widgetLayoutDesc["Markers"].append(["nPointRender"])
@@ -1022,7 +1022,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
 
     if scatter:
-        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender"}])
+        figureArray.append([['varX'], ['varY'], {"colorZvar": "varZ", "name": "scatter", "nPointRender": "nPointRender", **figureGlobalOption}])
         figureLayoutDesc["scatter"] = [["scatter"], {"plot_height": 800}]
         widgetParams.append(["spinner", ["nPointRender"], {"name": "nPointRender"}])
         widgetLayoutDesc["Markers"].append(["nPointRender"])
