@@ -119,4 +119,3 @@ def test_gather_realistic():
 
 
 # Remove standalone call - tests should only run via pytest
-test_gather_realistic()
