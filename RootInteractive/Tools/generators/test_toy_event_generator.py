@@ -14,10 +14,12 @@ from toy_event_generator import (
     generate_event_display,
     generate_event_display_its_only,
     generate_event_display_tpc_only,
+    helix_position,
     merge_all,
     save_tables,
     load_tables,
     generate_or_load,
+    save_to_root,
     _make_metadata,
     LAYERS_ALL,
     LAYERS_ITS,
@@ -268,3 +270,123 @@ def test_cache_parameter_mismatch(tmp_path):
     # Force bypasses validation
     e2, _, _ = generate_or_load(cache_dir, n_events=20, seed=99, force=True)
     assert len(e2) == 20
+
+
+def test_clusters_match_track_helix(sample_data):
+    """Verify every cluster position matches helix_position() for its track's parameters."""
+    events, tracks, clusters = sample_data
+
+    for _, trk in tracks.iterrows():
+        eid, tid = int(trk['event_id']), int(trk['track_id'])
+        ev = events[events['event_id'] == eid].iloc[0]
+        trk_cls = clusters[(clusters['event_id'] == eid) & (clusters['track_id'] == tid)]
+
+        for _, cl in trk_cls.iterrows():
+            layer = int(cl['layer'])
+            r_layer = LAYERS_ALL[layer]
+            x_ref, y_ref, z_ref = helix_position(
+                trk['pt'], trk['eta'], trk['phi'], int(trk['charge']),
+                r_layer, 0.5, ev['vertex_x'], ev['vertex_y'], ev['vertex_z']
+            )
+            assert abs(cl['x'] - x_ref) < 1e-10, (
+                f"x mismatch: event={eid} track={tid} layer={layer}"
+            )
+            assert abs(cl['y'] - y_ref) < 1e-10, (
+                f"y mismatch: event={eid} track={tid} layer={layer}"
+            )
+            assert abs(cl['z'] - z_ref) < 1e-10, (
+                f"z mismatch: event={eid} track={tid} layer={layer}"
+            )
+
+
+def test_track_indexes_and_fk_integrity(sample_data):
+    """Verify track_id sequential per event, FK integrity, and cluster counts."""
+    events, tracks, clusters = sample_data
+
+    for eid in events['event_id']:
+        ev = events[events['event_id'] == eid].iloc[0]
+        ev_tracks = tracks[tracks['event_id'] == eid].sort_values('track_id')
+        n_trk = int(ev['n_tracks'])
+
+        # track_id should be 0, 1, 2, ..., n_trk-1
+        expected_ids = list(range(n_trk))
+        actual_ids = list(ev_tracks['track_id'])
+        assert actual_ids == expected_ids, (
+            f"event {eid}: expected track_ids {expected_ids}, got {actual_ids}"
+        )
+
+        # All cluster track_ids must reference existing tracks
+        ev_cls = clusters[clusters['event_id'] == eid]
+        invalid = ev_cls[~ev_cls['track_id'].isin(ev_tracks['track_id'])]
+        assert len(invalid) == 0, (
+            f"event {eid}: {len(invalid)} clusters reference non-existent track_id"
+        )
+
+        # Each track must have exactly n_layers clusters
+        for tid in actual_ids:
+            n_cls = len(ev_cls[ev_cls['track_id'] == tid])
+            assert n_cls == len(LAYERS_ALL), (
+                f"event {eid} track {tid}: {n_cls} clusters, expected {len(LAYERS_ALL)}"
+            )
+
+
+def test_tracks_have_unique_parameters(sample_data):
+    """Verify different tracks in the same event have different parameters."""
+    _, tracks, _ = sample_data
+
+    for eid in tracks['event_id'].unique():
+        ev_trk = tracks[tracks['event_id'] == eid]
+        if len(ev_trk) < 2:
+            continue
+        # pt, eta, phi should all be unique per event (from independent RNG draws)
+        assert ev_trk['pt'].is_unique, f"event {eid}: duplicate pt values"
+        assert ev_trk['phi'].is_unique, f"event {eid}: duplicate phi values"
+        assert ev_trk['eta'].is_unique, f"event {eid}: duplicate eta values"
+
+
+def test_save_to_root(sample_data, tmp_path):
+    """Export to ROOT file via uproot and verify roundtrip."""
+    uproot = pytest.importorskip("uproot")
+    events, tracks, clusters = sample_data
+    root_file = str(tmp_path / "test_output.root")
+
+    save_to_root(events, tracks, clusters, root_file)
+
+    with uproot.open(root_file) as f:
+        # Check all 4 trees exist
+        assert "events" in f
+        assert "tracks" in f
+        assert "clusters" in f
+        assert "flat" in f
+
+        # Events roundtrip
+        ev_root = f["events"].arrays(library="np")
+        np.testing.assert_array_equal(ev_root["event_id"], events["event_id"].values)
+        np.testing.assert_allclose(ev_root["vertex_x"], events["vertex_x"].values)
+
+        # Tracks roundtrip
+        trk_root = f["tracks"].arrays(library="np")
+        np.testing.assert_array_equal(trk_root["event_id"], tracks["event_id"].values)
+        np.testing.assert_allclose(trk_root["pt"], tracks["pt"].values)
+        np.testing.assert_array_equal(trk_root["charge"], tracks["charge"].values)
+
+        # Clusters roundtrip
+        cl_root = f["clusters"].arrays(library="np")
+        np.testing.assert_array_equal(cl_root["event_id"], clusters["event_id"].values)
+        np.testing.assert_array_equal(cl_root["track_id"], clusters["track_id"].values)
+        np.testing.assert_allclose(cl_root["x"], clusters["x"].values)
+        np.testing.assert_allclose(cl_root["y"], clusters["y"].values)
+        np.testing.assert_allclose(cl_root["z"], clusters["z"].values)
+
+        # detector_id: 0=ITS, 1=TPC
+        expected_det_id = (clusters["detector"] == "TPC").astype(np.int32).values
+        np.testing.assert_array_equal(cl_root["detector_id"], expected_det_id)
+
+        # Flat tree: should have rows == clusters, and columns from all tables
+        flat_root = f["flat"].arrays(library="np")
+        flat_keys = set(flat_root.keys()) if hasattr(flat_root, 'keys') else set(flat_root.dtype.names)
+        assert len(flat_root["event_id"]) == len(clusters)
+        assert "track_pt" in flat_keys
+        assert "event_vertex_x" in flat_keys
+        assert "cluster_x" in flat_keys
+        assert "cluster_detector_id" in flat_keys

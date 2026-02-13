@@ -99,7 +99,7 @@ def test_gather_realistic():
         {"name": "tracks", "data": tracks}
     ]
     clustersJoin = clusters.join(tracks, on="track_id", rsuffix="_track")
-    clustersJoin = clusters.join(events, on="event_id", rsuffix="_event")
+    clustersJoin = clustersJoin.join(events, on="event_id", rsuffix="_event")
     aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, \
         histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
             variables=list(clustersJoin.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
@@ -107,11 +107,16 @@ def test_gather_realistic():
             multiAxis="weights", scatter=True)
     widgetsSelect = [
         ['range', ['events.n_tracks[event_id]', events["n_tracks"].min(), events["n_tracks"].max()], {"name":"n_tracks", "bins":20}],
+        ['range', ['events.vertex_z[event_id]', events["vertex_z"].min(), events["vertex_z"].max()], {"name":"vertex_z", "bins":20}],
+
         ['range', ['tracks.pt[track_id]', tracks["pt"].min(), tracks["pt"].max()], {"name":"pt", "bins":20}],
-        ['range', ['tracks.eta[track_id]', tracks["eta"].min(), tracks["eta"].max()], {"name":"eta", "bins":20}]
+        ['range', ['tracks.eta[track_id]', tracks["eta"].min(), tracks["eta"].max()], {"name":"eta", "bins":20}],
+        ['range', ['eta', tracks["eta"].min(), tracks["eta"].max()], {"name":"etaref", "bins":20}]
+        #
         ]
     selectionTab = [
-        ["n_tracks", "pt", "eta"]
+        ["n_tracks","vertex_z"],
+        [ "pt", "eta","etaref"]
     ]
     widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
     widgetLayoutDesc["Select"] = selectionTab

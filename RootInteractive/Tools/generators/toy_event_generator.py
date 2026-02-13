@@ -306,6 +306,49 @@ def merge_all(
     return merged
 
 
+def save_to_root(
+    events_df: pd.DataFrame,
+    tracks_df: pd.DataFrame,
+    clusters_df: pd.DataFrame,
+    filename: str,
+) -> None:
+    """
+    Export as ROOT file with 4 TTrees using uproot.
+
+    Trees:
+        "events"   — event-level (event_id, vertex, n_tracks)
+        "tracks"   — track-level (event_id, track_id, pt, eta, phi, charge)
+        "clusters" — cluster-level (event_id, track_id, cluster_id, x, y, z, ...)
+        "flat"     — fully merged (all columns from all 3 tables)
+
+    String columns (e.g. 'detector') are replaced by detector_id (0=ITS, 1=TPC).
+    Requires: pip install uproot
+    """
+    import uproot
+
+    with uproot.recreate(filename) as f:
+        # Events
+        f["events"] = {col: events_df[col].values for col in events_df.columns}
+
+        # Tracks
+        f["tracks"] = {col: tracks_df[col].values for col in tracks_df.columns}
+
+        # Clusters — exclude string columns, add detector_id
+        numeric_cols = [c for c in clusters_df.columns if clusters_df[c].dtype.kind != 'O']
+        cluster_dict = {col: clusters_df[col].values for col in numeric_cols}
+        cluster_dict["detector_id"] = (clusters_df["detector"] == "TPC").astype(np.int32).values
+        f["clusters"] = cluster_dict
+
+        # Flat — merged table with all columns
+        merged = merge_all(events_df, tracks_df, clusters_df)
+        # Replace string columns with integer encoding
+        if 'cluster_detector' in merged.columns:
+            merged['cluster_detector_id'] = (merged['cluster_detector'] == "TPC").astype(np.int32)
+            merged = merged.drop(columns=['cluster_detector'])
+        flat_dict = {col: merged[col].values for col in merged.columns}
+        f["flat"] = flat_dict
+
+
 # ============================================================================
 # Parquet cache (generate once, load fast)
 # ============================================================================
@@ -468,3 +511,12 @@ if __name__ == "__main__":
     generate_event_display(n_events=1000, seed=123)
     t1 = time.perf_counter()
     print(f"\n1K events benchmark: {t1 - t0:.2f}s (target: < 1s)")
+
+    # ROOT export
+    try:
+        root_file = "toy_event_display.root"
+        save_to_root(events, tracks, clusters, root_file)
+        print(f"\nROOT file written: {root_file}")
+        print(f"  Trees: events, tracks, clusters, flat")
+    except ImportError:
+        print("\nSkipping ROOT export (uproot not installed)")
