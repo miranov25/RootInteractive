@@ -94,23 +94,28 @@ def test_gather():
 def test_gather_realistic():
     output_file("test_gather_realistic.html")
     (events, tracks, clusters) = generate_event_display(1000)
+    tracks['global_track_id'] = np.arange(len(tracks))
+    clusters = clusters.merge(
+        tracks[['event_id', 'track_id', 'global_track_id']],
+        on=['event_id', 'track_id']
+    )
     cdsArray = [
         {"name": "events", "data": events},
         {"name": "tracks", "data": tracks}
     ]
-    clustersJoin = clusters.join(tracks, on="track_id", rsuffix="_track")
-    clustersJoin = clustersJoin.join(events, on="event_id", rsuffix="_event")
+    clustersJoin = clusters.join(events, on="event_id", rsuffix="_event")
+    clustersJoin = clustersJoin.join(tracks, on="global_track_id", rsuffix="_track")
     aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, \
         histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
             variables=list(clustersJoin.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
-                                           "tracks.pt[track_id]", "tracks.eta[track_id]", "tracks.phi[track_id]", "tracks.charge[track_id]"], 
+                                           "tracks.pt[global_track_id]", "tracks.eta[global_track_id]", "tracks.phi[global_track_id]", "tracks.charge[global_track_id]"], 
             multiAxis="weights", scatter=True)
     widgetsSelect = [
         ['range', ['events.n_tracks[event_id]', events["n_tracks"].min(), events["n_tracks"].max()], {"name":"n_tracks", "bins":20}],
         ['range', ['events.vertex_z[event_id]', events["vertex_z"].min(), events["vertex_z"].max()], {"name":"vertex_z", "bins":20}],
 
-        ['range', ['tracks.pt[track_id]', tracks["pt"].min(), tracks["pt"].max()], {"name":"pt", "bins":20}],
-        ['range', ['tracks.eta[track_id]', tracks["eta"].min(), tracks["eta"].max()], {"name":"eta", "bins":20}],
+        ['range', ['tracks.pt[global_track_id]', tracks["pt"].min(), tracks["pt"].max()], {"name":"pt", "bins":20}],
+        ['range', ['tracks.eta[global_track_id]', tracks["eta"].min(), tracks["eta"].max()], {"name":"eta", "bins":20}],
         ['range', ['eta', tracks["eta"].min(), tracks["eta"].max()], {"name":"etaref", "bins":20}]
         #
         ]
