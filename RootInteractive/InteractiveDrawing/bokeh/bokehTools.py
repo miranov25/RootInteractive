@@ -499,7 +499,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     variablesAlias.append(paramDict[j]["value"])
                     fields.append(j)
                     nvars_local = nvars_local+1
-                transform = CustomJSNAryFunction(parameters={**customJsArgList, **{i[0]:cdsDict[i[0]]["cdsFull"] for i in evaluator.dependencies_table.keys()}}, fields=fields.copy(), v_func=func)
+                transform = CustomJSNAryFunction(parameters={**customJsArgList, **{i[0]:getOrMakeCdsFull(cdsDict, paramDict, i[0]) for i in evaluator.dependencies_table.keys()}}, fields=fields.copy(), v_func=func)
                 fields = variablesAlias
             else:
                 aliasDict[i["name"]] = result["name"]
@@ -625,7 +625,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 if value["type"] in ["histogram", "histo2d", "histoNd"]:
                     histoListLocal.append(key)
             # We just want to add them to the dependency tree
-            _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", histoListLocal, cdsDict, paramDict, jsFunctionDict, memoized_columns)
+            _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", histoListLocal, cdsDict, paramDict, jsFunctionDict, memoized_columns, cdsFullGetter=getOrMakeCdsFull)
             sources.update(used_names_local)
             if len(variables) > 1:
                 TOptions.update(variables[1])
@@ -646,7 +646,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     varName = variables[1]
                 else:
                     optionWidget["callback"] = "selection"
-                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                    column, cds_names, memoized_columns, used_names_local = getOrMakeColumns(variables[1][0], None, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict, cdsFullGetter=getOrMakeCdsFull)
                     varName = column[0]["name"]
                     if column[0]["type"] == "column":
                         fakeDf = {varName: dfQuery[varName]}
@@ -840,11 +840,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         for i, iY in enumerate(variablesLocal[1]):
             if iY in cdsDict and cdsDict[iY]["type"] in ["histogram", "histo2d"]:
                 cds_names[i] = "$IGNORE"
-                _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", variablesLocal[1][i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                _, _, memoized_columns, used_names_local = getOrMakeColumns("bin_count", variablesLocal[1][i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict, cdsFullGetter=getOrMakeCdsFull)
                 sources.update(used_names_local)
 
         for axis_index, axis_name  in enumerate(BOKEH_DRAW_ARRAY_VAR_NAMES):
-            variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+            variablesLocal[axis_index], cds_names, memoized_columns, used_names_local = getOrMakeColumns(variablesLocal[axis_index], cds_names, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict, cdsFullGetter=getOrMakeCdsFull)
             sources.update(used_names_local)
 
         # varZ - if 3D use 3D
@@ -1132,7 +1132,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     tooltipColumns = getTooltipColumns(optionLocal['tooltips'])
                 else:
                     tooltipColumns = getTooltipColumns(cdsDict[cds_name].get("tooltips", []))
-                _, _, memoized_columns, tooltip_sources = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict)
+                _, _, memoized_columns, tooltip_sources = getOrMakeColumns(list(tooltipColumns), cds_names[i], cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict, cdsFullGetter=getOrMakeCdsFull)
                 sources.update(tooltip_sources)
             if cds_name == "$IGNORE":
                 cds_name = varY
@@ -1461,7 +1461,9 @@ def makeBokehSliderWidget(df: pd.DataFrame, isRange: bool, params: list, paramDi
                 step = (end - start) / bins
             value = paramDict[params[0]]["value"]
     else:
-        start, end, step = makeSliderParameters(df, params, **kwargs)
+        if len(params) > 1:
+            options['type'] = "user"
+        start, end, step = makeSliderParameters(df, params, **options)
     if isRange:
         if (start==end):
             start-=1
@@ -1498,7 +1500,11 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
     except:
         pass
     if options['type'] == 'user':
-        start, end, step = params[1], params[2], params[3]
+        start, end = params[1], params[2]
+        if "bins" in options:
+            step = (end-start) / options["bins"]
+        else:
+            step = params[3]
     elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
         if df is not None and name in df:
             start = np.nanmin(df[name])

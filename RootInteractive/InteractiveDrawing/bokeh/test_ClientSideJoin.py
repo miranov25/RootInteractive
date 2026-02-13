@@ -4,8 +4,11 @@ import pandas as pd
 from bokeh.plotting import output_file
 
 from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
-from RootInteractive.InteractiveDrawing.bokeh.bokehTools import bokehDrawArray
+from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
+from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVarsNormAll
+
+from RootInteractive.Tools.generators.toy_event_generator import generate_event_display
 
 output_file("test_join.html")
 
@@ -85,5 +88,46 @@ def test_gather():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, sourceArray=sourceArrayGather, layout=figureLayout, widgetLayout=widgetDesc)
 
 
+@pytest.mark.feature("DSL.gather_operation")
+@pytest.mark.backend("browser")
+@pytest.mark.layer("integration")
+def test_gather_realistic():
+    output_file("test_gather_realistic.html")
+    (events, tracks, clusters) = generate_event_display(1000)
+    tracks['global_track_id'] = np.arange(len(tracks))
+    clusters = clusters.merge(
+        tracks[['event_id', 'track_id', 'global_track_id']],
+        on=['event_id', 'track_id']
+    )
+    cdsArray = [
+        {"name": "events", "data": events},
+        {"name": "tracks", "data": tracks}
+    ]
+    clustersJoin = clusters.join(events, on="event_id", rsuffix="_event")
+    clustersJoin = clustersJoin.join(tracks, on="global_track_id", rsuffix="_track")
+    aliasArray, jsFunctionArray, variables, parameterArray, widgetParams, widgetLayoutDesc, \
+        histoArray, figureArray, figureLayoutDesc = getDefaultVarsNormAll(
+            variables=list(clustersJoin.keys()) + ["events.vertex_x[event_id]", "events.vertex_y[event_id]","events.vertex_z[event_id]","events.n_tracks[event_id]",
+                                           "tracks.pt[global_track_id]", "tracks.eta[global_track_id]", "tracks.phi[global_track_id]", "tracks.charge[global_track_id]"], 
+            multiAxis="weights", scatter=True)
+    widgetsSelect = [
+        ['range', ['events.n_tracks[event_id]', events["n_tracks"].min(), events["n_tracks"].max()], {"name":"n_tracks", "bins":20}],
+        ['range', ['events.vertex_z[event_id]', events["vertex_z"].min(), events["vertex_z"].max()], {"name":"vertex_z", "bins":20}],
+
+        ['range', ['tracks.pt[global_track_id]', tracks["pt"].min(), tracks["pt"].max()], {"name":"pt", "bins":20}],
+        ['range', ['tracks.eta[global_track_id]', tracks["eta"].min(), tracks["eta"].max()], {"name":"eta", "bins":20}],
+        ['range', ['eta', tracks["eta"].min(), tracks["eta"].max()], {"name":"etaref", "bins":20}]
+        #
+        ]
+    selectionTab = [
+        ["n_tracks","vertex_z"],
+        [ "pt", "eta","etaref"]
+    ]
+    widgetParams = mergeFigureArrays(widgetParams, widgetsSelect)
+    widgetLayoutDesc["Select"] = selectionTab
+    bokehDrawSA.fromArray(clustersJoin, None, figureArray, widgetParams, sourceArray=histoArray + cdsArray, layout=figureLayoutDesc,
+                           widgetLayout=widgetLayoutDesc, aliasArray=aliasArray, arrayCompression=[(".*",["zip", "base64"])],
+                           parameterArray=parameterArray, jsFunctionArray=jsFunctionArray, nPointRender="nPointRender")
+
+
 # Remove standalone call - tests should only run via pytest
-# test_join()
