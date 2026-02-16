@@ -15,7 +15,8 @@ TEST_CASES = {
     "default": rng.random(1000),
     "integers": rng.integers(0,100,100).astype(np.int32),
     "all_nan": np.array([np.nan] * 100),
-    "has_infinity": np.array([0.1,1e7,-14,np.nan,np.inf,-np.inf]).astype(np.float64)
+    "has_infinity": np.array([0.1,1e7,-14,np.nan,np.inf,-np.inf]).astype(np.float64),
+    "nan_and_inf": np.array([np.nan, np.inf, -np.inf]).astype(np.float64),
 }
 
 test_b64 = {i: base64.b64encode(TEST_CASES[i]).decode('utf-8') for i in TEST_CASES.keys()}
@@ -43,7 +44,6 @@ def run_test_in_node(data, temp_dir):
 def test_serializationutils():
     cwd = pathlib.Path(__file__).parent.resolve()
     temp_dir = tempfile.gettempdir()
-    cwd = pathlib.Path(__file__).parent.resolve()
     subprocess.run(["node", "node_modules/typescript/bin/tsc",
                     '--module', 'None',
                     '--target', 'ES2020',

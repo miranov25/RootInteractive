@@ -191,17 +191,21 @@ def test_CompressionSampleRel(arraySize=10000,scale=255, nBits=7):
         compSize=getSize(arrayC["history"][2])
         print("test_CompressionSampleRel: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, (np.abs(arrayC["array"]-arrayInput)/(arrayC["array"]+arrayInput)).sum()/arraySize))
 
-@pytest.mark.unittest
+@pytest.mark.feature("ENC.compression.delta")
+@pytest.mark.layer("unit")
 def test_CompressionSampleDelta(arraySize=10000,scale=255, delta=1):
-    actionArray=[("delta",delta), ("zip",0), ("base64",0), ("base64_decode",0),("unzip","int8")]
+    actionArray=[("delta",delta), ("zip",0), "snap_size", ("base64",0), ("base64_decode",0),("unzip","int8")]
     for coding in ["float32", "float64"]:
         arrayInput=pd.Series((rng.random(size=arraySize)*scale).astype(coding))
         inputSize=getSize(arrayInput)
         tic = time.perf_counter()
         arrayC = compressArray(arrayInput,actionArray, True)
         toc = time.perf_counter()
-        compSize=getSize(arrayC["history"][2])
-        print("test_CompressionSampleDelta: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((arrayC["array"]-arrayInput)**2).sum()/arraySize)))
+        actionParams = arrayC["decodeProgram"][-1][1]
+        decodedArray = arrayC["array"] * delta + actionParams["origin"]
+        compSize=arrayC["snap_size"]
+        np.testing.assert_allclose(decodedArray, arrayInput, rtol=1e-10, atol=.5 * delta )
+        print("test_CompressionSampleDelta: {}\t{}\t{:04f}\t{}\t{}\t{}".format(coding, arraySize, toc - tic, inputSize, compSize/inputSize, np.sqrt(((decodedArray-arrayInput)**2).sum()/arraySize)))
 
 @pytest.mark.feature("ENC.compression.delta")
 @pytest.mark.layer("unit")
