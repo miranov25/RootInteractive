@@ -321,4 +321,3 @@ def test_CompressionCDSPipeDraw():
     #print("test_CompressionCDSPipeDraw",size8,sizeNo, size8/sizeNo)
 
 #test_CompressionCDSPipeDraw()
-test_CompressionSampleDelta()
