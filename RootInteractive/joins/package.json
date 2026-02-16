@@ -1,0 +1,16 @@
+{
+  "name": "rootinteractive-joins",
+  "version": "0.2.0",
+  "description": "CrossTableFilter prototype — multi-table join primitives for RootInteractive",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test_*.mjs",
+    "test:invariance": "node --test test_invariance.mjs",
+    "test:unit": "node --test test_inverse_index.mjs test_cross_table_filter.mjs",
+    "test:perf": "node --test test_performance.mjs",
+    "test:compat": "node --test test_backward_compat.mjs",
+    "generate-fixture": "cd ../Tools/generators && python generate_ao2d_fixture.py ../../joins/ao2d_fixture.json"
+  },
+  "keywords": ["rootinteractive", "joins", "cross-table-filter", "inverse-index"],
+  "license": "LGPL-3.0"
+}
