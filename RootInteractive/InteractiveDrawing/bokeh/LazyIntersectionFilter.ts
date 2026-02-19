@@ -19,11 +19,6 @@ export function spread_nibble(x: number): number {
   return y
 }
 
-/*const incrementLUT = [0x00000000, 0x00000001, 0x00000100, 0x00000101, 
-                      0x00010000, 0x00010001, 0x00010100, 0x00010101, 
-                      0x01000000, 0x01000001, 0x01000100, 0x01000101,  
-                      0x01010000, 0x01010001, 0x01010100, 0x01010101]*/
-
 export class LazyIntersectionFilter extends RIFilter {
   properties: LazyIntersectionFilter.Props
 
@@ -40,13 +35,14 @@ export class LazyIntersectionFilter extends RIFilter {
   }
 
   changed: Set<number>
-  counts: number[]
+  counts: number[] | Int32Array
   cached_vector: boolean[]
   old_values: Int32Array[]
   cached_indices: number[]
   changed_indices: boolean
   _changed_values: boolean
   _old_old_values: Int32Array | null
+  _vectorize: boolean
 
   initialize(){
     super.initialize()
@@ -54,6 +50,7 @@ export class LazyIntersectionFilter extends RIFilter {
     for(let i=0; i < this.filters.length; i++){
         this.changed.add(i)
     }
+    this._vectorize = this.filters.length < 256 ? true : false
     this.changed_indices = true
     this.old_values = []
   }
@@ -77,12 +74,20 @@ export class LazyIntersectionFilter extends RIFilter {
     this.change.emit()
   }
 
+  resize_counts(new_length: number){
+    if(this.counts == null || (this._vectorize && this.counts.length < new_length*8) || (!this._vectorize && this.counts.length < new_length*32)){
+      if(this._vectorize){
+        this.counts = new Int32Array(new_length*8)
+      } else {
+        this.counts = Array(new_length * 32).fill(0)
+        this.counts.length = new_length * 32
+      }
+    }
+  }
+
   update_from_bits(bits: Int32Array, old_values: Int32Array | null, invert: boolean ): Int32Array {
     let mask = 1
-    if(this.counts == null){
-      this.counts = Array(bits.length * 32).fill(0)
-    }
-    this.counts.length = bits.length * 32
+    this.resize_counts(bits.length)
     if(old_values == null || old_values.length < Math.ceil(bits.length)){
       old_values = new Int32Array(Math.ceil(bits.length))
       for(let i=0; i < old_values.length; i++){
@@ -154,10 +159,7 @@ export class LazyIntersectionFilter extends RIFilter {
             this.old_values[x] = new_old_values
             old_values = new_old_values
           }
-          if(this.counts == null){
-              this.counts = Array(values.length).fill(0)
-          }
-          this.counts.length = values.length
+          this.resize_counts(values.length)
           const invert = filters[x].invert
           for(let i=0; i < values.length; i++){
             const new_value = values[i]!==invert
