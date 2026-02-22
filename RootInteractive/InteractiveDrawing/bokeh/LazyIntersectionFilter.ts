@@ -188,9 +188,9 @@ export class LazyIntersectionFilter extends RIFilter {
           const counts = this.resize_counts(values_bits.length)
           if(this._vectorize){
               if(filters[x].invert){
-                this._changed_values = from_bits_8(values_bits, this.old_values[x], counts)
+                this._changed_values ||= from_bits_8(values_bits, this.old_values[x], counts)
               } else {
-                this._changed_values = from_bits_8(this.old_values[x], values_bits, counts)
+                this._changed_values ||= from_bits_8(this.old_values[x], values_bits, counts)
               }
               [this._old_old_values, this.old_values[x]] = [this.old_values[x], values_bits]
           } else {
@@ -205,9 +205,9 @@ export class LazyIntersectionFilter extends RIFilter {
           const counts = this.counts
           if(this._vectorize){
               if(filters[x].invert){
-                this._changed_values = from_bits_8(null, this.old_values[x], counts)
+                this._changed_values ||= from_bits_8(null, this.old_values[x], counts)
               } else {
-                this._changed_values = from_bits_8(this.old_values[x], null, counts)
+                this._changed_values ||= from_bits_8(this.old_values[x], null, counts)
               }
           } else {
             const l = this.counts.length
