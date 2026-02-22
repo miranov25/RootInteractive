@@ -24,7 +24,7 @@ for(let i=0; i<16; i++){
   nibble_lut[i] = spread_nibble(i)
 }
 
-function from_bits_8(front: Int32Array | null, back: Int32Array | null, counter: Int32Array): [Int32Array | null, Int32Array | null, boolean]{
+function from_bits_8(front: Int32Array | null, back: Int32Array | null, counter: Int32Array): boolean{
   let changed = false
   const len = front ? front.length : back ? back.length : 0
   for(let i=0; i<len; i++){
@@ -40,7 +40,7 @@ function from_bits_8(front: Int32Array | null, back: Int32Array | null, counter:
       back_i32 >>>= 4
     }
   }
-  return [back, front, changed]
+  return changed
 }
 
 function decode_8(counter: Int32Array, out: any[]){
@@ -188,10 +188,11 @@ export class LazyIntersectionFilter extends RIFilter {
           const counts = this.resize_counts(values_bits.length)
           if(this._vectorize){
               if(filters[x].invert){
-                [this._old_old_values, this.old_values[x], this._changed_values] = from_bits_8(values_bits, this.old_values[x], counts)
+                this._changed_values = from_bits_8(values_bits, this.old_values[x], counts)
               } else {
-                [this.old_values[x], this._old_old_values, this._changed_values] = from_bits_8(this.old_values[x], values_bits, counts)
+                this._changed_values = from_bits_8(this.old_values[x], values_bits, counts)
               }
+              [this._old_old_values, this.old_values[x]] = [this.old_values[x], values_bits]
           } else {
               this._old_old_values = this.update_from_bits(values_bits, this.old_values[x], filters[x].invert)
               this.old_values[x] = values_bits
@@ -204,9 +205,9 @@ export class LazyIntersectionFilter extends RIFilter {
           const counts = this.counts
           if(this._vectorize){
               if(filters[x].invert){
-                [, , this._changed_values] = from_bits_8(null, this.old_values[x], counts)
+                this._changed_values = from_bits_8(null, this.old_values[x], counts)
               } else {
-                [, , this._changed_values] = from_bits_8(this.old_values[x], null, counts)
+                this._changed_values = from_bits_8(this.old_values[x], null, counts)
               }
           } else {
             const l = this.counts.length
@@ -232,7 +233,7 @@ export class LazyIntersectionFilter extends RIFilter {
     }
     this.update_counts()
     let new_vector: boolean[] = this.cached_vector
-     if (new_vector == null){
+    if (new_vector == null){
         new_vector = this._vectorize ? Array(this.counts.length * 4).fill(false) : Array(this.counts.length).fill(false)
     } else {
         new_vector.length = this._vectorize ? this.counts.length * 4: this.counts.length
