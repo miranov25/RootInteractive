@@ -55,8 +55,10 @@ function decode_8(counter: Int32Array, out: any[]){
 
 // Adapt booleans from old interface
 function pack_booleans(values: any[], out: Int32Array | null){
-  if(out == null){
+  if(out == null || out.length <= values.length / 32){
     out = new Int32Array((values.length / 32) + 1)
+  } else {
+    out.fill(0)
   }
   for(let i=0; i<values.length; i++){
     if(values[i]){
