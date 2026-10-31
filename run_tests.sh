@@ -396,6 +396,8 @@ if [[ $QUICK_MODE -eq 0 ]]; then
         echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py"
         echo "  Reports: ${REPORT_FILES[*]}"
     else
+        # Remove previous outputs so a failed/no-op generator cannot look successful.
+        rm -f "$MATRIX_OUTPUT" "${MATRIX_OUTPUT%.md}.json"
         if [[ ${#REPORT_FILES[@]} -gt 0 ]]; then
             echo "Using reports:"
             for rf in "${REPORT_FILES[@]}"; do
@@ -409,13 +411,15 @@ if [[ $QUICK_MODE -eq 0 ]]; then
             echo "No reports found, running pytest internally..."
             python3 scripts/generate_capability_matrix.py \
                 --output "$MATRIX_OUTPUT"
+            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
         fi
         
-        if [[ -f "$MATRIX_OUTPUT" ]]; then
+        if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
             print_success "Generated: $MATRIX_OUTPUT"
             print_success "Generated: ${MATRIX_OUTPUT%.md}.json"
         else
-            print_error "Failed to generate CAPABILITY_MATRIX"
+            RUN_FAILED=1
+            print_error "Failed to generate fresh CAPABILITY_MATRIX outputs"
         fi
     fi
 fi
@@ -435,7 +439,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-if [[ -f "$MATRIX_OUTPUT" ]]; then
+if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
     echo "Matrix: $MATRIX_OUTPUT"
 fi
 
@@ -479,10 +483,11 @@ if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
         echo "No changes since $PHASE_TAG"
     fi
 else
-    print_warning "Tag $PHASE_TAG missing; committed phase diff unavailable. HEAD/index/worktree evidence is still packaged."
+    RUN_FAILED=1
+    print_error "Tag $PHASE_TAG missing — phase review blocked (P0). Evidence is still packaged."
     echo "  Missing reference tag recorded; no tag is changed by this runner."
     echo ""
-    echo "  Choose the phase baseline explicitly during review."
+    echo "  Restore the approved phase reference before claiming a green canonical gate."
     echo "  This runner does not change baseline tags or approve a phase."
 fi
 
@@ -536,7 +541,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
 done
 
 # Collect matrix (unique name, no prefix needed)
-if [[ -f "$MATRIX_OUTPUT" ]]; then
+if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
     cp "$MATRIX_OUTPUT" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
     REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
 fi
@@ -611,7 +616,7 @@ if example.is_file():(stage/'MLpipeline_example.log').write_bytes(example.read_b
 docs=os.environ.get('RootInteractive_DOCS')
 missing=[]
 if docs:
-    names=['PHASE_2_1_MIForestErrPDFUpdate_Proposal_v0_2_1.md','PHASE_2_1_StageB_Reducible_v0_1_Consolidated_Official_Review_Summary_GPT10_20261030.md','PHASE_2_1_StageC_Noise_CRR_v0_1_GPT20_20261030.md']
+    names=['PHASE_2_1_MIForestErrPDFUpdate_Proposal_v0_2_1.md','PHASE_2_1_StageB_Reducible_v0_1_Consolidated_Official_Review_Summary_GPT10_20261030.md','PHASE_2_1_StageC_Noise_CRR_v0_2_GPT20_20261031.md','PHASE_2_1_StageC_Noise_v0_1_Consolidated_Official_Review_Summary_GPT10_20261031.md']
     for name in names:
         p=pathlib.Path(docs)/name
         if p.is_file():(stage/name).write_bytes(p.read_bytes())
@@ -654,7 +659,7 @@ rm -rf "$REVIEWER_STAGE"
 
 # =============================================================================
 # Return a truthful process status after preserving the review packet.
-if [[ $MATRIX_ONLY -eq 0 && ( $RUN_FAILED -ne 0 || $TOTAL_FAILED -gt 0 || $TOTAL_ERRORS -gt 0 ) ]]; then
+if [[ $RUN_FAILED -ne 0 || $TOTAL_FAILED -gt 0 || $TOTAL_ERRORS -gt 0 ]]; then
     return 1
 fi
 return 0
