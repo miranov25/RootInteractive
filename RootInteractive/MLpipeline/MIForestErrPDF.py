@@ -1,4 +1,4 @@
-"""Stage-A statistics repair; the legacy MIForestErrPDF estimator awaits B/C repairs.
+"""Disjoint-block regression with out-of-fold signed noise-variance estimation.
 
 Tree/member spread and quantiles are not calibrated response-noise estimates.
 """
@@ -208,244 +208,429 @@ def predictForestStat(treeArray, X, statDictionary, n_jobs, verbose=False):
                               'quantiles', verbose=verbose)
 
 
+class _BlockMember:
+    """One statistical member: the mean of trees trained on the same block."""
+    def __init__(self, trees):
+        self.trees = tuple(trees)
+
+    def predict(self, X):
+        return np.mean([_stat_tree_prediction(tree, X) for tree in self.trees], axis=0)
+
+
 class MIForestErrPDF:
-    """
-    Forest with reducible and irreducible error estimation and PDF estimation
-    https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeRegressor.html
-    """
+    """Disjoint-block regression mean and experimental paired sampling error.
 
+    Block-member spread/quantiles are descriptive, not a response PDF. The
+    paired error formula still requires Stage D scientific calibration.
+    Optional noise fitting uses held-out signed residual-variance targets.
+    """
     def __init__(self, switch, optionsErrPDF0, **kwargs):
-        """
-        :param switch: It can be chosen between 'Classifier' or 'Regressor' with the corresponding string.
-        :param options ErrPDF options - see default PDF options
-        :param kwargs: All options from sklearn can be used. For instance
-        """
-        defaultErrPDFOptions = {
-            "mean_depth": 10,              # mean depth of the tree
-            "min_tree": 64,                # minimal number of trees for fit
-            "niter_max": 3,                # number of iterations
-            "test_fraction": 0.025,         # test fraction of points to use to evaluate progress
-            "n_jobs": 4,                   # nJobs - not yet implemented
-            "nPermutation_RedErr":128,     # number of itteration to evaluate reducible error
-            "dump_progress": False,        # switch to follow progress -slow donw by factor 10
-            "verbose": 1
-        }
-        self.optionsErrPDF = defaultErrPDFOptions
-        self.optionsErrPDF.update(optionsErrPDF0)
-        self.method = "MIForestErrPDF"
-        self.trees = {}
-        self.trees[0] = []  # trees for data
-        self.trees[1] = []  # trees for reference data
-        self.deltaTrees = []  # trees for delta residuals
+        import copy
+        if switch == 'Classifier':
+            raise NotImplementedError('classification repair remains OPEN; this phase supports regression only')
+        if switch != 'Regressor':
+            raise ValueError("switch must be 'Regressor'")
+        defaults = dict(mean_depth=10, min_tree=64, niter_max=3,
+                        test_fraction=.025, n_jobs=4, nPermutation_RedErr=128,
+                        dump_progress=False, verbose=1, fit_noise=False, random_state=None,
+                        noise_options={})
+        unknown = set(optionsErrPDF0) - set(defaults)
+        if unknown:
+            raise ValueError('unknown optionsErrPDF: ' + ', '.join(sorted(unknown)))
+        self.optionsErrPDF = copy.deepcopy(defaults)
+        self.optionsErrPDF.update(copy.deepcopy(optionsErrPDF0))
+        self.options = copy.deepcopy(kwargs)
+        # Constructor validation and public sklearn keyword forwarding.
+        DecisionTreeRegressor(**self.options)
         self.type = switch
-        self.options = kwargs
+        self.method = 'MIForestErrPDF'
         self.model_name = ''
-        self.nTrees=0
+        self._reset_fit()
 
-    def fit(self, xIn, yIn, sample_weight=None):
-        self.fitWithParam(xIn, yIn, self.optionsErrPDF["mean_depth"], self.optionsErrPDF["niter_max"])
+    def _reset_fit(self):
+        for name in list(vars(self)):
+            if name.endswith('_'):
+                delattr(self, name)
+        self.trees = {0: [], 1: []}
+        self.deltaTrees = []
+        self.nTrees = 0
 
-    def fitWithParam(self, x0, y0, meanDepth, nIterMax, sample_weight=None):
-        """
-        make fits in iteration
-        :param X_train:         input data set
-        :param y_train:         input data set
-        :param meanDepth        mean depth of te tree
-        :return:
-        """
-        n_jobs=self.optionsErrPDF["n_jobs"]
-        fractions = [0.2, 0.3, 0.4,0.5, 0.6,0.7, 0.8,0.9]  # fracions to estimate reducible error
-        assert len(x0) == len(y0)
-        nRows = x0.shape[0]
-        nSampleTest = int(nRows * self.optionsErrPDF["test_fraction"])
-        nTrees = nRows / (2 ** meanDepth)
-        nTrees = np.exp2(np.log2(nTrees)).astype(int)  # number of independent trees forced to be 2**N
-        if nTrees < self.optionsErrPDF["min_tree"]:
-            nTrees = self.optionsErrPDF["min_tree"]
-        bucketSize = ((nRows / nTrees) // 2)
-        self.nTrees=nTrees
-        #
-        #xIn, _, yIn, _ = train_test_split(x0, y0, test_size=0.0)
-        xIn=x0; yIn=y0;
-        #  nRows=100; xIn=np.linspace(0.0, 1.0, num=nRows); yIn=np.linspace(0.0, 1.0, num=nRows);
-        x = {}
-        y = {}
-        ypred = {}
-        statDict = {"mean": 0, "median": 0, "std": 0,"trim_mean":[0.1]}
-        statDict0 = {"mean": 0, "median": 0, "std": 0,"trim_mean":[0.1]}
-        statDict1 = {"mean": 0, "median": 0, "std": 0,"trim_mean":[0.1]}
-        reducibleErrorEst = {}
-        for tIter in range(0, nIterMax):
-            # create permutations in 2 groups data and reference data - to be fitted with tree and refernce tree
-            permutation = np.random.permutation(nRows // 2)
-            # x[0]=xIn[0:nRows//2][permutation]
-            x[0] = xIn[0:nRows // 2].iloc[permutation].reset_index(drop=True)
-            y[0] = yIn[0:nRows // 2].iloc[permutation]
-            permutation = np.random.permutation(nRows - nRows // 2)
-            # x[1]=xIn[nRows//2:nRows][permutation]
-            x[1] = xIn[nRows // 2:nRows].iloc[permutation].reset_index(drop=True)
-            y[1] = yIn[nRows // 2:nRows].iloc[permutation]
-            #
-            # fit trees
-            treeAllNew = []
-            for iTree in range(0, nTrees):
-                iter = (2 * iTree // nTrees)
-                i0 = int(iTree * bucketSize)
-                i1 = int((iTree + 1) * bucketSize)
-                if self.type == 'Classifier':
-                    clf = DecisionTreeClassifier()
-                elif self.type == 'Regressor':
-                    clf = DecisionTreeRegressor()
-                #clf.fit(x[iter][i0:i1], y[iter][i0:i1])
-                self.trees[iter].append(clf)
-                treeAllNew.append(clf)
-            Parallel(n_jobs=n_jobs,require="sharedmem",)(
-                delayed(tree.fit)(x[(2 * iTree // nTrees)][int(iTree * bucketSize):int((iTree + 1) * bucketSize)],
-                                  y[(2 * iTree // nTrees)][int(iTree * bucketSize):int((iTree + 1) * bucketSize)])
-                for iTree,tree in enumerate(treeAllNew)
-            )
-            treeSlice = slice(0, (nTrees // 2) * (tIter + 1) - 1)
-            if (not self.optionsErrPDF["dump_progress"]) & (tIter < nIterMax):
-                #yPred0 = self.predictStat(xIn[:nSampleTest], 0, statDict, treeSlice)
-                #yPred1 = self.predictStat(xIn[:nSampleTest], 1, statDict, treeSlice)
-                #rmsPred = np.std(yPred0 - yPred1)
-                statDictOut0=predictForestStat(self.trees[0][treeSlice],xIn[:nSampleTest].to_numpy(dtype=np.float32), statDict0,n_jobs)
-                statDictOut1=predictForestStat(self.trees[1][treeSlice],xIn[:nSampleTest].to_numpy(dtype=np.float32), statDict1,n_jobs)
-                rmsPred = np.std(statDictOut0["mean"] - statDictOut1["mean"])
-                rmsPredMed = np.std(statDictOut0["median"] - statDictOut1["median"])
-                keyName=statDict0["trim_mean"][0]
-                rmsPredTM = np.std(statDictOut0["trim_mean"][keyName] - statDictOut1["trim_mean"][keyName])
-                print(f"{tIter}\t{nTrees}\t{rmsPred:.4}\t{rmsPredMed:.4}\t{rmsPredTM:.4}")
-                #self.predictReducibleError(xIn[:nSampleTest], reducibleErrorEst, 64, fractions)
-                #for fraction in fractions:
-                #    reducibleErrorEst[fraction] = np.mean(reducibleErrorEst[fraction])
-                #print(f"{tIter}\t{nTrees}\t{rmsPred:.4f}\t{rmsPredMed:.4f}",reducibleErrorEst)
-                continue
-            return  0
-            # estimate reducible error
-            #yPred0 = self.predictStat(xIn, 0, statDict, treeSlice)
-            predictForestStat(self.trees[0][treeSlice],xIn.to_numpy(dtype=np.float32), statDict,n_jobs)
-            yPred0 =statDict["mean"]
-            yPredMed0 = statDict["median"]
-            yPredStd0 = statDict["std"]
-            #yPred1 = self.predictStat(xIn, 1, statDict, treeSlice)
-            predictForestStat(self.trees[1][treeSlice],xIn.to_numpy(dtype=np.float32), statDict,n_jobs)
-            yPred1 =statDict["mean"]
-            yPredMed1 = statDict["median"]
-            yPredStd1 = statDict["std"]
-            yPred = 0.5 * (yPred0 + yPred1)
-            yDelta=(yIn - yPred)
-            # make delta regression trees
-            self.deltaTrees.clear()
+    @staticmethod
+    def _positive_int(value, name, minimum=1):
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or value < minimum:
+            raise ValueError(name + ' must be an integer >= ' + str(minimum))
+        return int(value)
 
-            for iTree in range(0, 2 * nTrees):
-                i0 = int(iTree * bucketSize)
-                i1 = int((iTree + 1) * bucketSize)
-                if self.type == 'Classifier':
-                    clf = DecisionTreeClassifier()
-                elif self.type == 'Regressor':
-                    clf = DecisionTreeRegressor()
-                #clf.fit(xIn[i0:i1], yDelta[i0:i1])
-                self.deltaTrees.append(clf)
-            Parallel(n_jobs=n_jobs,require="sharedmem",)(
-                delayed(tree.fit)(xIn[int(iTree * bucketSize):int((iTree + 1) * bucketSize)],
-                                  yDelta[int(iTree * bucketSize):int((iTree + 1) * bucketSize)])
-                for iTree,tree in enumerate(self.deltaTrees)
-            )
+    def fit(self, xIn, yIn, sample_weight=None, *, groups=None):
+        """Fit mean members on disjoint original-data blocks; return self."""
+        return self.fitWithParam(xIn, yIn, self.optionsErrPDF['mean_depth'],
+                                 self.optionsErrPDF['niter_max'], sample_weight, groups=groups)
 
-            rmsPred = np.std(yPred0 - yPred1)
-            rmsPredMed = np.std(yPredMed0 - yPredMed1)
-            meanStd = np.mean(0.5 * (yPredStd0 + yPredStd1))
-            meanDeltaRelStd = np.std((yPredStd0 - yPredStd1)) / np.mean(0.5 * (yPredStd0 + yPredStd1))
-            rmsPoint = np.std(0.5 * (yPred0 + yPred1) - yIn)
-            #
-            treeSlice = slice(0, len(self.deltaTrees))
-            #deltaPred = self.predictStat(xIn[:nSampleTest], -1, statDict, treeSlice)
-            predictForestStat(self.deltaTrees,xIn.to_numpy(dtype=np.float32)[:nSampleTest], statDict,n_jobs)
-            meanStdDelta = np.mean(statDict["std"])
-            irreducibleStdEst = np.sqrt(meanStdDelta ** 2 - (rmsPred ** 2) / 2.)
-            self.predictReducibleError(xIn[:nSampleTest], reducibleErrorEst, 64, fractions)
-            meanlocalErrEst = []
-            for fraction in fractions:
-                meanlocalErrEst.append(np.mean(reducibleErrorEst[fraction]))
-            # print(tIter,nTrees, rmsPoint, meanStdDelta, irreducibleStdEst,  meanStd, meanDeltaRelStd,  rmsPred, rmsPredMed)
-            print(f"{tIter}\t{nTrees}\t{rmsPoint:.4f}\t{meanStdDelta:.4}\t{irreducibleStdEst:.4f}\t{meanStd:.4f}\t"
-                  f"{meanDeltaRelStd:.4f}\t{rmsPred:.4f}\t{rmsPredMed:.4f}",meanlocalErrEst)
-        return 0
+    def fitWithParam(self, x0, y0, meanDepth, nIterMax, sample_weight=None, *, groups=None):
+        """Fit with explicit depth/repetition overrides; failed refits invalidate old state."""
+        import pandas as pd
+        self._reset_fit()
+        try:
+            X = _stat_input(x0)
+            y = np.asarray(y0, dtype=float)
+            if y.ndim == 2 and y.shape[1] == 1:
+                y = y[:, 0]
+            if y.ndim != 1 or len(y) != len(X) or not len(y) or not np.isfinite(y).all():
+                raise ValueError('y must be finite, nonempty, and single-output with one value per row')
+            if isinstance(meanDepth, (bool, np.bool_)) or not isinstance(meanDepth, (int, float, np.integer, np.floating)) or not np.isfinite(meanDepth) or meanDepth <= 0:
+                raise ValueError('meanDepth must be finite and positive')
+            repeats = self._positive_int(nIterMax, 'nIterMax')
+            minimum = self._positive_int(self.optionsErrPDF['min_tree'], 'min_tree')
+            jobs = self.optionsErrPDF['n_jobs']
+            if jobs is not None and (isinstance(jobs, (bool, np.bool_)) or not isinstance(jobs, (int, np.integer)) or jobs == 0):
+                raise ValueError('n_jobs must be None or a nonzero integer')
+            noise = self.optionsErrPDF['fit_noise']
+            if not isinstance(noise, (bool, np.bool_)):
+                raise ValueError('fit_noise must be Boolean')
+            seed = self.optionsErrPDF['random_state']
+            tree_seed = self.options.get('random_state')
+            if seed is None:
+                seed = tree_seed
+            elif tree_seed is not None and tree_seed != seed:
+                raise ValueError('conflicting random_state in tree kwargs and optionsErrPDF')
+            if seed is not None and (isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)) or not 0 <= seed < 2**32):
+                raise ValueError('random_state must be None or a nonnegative 32-bit integer')
+            rng = np.random.default_rng(seed)
+            weights = np.ones(len(y)) if sample_weight is None else np.asarray(sample_weight, dtype=float)
+            if weights.shape != y.shape or not np.isfinite(weights).all() or np.any(weights < 0):
+                raise ValueError('sample_weight must be finite nonnegative values, one per row')
+            active = np.flatnonzero(weights > 0)
+            if not len(active):
+                raise ValueError('sample_weight must contain positive weight')
+            fit_weights = np.ones(len(y)) if np.all(weights[active] == weights[active[0]]) else weights
+            codes = None
+            if groups is not None:
+                group_values = np.asarray(groups)
+                if group_values.ndim != 1 or len(group_values) != len(y) or pd.isna(group_values).any():
+                    raise ValueError('groups must contain one nonmissing group ID per row')
+                codes, labels = pd.factorize(group_values[active], sort=False)
+            N = len(active)
+            count = max(4, 2 * int(math.ceil(max(minimum, math.floor(N / 2.**meanDepth) if meanDepth < 1024 else 0) / 2)))
+            units = N if codes is None else len(labels)
+            if count > units:
+                raise ValueError('requested block count exceeds independent rows/groups')
+            if codes is None:
+                blocks = [a.copy() for a in np.array_split(rng.permutation(active), count)]
+                group_counts = np.array([len(a) for a in blocks])
+            else:
+                blocks, group_counts = self._group_blocks(active, codes, count, rng)
+            # Pair adjacent sizes, then seed pair order/orientation.
+            order = sorted(range(count), key=lambda i: -len(blocks[i]))
+            pairs = np.asarray(order).reshape(-1, 2)[rng.permutation(count // 2)]
+            for pair in pairs:
+                if rng.integers(2):
+                    pair[:] = pair[::-1]
+            order = pairs.ravel()
+            blocks = [blocks[i] for i in order]
+            group_counts = group_counts[order]
+            seeds = rng.choice(2**31 - 1, size=(count, repeats), replace=False)
+            permutation_seed = int(rng.integers(0, 2**31 - 1))
+            tree_options = dict(self.options)
+            tree_options.pop('random_state', None)
+            def fit_block(b):
+                idx = blocks[b]
+                if weights[idx].sum() <= 0:
+                    raise ValueError('each block requires positive weight')
+                result = []
+                for iteration in range(repeats):
+                    tree = DecisionTreeRegressor(random_state=int(seeds[b, iteration]), **tree_options)
+                    tree.fit(X[idx], y[idx], sample_weight=fit_weights[idx])
+                    result.append(tree)
+                return result
+            fitted = Parallel(n_jobs=jobs, require='sharedmem')(
+                delayed(fit_block)(b) for b in range(count))
+            # Publish only after every member is fitted successfully.
+            self.block_trees_ = tuple(tuple(a) for a in fitted)
+            self.members_ = tuple(_BlockMember(a) for a in self.block_trees_)
+            self.estimators_ = tuple(t for a in self.block_trees_ for t in a)
+            self.block_indices_ = tuple(a.copy() for a in blocks)
+            self.block_membership_ = np.full(len(y), -1, dtype=int)
+            for b, indices in enumerate(blocks):
+                self.block_membership_[indices] = b
+            self.active_indices_ = active.copy()
+            self.n_zero_weight_ = len(y) - N
+            self.block_sizes_ = np.array([len(a) for a in blocks])
+            self.block_group_counts_ = group_counts
+            self.block_count_ = count
+            self.n_pairs_ = count // 2
+            self.n_repeats_ = repeats
+            self.mean_depth_ = meanDepth
+            self.tree_seeds_ = seeds
+            self.permutation_seed_ = permutation_seed
+            self.fit_seed_ = seed
+            self.n_features_in_ = X.shape[1]
+            if hasattr(x0, 'columns'):
+                self.feature_names_in_ = np.asarray(x0.columns).copy()
+            self.fit_noise_ = False
+            nonuniform = not np.all(weights[active] == weights[active[0]])
+            self.uncertainty_status_ = dict(validated=False, grouped=groups is not None,
+                nonuniform_weights=bool(nonuniform), unequal_block_sizes=bool(np.ptp(self.block_sizes_)),
+                limitations=['paired sampling-error interpretation awaits Stage D calibration',
+                             'unequal blocks, groups and weighting can violate comparable-block assumptions'])
+            self.trees = {0: [t for a in self.block_trees_[::2] for t in a],
+                          1: [t for a in self.block_trees_[1::2] for t in a]}
+            self.nTrees = count
+            if noise:
+                self._fit_noise(X, y, weights, groups, meanDepth, repeats,
+                                int(rng.integers(0, 2**31 - 1)))
+                self.fit_noise_ = True
+            self.is_fitted_ = True
+            if self.optionsErrPDF['dump_progress']:
+                print('MIForestErrPDF: fitted %d blocks, %d trees per block, %d active rows' % (count, repeats, N))
+            return self
+        except Exception:
+            self._reset_fit()
+            raise
 
-    def predictStat(self, data, statDictionary,treeType=-1):
-        """
-        predict value
-        :param data:           inout data
-        :param statDictonary:  statistics to output
-        :param treeType:
-        :return:
-        """
-        # assert(treeType!=0 & treeType!=1)
-        if treeType>=0 & treeType<2:
-            return predictForestStat(self.trees[treeType], data.to_numpy(dtype=np.float32), statDictionary, self.optionsErrPDF["n_jobs"])
+    @staticmethod
+    def _group_blocks(active, codes, count, rng):
+        """Stable O(N log N + G log B) gathering/assignment; preserve seeded ties."""
+        import heapq
+        units = int(codes.max()) + 1
+        order = np.argsort(codes, kind='stable')
+        by_group = np.split(active[order], np.cumsum(np.bincount(codes))[:-1])
+        shuffled = rng.permutation(units)
+        ordered = sorted(shuffled, key=lambda k: -len(by_group[k]))
+        buckets = [[] for _ in range(count)]
+        group_counts = np.zeros(count, dtype=int)
+        tie_order = rng.permutation(count)
+        heap = [(0, rank, int(b)) for rank, b in enumerate(tie_order)]
+        heapq.heapify(heap)
+        for k in ordered:
+            size, rank, b = heapq.heappop(heap)
+            buckets[b].append(by_group[k])
+            group_counts[b] += 1
+            heapq.heappush(heap, (size + len(by_group[k]), rank, b))
+        if any(not bucket for bucket in buckets):
+            raise ValueError('not enough groups for nonempty blocks/folds')
+        return [np.concatenate(bucket) for bucket in buckets], group_counts
+
+    def _fit_noise(self, X, y, weights, groups, depth, repeats, seed):
+        """Five OOF mean ensembles, signed subtraction before noise-model fitting."""
+        import copy
+        import pandas as pd
+        rng = np.random.default_rng(seed)
+        active = self.active_indices_
+        if groups is None:
+            if len(active) < 5:
+                raise ValueError('noise fitting requires five nonempty independent folds')
+            folds = [a.copy() for a in np.array_split(rng.permutation(active), 5)]
         else:
-            return predictForestStat(self.trees[0], data.to_numpy(dtype=np.float32), statDictionary, self.optionsErrPDF["n_jobs"])
+            codes, labels = pd.factorize(np.asarray(groups)[active], sort=False)
+            if len(labels) < 5:
+                raise ValueError('noise fitting requires at least five independent groups')
+            folds, _ = self._group_blocks(active, codes, 5, rng)
+        fold_seeds = rng.choice(2**31 - 1, size=6, replace=False)
+        oof_mean = np.full(len(y), np.nan)
+        oof_var = np.full(len(y), np.nan)
+        fold_ids = np.full(len(y), -1, dtype=int)
+        records = []
+        for f, held in enumerate(folds):
+            train = active[~np.isin(active, held)]
+            opts = copy.deepcopy(self.optionsErrPDF)
+            opts.update(fit_noise=False, random_state=int(fold_seeds[f]),
+                        mean_depth=depth, niter_max=repeats, dump_progress=False)
+            kwargs = dict(self.options); kwargs.pop('random_state', None)
+            child = type(self)('Regressor', opts, **kwargs)
+            child.fit(X[train], y[train], weights[train],
+                      groups=None if groups is None else np.asarray(groups)[train])
+            oof_mean[held] = child.predict(X[held])
+            # Private arithmetic path: no calibration claim or experimental warning per fold.
+            variance = np.empty(len(held))
+            for first, members in child._member_chunks(X[held]):
+                variance[first:first + members.shape[1]] = np.var(
+                    members[1::2] - members[::2], axis=0, ddof=1) / (4 * child.n_pairs_)
+            oof_var[held] = variance
+            fold_ids[held] = f
+            records.append(dict(train_indices=train.copy(), heldout_indices=held.copy(),
+                block_indices=tuple(train[idx] for idx in child.block_indices_),
+                block_count=child.block_count_, seed=int(fold_seeds[f])))
+        signed = (y[active] - oof_mean[active])**2 - oof_var[active]
+        if not np.isfinite(signed).all():
+            raise ValueError('OOF corrected targets must be finite')
+        requested = self.optionsErrPDF['noise_options']
+        if not isinstance(requested, dict):
+            raise ValueError('noise_options must be a dictionary of RandomForestRegressor options')
+        options = dict(n_estimators=128, min_samples_leaf=20, criterion='squared_error',
+                       random_state=int(fold_seeds[-1]), n_jobs=self.optionsErrPDF['n_jobs'])
+        options.update(copy.deepcopy(requested))
+        if options.get('criterion') != 'squared_error':
+            raise ValueError('noise model requires squared_error to average signed corrections')
+        noise_model = RandomForestRegressor(**options)
+        w = weights[active]
+        fit_weights = np.ones(len(w)) if np.all(w == w[0]) else w
+        noise_model.fit(X[active], signed, sample_weight=fit_weights)
+        self.noise_model_ = noise_model
+        self.noise_options_ = copy.deepcopy(options)
+        self.oof_mean_ = oof_mean
+        self.oof_reducible_var_ = oof_var
+        self.oof_signed_target_ = np.full(len(y), np.nan)
+        self.oof_signed_target_[active] = signed
+        self.oof_fold_ids_ = fold_ids
+        self.oof_folds_ = tuple(records)
+        self.noise_seed_ = seed
 
+    def _prediction_input(self, data):
+        from sklearn.exceptions import NotFittedError
+        if not getattr(self, 'is_fitted_', False):
+            raise NotFittedError('MIForestErrPDF must be successfully fitted first')
+        values = _stat_input(data, [getattr(self, 'feature_names_in_', None)])
+        if values.shape[1] != self.n_features_in_:
+            raise ValueError('X feature count differs from fitted model')
+        return values
 
-    def predictReducibleError(self, data, statDictionary, nPermutation, fractionArray):
-        """
-        predict local reducible array
-        :param data:           input data
-        :param statDictionary:  statistics to output
-        :param nPermutation:
-        :param fractionArray:
-        :return:
-        """
-        # assert(treeType!=0 & treeType!=1)
-        forestPredict = {}
-        n_jobs=self.optionsErrPDF["n_jobs"]
-        for treeType in [0, 1]:
-            counter = 0
-            for counter, tree in enumerate(self.trees[treeType]): pass
-            selTree = np.zeros((counter + 1, data.shape[0]))
-            forestPredict[treeType] = selTree
-            #for counter, tree in enumerate(self.trees[treeType]):
-            #    selTree[counter] = tree.predict(data)
-            Parallel(n_jobs=n_jobs,require="sharedmem",)(
-                delayed(_accumulate_predictionNL)(e.predict, data.to_numpy(dtype=np.float32), selTree, col)
-                for col,e in enumerate(self.trees[treeType][0:self.nTrees//2])
-            )
-        #
+    def _member_chunks(self, values):
+        for first in range(0, len(values), _STAT_CHUNK_ROWS):
+            chunk = values[first:first + _STAT_CHUNK_ROWS]
+            with Parallel(n_jobs=self.optionsErrPDF['n_jobs'], require='sharedmem') as runner:
+                prediction = np.asarray(runner(delayed(member.predict)(chunk) for member in self.members_))
+            yield first, prediction
 
-        nTreesAll = self.nTrees
-        nIter=2*len(self.trees[0])//(self.nTrees)
-        for fraction in fractionArray:
-            deltas = np.zeros((nPermutation, data.shape[0]))
-            for iPer in range(0, nPermutation):
-                permutation = np.random.permutation(self.nTrees//2)
-                #permutation2=permutation+((4)*self.nTrees//2)
-                nTreesM = int(fraction * self.nTrees//2)
-                y0 = np.mean(forestPredict[0][permutation][0:nTreesM], 0)
-                y1 = np.mean(forestPredict[1][permutation][0:nTreesM], 0)
-                deltas[iPer] = y1 - y0
-            statDictionary[fraction] = np.std(deltas, 0) * np.sqrt(fraction/(1. - fraction))*0.5;
-            statDictionary[1+fraction] = np.std(deltas, 0)
-        return
-
-
+    def _uncertainty_policy(self, experimental=False):
+        import warnings
+        if not isinstance(experimental, (bool, np.bool_)):
+            raise ValueError('experimental must be Boolean')
+        status = self.uncertainty_status_
+        if status['grouped'] or status['nonuniform_weights']:
+            if not experimental:
+                raise ValueError('grouped/nonuniform-weight uncertainty is not calibrated; use predictReducibleStd(experimental=True) explicitly')
+            warnings.warn('experimental grouped/weighted uncertainty: validated=False', RuntimeWarning, stacklevel=3)
 
     def predict(self, data, **options):
+        """Full equal-block ensemble mean in target units; no uncertainty implied."""
+        if options:
+            raise TypeError('unknown prediction options: ' + ', '.join(options))
+        return self.predictStat(data, {'mean': True}, treeType='all')['mean']
+
+    def predictStat(self, data, statDictionary=None, treeType=-1, *legacy):
+        """Statistics of block averages; -1 warns and retains group-0 fallback.
+
+        Historical four-argument residual-tree calls are unsupported. Quantiles
+        describe block-member predictions, not response distributions.
         """
-        TODO
-        Returns the output of the RF to the provided data.
-        :param data: array of the features to get the prediction for.
-        :return: array of the predicted values.
+        import warnings
+        if legacy or (statDictionary is not None and not isinstance(statDictionary, dict)):
+            raise TypeError("historical predictStat(data, treeType, statDictionary, treeSlice) is unsupported; use predictStat(data, statDictionary, treeType=0/1/'all')")
+        values = self._prediction_input(data)
+        if isinstance(treeType, (bool, np.bool_)):
+            raise ValueError('Boolean treeType selectors are unsupported')
+        if treeType == -1:
+            warnings.warn("predictStat treeType=-1 selects group 0; specify 0, 1 or 'all'", FutureWarning, stacklevel=2)
+            treeType = 0
+        if treeType == 'all':
+            selected = self.members_
+        elif treeType in (0, 1):
+            selected = self.members_[treeType::2]
+        else:
+            raise ValueError("treeType must be -1, 0, 1 or 'all'")
+        request = _stat_requests({'mean': True, 'std': True} if statDictionary is None else statDictionary)
+        want_std2 = 'std2' in request
+        if want_std2:
+            request.pop('std2')
+            if len(selected) < 2:
+                raise ValueError('std2 requires at least two block members')
+        result = predictForestStat(selected, values, request, self.optionsErrPDF['n_jobs'])
+        if want_std2:
+            order = np.random.default_rng(self.permutation_seed_).permutation(len(selected))
+            half = len(selected) // 2
+            result['std2'] = np.empty(len(values))
+            for first in range(0, len(values), _STAT_CHUNK_ROWS):
+                members = np.asarray([member.predict(values[first:first + _STAT_CHUNK_ROWS]) for member in selected])
+                result['std2'][first:first + members.shape[1]] = np.std(
+                    members[order[:half]] - members[order[half:2*half]], axis=0)
+        return result
+
+    def predictReducibleStd(self, data, *, experimental=False):
+        """sqrt(var(T_1j-T_0j, ddof=1)/(4*m)); same members as predict.
+
+        Target units. Finite-array identity only; scientific calibration awaits
+        Stage D. Repeated trees are averaged, never counted as independent blocks.
         """
+        values = self._prediction_input(data)
+        self._uncertainty_policy(experimental)
+        out = np.empty(len(values))
+        for first, members in self._member_chunks(values):
+            differences = members[1::2] - members[::2]
+            out[first:first + members.shape[1]] = np.sqrt(np.var(differences, axis=0, ddof=1) / (4 * self.n_pairs_))
+        return out
+
+    def predictReducibleError(self, data, statDictionary, nPermutation, fractionArray):
+        """Legacy in-place paired subset adapter (None return).
+
+        Uses actual k/m fractions and population spread across permutations;
+        finite Monte Carlo budgets have downward variance bias. Prefer the
+        authoritative closed form predictReducibleStd. No global RNG mutation.
+        """
+        values = self._prediction_input(data)
+        self._uncertainty_policy()
+        if not isinstance(statDictionary, dict):
+            raise TypeError('statDictionary must be a dictionary')
+        permutations = self._positive_int(nPermutation, 'nPermutation', 2)
+        fractions = np.asarray(fractionArray, dtype=float)
+        if fractions.ndim != 1 or not np.isfinite(fractions).all() or np.any((fractions <= 0) | (fractions >= 1)):
+            raise ValueError('fractions must be a finite sequence strictly between zero and one')
+        keys = list(fractions) + list(1 + fractions)
+        if len(set(keys)) != len(keys):
+            raise ValueError('fraction output keys must be distinct and noncolliding')
+        counts = np.floor(fractions * self.n_pairs_).astype(int)
+        if np.any(counts < 1) or np.any(counts >= self.n_pairs_):
+            raise ValueError('actual subset count must satisfy 1 <= k < pair count')
+        result = {key: np.empty(len(values)) for key in keys}
+        for first, members in self._member_chunks(values):
+            differences = members[1::2] - members[::2]
+            for fraction, k in zip(fractions, counts):
+                rng = np.random.default_rng(self.permutation_seed_)
+                mean = np.zeros(members.shape[1])
+                m2 = np.zeros(members.shape[1])
+                for iteration in range(1, permutations + 1):
+                    delta = differences[rng.permutation(self.n_pairs_)[:k]].mean(axis=0)
+                    step = delta - mean
+                    mean += step / iteration
+                    m2 += step * (delta - mean)
+                raw = np.sqrt(m2 / permutations)
+                actual = k / self.n_pairs_
+                sl = slice(first, first + len(raw))
+                result[fraction][sl] = raw * .5 * np.sqrt(actual / (1 - actual))
+                result[1 + fraction][sl] = raw
+        statDictionary.update(result)
+        return None
+
+    def predictUncertainty(self, data, *, experimental=False):
+        """Mean, paired sigma and raw/clipped conditional-noise variance diagnostics.
+
+        All sigmas have target units; raw variance has squared target units.
+        Bias contamination and clipping remain visible; no PDF/coverage guarantee.
+        """
+        import copy
+        values = self._prediction_input(data)
+        if not self.fit_noise_:
+            raise RuntimeError('noise model unavailable; fit with fit_noise=True or use predict and predictReducibleStd')
+        self._uncertainty_policy(experimental)
+        raw = np.empty(len(values))
+        for first in range(0, len(values), _STAT_CHUNK_ROWS):
+            chunk = values[first:first + _STAT_CHUNK_ROWS]
+            raw[first:first + len(chunk)] = self.noise_model_.predict(chunk)
+        if not np.isfinite(raw).all():
+            raise ValueError('noise model returned nonfinite variance')
+        reducible = np.empty(len(values))
+        for first, members in self._member_chunks(values):
+            reducible[first:first + members.shape[1]] = np.sqrt(np.var(
+                members[1::2] - members[::2], axis=0, ddof=1) / (4 * self.n_pairs_))
+        clipped = np.maximum(raw, 0.)
+        metadata = copy.deepcopy(self.uncertainty_status_)
+        metadata.update(noise_fit=True, noise_folds=5,
+                        noise_interpretation='signed OOF residual variance minus fitted-mean variance; may contain squared bias')
+        return dict(mean=self.predict(values), reducible_std=reducible,
+            irreducible_std=np.sqrt(clipped), irreducible_var_raw=raw,
+            predictive_std=np.sqrt(reducible**2 + clipped), metadata=metadata)
 
     def getImportance(self):
-        """
-        print sorted importance - TODO
-        :param varNames:
-        :kwargs:
-        :return:
-        """
-        impTree = np.zeros((len(self.trees[0]), len(self.trees[0][0])))
-        for row,tree in enumerate(self.trees[0]):
-            impTree[row]=tree.feature_importances_
-        return    impTree.mean(axis=0)
+        """Mean feature importance with the same block/within-block weights as predict."""
+        self._prediction_input(np.empty((0, self.n_features_in_)) if getattr(self, 'is_fitted_', False) else np.empty((0, 1)))
+        return np.mean([np.mean([t.feature_importances_ for t in block], axis=0)
+                        for block in self.block_trees_], axis=0)
