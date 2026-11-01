@@ -17,6 +17,7 @@ TEST_CASES = {
     "all_nan": np.array([np.nan] * 100),
     "has_infinity": np.array([0.1,1e7,-14,np.nan,np.inf,-np.inf]).astype(np.float64),
     "nan_and_inf": np.array([np.nan, np.inf, -np.inf]).astype(np.float64),
+    "odd_length": rng.random(999)
 }
 
 test_b64 = {i: base64.b64encode(TEST_CASES[i]).decode('utf-8') for i in TEST_CASES.keys()}

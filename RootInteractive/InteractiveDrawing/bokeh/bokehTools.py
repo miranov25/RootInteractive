@@ -425,7 +425,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 varX = i["varX"]
             iFitter.varX = varX
-            break
+            continue
         if isinstance(i["parameters"], list):
             for j in i["parameters"]:
                 customJsArgList[j] = paramDict[j]["value"]
@@ -869,15 +869,15 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if "name" in optionLocal:
                 plotDict[optionLocal["name"]] = plotI
             continue
-        else:
-            figureI = figure(width=options.get("plot_width", 600), height=options.get("plot_height", 400),
-                    tools=options['tools'], x_axis_type=options['x_axis_type'],
-                             y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"),
-                             title=r"\[x\pi\]")
-            figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
-            figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
-            figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
-            figureI.yaxis.major_label_text_font_size = options["major_label_text_font_size"]
+        
+        figureI = figure(width=options.get("plot_width", 600), height=options.get("plot_height", 400),
+                tools=options['tools'], x_axis_type=options['x_axis_type'],
+                            y_axis_type=options['y_axis_type'], sizing_mode=options.get("sizing_mode", "stretch_width"),
+                            title=r"\[x\pi\]")
+        figureI.xaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
+        figureI.xaxis.major_label_text_font_size = options["major_label_text_font_size"]
+        figureI.yaxis.axis_label_text_font_size = options["axis_label_text_font_size"]
+        figureI.yaxis.major_label_text_font_size = options["major_label_text_font_size"]
 
         lengthY = len(variables[1])
         length = max(len(variables[0]), len(variables[1]))

@@ -1,4 +1,5 @@
 #!/bin/bash
+ri_main() {
 # =============================================================================
 # run_tests.sh — RootInteractive Test Runner
 # =============================================================================
@@ -30,7 +31,6 @@
 # Date: 2026-02-03
 # =============================================================================
 
-set -e
 
 # =============================================================================
 # Configuration
@@ -44,6 +44,7 @@ TEST_DIRS=(
     "RootInteractive/InteractiveDrawing/bokeh"
     "RootInteractive/Tools"
     "RootInteractive/onnx"
+    "RootInteractive/MLpipeline/tests"
 )
 
 # Output locations
@@ -58,6 +59,8 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DATE_SHORT=$(date +%Y%m%d)
 
 # P0-3 FIX: Initialize counters at top to avoid unbound variable errors
+RUN_FAILED=0
+TOTAL_ERRORS=0
 TOTAL_PASSED=0
 TOTAL_FAILED=0
 TOTAL_SKIPPED=0
@@ -156,7 +159,7 @@ Examples:
   diff test_logs/bokeh_20260201_*/summary.txt test_logs/bokeh_20260202_*/summary.txt
 
 EOF
-    exit 0
+    return 0
 }
 
 # =============================================================================
@@ -170,16 +173,17 @@ DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -h|--help) show_help ;;
+        -h|--help) show_help; return 0 ;;
         -v|--verbose) VERBOSE="-v" ;;
         -n)
             shift
-            PARALLEL_WORKERS="$1"
+            PARALLEL_WORKERS="${1:-}"
+            if [[ ! "$PARALLEL_WORKERS" =~ ^[1-9][0-9]*$ ]]; then echo "Invalid worker count"; return 2; fi
             ;;
         --quick) QUICK_MODE=1 ;;
         --matrix) MATRIX_ONLY=1 ;;
         --dry-run) DRY_RUN=1 ;;
-        *) echo "Unknown option: $1"; show_help ;;
+        *) echo "Unknown option: $1"; show_help; return 2 ;;
     esac
     shift
 done
@@ -215,6 +219,7 @@ cd "$PROJECT_ROOT"
 
 # P1-1 FIX: Check dependencies before running
 check_dependencies
+if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
 
 print_header "RootInteractive Test Runner"
 echo "Project root: $PROJECT_ROOT"
@@ -226,6 +231,14 @@ echo "Log directory: $LOG_BASE_DIR/"
 mkdir -p "$LOG_BASE_DIR"
 
 REPORT_FILES=()
+if [[ $DRY_RUN -eq 0 && $MATRIX_ONLY -eq 0 ]]; then
+    python3 - "$PROJECT_ROOT" "$LOG_BASE_DIR/source_before_${TIMESTAMP}.json" <<'BEFOREPY'
+import hashlib,json,pathlib,sys
+root=pathlib.Path(sys.argv[1]); files=[root/'run_tests.sh',*(root/'RootInteractive/MLpipeline').rglob('*.py')]
+pathlib.Path(sys.argv[2]).write_text(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()},indent=2))
+BEFOREPY
+    if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+fi
 
 # =============================================================================
 # Phase 1: Run Tests
@@ -237,6 +250,7 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
     for test_dir in "${TEST_DIRS[@]}"; do
         if [[ ! -d "$test_dir" ]]; then
             print_warning "Directory not found: $test_dir (skipping)"
+            RUN_FAILED=1
             continue
         fi
         
@@ -244,6 +258,7 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
         test_count=$(ls -1 "$test_dir"/test*.py 2>/dev/null | wc -l | tr -d ' ')
         if [[ "$test_count" -eq 0 ]]; then
             print_warning "No test files in: $test_dir (skipping)"
+            RUN_FAILED=1
             continue
         fi
         
@@ -263,10 +278,9 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
         if [[ $DRY_RUN -eq 1 ]]; then
             echo "  [DRY RUN] Would run: pytest $test_dir/ -n $PARALLEL_WORKERS"
         else
-            set +e
             # Run pytest with parallel workers
             if [[ "$PARALLEL_WORKERS" -gt 1 ]]; then
-                pytest "$test_dir/" \
+                python3 -m pytest "$test_dir/" \
                     -n "$PARALLEL_WORKERS" \
                     $VERBOSE \
                     --json-report \
@@ -274,15 +288,15 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
                     2>&1 | tee "$log_file"
             else
                 # Sequential run
-                pytest "$test_dir/" \
+                python3 -m pytest "$test_dir/" \
                     $VERBOSE \
                     --json-report \
                     --json-report-file="$report_file" \
                     2>&1 | tee "$log_file"
             fi
-            exit_code=$?
-            set -e
-            
+            exit_code=${PIPESTATUS[0]}
+            if [[ $exit_code -ne 0 ]]; then RUN_FAILED=1; fi
+
             if [[ -f "$report_file" ]]; then
                 REPORT_FILES+=("$report_file")
                 
@@ -290,7 +304,10 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
                 passed=$(python3 -c "import json; r=json.load(open('$report_file')); print(r.get('summary',{}).get('passed',0))" 2>/dev/null || echo "0")
                 failed=$(python3 -c "import json; r=json.load(open('$report_file')); print(r.get('summary',{}).get('failed',0))" 2>/dev/null || echo "0")
                 skipped=$(python3 -c "import json; r=json.load(open('$report_file')); print(r.get('summary',{}).get('skipped',0))" 2>/dev/null || echo "0")
-                total=$((passed + failed + skipped))
+                errors=$(python3 -c "import json; r=json.load(open('$report_file')); print(r.get('summary',{}).get('error',0)+r.get('summary',{}).get('errors',0))" 2>/dev/null)
+                errors=${errors:-0}
+                TOTAL_ERRORS=$((TOTAL_ERRORS + errors))
+                total=$((passed + failed + skipped + errors))
                 
                 TOTAL_PASSED=$((TOTAL_PASSED + passed))
                 TOTAL_FAILED=$((TOTAL_FAILED + failed))
@@ -305,6 +322,8 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
 PASSED:  $passed
 FAILED:  $failed
 SKIPPED: $skipped
+ERRORS:  $errors
+PYTEST_EXIT_STATUS: $exit_code
 TOTAL:   $total
 
 # Failed tests:
@@ -325,6 +344,7 @@ for t in r.get('tests', []):
                 ln -sf "${dir_name}_${TIMESTAMP}" "$LOG_BASE_DIR/${dir_name}_latest"
             else
                 print_warning "Report not generated for $test_dir"
+                RUN_FAILED=1
             fi
         fi
     done
@@ -335,11 +355,19 @@ for t in r.get('tests', []):
     echo "  ${BOLD}FAILED:${RESET}  ${RED}${TOTAL_FAILED}${RESET}"
     echo "  ${BOLD}SKIPPED:${RESET} ${YELLOW}${TOTAL_SKIPPED}${RESET}"
     
-    if [[ $TOTAL_FAILED -gt 0 ]]; then
+    if [[ $RUN_FAILED -ne 0 || $TOTAL_FAILED -gt 0 || $TOTAL_ERRORS -gt 0 ]]; then
         print_error "Some tests failed!"
     else
         print_success "All tests passed!"
     fi
+fi
+
+# Focused example is separate from pytest collection and is included in the packet.
+if [[ $MATRIX_ONLY -eq 0 && $DRY_RUN -eq 0 ]]; then
+    python3 RootInteractive/MLpipeline/examples/phase_2_1_reducible_example.py > "$LOG_BASE_DIR/MLpipeline_example_${TIMESTAMP}.log" 2>&1
+    EXAMPLE_STATUS=$?
+    echo "MLpipeline example exit status: $EXAMPLE_STATUS"
+    if [[ $EXAMPLE_STATUS -ne 0 ]]; then RUN_FAILED=1; fi
 fi
 
 # =============================================================================
@@ -368,6 +396,8 @@ if [[ $QUICK_MODE -eq 0 ]]; then
         echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py"
         echo "  Reports: ${REPORT_FILES[*]}"
     else
+        # Remove previous outputs so a failed/no-op generator cannot look successful.
+        rm -f "$MATRIX_OUTPUT" "${MATRIX_OUTPUT%.md}.json"
         if [[ ${#REPORT_FILES[@]} -gt 0 ]]; then
             echo "Using reports:"
             for rf in "${REPORT_FILES[@]}"; do
@@ -376,17 +406,20 @@ if [[ $QUICK_MODE -eq 0 ]]; then
             python3 scripts/generate_capability_matrix.py \
                 --from-reports "${REPORT_FILES[@]}" \
                 --output "$MATRIX_OUTPUT"
+            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
         else
             echo "No reports found, running pytest internally..."
             python3 scripts/generate_capability_matrix.py \
                 --output "$MATRIX_OUTPUT"
+            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
         fi
         
-        if [[ -f "$MATRIX_OUTPUT" ]]; then
+        if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
             print_success "Generated: $MATRIX_OUTPUT"
             print_success "Generated: ${MATRIX_OUTPUT%.md}.json"
         else
-            print_error "Failed to generate CAPABILITY_MATRIX"
+            RUN_FAILED=1
+            print_error "Failed to generate fresh CAPABILITY_MATRIX outputs"
         fi
     fi
 fi
@@ -406,7 +439,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-if [[ -f "$MATRIX_OUTPUT" ]]; then
+if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
     echo "Matrix: $MATRIX_OUTPUT"
 fi
 
@@ -440,8 +473,8 @@ if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
         DIFF_PHASE="$LOG_BASE_DIR/diff_to_phase_${DIFF_TIMESTAMP}.txt"
         DIFF_LAST="$LOG_BASE_DIR/diff_last_commit_${DIFF_TIMESTAMP}.txt"
 
-        git diff "$PHASE_TAG"..HEAD > "$DIFF_PHASE"
-        git diff HEAD~1..HEAD > "$DIFF_LAST"
+        git diff "$PHASE_TAG"..HEAD -- . > "$DIFF_PHASE"
+        git diff HEAD~1..HEAD -- . > "$DIFF_LAST"
 
         echo ""
         echo "Full diff: git diff $PHASE_TAG..HEAD"
@@ -450,11 +483,12 @@ if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
         echo "No changes since $PHASE_TAG"
     fi
 else
-    print_error "Tag $PHASE_TAG not found — PHASE REVIEW NOT POSSIBLE (P0 violation per Organization-structure-v1_16.md)"
-    echo "  Create with: git tag -f $PHASE_TAG && git push origin $PHASE_TAG -f"
+    RUN_FAILED=1
+    print_error "Tag $PHASE_TAG missing — phase review blocked (P0). Evidence is still packaged."
+    echo "  Missing reference tag recorded; no tag is changed by this runner."
     echo ""
-    echo "  ⚠️  Without this tag, reviewers cannot verify git diff to phase start."
-    echo "  ⚠️  Phase approval without diff review is a P0 process violation."
+    echo "  Restore the approved phase reference before claiming a green canonical gate."
+    echo "  This runner does not change baseline tags or approve a phase."
 fi
 
 # =============================================================================
@@ -491,23 +525,23 @@ mkdir -p "$REVIEWER_STAGE"
 
 REVIEWER_COUNT=0
 
-# Collect test logs and summaries (prefix with dir name to avoid collisions)
+# Collect only this run, never substitute stale latest logs for a failed suite.
 for test_dir in "${TEST_DIRS[@]}"; do
     dir_name=$(basename "$test_dir")
-    latest_link="$LOG_BASE_DIR/${dir_name}_latest"
-    if [[ -L "$latest_link" ]]; then
-        latest_dir="$LOG_BASE_DIR/$(readlink "$latest_link")"
-        for f in test.log summary.txt report.json; do
-            if [[ -f "$latest_dir/$f" ]]; then
-                cp "$latest_dir/$f" "$REVIEWER_STAGE/${dir_name}_${f}"
-                REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
-            fi
-        done
+    latest_dir="$LOG_BASE_DIR/${dir_name}_${TIMESTAMP}"
+    if [[ $MATRIX_ONLY -eq 1 && -L "$LOG_BASE_DIR/${dir_name}_latest" ]]; then
+        latest_dir="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/${dir_name}_latest")"
     fi
+    for f in test.log summary.txt report.json; do
+        if [[ -f "$latest_dir/$f" ]]; then
+            cp "$latest_dir/$f" "$REVIEWER_STAGE/${dir_name}_${f}"
+            REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+        fi
+    done
 done
 
 # Collect matrix (unique name, no prefix needed)
-if [[ -f "$MATRIX_OUTPUT" ]]; then
+if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
     cp "$MATRIX_OUTPUT" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
     REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
 fi
@@ -532,9 +566,73 @@ if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
     fi
 fi
 
+if [[ $DRY_RUN -eq 0 ]]; then
+    export RI_REVIEW_STAGE="$REVIEWER_STAGE" RI_REVIEW_ROOT="$PROJECT_ROOT" RI_REVIEW_TIMESTAMP="$TIMESTAMP" RI_REVIEW_FAILURE="$RUN_FAILED" RI_REVIEW_EXAMPLE="${EXAMPLE_STATUS:-not-run}" RI_REVIEW_MATRIX_ONLY="$MATRIX_ONLY"
+    python3 - <<'REVIEWPY'
+import hashlib, importlib.metadata, json, os, pathlib, platform, subprocess
+root=pathlib.Path(os.environ['RI_REVIEW_ROOT']); stage=root/os.environ['RI_REVIEW_STAGE']
+def git(*args):
+    r=subprocess.run(['git','-C',str(root),*args],capture_output=True)
+    return r.stdout if r.returncode==0 else b'GIT COMMAND FAILED: '+r.stderr
+for name,args in [('diff_worktree.patch',['diff','--binary','--','.']),('diff_staged.patch',['diff','--cached','--binary','--','.']),('diff_HEAD_to_worktree.patch',['diff','HEAD','--binary','--','.']),('git_status.txt',['status','--short','--','.']),('git_identity.txt',['log','-1','--format=fuller'])]:
+    (stage/name).write_bytes(git(*args))
+source_paths={pathlib.Path('run_tests.sh')}
+for relative in git('diff','HEAD','--name-only','--','.').decode(errors='replace').splitlines(): source_paths.add(pathlib.Path(relative))
+for relative in git('ls-files','--others','--exclude-standard','--','RootInteractive/MLpipeline').decode(errors='replace').splitlines(): source_paths.add(pathlib.Path(relative))
+source_paths.update(p.relative_to(root) for p in (root/'RootInteractive/MLpipeline').rglob('*.py'))
+manifest=[]
+for relative in sorted(source_paths):
+    p=root/relative
+    if not p.is_file() or p.suffix not in ('.py','.sh','.ts','.mjs','.md'): continue
+    if any(x in relative.parts for x in ('__pycache__','node_modules','test_logs')): continue
+    data=p.read_bytes(); destination=stage/'source'/relative
+    destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(data)
+    manifest.append(dict(path=str(relative),bytes=len(data),md5=hashlib.md5(data).hexdigest(),sha256=hashlib.sha256(data).hexdigest()))
+(stage/'source_manifest.json').write_text(json.dumps(manifest,indent=2))
+(stage/'run_status.json').write_text(json.dumps(dict(failed_or_blocked=int(os.environ['RI_REVIEW_FAILURE']),example_status=os.environ['RI_REVIEW_EXAMPLE'],matrix_only=int(os.environ['RI_REVIEW_MATRIX_ONLY'])),indent=2))
+before=root/'test_logs'/('source_before_'+os.environ['RI_REVIEW_TIMESTAMP']+'.json')
+changed=[]
+if before.is_file():
+    original=json.loads(before.read_text())
+    (stage/'source_before.json').write_bytes(before.read_bytes())
+    current={entry['path']:entry['sha256'] for entry in manifest}
+    changed=[name for name,sha in original.items() if current.get(name)!=sha]
+(stage/'source_consistency.json').write_text(json.dumps(dict(changed_during_run=changed),indent=2))
+# New files have complete source above and an explicit /dev/null patch here.
+patch=b''
+for relative in git('ls-files','--others','--exclude-standard','--','RootInteractive/MLpipeline').decode(errors='replace').splitlines():
+    p=root/relative
+    if p.is_file() and p.suffix=='.py':
+        r=subprocess.run(['git','diff','--no-index','--','/dev/null',str(p)],capture_output=True)
+        patch+=r.stdout
+(stage/'diff_untracked.patch').write_bytes(patch)
+packages={}
+for name in ['numpy','pandas','scipy','scikit-learn','joblib','pytest','xgboost','onnxruntime','keras']:
+    try:packages[name]=importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:packages[name]='NOT INSTALLED'
+(stage/'environment.json').write_text(json.dumps(dict(python=platform.python_version(),platform=platform.platform(),packages=packages),indent=2))
+example=root/'test_logs'/('MLpipeline_example_'+os.environ['RI_REVIEW_TIMESTAMP']+'.log')
+if example.is_file():(stage/'MLpipeline_example.log').write_bytes(example.read_bytes())
+docs=os.environ.get('RootInteractive_DOCS')
+missing=[]
+if docs:
+    names=['PHASE_2_1_MIForestErrPDFUpdate_Proposal_v0_2_1.md','PHASE_2_1_StageB_Reducible_v0_1_Consolidated_Official_Review_Summary_GPT10_20261030.md','PHASE_2_1_StageC_Noise_CRR_v0_2_GPT20_20261031.md','PHASE_2_1_StageC_Noise_v0_1_Consolidated_Official_Review_Summary_GPT10_20261031.md']
+    for name in names:
+        p=pathlib.Path(docs)/name
+        if p.is_file():(stage/name).write_bytes(p.read_bytes())
+        else:missing.append(name)
+else:missing.append('RootInteractive_DOCS environment variable unavailable; formal docs not collected')
+(stage/'review_packet_notes.txt').write_text('Source is the actual worktree, including staged/unstaged/new ML files.\nMissing formal references:\n'+'\n'.join(missing)+'\nFull-run failures are not waived; see each suite log.\n')
+if changed:
+    raise RuntimeError('Source changed during tests; review source_consistency.json')
+REVIEWPY
+    if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+fi
+
 if [[ $REVIEWER_COUNT -gt 0 ]]; then
     # Create zip from staging directory (flat structure, no path issues)
-    (cd "$REVIEWER_STAGE" && zip -q "$PROJECT_ROOT/$REVIEWER_ZIP" *)
+    (cd "$REVIEWER_STAGE" && zip -qr "$PROJECT_ROOT/$REVIEWER_ZIP" .)
+    if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
     if [[ -f "$REVIEWER_ZIP" ]]; then
         rm -f "$LOG_BASE_DIR/reviewer_latest.zip"
         ln -sf "reviewer_${TIMESTAMP}.zip" "$LOG_BASE_DIR/reviewer_latest.zip"
@@ -543,8 +641,14 @@ if [[ $REVIEWER_COUNT -gt 0 ]]; then
         echo "  ($REVIEWER_COUNT files)"
         echo ""
         echo "  Upload this single file to a reviewer session."
+        if [[ -n "${RootInteractive_DOCS:-}" ]]; then
+            mkdir -p "$RootInteractive_DOCS/files_RI"
+            cp -p "$REVIEWER_ZIP" "$RootInteractive_DOCS/files_RI/"
+            if [[ $? -ne 0 ]]; then RUN_FAILED=1; else echo "Exchange packet: $RootInteractive_DOCS/files_RI/$(basename "$REVIEWER_ZIP")"; fi
+        fi
     else
         print_error "Failed to create reviewer.zip"
+        RUN_FAILED=1
     fi
 else
     print_warning "No files to package for reviewer.zip"
@@ -554,31 +658,11 @@ fi
 rm -rf "$REVIEWER_STAGE"
 
 # =============================================================================
-# Phase Closure Helper
-# =============================================================================
-# Per Organization-structure-v1_16.md §PHASE_BEGIN Tag Convention:
-# After phase approval, PHASE_BEGIN_<project> must be moved to HEAD
-# to mark the start of the next phase.
-
-if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -eq 0 ]] && [[ $TOTAL_PASSED -gt 0 ]]; then
-    if git rev-parse "$PHASE_TAG" >/dev/null 2>&1; then
-        TAG_COMMIT=$(git rev-parse "$PHASE_TAG" 2>/dev/null)
-        HEAD_COMMIT=$(git rev-parse HEAD 2>/dev/null)
-        if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
-            print_header "Phase Closure"
-            echo "  All tests passed. If this phase is approved, move the tag:"
-            echo ""
-            echo "    git tag -f $PHASE_TAG && git push origin $PHASE_TAG -f"
-            echo ""
-            echo "  This marks HEAD as the start of the next phase."
-        fi
-    fi
+# Return a truthful process status after preserving the review packet.
+if [[ $RUN_FAILED -ne 0 || $TOTAL_FAILED -gt 0 || $TOTAL_ERRORS -gt 0 ]]; then
+    return 1
 fi
+return 0
 
-echo ""
-
-# Exit with failure if tests failed
-if [[ $MATRIX_ONLY -eq 0 ]] && [[ $TOTAL_FAILED -gt 0 ]]; then
-    exit 1
-fi
-exit 0
+}
+ri_main "$@"

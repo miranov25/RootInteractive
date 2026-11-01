@@ -1,3 +1,4 @@
+"""Exploratory toy residual dashboard using Stage C noise outputs; not calibrated detector errors."""
 #  from RootInteractive.MLpipeline.test_RandomForestErrPDF import *
 import pandas as pd
 import numpy as np
@@ -6,9 +7,7 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA import bokehDrawSA
 from RootInteractive.MLpipeline.NDFunctionInterface import *
 from RootInteractive.MLpipeline.NDFunctionInterface import *
 from bokeh.io import output_file
-from RootInteractive.MLpipeline.AugmentedForest import AugmentedForestRegressor
 from RootInteractive.MLpipeline.MIForestErrPDF import *
-from RootInteractive.MLpipeline.local_linear_forest import LocalLinearForestRegressor
 
 
 widgetParams = [
@@ -71,19 +70,18 @@ def makeFitsErrPDF(df,n_jobs=-1, mean_depth=14, niter_max=8):
     fitter = Fitter(dataContainer)
     #
     miErrPDF=MIForestErrPDF("Regressor",{"mean_depth":mean_depth, "n_jobs":n_jobs,"niter_max":niter_max })
-    llfForest=LocalLinearForestRegressor(n_estimators=mean_depth,n_jobs=n_jobs)
-    #fitter.Register_Model('RFErrPDF',miErrPDF)
-    fitter.Register_Model('llfForest',llfForest)
+    miErrPDF.optionsErrPDF.update(fit_noise=True, random_state=42)
+    fitter.Register_Model('RFErrPDF',miErrPDF)
     fitter.Fit()
     return fitter
 
 def doFitErrRF(nPoints, n_jobs, mean_depth, niter_max):
     df =generateInput(nPoints,0)
-    fitter=makeFitsErrPDF(df,10,mean_depth, niter_max)
+    fitter=makeFitsErrPDF(df,n_jobs,mean_depth, niter_max)
     return fitter,df
 
 def doFitLLR(n_estimators=200):
-    llf=  LocalLinearForestRegressor(n_estimators=5)
+    raise NotImplementedError('LocalLinearForest example is outside this residual-noise workflow')
 
 
 def appendPrediction(nPoints):
@@ -94,10 +92,10 @@ def appendPrediction(nPoints):
     fitter.Models[0].predict(dataIn)
     #return
     #
-    yPred0 = fitter.Models[0].predictStat(dataIn, 0, statDict, slice(0,dataIn.shape[0]))
+    statDict = fitter.Models[0].predictStat(dataIn, statDict, treeType=0)
     df["pred0"]=statDict["mean"]
     df["predMedian0"]=statDict["median"]
-    yPred1 = fitter.Models[0].predictStat(dataIn, 1, statDict, slice(0,dataIn.shape[0]))
+    statDict = fitter.Models[0].predictStat(dataIn, statDict, treeType=1)
     df["pred1"]=statDict["mean"]
     df["predMedian1"]=statDict["median"]
     df["pred"]=0.5*(df["pred0"]+df["pred1"])
@@ -108,13 +106,14 @@ def appendPrediction(nPoints):
     df["dpredMedian"]=0.5*(df["predMedian0"]+df["predMedian1"])-df["valueOrig"]
 
     fitter.Models[0].predictReducibleError(dataIn,reducibleErrorEst,64,[0.5,0.7,0.8,0.9])
-    deltaPred = fitter.Models[0].predictStat(dataIn, -1, statDict, slice(0,dataIn.shape[0]))
+    uncertainty = fitter.Models[0].predictUncertainty(dataIn)
     df["redErrEst05"]=reducibleErrorEst[0.5]
     df["redErrEst07"]=reducibleErrorEst[0.7]
     df["redErrEst08"]=reducibleErrorEst[0.8]
     df["redErrEst09"]=reducibleErrorEst[0.9]
-    df["stdPoint"]=statDict["std"]
-    df["irrError"]=np.sqrt(df["stdPoint"]**2-df["redErrEst08"]**2)
+    df["stdPoint"]=uncertainty["predictive_std"]
+    df["irreducibleVarRaw"]=uncertainty["irreducible_var_raw"]
+    df["irrError"]=uncertainty["irreducible_std"]
     #
     df["ppredF"]=df["dpredF"]/df["stdPoint"]
     df["ppred"]=df["dpred"]/df["stdPoint"]
@@ -185,6 +184,6 @@ def makeDashboard(fitter,df):
     return 0
 
 
-doFitErrRF(400000,1,12,8)
-appendPrediction(10000)
+if __name__ == '__main__':
+    appendPrediction(10000)
 

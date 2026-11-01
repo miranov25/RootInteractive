@@ -14,17 +14,43 @@ function is_little_endian(): boolean {
 
 export const BYTE_ORDER = is_little_endian() ? "little" : "big";
 
-function swap16(buffer: ArrayBuffer) {
+function swap16(buffer: ArrayBuffer, offset?: number, bytelength?: number) {
   const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 2) {
+  if (offset === undefined) {
+    offset = 0;
+  }
+  if (bytelength === undefined) {
+    bytelength = x.length - offset;
+  }
+    const elementSize = 2;
+
+  if (bytelength % elementSize !== 0) {
+    throw new RangeError(
+      `Invalid byte length ${bytelength} for 16-bit swap. Must be a multiple of ${elementSize}.`
+    );
+  }
+  for (let i = offset, end = offset + bytelength; i < end; i += 2) {
       const t = x[i];
       x[i] = x[i + 1];
       x[i + 1] = t;
   }
 }
-function swap32(buffer: ArrayBuffer) {
+function swap32(buffer: ArrayBuffer, offset?: number, bytelength?: number) {
   const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 4) {
+  if (offset === undefined) {
+    offset = 0;
+  }
+  if (bytelength === undefined) {
+    bytelength = x.length - offset;
+  }
+  const elementSize = 4;
+
+  if (bytelength % elementSize !== 0) {
+    throw new RangeError(
+      `Invalid byte length ${bytelength} for 32-bit swap. Must be a multiple of ${elementSize}.`
+    );
+  }
+  for (let i = offset, end = offset + bytelength; i < end; i += 4) {
       let t = x[i];
       x[i] = x[i + 3];
       x[i + 3] = t;
@@ -33,9 +59,22 @@ function swap32(buffer: ArrayBuffer) {
       x[i + 2] = t;
   }
 }
-function swap64(buffer: ArrayBuffer) {
+function swap64(buffer: ArrayBuffer, offset?: number, bytelength?: number) {
   const x = new Uint8Array(buffer);
-  for (let i = 0, end = x.length; i < end; i += 8) {
+  if (offset === undefined) {
+    offset = 0;
+  }
+  if (bytelength === undefined) {
+    bytelength = x.length - offset;
+  }
+  const elementSize = 8;
+
+  if (bytelength % elementSize !== 0) {
+    throw new RangeError(
+      `Invalid byte length ${bytelength} for 64-bit swap. Must be a multiple of ${elementSize}.`
+    );
+  }
+  for (let i = offset, end = offset + bytelength; i < end; i += 8) {
       let t = x[i];
       x[i] = x[i + 7];
       x[i + 7] = t;
@@ -51,19 +90,19 @@ function swap64(buffer: ArrayBuffer) {
   }
 }
 
-export function swap(buffer: ArrayBuffer, dtype: string) {
+export function swap(buffer: ArrayBuffer, dtype: string, offset?: number, bytelength?: number) {
   switch (dtype) {
       case "uint16":
       case "int16":
-          swap16(buffer);
+          swap16(buffer, offset, bytelength);
           break;
       case "uint32":
       case "int32":
       case "float32":
-          swap32(buffer);
+          swap32(buffer, offset, bytelength);
           break;
       case "float64":
-          swap64(buffer);
+          swap64(buffer, offset, bytelength);
           break;
   }
 }
@@ -175,34 +214,37 @@ export function quantizeSinhArray(array: number[], sigma0: number, sigma1: numbe
   return {"array": encodedArray, "sentinels": {"nan": nanSentinel, "posinf":posinfSentinel, "neginf":neginfSentinel}}
 }
 
-export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dtype: string){
+export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dtype: string, offset: number = 0, bytelength?: number){
+  if (bytelength === undefined){
+    bytelength = ab.byteLength - offset
+  }
   if(byteorder !== BYTE_ORDER){
-    swap(ab, dtype)
+    swap(ab, dtype, offset, bytelength)
   }
   if (dtype == "int8"){
-    return new Int8Array(ab)
+    return new Int8Array(ab, offset, bytelength)
   }
   if (dtype == "uint8"){
-    return new Uint8Array(ab)
+    return new Uint8Array(ab, offset, bytelength)
   }
   if (dtype == "int16"){
-    return new Int16Array(ab)
+    return new Int16Array(ab, offset, bytelength >> 1)
   }
   if (dtype == "uint16"){
-    return new Uint16Array(ab)
+    return new Uint16Array(ab, offset, bytelength >> 1)
   }
   if (dtype == "int32"){
-    return new Int32Array(ab)
+    return new Int32Array(ab, offset, bytelength >> 2)
   }
   if (dtype == "uint32"){
-    return new Uint32Array(ab)
+    return new Uint32Array(ab, offset, bytelength >> 2)
   }
   if (dtype == "float32"){
-    const arrayOut = new Float32Array(ab)
+    const arrayOut = new Float32Array(ab, offset, bytelength >> 2)
     return new Float64Array(arrayOut)
   }
   if (dtype == "float64"){
-    return new Float64Array(ab)
+    return new Float64Array(ab, offset, bytelength >> 3)
   }
   throw new Error(`Unknown dtype: ${dtype}`)
 }
@@ -235,6 +277,25 @@ function makeTypedArray(n_elems: number, dtype: string){
   throw new Error(`Unknown dtype: ${dtype}`)
 }
 
+function getElementSize(dtype: string): number {
+  switch (dtype) {
+    case "int8":
+    case "uint8":
+      return 1;
+    case "int16":
+    case "uint16":
+      return 2;
+    case "int32":
+    case "uint32":
+    case "float32":
+      return 4;
+    case "float64":
+      return 8;
+    default:
+      throw new Error(`Unknown dtype: ${dtype}`);
+  }
+}
+
 export function decodeArray(arrayIn: any, instructions: any, env: any){
   const inflate = env.builtins.inflate
   const enableDithering = env.enableDithering
@@ -258,19 +319,30 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
       }
       if(action == "array"){
         const dtype = actionParams
-        const ab = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + arrayOut.byteLength)
-        arrayOut = interpretArray(ab, env.byteorder, dtype)
+        const ab = arrayOut.buffer
+        arrayOut = interpretArray(ab, env.byteorder, dtype, arrayOut.byteOffset, arrayOut.byteLength)
       }
       if (action == "code") {
         if (actionParams.version){
           const {len0, dtype0, len1, dtype1} = actionParams
-          const ab0 = arrayOut.buffer.slice(arrayOut.byteOffset, arrayOut.byteOffset + len0)
-          const arrayCode = interpretArray(ab0, env.byteorder, dtype0)
+          const ab = arrayOut.buffer
+          const arrayCode = interpretArray(ab, env.byteorder, dtype0, arrayOut.byteOffset, len0)
           const size = arrayCode.length
-          const ab1 = arrayOut.buffer.slice(arrayOut.byteOffset + len0, arrayOut.byteOffset + len0 + len1)
-          const valueCode = interpretArray(ab1, env.byteorder, dtype1)
+          const elementSize = getElementSize(dtype1)
+          let ab1: ArrayBuffer
+          let valueCode: any
+          if((arrayOut.byteOffset + len0) % elementSize !== 0){
+            ab1 = ab.slice(arrayOut.byteOffset + len0, arrayOut.byteOffset + len0 + len1)
+            valueCode = interpretArray(ab1, env.byteorder, dtype1, 0, len1)
+          } else {
+            ab1 = ab
+            valueCode = interpretArray(ab1, env.byteorder, dtype1, arrayOut.byteOffset + len0, len1)
+          }
           let arrayOutNew = makeTypedArray(size, dtype1)
           for (let j = 0; j < size; j++) {
+            if (arrayCode[j] < 0 || arrayCode[j] >= valueCode.length) {
+              throw new Error(`Index out of bounds: ${arrayCode[j]} for valueCode of length ${valueCode.length}`)
+            }
             arrayOutNew[j] = valueCode[arrayCode[j]]
           }
           arrayOut=arrayOutNew
@@ -279,6 +351,9 @@ export function decodeArray(arrayIn: any, instructions: any, env: any){
         let size = arrayOut.length
         let arrayOutNew = new Array(arrayOut.length)
         for (let j = 0; j < size; j++) {
+          if (arrayOut[j] < 0 || arrayOut[j] >= actionParams.valueCode.length) {
+            throw new Error(`Index out of bounds: ${arrayOut[j]} for valueCode of length ${actionParams.valueCode.length}`)
+          }
           arrayOutNew[j] = actionParams.valueCode[arrayOut[j]]
         }
         arrayOut=arrayOutNew

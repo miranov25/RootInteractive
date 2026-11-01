@@ -44,7 +44,7 @@ for(let i=0; i<data.length; i++){
         decoded_ref = new Float64Array(binary_string_ref.buffer, binary_string_ref.byteOffset, binary_string_ref.length / Float64Array.BYTES_PER_ELEMENT)
     } else if(dtype === "int32"){
         if (binary_string_ref.length % 4 !== 0) {
-            throw new Error(`Invalid float64 payload length ${binary_string_ref.length} (not divisible by 4)`);
+            throw new Error(`Invalid int32 payload length ${binary_string_ref.length} (not divisible by 4)`);
         }
         decoded_ref = new Int32Array(binary_string_ref.buffer, binary_string_ref.byteOffset, binary_string_ref.length / Int32Array.BYTES_PER_ELEMENT)
     } else {
