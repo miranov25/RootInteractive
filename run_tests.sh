@@ -617,11 +617,30 @@ docs=os.environ.get('RootInteractive_DOCS')
 missing=[]
 if docs:
     names=['PHASE_2_1_MIForestErrPDFUpdate_Proposal_v0_2_1.md','PHASE_2_1_StageB_Reducible_v0_1_Consolidated_Official_Review_Summary_GPT10_20261030.md','PHASE_2_1_StageC_Noise_CRR_v0_2_GPT20_20261031.md','PHASE_2_1_StageC_Noise_v0_1_Consolidated_Official_Review_Summary_GPT10_20261031.md']
-    for name in names:
+    # Current review references are explicit basenames under RootInteractive_DOCS.
+    # Keep defaults above for historical evidence; no directory traversal.
+    names.extend(os.environ[key] for key in
+        ['RootInteractive_REVIEW_CRR','RootInteractive_REVIEW_PROPOSAL','RootInteractive_REVIEW_SUMMARY','RootInteractive_REVIEW_EVIDENCE']
+        if os.environ.get(key))
+    for name in dict.fromkeys(names):
+        if pathlib.Path(name).name != name:
+            missing.append('invalid review-reference basename: '+name)
+            continue
         p=pathlib.Path(docs)/name
         if p.is_file():(stage/name).write_bytes(p.read_bytes())
         else:missing.append(name)
 else:missing.append('RootInteractive_DOCS environment variable unavailable; formal docs not collected')
+# Explicit benchmark run directory, always relative to this repository's test_logs.
+benchmark_name=os.environ.get('RootInteractive_REVIEW_BENCHMARK')
+if benchmark_name:
+    benchmark=root/'test_logs'/benchmark_name
+    if pathlib.Path(benchmark_name).name != benchmark_name or not benchmark.is_dir() or benchmark.is_symlink():
+        missing.append('invalid or missing benchmark run directory: '+benchmark_name)
+    else:
+        destination=stage/'benchmark';destination.mkdir(exist_ok=True)
+        for p in sorted(benchmark.iterdir()):
+            if p.is_file() and not p.is_symlink() and p.suffix in ('.json','.log','.py','.txt'):
+                (destination/p.name).write_bytes(p.read_bytes())
 (stage/'review_packet_notes.txt').write_text('Source is the actual worktree, including staged/unstaged/new ML files.\nMissing formal references:\n'+'\n'.join(missing)+'\nFull-run failures are not waived; see each suite log.\n')
 if changed:
     raise RuntimeError('Source changed during tests; review source_consistency.json')
