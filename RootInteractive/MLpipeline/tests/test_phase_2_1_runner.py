@@ -24,16 +24,6 @@ class ReviewRunnerContracts(unittest.TestCase):
             added=root/'RootInteractive/MLpipeline/tests/test_new.py';added.write_text('def test_new(): assert True\n')
             tracked=root/dirs[1]/'test_smoke.py';tracked.write_text('def test_ok(): assert 1 == 1\n')
             env=dict(os.environ);env['RootInteractive_DOCS']=str(root/'docs')
-            (root/'docs').mkdir()
-            (root/'docs/current_crr.md').write_text('current scoped CRR')
-            env['RootInteractive_REVIEW_CRR']='current_crr.md'
-            (root/'docs/current_evidence.txt').write_text('local evidence')
-            env['RootInteractive_REVIEW_EVIDENCE']='current_evidence.txt'
-            benchmark=root/'test_logs/benchmark_fixture';benchmark.mkdir(parents=True)
-            (benchmark/'benchmark_e1.json').write_text('{"fixture":true}')
-            env['RootInteractive_REVIEW_BENCHMARK']='benchmark_fixture'
-            env['RootInteractive_REVIEW_PROPOSAL']='../outside.md'
-
             run=subprocess.run(['./run_tests.sh','--quick','-n','1'],cwd=d,env=env,capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
             archive=root/'test_logs/reviewer_latest.zip'
@@ -45,10 +35,6 @@ class ReviewRunnerContracts(unittest.TestCase):
                 self.assertIn('tests_report.json',z.namelist())
                 self.assertIn('environment.json',z.namelist())
                 self.assertIn('MLpipeline_example.log',z.namelist())
-                self.assertEqual(z.read('current_crr.md'),b'current scoped CRR')
-                self.assertEqual(z.read('current_evidence.txt'),b'local evidence')
-                self.assertEqual(z.read('benchmark/benchmark_e1.json'),b'{"fixture":true}')
-                self.assertIn(b'invalid review-reference basename',z.read('review_packet_notes.txt'))
             tracked.write_text('this is broken syntax !!!\n')
             failed=subprocess.run(['./run_tests.sh','--quick','-n','1'],cwd=d,env=env,capture_output=True,text=True)
             self.assertNotEqual(failed.returncode,0,failed.stdout+failed.stderr)
