@@ -221,6 +221,17 @@ export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dty
   if(byteorder !== BYTE_ORDER){
     swap(ab, dtype, offset, bytelength)
   }
+  let elementSize = 1
+  if (dtype == "int16" || dtype == "uint16"){
+    elementSize = 2
+  } else if (dtype == "int32" || dtype == "uint32" || dtype == "float32"){
+    elementSize = 4
+  } else if (dtype == "float64"){
+    elementSize = 8
+  }   
+  if(bytelength % elementSize !== 0){
+    throw new Error(`Byte length ${bytelength} is not a multiple of element size ${elementSize} for dtype ${dtype}`)
+  }
   if (dtype == "int8"){
     return new Int8Array(ab, offset, bytelength)
   }
