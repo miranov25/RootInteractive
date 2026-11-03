@@ -69,6 +69,9 @@ def _stat_requests(statDictionary):
     for name, upper, inclusive in [('quantile', 1., True), ('trim_mean', .5, False)]:
         if name not in request:
             continue
+        if name == 'quantile' and any(isinstance(v, (bool, np.bool_))
+                                      for v in np.asarray(request[name], dtype=object).flat):
+            raise ValueError('quantile requires numeric probabilities, not Boolean values')
         try:
             values = np.asarray(request[name], dtype=float)
         except (TypeError, ValueError) as exc:
@@ -160,14 +163,26 @@ def _fill_forest_statistics(trees, X, request, out, chunk, quantile_key, paralle
     for first in range(0, len(X), chunk):
         last = min(first + chunk, len(X))
         predictions = np.asarray(parallel(delayed(_stat_tree_prediction)(tree, X[first:last]) for tree in trees))
-        for name in ('mean', 'median', 'std'):
+        for name in ('mean', 'std'):
             if name in request:
                 out[name][first:last] = getattr(np, name)(predictions, axis=0)
         if order is not None:
             half = len(trees) // 2
             out['std2'][first:last] = np.std(predictions[order[:half]] - predictions[order[half:2 * half]], axis=0)
-        for q in request.get('quantile', []):
-            out[quantile_key][q][first:last] = np.quantile(predictions, q, axis=0)
+        probabilities = list(dict.fromkeys(request.get('quantile', [])))
+        if 'median' in request and .5 not in probabilities:
+            probabilities.append(.5)
+        if probabilities:
+            work = predictions.copy()
+            quantiles = np.quantile(work, probabilities, axis=0, method='linear', overwrite_input=True)
+            for index, q in enumerate(probabilities):
+                if q in out.get(quantile_key, {}):
+                    out[quantile_key][q][first:last] = quantiles[index]
+            if 'median' in request:
+                # Q50 partitions both middle ranks. Preserve np.median's mean
+                # reduction (including its rounding), not quantile's lerp.
+                middle = len(work) // 2
+                out['median'][first:last] = np.mean(work[(len(work)-1)//2:middle+1], axis=0)
         for q in request.get('trim_mean', []):
             out['trim_mean'][q][first:last] = stats.trim_mean(predictions, q, axis=0)
     return out
