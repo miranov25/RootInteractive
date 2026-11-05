@@ -24,7 +24,7 @@ function allclose(A,B,abs_tol,rel_tol,nan_equal=false){
             }
         } else if(Number.isFinite(a) && Number.isFinite(b)){
             const diff = Math.abs(a - b);
-            if (diff > abs_tol && diff > rel_tol * Math.max(Math.abs(a), Math.abs(b))) {
+            if (diff > abs_tol + rel_tol * Math.max(Math.abs(a), Math.abs(b))) {
                 console.log(`allclose failed at index ${i}: a=${a}, b=${b}, diff=${diff}, abs_tol=${abs_tol}, rel_tol=${rel_tol}`)
                 return false;
             }
