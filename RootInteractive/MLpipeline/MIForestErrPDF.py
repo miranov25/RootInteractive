@@ -152,6 +152,8 @@ def _forest_statistics(trees, X, statDictionary, n_jobs, max_rows, quantile_key,
         order = np.random.permutation(len(trees))
     if not size or not request:
         return out
+    if parallel is None and n_jobs == 1:
+        return _fill_forest_statistics(trees, values, request, out, chunk, quantile_key, None, order)
     if parallel is None:
         with Parallel(n_jobs=n_jobs, verbose=verbose, require='sharedmem') as runner:
             return _fill_forest_statistics(trees, values, request, out, chunk, quantile_key, runner, order)
@@ -162,7 +164,8 @@ def _fill_forest_statistics(trees, X, request, out, chunk, quantile_key, paralle
     """Fill canonical outputs; each chunk is released before predicting the next."""
     for first in range(0, len(X), chunk):
         last = min(first + chunk, len(X))
-        predictions = np.asarray(parallel(delayed(_stat_tree_prediction)(tree, X[first:last]) for tree in trees))
+        predictions = np.asarray([_stat_tree_prediction(tree, X[first:last]) for tree in trees]
+            if parallel is None else parallel(delayed(_stat_tree_prediction)(tree, X[first:last]) for tree in trees))
         for name in ('mean', 'std'):
             if name in request:
                 out[name][first:last] = getattr(np, name)(predictions, axis=0)
@@ -617,6 +620,14 @@ class MIForestErrPDF:
     def _historical_chunks(self, values, smear_streams=None):
         """Predict each historical tree once per bounded query chunk, in iteration/pair order."""
         size = self._chunk_rows()
+        if self.optionsErrPDF['n_jobs'] == 1:
+            for first in range(0, len(values), size):
+                q = values[first:first+size]
+                T = np.asarray([self._tree_prediction(tree, q,
+                    None if smear_streams is None else smear_streams[b][l])
+                    for l, iteration in enumerate(self.iteration_trees_) for b, tree in enumerate(iteration)])
+                yield first, T.reshape(self.n_repeats_, self.block_count_, len(q))
+            return
         with Parallel(n_jobs=self.optionsErrPDF['n_jobs'], require='sharedmem') as runner:
             for first in range(0, len(values), size):
                 q = values[first:first+size]
@@ -800,6 +811,15 @@ class MIForestErrPDF:
 
     def _member_chunks(self, values, smear_streams=None):
         size = self._chunk_rows()
+        if self.optionsErrPDF['n_jobs'] == 1:
+            for first in range(0, len(values), size):
+                chunk = values[first:first+size]
+                prediction = np.asarray([self._validated_member_prediction(member, chunk)
+                    for member in self.members_] if smear_streams is None else
+                    [self._smeared_member_prediction(member, chunk, smear_streams[b])
+                     for b, member in enumerate(self.members_)])
+                yield first, prediction
+            return
         with Parallel(n_jobs=self.optionsErrPDF['n_jobs'], require='sharedmem') as runner:
             for first in range(0, len(values), size):
                 chunk = values[first:first + size]
@@ -852,6 +872,8 @@ class MIForestErrPDF:
         parent, weight these observations equally by tree. See the accompanying
         CRR for the distinction between local and full-tree convolution.
         Existing prediction, response-spread and quantile APIs are unchanged.
+        local_half_A/B_fallback and local_half_A/B_condition describe each
+        independent half solve; half means remain uncalibrated diagnostics.
         """
         self._require_leaf_stats()
         values = self._prediction_input(data)
@@ -905,10 +927,119 @@ class MIForestErrPDF:
             q = values if streams is None else self._smear_values(values, streams[b][l])
             ids = tree.apply(q, check_input=False)
             return b, l, tree, ids, tree._ri_leaf_stats, q
+        if self.optionsErrPDF['n_jobs'] == 1:
+            for b, trees in enumerate(self.block_trees_):
+                for l, tree in enumerate(trees):
+                    yield select(b, l, tree)
+            return
         with Parallel(n_jobs=self.optionsErrPDF['n_jobs'], require='sharedmem') as runner:
             selected = runner(delayed(select)(b, l, tree)
                 for b, trees in enumerate(self.block_trees_) for l, tree in enumerate(trees))
         yield from selected
+
+    def _linear_from_selected(self, q, selected, ridge=0., condition_limit=1e10):
+        """Shared arithmetic owner; selected leaves already belong to this batch."""
+        d = q.shape[1]
+        sz, sy = np.zeros_like(q, dtype=float), np.zeros(len(q))
+        szz, szy = np.zeros((len(q), d, d)), np.zeros_like(q, dtype=float)
+        count = 0
+        for _, _, tree, ids, stat, _ in selected:
+            delta = stat['centroid'][ids]-q  # original query, not smeared traversal coordinate
+            y = tree.tree_.value[ids, 0, 0]
+            sz += delta; sy += y
+            szz += np.einsum('ni,nj->nij', delta, delta)
+            szy += delta*y[:, None]
+            count += 1
+        zbar, ybar = sz/count, sy/count
+        covariance = szz/count-np.einsum('ni,nj->nij', zbar, zbar)
+        cross = szy/count-zbar*ybar[:, None]
+        scales = np.sqrt(np.maximum(np.diagonal(covariance, axis1=1, axis2=2), 0))
+        usable = (scales > np.finfo(float).eps).all(1)
+        safe_scales = np.where(scales > np.finfo(float).eps, scales, 1.)
+        matrix = covariance/(safe_scales[:, :, None]*safe_scales[:, None, :])
+        eigen = np.linalg.eigvalsh(matrix)
+        # A ridge may regularize a singular design, but zero-spread axes remain
+        # unidentified; with ridge=0 enforce the original design condition.
+        denom = eigen[:, 0]+ridge
+        cond = np.full(len(q), np.inf)
+        np.divide(eigen[:, -1]+ridge, denom, out=cond, where=denom > 0)
+        usable &= np.isfinite(cond) & (cond <= condition_limit)
+        result = ybar.copy()
+        good = np.flatnonzero(usable)
+        slopes = np.full_like(zbar, np.nan)
+        if len(good):
+            solved = np.linalg.solve(matrix[good]+ridge*np.eye(d),
+                                     (cross/safe_scales)[good, :, None])[:, :, 0]
+            slopes[good] = solved/safe_scales[good]
+            result[good] -= np.sum(zbar[good]*slopes[good], axis=1)
+        return dict(mean=result, gradient=slopes, tree_mean=ybar, fallback=~usable, condition=cond)
+
+    def _combined_prediction_chunks(self, data, *, linear=False, variance=False,
+            members=False, augment=False, random_state=None, ridge=0.,
+            chunk_rows=None, max_working_mb=64., local_options=None):
+        """Private request engine: one traversal, scoped to bounded query batches."""
+        values = self._prediction_input(data)
+        if linear or local_options is not None:
+            self._require_leaf_stats()
+        if augment and random_state is None:
+            raise ValueError('combined augmentation requires an explicit replay seed')
+        if local_options is not None and augment:
+            raise ValueError('deterministic local convolution cannot reuse jittered selections')
+        if isinstance(ridge, (bool, np.bool_)) or not np.isscalar(ridge) or not np.isfinite(ridge) or ridge < 0:
+            raise ValueError('ridge must be finite and nonnegative')
+        if not np.isfinite(max_working_mb) or max_working_mb <= 0:
+            raise ValueError('max_working_mb must be positive')
+        if variance:
+            self._uncertainty_policy(False)
+        streams = self._smear_streams(augment, random_state)
+        B = len(self.block_trees_); L = len(self.block_trees_[0])
+        if any(len(block) != L for block in self.block_trees_):
+            raise ValueError('combined predictions require rectangular iterations')
+        requested = self._chunk_rows() if chunk_rows is None else self._positive_int(chunk_rows, 'chunk_rows')
+        # Member values, optional offsets, adjusted values and IDs are bounded.
+        per_row = 8 * B * L * (values.shape[1] + 5)
+        size = min(requested, self._chunk_rows(), max(1, int(max_working_mb*1024**2/per_row)))
+        for first in range(0, len(values), size):
+            q = values[first:first+size]; n = len(q)
+            if self.store_leaf_stats_:
+                selected = list(self._linear_selections(q, streams))
+            else:
+                selected = []
+                for b, block in enumerate(self.block_trees_):
+                    for l, tree in enumerate(block):
+                        query = q if streams is None else self._smear_values(q, streams[b][l])
+                        selected.append((b,l,tree,tree.apply(query,check_input=False),None,query))
+            raw = np.column_stack([tree.tree_.value[ids,0,0] for _,_,tree,ids,_,_ in selected])
+            # Preserve the public block/iteration reduction order, not a flat
+            # mean across trees with a potentially different rounding order.
+            block_means = np.asarray([np.mean([raw[:,b*L+l] for l in range(L)],axis=0) for b in range(B)])
+            result = dict(mean=block_means.mean(axis=0))
+            if variance:
+                if getattr(self,'block_sampling_','fixed') == 'historical':
+                    T = np.asarray([[raw[:,b*L+l] for b in range(B)] for l in range(L)])
+                    v = np.var(T[0,1::2]-T[0,::2],axis=0,ddof=1)/(4*(B//2))
+                    if L>1:v -= (1-1/L)*np.var(T.mean(axis=1),axis=0,ddof=1)
+                else:
+                    v = np.var(block_means[1::2]-block_means[::2],axis=0,ddof=1)/(4*self.n_pairs_)
+                result['variance'] = v
+            if linear:
+                result['linear'] = self._linear_from_selected(q, selected, ridge)
+            if members:
+                result['members'] = dict(Mean=raw)
+                if linear:
+                    gradient = np.where(result['linear']['fallback'][:,None],0.,result['linear']['gradient'])
+                    delta = np.stack([stat['centroid'][ids]-q for _,_,_,ids,stat,_ in selected],axis=1)
+                    result['members']['Linear'] = raw-np.einsum('ntd,nd->nt',delta,gradient)
+                    del delta
+            if local_options is not None:
+                options = dict(local_options)
+                unknown = set(options)-{'sigma','degrees','parent_levels','ridge','max_working_mb'}
+                if unknown:raise TypeError('unknown private local options: '+', '.join(sorted(unknown)))
+                ids = np.column_stack([item[3] for item in selected])
+                result['local'] = _ri_local_convolution(self,q,options.get('sigma'),options.get('degrees'),
+                    options.get('parent_levels',1),options.get('ridge',ridge),n,
+                    options.get('max_working_mb',max_working_mb),None,selected_leaves=ids)
+            yield first, first+n, result
 
     def predictLinear(self, data, *, augment=False, random_state=None, ridge=0.,
                       condition_limit=1e10, return_diagnostics=False):
@@ -932,38 +1063,9 @@ class MIForestErrPDF:
         fallback, condition = np.ones(n, dtype=bool), np.full(n, np.inf)
         for first in range(0, n, self._chunk_rows()):
             q = values[first:first+self._chunk_rows()]
-            sz, sy = np.zeros_like(q, dtype=float), np.zeros(len(q))
-            szz, szy = np.zeros((len(q), d, d)), np.zeros_like(q, dtype=float)
-            count = 0
-            for _, _, tree, ids, stat, _ in self._linear_selections(q, streams):
-                delta = stat['centroid'][ids]-q  # original query, not smeared traversal coordinate
-                y = tree.tree_.value[ids, 0, 0]
-                sz += delta; sy += y
-                szz += np.einsum('ni,nj->nij', delta, delta)
-                szy += delta*y[:, None]
-                count += 1
-            zbar, ybar = sz/count, sy/count
-            covariance = szz/count-np.einsum('ni,nj->nij', zbar, zbar)
-            cross = szy/count-zbar*ybar[:, None]
-            scales = np.sqrt(np.maximum(np.diagonal(covariance, axis1=1, axis2=2), 0))
-            usable = (scales > np.finfo(float).eps).all(1)
-            safe_scales = np.where(scales > np.finfo(float).eps, scales, 1.)
-            matrix = covariance/(safe_scales[:, :, None]*safe_scales[:, None, :])
-            eigen = np.linalg.eigvalsh(matrix)
-            # A ridge may regularize a singular design, but zero-spread axes remain
-            # unidentified; with ridge=0 enforce the original design condition.
-            denom = eigen[:, 0]+ridge
-            cond = np.full(len(q), np.inf)
-            np.divide(eigen[:, -1]+ridge, denom, out=cond, where=denom > 0)
-            usable &= np.isfinite(cond) & (cond <= condition_limit)
-            result = ybar.copy()
-            good = np.flatnonzero(usable)
-            slopes = np.full_like(zbar, np.nan)
-            if len(good):
-                solved = np.linalg.solve(matrix[good]+ridge*np.eye(d),
-                                         (cross/safe_scales)[good, :, None])[:, :, 0]
-                slopes[good] = solved/safe_scales[good]
-                result[good] -= np.sum(zbar[good]*slopes[good], axis=1)
+            batch = self._linear_from_selected(q, self._linear_selections(q, streams), ridge, condition_limit)
+            result, ybar = batch['mean'], batch['tree_mean']
+            slopes, usable, cond = batch['gradient'], ~batch['fallback'], batch['condition']
             sl = slice(first, first+len(q))
             pred[sl], tree_mean[sl] = result, ybar
             gradient[sl], fallback[sl], condition[sl] = slopes, ~usable, cond
@@ -1177,58 +1279,115 @@ class MIForestErrPDF:
                         for block in self.block_trees_], axis=0)
 
 
-# PHASE_2_3 experimental, opt-in path. Legacy methods above are untouched.
+# PHASE_2_3 experimental, opt-in path. Legacy estimator definitions are preserved.
 def _ri_parent_geometry(tree, levels):
-    """DFS leaf order makes every node's descendant leaves one interval."""
+    """One cached parent level per fitted tree, replaced on level/refit change."""
     t = tree.tree_; size = t.node_count; dim = tree.n_features_in_
+    stats = tree._ri_leaf_stats
+    level = min(levels, t.max_depth)
+    cached = getattr(tree, '_ri_parent_geometry_cache', None)
+    if cached is not None and cached[0] is t and cached[1] is stats and cached[2] == level:
+        return cached[3]
     parent = np.zeros(size, dtype=np.intp)
     start = np.zeros(size, dtype=np.intp); stop = start.copy()
-    leaf_ids = []; lower = []; upper = []
-    stack = [(0, np.full(dim, -np.inf), np.full(dim, np.inf), False)]
+    leaf_ids = []
+    stack = [(0, False)]
     while stack:
-        node, lo, hi, done = stack.pop()
+        node, done = stack.pop()
         if done:
             stop[node] = len(leaf_ids); continue
         start[node] = len(leaf_ids)
         left, right = t.children_left[node], t.children_right[node]
         if left == -1:
-            leaf_ids.append(node); lower.append(lo); upper.append(hi)
+            leaf_ids.append(node)
             stop[node] = len(leaf_ids); continue
         parent[left] = parent[right] = node
-        j = t.feature[node]; threshold = t.threshold[node]
-        lh = hi.copy(); lh[j] = min(lh[j], threshold)
-        rl = lo.copy(); rl[j] = max(rl[j], threshold)
-        stack.extend([(node, lo, hi, True), (right, rl, hi.copy(), False),
-                      (left, lo.copy(), lh, False)])
+        stack.extend([(node, True), (right, False), (left, False)])
     ancestor = np.arange(size)
     # Saturate at the root; arbitrarily large levels need no long loop.
-    for _ in range(min(levels, t.max_depth)):
+    for _ in range(level):
         ancestor = parent[ancestor]
     leaves = np.asarray(leaf_ids)
-    return dict(start=start, stop=stop, ancestor=ancestor,
-                lower=np.asarray(lower), upper=np.asarray(upper),
+    geometry = dict(start=start, stop=stop, ancestor=ancestor,
+                lower=stats['cell_lower'][leaves], upper=stats['cell_upper'][leaves],
                 value=t.value[leaves, 0, 0],
-                centroid=tree._ri_leaf_stats['centroid'][leaves])
+                centroid=stats['centroid'][leaves])
+    tree._ri_parent_geometry_cache = (t, stats, level, geometry)
+    return geometry
 
 
 def _ri_gaussian_leaf_mass(query, lower, upper, sigma):
     """Matched rows, stable positive-tail CDF subtraction; no random draws."""
     from scipy.special import ndtr
+    active = np.flatnonzero(sigma > 0)
+    factors = np.empty_like(query, dtype=float)
+    if len(active):
+        a = (lower[:, active] - query[:, active]) / sigma[active]
+        b = (upper[:, active] - query[:, active]) / sigma[active]
+        reflected = a >= 0
+        # One CDF call for both limits and all active coordinates. Reflection
+        # retains the existing stable positive-tail subtraction exactly.
+        limits = np.stack((np.where(reflected, -a, b), np.where(reflected, -b, a)))
+        cdf = ndtr(limits)
+        factors[:, active] = np.maximum(0., cdf[0] - cdf[1])
+    inactive = np.flatnonzero(sigma == 0)
+    factors[:, inactive] = ((query[:, inactive] > lower[:, inactive]) &
+                            (query[:, inactive] <= upper[:, inactive]))
     mass = np.ones(len(query))
-    for j, width in enumerate(sigma):
-        x = query[:, j]
-        if width == 0:
-            mass *= (x > lower[:, j]) & (x <= upper[:, j])
-        else:
-            a = (lower[:, j] - x) / width
-            b = (upper[:, j] - x) / width
-            mass *= np.maximum(0., np.where(a >= 0,
-                ndtr(-a) - ndtr(-b), ndtr(b) - ndtr(a)))
+    for j in range(query.shape[1]):
+        mass *= factors[:, j]
     return mass
 
 
+def _ri_descendant_chunks(starts, counts, max_pairs):
+    """Bounded ragged expansion; only two scalar searches per work slice."""
+    cumulative = np.r_[0, np.cumsum(counts)]
+    for begin in range(0, int(cumulative[-1]), max_pairs):
+        end = min(begin + max_pairs, int(cumulative[-1]))
+        first = np.searchsorted(cumulative[1:], begin, side='right')
+        last = np.searchsorted(cumulative[1:], end - 1, side='right') + 1
+        owners = np.arange(first, last)
+        lengths = np.minimum(cumulative[owners + 1], end) - np.maximum(cumulative[owners], begin)
+        qi = np.repeat(owners, lengths)
+        li = starts[qi] + np.arange(begin, end) - cumulative[qi]
+        yield qi, li
+
+
+def _ri_local_tree_moments(item, q, sigma, terms, P, max_pairs, selected=None):
+    (b, l, tree), geo = item
+    n = len(q)
+    if selected is None:selected = tree.apply(q, check_input=False)
+    nodes = geo['ancestor'][selected]
+    starts = geo['start'][nodes]; counts = geo['stop'][nodes] - starts
+    # Subdivide by actual number of descendant observations, not just
+    # query count. One enormous subtree is also split across leaf slices.
+    weighted_y = np.zeros(n); total_mass = np.zeros(n)
+    tree_G = np.zeros((n, P, P)); tree_h = np.zeros((n, P))
+    # Collect unnormalized moments and mass together. Normalize each
+    # tree's complete contribution once, preserving equal tree weight.
+    for qi, li in _ri_descendant_chunks(starts, counts, max_pairs):
+        mass = _ri_gaussian_leaf_mass(q[qi], geo['lower'][li], geo['upper'][li], sigma)
+        total_mass += np.bincount(qi, mass, minlength=n)
+        weighted_y += np.bincount(qi, mass * geo['value'][li], minlength=n)
+        delta = geo['centroid'][li] - q[qi]
+        design = np.column_stack([np.ones(len(qi))] + [delta[:, j]**power for j, power in terms])
+        weighted_design = mass[:, None] * design
+        # Intercept moments are the same mass/value sums already accumulated.
+        for k in range(1, P):
+            tree_h[:, k] += np.bincount(qi, weighted_design[:, k] * geo['value'][li], minlength=n)
+            for m in range(k + 1):
+                value = np.bincount(qi, weighted_design[:, k] * design[:, m], minlength=n)
+                tree_G[:, k, m] += value
+                if m != k: tree_G[:, m, k] += value
+    if np.any(total_mass <= 0):
+        raise FloatingPointError('parent Gaussian mass underflow; no silent renormalization')
+    tree_h[:, 0] = weighted_y
+    tree_G[:, 0, 0] = total_mass
+    return b, l, weighted_y / total_mass, total_mass, counts, tree_h / total_mass[:, None], tree_G / total_mass[:, None, None]
+
+
 def _ri_local_convolution(model, values, sigma, degrees, levels, ridge,
-                          chunk_rows, max_working_mb, progress):
+                          chunk_rows, max_working_mb, progress, selected_leaves=None):
     dim = values.shape[1]
     sigma = model.smear_sigma_ if sigma is None else sigma
     sigma = np.asarray(sigma, dtype=float)
@@ -1259,113 +1418,104 @@ def _ri_local_convolution(model, values, sigma, degrees, levels, ridge,
     P = 1 + len(terms); N = len(values)
     # Conservative bound on temporaries per expanded query/descendant pair.
     # This is a work-array budget, not a total-process RSS guarantee.
-    max_pairs = max(1, int(max_working_mb * 1024**2 / (8 * (4*dim + 3*P + 20))))
+    from joblib import effective_n_jobs
+    from concurrent.futures import ThreadPoolExecutor
+    from contextlib import nullcontext
+    jobs = min(len(trees), effective_n_jobs(model.optionsErrPDF['n_jobs']))
+    max_pairs = max(1, int(max_working_mb * 1024**2 / (jobs * 8 * (12*dim + 3*P + 24))))
     output = {k: np.empty(N) for k in ('mean_parent_convolved', 'mean_local',
         'mean_local_convolved', 'parent_half_A', 'parent_half_B',
         'parent_variance_raw', 'retained_mass', 'minimum_retained_mass',
-        'condition', 'local_half_A', 'local_half_B')}
+        'condition', 'local_half_A', 'local_half_B',
+        'local_half_A_condition', 'local_half_B_condition')}
     output.update(gradient=np.full((N, dim), np.nan),
                   curvature=np.full((N, dim), np.nan),
                   fallback=np.zeros(N, dtype=bool),
+                  local_half_A_fallback=np.zeros(N, dtype=bool),
+                  local_half_B_fallback=np.zeros(N, dtype=bool),
                   descendant_pairs=np.zeros(N, dtype=np.int64))
     def solve(G, h, mean):
         scales = np.sqrt(np.maximum(np.diagonal(G, axis1=1, axis2=2), 0.))
         valid = (scales > np.finfo(float).eps).all(1)
         safe = np.where(scales > np.finfo(float).eps, scales, 1.)
         matrix = G / safe[:, :, None] / safe[:, None, :]
-        eigen = np.linalg.eigvalsh(matrix)
-        condition = np.full(len(G), np.inf)
-        np.divide(eigen[:, -1] + ridge, eigen[:, 0] + ridge,
-                  out=condition, where=eigen[:, 0] + ridge > 0)
-        valid &= np.isfinite(condition) & (condition <= 1e12)
-        # Do not penalize the intercept. Ridge on normalized slope terms only.
+        # Condition exactly the matrix solved below: ridge excludes intercept.
         penalty = np.eye(P) * ridge; penalty[0, 0] = 0.
+        penalized = matrix + penalty
+        eigen = np.linalg.eigvalsh(penalized)
+        condition = np.full(len(G), np.inf)
+        np.divide(eigen[:, -1], eigen[:, 0],
+                  out=condition, where=eigen[:, 0] > 0)
+        valid &= np.isfinite(condition) & (condition <= 1e12)
         coef = np.zeros_like(h); coef[:, 0] = mean
         if valid.any():
             # Use individual fallback if a numerically singular batch slips
             # through the condition test; never silently solve a pseudo-inverse.
             try:
-                coef[valid] = np.linalg.solve(matrix[valid] + penalty,
+                coef[valid] = np.linalg.solve(penalized[valid],
                     (h[valid] / safe[valid])[..., None])[..., 0] / safe[valid]
             except np.linalg.LinAlgError:
                 for i in np.flatnonzero(valid):
-                    try: coef[i] = np.linalg.solve(matrix[i] + penalty, h[i]/safe[i]) / safe[i]
+                    try: coef[i] = np.linalg.solve(penalized[i], h[i]/safe[i]) / safe[i]
                     except np.linalg.LinAlgError: valid[i] = False
         return coef, ~valid, condition
-    for first in range(0, N, chunk_rows):
-        last = min(first + chunk_rows, N); q = values[first:last]; n = len(q)
-        G = np.zeros((2, n, P, P)); h = np.zeros((2, n, P))
-        T = np.empty((L, B, n)); retained = np.zeros(n); minimum = np.ones(n)
-        pairs_count = np.zeros(n, dtype=np.int64)
-        for (b, l, tree), geo in zip(trees, geometry):
-            selected = tree.apply(q, check_input=False)
-            nodes = geo['ancestor'][selected]
-            starts = geo['start'][nodes]; counts = geo['stop'][nodes] - starts
-            pairs_count += counts
-            # Subdivide by actual number of descendant observations, not just
-            # query count. One enormous subtree is also split across leaf slices.
-            cumulative = np.r_[0, np.cumsum(counts)]
-            weighted_y = np.zeros(n); total_mass = np.zeros(n)
-            # First pass gets each tree's parent mass for equal-tree weighting.
-            for begin in range(0, int(cumulative[-1]), max_pairs):
-                flat = np.arange(begin, min(begin + max_pairs, cumulative[-1]))
-                qi = np.searchsorted(cumulative[1:], flat, side='right')
-                li = starts[qi] + flat - cumulative[qi]
-                mass = _ri_gaussian_leaf_mass(q[qi], geo['lower'][li], geo['upper'][li], sigma)
-                total_mass += np.bincount(qi, mass, minlength=n)
-                weighted_y += np.bincount(qi, mass * geo['value'][li], minlength=n)
-            if np.any(total_mass <= 0):
-                raise FloatingPointError('parent Gaussian mass underflow; no silent renormalization')
-            T[l, b] = weighted_y / total_mass
-            retained += total_mass; minimum = np.minimum(minimum, total_mass)
-            # Second bounded pass accumulates all polynomial normal-equation
-            # entries from the same descendant observations (no per-output fit).
-            for begin in range(0, int(cumulative[-1]), max_pairs):
-                flat = np.arange(begin, min(begin + max_pairs, cumulative[-1]))
-                qi = np.searchsorted(cumulative[1:], flat, side='right')
-                li = starts[qi] + flat - cumulative[qi]
-                weight = _ri_gaussian_leaf_mass(q[qi], geo['lower'][li], geo['upper'][li], sigma) / total_mass[qi]
-                delta = geo['centroid'][li] - q[qi]
-                design = np.column_stack([np.ones(len(qi))] + [delta[:, j]**power for j, power in terms])
-                side = b % 2
-                for k in range(P):
-                    h[side, :, k] += np.bincount(qi, weight * design[:, k] * geo['value'][li], minlength=n)
-                    for m in range(k + 1):
-                        value = np.bincount(qi, weight * design[:, k] * design[:, m], minlength=n)
-                        G[side, :, k, m] += value
-                        if m != k: G[side, :, m, k] += value
-        G /= B*L/2; h /= B*L/2
-        mean = T.mean(0).mean(0)
-        coef, fallback, condition = solve(G.mean(0), h.mean(0), mean)
-        gradient = np.zeros((n, dim)); curvature = np.zeros_like(gradient)
-        for k, (j, power) in enumerate(terms, 1):
-            if power == 1: gradient[:, j] = coef[:, k]
-            else: curvature[:, j] = 2 * coef[:, k]
-        gradient[fallback] = np.nan; curvature[fallback] = np.nan
-        convolved_local = coef[:, 0].copy()
-        for k, (j, power) in enumerate(terms, 1):
-            if power == 2: convolved_local += coef[:, k] * sigma[j]**2
-        sl = slice(first, last)
-        output['mean_parent_convolved'][sl] = mean
-        output['mean_local'][sl] = coef[:, 0]
-        output['mean_local_convolved'][sl] = convolved_local
-        output['parent_half_A'][sl] = T[:, ::2].mean(0).mean(0)
-        output['parent_half_B'][sl] = T[:, 1::2].mean(0).mean(0)
-        v1 = np.var(T[0, 1::2] - T[0, ::2], axis=0, ddof=1) / (4 * (B//2))
-        vi = np.var(T.mean(1), axis=0, ddof=1) if L > 1 else np.zeros(n)
-        if getattr(model, 'block_sampling_', 'fixed') == 'historical':
-            output['parent_variance_raw'][sl] = v1 - (1 - 1/L)*vi
-        else:
-            members = T.mean(0)
-            output['parent_variance_raw'][sl] = np.var(members[1::2]-members[::2], axis=0, ddof=1)/(4*(B//2))
-        # Half fits are genuinely refitted with their own observations. Their
-        # difference is a diagnostic, not a claimed calibrated standard error.
-        output['local_half_A'][sl] = solve(G[0], h[0], T[:, ::2].mean(0).mean(0))[0][:, 0]
-        output['local_half_B'][sl] = solve(G[1], h[1], T[:, 1::2].mean(0).mean(0))[0][:, 0]
-        output['retained_mass'][sl] = retained / (B*L)
-        output['minimum_retained_mass'][sl] = minimum
-        output['gradient'][sl] = gradient; output['curvature'][sl] = curvature
-        output['fallback'][sl] = fallback; output['condition'][sl] = condition
-        output['descendant_pairs'][sl] = pairs_count
-        if progress: progress(first, last)
+    with ThreadPoolExecutor(max_workers=jobs) if jobs > 1 else nullcontext() as executor:
+        for first in range(0, N, chunk_rows):
+            last = min(first + chunk_rows, N); q = values[first:last]; n = len(q)
+            G = np.zeros((2, n, P, P)); h = np.zeros((2, n, P))
+            T = np.empty((L, B, n)); retained = np.zeros(n); minimum = np.ones(n)
+            pairs_count = np.zeros(n, dtype=np.int64)
+            def evaluate(indexed):
+                index, item = indexed
+                selected = None if selected_leaves is None else selected_leaves[first:last,index]
+                return _ri_local_tree_moments(item, q, sigma, terms, P, max_pairs, selected)
+            for wave in range(0, len(trees), jobs):
+                items = list(enumerate(zip(trees[wave:wave+jobs], geometry[wave:wave+jobs]),start=wave))
+                results = map(evaluate, items) if executor is None else executor.map(evaluate, items)
+                # Executor.map preserves tree order. At most jobs results can be
+                # pending; never retain a full forest of query normal equations.
+                for b, l, tree_mean, total_mass, counts, tree_h, tree_G in results:
+                    T[l, b] = tree_mean
+                    retained += total_mass; minimum = np.minimum(minimum, total_mass)
+                    pairs_count += counts
+                    h[b % 2] += tree_h
+                    G[b % 2] += tree_G
+            G /= B*L/2; h /= B*L/2
+            mean = T.mean(0).mean(0)
+            coef, fallback, condition = solve(G.mean(0), h.mean(0), mean)
+            gradient = np.zeros((n, dim)); curvature = np.zeros_like(gradient)
+            for k, (j, power) in enumerate(terms, 1):
+                if power == 1: gradient[:, j] = coef[:, k]
+                else: curvature[:, j] = 2 * coef[:, k]
+            gradient[fallback] = np.nan; curvature[fallback] = np.nan
+            convolved_local = coef[:, 0].copy()
+            for k, (j, power) in enumerate(terms, 1):
+                if power == 2: convolved_local += coef[:, k] * sigma[j]**2
+            sl = slice(first, last)
+            output['mean_parent_convolved'][sl] = mean
+            output['mean_local'][sl] = coef[:, 0]
+            output['mean_local_convolved'][sl] = convolved_local
+            output['parent_half_A'][sl] = T[:, ::2].mean(0).mean(0)
+            output['parent_half_B'][sl] = T[:, 1::2].mean(0).mean(0)
+            v1 = np.var(T[0, 1::2] - T[0, ::2], axis=0, ddof=1) / (4 * (B//2))
+            vi = np.var(T.mean(1), axis=0, ddof=1) if L > 1 else np.zeros(n)
+            if getattr(model, 'block_sampling_', 'fixed') == 'historical':
+                output['parent_variance_raw'][sl] = v1 - (1 - 1/L)*vi
+            else:
+                members = T.mean(0)
+                output['parent_variance_raw'][sl] = np.var(members[1::2]-members[::2], axis=0, ddof=1)/(4*(B//2))
+            # Half fits are genuinely refitted with their own observations. Their
+            # difference is a diagnostic, not a claimed calibrated standard error.
+            for side, label in enumerate(('A', 'B')):
+                half_coef, half_fallback, half_condition = solve(
+                    G[side], h[side], output['parent_half_' + label][sl])
+                output['local_half_' + label][sl] = half_coef[:, 0]
+                output['local_half_' + label + '_fallback'][sl] = half_fallback
+                output['local_half_' + label + '_condition'][sl] = half_condition
+            output['retained_mass'][sl] = retained / (B*L)
+            output['minimum_retained_mass'][sl] = minimum
+            output['gradient'][sl] = gradient; output['curvature'][sl] = curvature
+            output['fallback'][sl] = fallback; output['condition'][sl] = condition
+            output['descendant_pairs'][sl] = pairs_count
+            if progress: progress(first, last)
     return output
