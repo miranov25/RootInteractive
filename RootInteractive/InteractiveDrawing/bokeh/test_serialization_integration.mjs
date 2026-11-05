@@ -22,14 +22,23 @@ function allclose(A,B,abs_tol,rel_tol,nan_equal=false){
             if(!(nan_equal && Number.isNaN(a) && Number.isNaN(b))){
                 return false;
             }
-        } else {
+        } else if(Number.isFinite(a) && Number.isFinite(b)){
             const diff = Math.abs(a - b);
-            if (diff > abs_tol && diff > rel_tol * Math.max(Math.abs(a), Math.abs(b))) {
+            if (diff > abs_tol + rel_tol * Math.max(Math.abs(a), Math.abs(b))) {
+                console.log(`allclose failed at index ${i}: a=${a}, b=${b}, diff=${diff}, abs_tol=${abs_tol}, rel_tol=${rel_tol}`)
+                return false;
+            }
+        } else {
+            if(a !== b){
                 return false;
             }
         }
     }
     return true;
+}
+
+if(allclose([Infinity, -Infinity, NaN], [-Infinity, -Infinity, NaN], 0, 0, true)){
+    throw new Error("allclose meta test failed. Expected false but got true")
 }
 
 for(let i=0; i<data.length; i++){
@@ -60,7 +69,7 @@ for(let i=0; i<data.length; i++){
     }
     const decoded_array = SerializationUtils.decodeArray(data_compressed, pipeline, env)
     if(!allclose(decoded_array, decoded_ref, meta.abs_tol, meta.rel_tol, meta.nan_equal)){
-        throw new Error(`${meta.name} test failed. Expected ${decoded_ref} but got ${decoded_array}`)
+        throw new Error(`${meta.name} test failed.`)
     }
     console.log(`Test case passed: ${meta.name}`)
 }

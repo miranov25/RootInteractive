@@ -189,6 +189,36 @@ def test_customJsFunctionBokehDrawArray_v():
     bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
                           widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
                            aliasArray=aliasArray, histogramArray=histoArray)
+
+def test_fitterBreakRegression():
+    jsFunctionArray = [
+        {
+            "name": "linearFit",
+            "type": "linearFit",
+            "varX": "predictors",
+            "varY": "A_mul_paramX_plus_B",
+            "alpha": 1e-4,
+            "weights": "C"
+        },
+        {
+            "name": "saxpy",
+            "parameters": ["paramX"],
+            "fields": ["x", "y"],
+            "v_func": """
+                if($output == null || $output.length !== a.length){
+                    $output = new Float64Array(a.length)
+                }
+                for(let i=0; i<$output.length; i++){
+                    $output[i] = paramX*a[i]+b[i]
+                }
+                return $output
+            """ 
+        }
+    ]
+    output_file("test_LinearFitterBreak.html")
+    bokehDrawSA.fromArray(df, None, figureArray, widgetParams, layout=figureLayoutDesc, tooltips=tooltips, parameterArray=parameterArray,
+                          widgetLayout=widgetLayoutDesc, sizing_mode="scale_width", nPointRender=300, jsFunctionArray=jsFunctionArray,
+                           aliasArray=aliasArray, histogramArray=histoArray)
  
 def test_Error():
     aliasArrayBad = aliasArray.copy()

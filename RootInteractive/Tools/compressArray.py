@@ -72,7 +72,7 @@ def roundAbsolute(df, delta, downgrade_type=True):
         return out, {"scale": 1, "origin": 0, "sentinels": {"nan":0, "neginf":-1, "posinf":1}}
     quantized = np.rint(df / delta)
     result = quantized * delta
-    deltaMean = (df - result)[np.isfinite(df)].mean()
+    deltaMean = np.mean((df - result)[np.isfinite(df)])
     quantized = np.rint((df-deltaMean) / delta)
     if downgrade_type:
         dfMin = np.nanmin(quantized[np.isfinite(quantized)])
@@ -106,7 +106,7 @@ def roundAbsolute(df, delta, downgrade_type=True):
     return result.astype(type), None
 
 
-def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
+def roundSqrtScaling(df, sigma0, sigma1, nBits=None):
     """
     roundSqrtScaling - round sqrt scaling of float number in nBits, assuming better lossy compression later
     :param df:              - input array (for a moment only pandas or numpy)
@@ -121,6 +121,8 @@ def roundSqrtScaling(df, sigma0, sigma1, nBits=8):
     if sigma0 <= 0 or sigma1 <= 0:
         raise ValueError("sigma0 and sigma1 must be positive")
     quantized = np.rint(np.arcsinh(df*sigma1/sigma0)/sigma0)
+    if nBits is None:
+        nBits = 8 if np.min(quantized) >= -0x80 and np.max(quantized) <= 0x7f else 16 if np.min(quantized) >= -0x8000 and np.max(quantized) <= 0x7fff else 32
     neginf = -2**(nBits-1)+1
     posinf = 2**(nBits-1)-1
     quantized = np.clip(quantized, neginf, posinf)
@@ -170,9 +172,9 @@ def codeMapDF(df, maxFraction=0.5, doPrint=0):
                 dictValuesI[i] = value
             mapCodeI[column] = dictValuesI
             if values.size < 255:
-                mapIndex[column] = df[column].map(dictValues).astype("int8")
+                mapIndex[column] = df[column].map(dictValues).astype("uint8")
             else:
-                mapIndex[column] = df[column].map(dictValues).astype("int16")
+                mapIndex[column] = df[column].map(dictValues).astype("uint16")
             if doPrint:
                 dfSizeC = getCompressionSize(mapIndex[column].to_numpy())
                 dfSize0 = getSize(mapIndex[column].to_numpy())
@@ -239,11 +241,11 @@ def compressArray(inputArray, actionArray, keepValues=False, verbosity=0):
                 for i, value in enumerate(values):
                     dictValues[value] = i
                 if values.size < 2 ** 8:
-                    currentArray = currentArray.map(dictValues).astype("int8")
+                    currentArray = currentArray.map(dictValues).astype("uint8")
                 elif values.size < 2 ** 16:
-                    currentArray = currentArray.map(dictValues).astype("int16")
+                    currentArray = currentArray.map(dictValues).astype("uint16")
                 else:
-                    currentArray = currentArray.map(dictValues).astype("int32")
+                    currentArray = currentArray.map(dictValues).astype("uint32")
                 dtype0 = currentArray.dtype
                 dtype1 = values.dtype
                 if dtype1.kind == 'O':
