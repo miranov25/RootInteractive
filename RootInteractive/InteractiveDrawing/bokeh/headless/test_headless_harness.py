@@ -18,6 +18,9 @@ Negative controls of stage 4.2b:
 9. A probed model that disappears after a JavaScript step is an ERROR, and the report is still written (Claude3 N-1).
 10. A console error that is not on the allowed list is an ERROR (console-error policy).
 11. An expected failure that does not occur is a strict XPASS and fails the scenario.
+12. (4.2b v0.2, GPT24 P1-2) After a step that never completes, every feature whose checks were not executed is
+    "Unverified" — not only the scenario's first feature; an error inside the automatic check marks only the affected
+    check and its feature.
 """
 import pytest
 
@@ -179,3 +182,46 @@ def test_expected_failure_that_does_not_occur_is_a_strict_xpass(headless_session
     res = run(headless_session, sc, headless_out, test_ref=__file__)
     x = [o for o in res.outcomes if o.check == "h1.bin_count" and o.step == 1]
     assert not res.ok and [o.outcome for o in x] == ["XPASS"] and "did not occur" in x[0].detail
+
+
+def _two_features(id_, steps):
+    return Scenario(id=id_, data=Tables(TableSpec(2000, 8, {"x": "uniform(0,1)", "y": "normal(0,1)",
+                                                         "a": "normal(0,1)"})),
+                    page=Page(histograms=(hist("h1", ["x"], 10, [0, 1]),
+                                          hist("h2", ["x", "y"], [10, 4], [[0, 1], [-3, 3]])),
+                              widgets=(range_("a"),)),
+                    steps=steps, checks=(auto(),), labels=Labels(family="harness", technique="feature attribution"))
+
+
+def test_stopped_scenario_leaves_every_untested_feature_unverified(headless_session, headless_out):
+    res = run(headless_session, _two_features("harness/two_features_stopped",
+              (load(), js_action("window.__never = false;", until="window.__never === true", timeout_s=0.3),
+               set_("a", [-1, 1]))), headless_out, test_ref=__file__)
+    f = res.features()
+    assert not res.ok and f["HIST.histogram_1d"] == "Unverified" and f["HIST.histogram_nd"] == "Unverified", res.text()
+    skipped = {(o.step, o.check) for o in res.outcomes if o.outcome == "SKIP"}
+    assert {(1, "h1.bin_count"), (1, "h2.bin_count"), (2, "h1.bin_count"), (2, "h2.bin_count")} <= skipped
+
+
+def test_completed_scenario_has_both_features_working(headless_session, headless_out):
+    res = run(headless_session, _two_features("harness/two_features_completed", (load(), set_("a", [-1, 1]))),
+              headless_out, test_ref=__file__)
+    f = res.features()
+    assert res.ok and f["HIST.histogram_1d"] == "Working" and f["HIST.histogram_nd"] == "Working", res.text()
+
+
+def test_error_inside_auto_marks_only_the_affected_check(headless_session, headless_out, monkeypatch):
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import runner
+    real = runner.histograms.counts
+
+    def failing_for_nd(columns, nbins, ranges, mask=None, weights=None):
+        if len(columns) > 1:
+            raise RuntimeError("injected oracle error for the N-D histogram")
+        return real(columns, nbins, ranges, mask=mask, weights=weights)
+    monkeypatch.setattr(runner.histograms, "counts", failing_for_nd)
+    res = run(headless_session, _two_features("harness/error_inside_auto", (load(), set_("a", [-1, 1]))),
+              headless_out, test_ref=__file__)
+    by = {(o.step, o.check): o for o in res.outcomes}
+    assert by[(0, "h2.bin_count")].outcome == "ERROR" and by[(0, "h1.bin_count")].outcome == "PASS", res.text()
+    f = res.features()
+    assert f["HIST.histogram_nd"] == "Broken" and f["HIST.histogram_1d"] == "Working", res.text()

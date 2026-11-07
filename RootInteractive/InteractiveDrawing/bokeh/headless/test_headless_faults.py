@@ -8,6 +8,7 @@ import pytest
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.histograms import PLAIN
+from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import known_defects
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
 
 pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration")]
@@ -55,3 +56,24 @@ def test_fault_that_does_not_match_is_an_error(headless_session, headless_out):
     bad = faults.Fault(id="no_match", description="target absent", source="none", search="no such text", replace="x")
     res = run(headless_session, PLAIN, headless_out, test_ref=__file__, fault=bad)
     assert not res.ok and [o.outcome for o in res.outcomes] == ["ERROR"] and "found 0 times" in res.outcomes[0].detail
+
+
+def test_lost_update_on_b1_is_not_masked_as_b1(headless_session, headless_out):
+    """4.2b v0.2 (P1-1, Claude3): with v0.1's direction-only B1 signature this run was XFAIL everywhere and OK. With the
+    exact signature, a page that ignores the widget moves is a different problem at the moves."""
+    res = run(headless_session, B1_TWO_FILTERS, headless_out, test_ref=__file__, fault=faults.UPDATE_NEVER_TRIGGERED)
+    by = _by(res)
+    assert res.fault_executions >= 1 and not res.ok, res.text()
+    for k in (1, 2):
+        assert by[(k, "h2.bin_count")].outcome == "FAIL" and "a different problem" in by[(k, "h2.bin_count")].detail
+    assert by[(0, "h2.bin_count")].outcome == "XFAIL"                           # at load the fault does not act yet
+
+
+@pytest.mark.parametrize("fault", list(faults.FAULTS.values()), ids=list(faults.FAULTS))
+@pytest.mark.parametrize("scenario", known_defects.SCENARIOS, ids=[s.id for s in known_defects.SCENARIOS])
+def test_fault_known_defect_matrix(fault, scenario, headless_session, headless_out):
+    """4.2b v0.2 (P2-5, Claude3): every fault on every known-defect scenario must make the scenario fail — never an
+    XFAIL with ok = True (a known defect hiding a new problem)."""
+    res = run(headless_session, scenario, headless_out, test_ref=__file__, fault=fault)
+    assert res.fault_executions >= 1, res.text()
+    assert not res.ok, "fault masked by a known defect:\n" + res.text()

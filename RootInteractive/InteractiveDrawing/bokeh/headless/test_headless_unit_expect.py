@@ -5,7 +5,8 @@ import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults, report
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.expect import (
-    EqualsUnselected, Error, ExcessInCells, Mismatch, classify, expected_failure, feature_status)
+    EqualsSelection, EqualsUnselected, Error, ExcessInCells, Mismatch, classify, expected_failure, feature_status)
+from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import filters
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     LOAD_CHECK, Labels, Page, Scenario, ScenarioError, TableSpec, Tables, auto, hist, load, range_, set_)
 
@@ -27,6 +28,10 @@ A = lambda *v: np.array(v, dtype=np.float64)
     (ExcessInCells((0,), "nan_rows"), A(7, 4, 2), A(5, 3, 2), {"nan_rows": 2.0}, False),   # another cell too
     (ExcessInCells((0,), "nan_rows"), A(6, 3, 2), A(5, 3, 2), {"nan_rows": 2.0}, False),   # wrong amount
     (ExcessInCells((0,), "nan_rows"), A(5, 3, 2), A(5, 3, 2), {"nan_rows": 0.0}, False),   # cannot show
+    (EqualsSelection("r"), A(7, 3), A(5, 3), {"selection:r": A(7, 3)}, True),
+    (EqualsSelection("r"), A(8, 3), A(5, 3), {"selection:r": A(7, 3)}, False),     # one extra count: not the defect
+    (EqualsSelection("r"), A(5, 3), A(5, 3), {"selection:r": A(5, 3)}, False),     # defect cannot show here
+    (EqualsSelection("r"), A(7, 3), A(5, 3), {}, False),                           # no reference
     (Error("KeyError: 'weights'"), None, None, {"error": "page build failed: KeyError: 'weights'"}, True),
     (Error("KeyError: 'weights'"), None, None, {"error": "TypeError"}, False),
 ])
@@ -116,3 +121,53 @@ def test_fault_applies_exactly_once():
         faults.apply("nothing here", f)
     with pytest.raises(faults.FaultNotApplied, match="found 2 times"):
         faults.apply(f.search + f.search, f)
+
+
+
+# ------------------------------------------------------------------------------------------- stage 4.2b v0.2
+def test_signature_uses_the_checks_tolerance():
+    """Claude3's / Claude10's weighted B8: bin 0 exceeds the oracle by the NaN weight sum only within ~1e-12."""
+    oracle = A(2232.2802212641473, 10.0)
+    page = A(2232.2802212641473 + 2486.554153600955, 10.0)
+    sig, ctx = ExcessInCells((0,), "nan_rows"), {"nan_rows": 2486.554153600963}
+    assert sig.holds(page, oracle, ctx, (0.0, 0.0))[0] is False            # exact comparison: false FAIL (v0.1)
+    assert sig.holds(page, oracle, ctx, (1e-9, 1e-12))[0] is True          # with the check's tolerance: the defect
+    assert classify("h.bin_count", 0, False, page, oracle, ctx,
+                    [expected_failure("B8", "h.bin_count", (0,), sig)], (1e-9, 1e-12))[0] == "XFAIL"
+
+
+def test_b1_masking_counterexamples_are_failures():
+    """GPT24 / GPT22 / Claude3: with the exact B1 signature, an overcount that B1 does not produce stays FAIL."""
+    oracle, b1 = A(823, 410, 200), A(938, 470, 230)
+    exp = [expected_failure("B1", "h.bin_count", (0,), EqualsSelection("r"))]
+    ctx = {"selection:r": b1}
+    assert classify("h.bin_count", 0, False, b1, oracle, ctx, exp)[0] == "XFAIL"                  # healthy control
+    assert classify("h.bin_count", 0, False, b1 + A(1, 0, 0), oracle, ctx, exp)[0] == "FAIL"      # one extra count
+    assert classify("h.bin_count", 0, False, A(970, 480, 240), oracle, ctx, exp)[0] == "FAIL"     # a lost update
+    out = classify("h.bin_count", 0, False, A(np.inf, np.inf, np.inf), oracle, ctx, exp)            # infinities
+    assert out[0] == "FAIL" and "non-finite" in out[1]
+
+
+def test_mismatch_is_reported_as_loose():
+    assert "loose signature" in Mismatch("page > oracle").holds(A(5, 3), A(4, 3), {})[1]
+
+
+def test_b1_selection_rule():
+    """First filter applied; a later filter keeps the rows it excluded at load (here: the missing value of b)."""
+    a_now, b_now = np.array([True, True, False, True]), np.array([True, False, True, False])
+    b_load = np.array([True, True, True, False])          # row 3: b missing, excluded at load
+    assert filters.b1_selection([a_now, b_now], [a_now, b_load]).tolist() == [True, False, False, True]
+    assert filters.b1_selection([a_now], [a_now]).tolist() == a_now.tolist()
+
+
+@pytest.mark.parametrize("over,match", [
+    ({"expect": (expected_failure("B1", "h.bin_count", (0,), Mismatch("page > oracle")),
+                 expected_failure("B8", "h.bin_count", (0, 1), ExcessInCells((0,), "nan_rows")))}, "two expected failures"),
+    ({"page": Page(histograms=(hist("h", ["x"], 10, [0, 1]),), widgets=(range_("a"), range_("x"))),
+      "expect": (expected_failure("B1", "h.bin_count", (0,), EqualsSelection("no_such_rule")),)}, "selection rule"),
+    ({"expect": (expected_failure("B1", "h.bin_count", (0,),
+                                  EqualsSelection("b1_later_filters_keep_rows_excluded_at_load")),)}, "several filters"),
+])
+def test_v02_expectation_validation(over, match):
+    with pytest.raises(ScenarioError, match=match):
+        _sc(**over).validate()

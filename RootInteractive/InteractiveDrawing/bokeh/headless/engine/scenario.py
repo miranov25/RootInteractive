@@ -18,7 +18,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from .expect import ExpectedFailure
+from ..oracles.filters import SELECTION_RULES
+from .expect import EqualsSelection, ExpectedFailure
 
 LOSSLESS = ((".*", (("code", 0), ("zip", 0), ("base64", 0))),)
 LOAD_CHECK = "load.finite_rows_selected"      # the engine's load check: rows selected by the page at default limits
@@ -292,9 +293,22 @@ class Scenario:
                           for o in params[h.weights].options]}
         if self.page.widgets and all(w.limits is None for w in self.page.widgets):
             checks_known.add(LOAD_CHECK)
+        seen = {}
         for e in self.expect:
             if not isinstance(e, ExpectedFailure):
                 raise ScenarioError(f"{where}: expect holds {type(e).__name__}; use expected_failure(...)")
+            for k in e.steps:
+                if (e.check, k) in seen:
+                    raise ScenarioError(f"{where}: two expected failures ({seen[(e.check, k)]}, {e.bug}) on check "
+                                        f"{e.check!r} at step {k}; overlapping defects need one combined description")
+                seen[(e.check, k)] = e.bug
+            if isinstance(e.signature, EqualsSelection):
+                if e.signature.rule not in SELECTION_RULES:
+                    raise ScenarioError(f"{where}: expected failure {e.bug} names selection rule "
+                                        f"{e.signature.rule!r}; known: {sorted(SELECTION_RULES)}")
+                if len(self.page.widgets) < 2:
+                    raise ScenarioError(f"{where}: selection rule {e.signature.rule!r} concerns several filters; "
+                                        f"the page has {len(self.page.widgets)}")
             if not e.bug:
                 raise ScenarioError(f"{where}: an expected failure needs the bug id it documents")
             if e.check not in checks_known:

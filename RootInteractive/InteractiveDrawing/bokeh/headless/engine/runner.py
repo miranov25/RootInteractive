@@ -39,10 +39,11 @@ from . import faults as faults_mod
 from . import page as page_mod
 from . import transport, vendor
 from .compare import compare
-from .expect import classify
+from .expect import EqualsSelection, classify
 from .report import ScenarioResult
 from .scenario import LOAD_CHECK, Audit, Auto, JsAction, JsValue, Load, Responds, Scenario, SetRange
 from ..oracles import filters, histograms
+from ..oracles.filters import SELECTION_RULES
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 LOAD_TIMEOUT_MS = 20_000
@@ -190,7 +191,9 @@ class Session:
 
 
 # ------------------------------------------------------------------------------------------- oracle helpers
-def _widget_mask(pg, scenario: Scenario, df: pd.DataFrame) -> Tuple[np.ndarray, Dict[str, dict]]:
+def _widget_mask(pg, scenario: Scenario, df: pd.DataFrame) -> Tuple[np.ndarray, Dict[str, dict], List[np.ndarray]]:
+    """Intersection of all range filters, the widget states read from the page, and the mask of each widget in the
+    order of the page declaration."""
     states = {}
     masks = []
     for w in scenario.page.widgets:
@@ -199,7 +202,7 @@ def _widget_mask(pg, scenario: Scenario, df: pd.DataFrame) -> Tuple[np.ndarray, 
             raise StepNotComplete(lim["error"])
         states[w.column] = lim
         masks.append(filters.range_mask(df[w.column].to_numpy(), lim["value"][0], lim["value"][1]))
-    return filters.intersection(masks, len(df)), states
+    return filters.intersection(masks, len(df)), states, masks
 
 
 def _variable(df: pd.DataFrame, scenario: Scenario, name: str) -> np.ndarray:
@@ -223,8 +226,31 @@ def _applies(check, step: int) -> bool:
     return check.steps is None or step in check.steps
 
 
-def _check_label(check) -> str:
-    return {Auto: "auto", Audit: "audit", JsValue: "js value", Responds: "responds"}.get(type(check), type(check).__name__)
+def _hist_feature(h) -> str:
+    return "HIST.histogram_1d" if len(h.variables) == 1 else "HIST.histogram_nd"
+
+
+def _load_check_applies(scenario: Scenario, step: int) -> bool:
+    return step == 0 and bool(scenario.page.widgets) and all(w.limits is None for w in scenario.page.widgets)
+
+
+def _concrete_checks(scenario: Scenario, check, step: int) -> List[Tuple[str, str]]:
+    """The concrete checks (report name, feature) a declared check produces at `step` — used to record SKIP and ERROR
+    for exactly the outputs that were not verified (4.2b v0.2, GPT24 P1-2), never for the scenario's first feature
+    only."""
+    if isinstance(check, Auto):
+        out = [(LOAD_CHECK, "FILTER.range")] if _load_check_applies(scenario, step) else []
+        return out + [(f"{m}.bin_count", _hist_feature(h)) for m, h, _ in page_mod.histogram_models(scenario.page)]
+    if isinstance(check, Audit):
+        return [(f"audit after {check.delay_s} s", "ENGINE.completion")]
+    if isinstance(check, JsValue):
+        return [(f"js value {check.expr}", "ENGINE.harness")]
+    if isinstance(check, Responds):
+        if step != max(check.steps):
+            return []
+        return [(f"{check.model}.{check.column} responds to step {check.moved} and returns at step {check.restored}",
+                 _feature_of(scenario, check))]
+    return [(type(check).__name__, "")]
 
 
 def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: int, name: str, feature: str) -> None:
@@ -308,6 +334,7 @@ def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: P
         pg.add_init_script(HELPER_JS)
         probes = _probes(scenario)
         recorded: Dict[Tuple[str, str], Dict[int, list]] = {}
+        state: Dict[str, list] = {}               # widget masks at load (selection rules of known defects need them)
 
         for i, step in enumerate(scenario.steps):
             name = step.describe()
@@ -335,13 +362,16 @@ def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: P
                 if miss:
                     raise StepNotComplete("probed model or column: " + "; ".join(miss))
                 res.completion.append({"step": i, "name": name, **done, "seconds": round(time.time() - ts, 3)})
+                if isinstance(step, Load) and scenario.page.widgets:
+                    state["load_masks"] = _widget_mask(pg, scenario, df)[2]
             except Exception as exc:                                   # the step itself failed: ERROR, then SKIP
                 res.add(i, name, "step completion", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", assertion=False)
                 for k in range(i, len(scenario.steps)):
                     for check in scenario.checks:
                         if _applies(check, k):
-                            res.add(k, scenario.steps[k].describe(), _check_label(check), "SKIP",
-                                    "not executed: an earlier step did not complete", feature=_feature_of(scenario, check))
+                            for cname, feat in _concrete_checks(scenario, check, k):
+                                res.add(k, scenario.steps[k].describe(), cname, "SKIP",
+                                        "not executed: an earlier step did not complete", feature=feat)
                 break
             snapshot = pg.evaluate("p => window.__riH.snapshot(p)", probes)
             for check in scenario.checks:
@@ -353,7 +383,7 @@ def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: P
                     continue
                 try:
                     if isinstance(check, Auto):
-                        _auto(pg, scenario, df, res, i, name)
+                        _auto(pg, scenario, df, res, i, name, state)
                     elif isinstance(check, Audit):
                         pg.wait_for_timeout(int(check.delay_s * 1000))   # audit mode only: deliberate delay
                         miss = pg.evaluate("p => window.__riH.missing(p)", probes)
@@ -371,9 +401,9 @@ def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: P
                     elif isinstance(check, Responds) and i == max(check.steps):
                         _responds(res, check, recorded.get((check.model, check.column), {}), i, name,
                                   _feature_of(scenario, check))
-                except Exception as exc:
-                    res.add(i, name, _check_label(check), "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}",
-                            feature=_feature_of(scenario, check))
+                except Exception as exc:                                # ERROR on each affected concrete check
+                    for cname, feat in _concrete_checks(scenario, check, i):
+                        res.add(i, name, cname, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=feat)
 
         if fault is not None:                                          # proof that the mutated code ran
             res.fault_executions = int(pg.evaluate("() => window.__riFault || 0"))
@@ -419,47 +449,70 @@ def _transport_check(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResu
         res.add(0, "load", f"transport {col}", "PASS" if ok else "FAIL", msg, assertion=False)
 
 
-def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: int, name: str) -> None:
-    mask, states = _widget_mask(pg, scenario, df)
-    defaults = scenario.page.widgets and all(w.limits is None for w in scenario.page.widgets)
-    if step == 0 and defaults and all(s["value"] == [s["start"], s["end"]] for s in states.values()):
+def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: int, name: str,
+          state: Dict[str, list]) -> None:
+    """Automatic oracle for every declared histogram (and the load check). Each concrete check is handled on its own:
+    an error in one marks only that check, with its own feature."""
+    try:
+        mask, states, masks = _widget_mask(pg, scenario, df)
+    except Exception as exc:
+        for cname, feat in _concrete_checks(scenario, Auto(), step):
+            res.add(step, name, cname, "ERROR", f"widget state not readable: {type(exc).__name__}: {str(exc)[:200]}",
+                    feature=feat)
+        return
+    # selections of known defects, only where an expectation asks for one (computed from data and widget values)
+    rules = {e.signature.rule for e in scenario.expect if isinstance(e.signature, EqualsSelection) and step in e.steps}
+    rule_masks = {r: SELECTION_RULES[r](masks, state.get("load_masks", masks)) for r in rules}
+
+    if _load_check_applies(scenario, step) and all(s["value"] == [s["start"], s["end"]] for s in states.values()):
         # the page's own selected-row count, read from the filter every histogram consumes, against the number of
         # rows whose widget columns are finite; only at RootInteractive's default limits (RB-1.4)
-        finite = np.ones(len(df), dtype=bool)
-        for col in states:
-            finite &= np.isfinite(df[col].to_numpy())
-        first = page_mod.histogram_models(scenario.page)[0][0]
-        sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)", [first, HIST_TYPES, len(df)])
-        if sel.get("error"):
-            res.add(step, name, LOAD_CHECK, "ERROR", sel["error"], feature="FILTER.range")
-        else:
-            n_fin = int(finite.sum())
-            outcome, why = classify(LOAD_CHECK, step, sel["count"] == n_fin, [sel["count"]], [n_fin], {},
-                                    scenario.expect)
-            res.add(step, name, LOAD_CHECK, outcome,
-                    f"page selects {sel['count']} rows ({sel['filter']}); rows with finite widget columns {n_fin} of "
-                    f"{len(df)}" + (f"; {why}" if why else ""), feature="FILTER.range")
+        try:
+            finite = np.ones(len(df), dtype=bool)
+            for col in states:
+                finite &= np.isfinite(df[col].to_numpy())
+            first = page_mod.histogram_models(scenario.page)[0][0]
+            sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)", [first, HIST_TYPES, len(df)])
+            if sel.get("error"):
+                res.add(step, name, LOAD_CHECK, "ERROR", sel["error"], feature="FILTER.range")
+            else:
+                n_fin = int(finite.sum())
+                ctx = {f"selection:{r}": [int(m.sum())] for r, m in rule_masks.items()}
+                outcome, why = classify(LOAD_CHECK, step, sel["count"] == n_fin, [sel["count"]], [n_fin], ctx,
+                                        scenario.expect, (0.0, 0.0))
+                res.add(step, name, LOAD_CHECK, outcome,
+                        f"page selects {sel['count']} rows ({sel['filter']}); rows with finite widget columns {n_fin} "
+                        f"of {len(df)}" + (f"; {why}" if why else ""), feature="FILTER.range")
+        except Exception as exc:
+            res.add(step, name, LOAD_CHECK, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature="FILTER.range")
+
     for model, h, wcol in page_mod.histogram_models(scenario.page):
         check = f"{model}.bin_count"
-        feature = "HIST.histogram_1d" if len(h.variables) == 1 else "HIST.histogram_nd"
-        cols = [_variable(df, scenario, v) for v in h.variables]
-        weights = None if wcol is None else df[wcol].to_numpy()
-        expect = histograms.counts(cols, h.nbins, h.range, mask=mask, weights=weights)
-        got = pg.evaluate("([n, c, t]) => window.__riH.col(n, c, t)", [model, "bin_count", HIST_TYPES])
-        if got is None:
-            why = pg.evaluate("([n, t]) => window.__riH.why(n, t)", [model, HIST_TYPES])
-            res.add(step, name, check, "ERROR", f"{why} (or no column bin_count)", feature=feature)
-            continue
-        cmp = compare(got, expect, kind="count") if weights is None else \
-            compare(got, expect, kind="float", abs_tol=1e-9, rel_tol=1e-12)
-        ctx = {}
-        if any(e.check == check and step in e.steps for e in scenario.expect):    # context for signatures
-            ctx["unselected"] = histograms.counts(cols, h.nbins, h.range, mask=None, weights=weights)
-            if len(cols) == 1:
-                nan_rows = mask & np.isnan(cols[0])
-                ctx["nan_rows"] = float(nan_rows.sum() if weights is None else weights[nan_rows].sum())
-        outcome, why = classify(check, step, cmp.ok, got, expect, ctx, scenario.expect)
-        res.add(step, name, check, outcome,
-                f"{cmp.message}; selected rows {int(mask.sum())}" +
-                (f"; ratio page/oracle {cmp.ratio_range}" if cmp.ratio_range else "") + (f"; {why}" if why else ""),
-                feature=feature)
+        feature = _hist_feature(h)
+        try:
+            cols = [_variable(df, scenario, v) for v in h.variables]
+            weights = None if wcol is None else df[wcol].to_numpy()
+            expect = histograms.counts(cols, h.nbins, h.range, mask=mask, weights=weights)
+            got = pg.evaluate("([n, c, t]) => window.__riH.col(n, c, t)", [model, "bin_count", HIST_TYPES])
+            if got is None:
+                why = pg.evaluate("([n, t]) => window.__riH.why(n, t)", [model, HIST_TYPES])
+                res.add(step, name, check, "ERROR", f"{why} (or no column bin_count)", feature=feature)
+                continue
+            tol = (0.0, 0.0) if weights is None else (1e-9, 1e-12)            # the check's own tolerance
+            cmp = compare(got, expect, kind="count") if weights is None else \
+                compare(got, expect, kind="float", abs_tol=tol[0], rel_tol=tol[1])
+            ctx = {}
+            if any(e.check == check and step in e.steps for e in scenario.expect):    # context for signatures
+                ctx["unselected"] = histograms.counts(cols, h.nbins, h.range, mask=None, weights=weights)
+                if len(cols) == 1:
+                    nan_rows = mask & np.isnan(cols[0])
+                    ctx["nan_rows"] = float(nan_rows.sum() if weights is None else weights[nan_rows].sum())
+                for r, m in rule_masks.items():
+                    ctx[f"selection:{r}"] = histograms.counts(cols, h.nbins, h.range, mask=m, weights=weights)
+            outcome, why = classify(check, step, cmp.ok, got, expect, ctx, scenario.expect, tol)
+            res.add(step, name, check, outcome,
+                    f"{cmp.message}; selected rows {int(mask.sum())}" +
+                    (f"; ratio page/oracle {cmp.ratio_range}" if cmp.ratio_range else "") + (f"; {why}" if why else ""),
+                    feature=feature)
+        except Exception as exc:
+            res.add(step, name, check, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=feature)
