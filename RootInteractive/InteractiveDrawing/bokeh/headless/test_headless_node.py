@@ -3,7 +3,9 @@
 A  the stored model bundle: key (erratum V-4), inventory of the 20 model classes with a negative control;
 B  the three rules, each shown to hold and shown to be necessary: realm, construction path, settle rule (V-3);
    the delayed-update control (two timer rounds) and the never-ready control, as in the browser harness;
-C  errors in the page and console errors are ERROR outcomes; the harness exits cleanly with code 0.
+C  errors in the page and console errors are ERROR outcomes, also when raised while the harness starts (v0.2,
+   GPT24); the harness exits cleanly with code 0;
+D  isolation between documents (v0.2, Claude3 and GPT24): a global set by one scenario does not exist in the next.
 """
 import pytest
 
@@ -46,7 +48,8 @@ def test_realm_and_construction_rules(node_session):
     r = node_session.request("selftest")["result"]
     assert r["node_realm"].startswith("rejected"), r              # rule 1 is necessary: Node-realm data is refused
     assert r["window_realm"] == "accepted", r                     # ... and sufficient
-    assert r["direct_histo_nd"].startswith("failed"), r           # rule 2 is necessary: direct construction fails
+    # rule 2 is necessary: with a VALID source, direct construction fails for the construction-order reason itself
+    assert "setting 'length'" in r["direct_histo_nd"], r
 
 
 def test_settle_rule_waits_for_a_timer_round(node_session, node_bundle_root):
@@ -110,3 +113,31 @@ def test_harness_exits_cleanly(node_bundle_root):
     s = NodeSession(node_bundle_root)
     assert s.missing_models == []
     assert s.close() == 0 and s.proc.poll() == 0                  # no hang (jsdom keeps timers alive otherwise)
+
+
+def test_startup_error_fails_every_run_of_the_session(node_bundle_root, headless_out, tmp_path):
+    """GPT24's counterexample: an unexpected console error while the harness loads must not leave a run OK."""
+    bad = tmp_path / "startup_error.js"
+    bad.write_text("console.error('unexpected error at start-up');")
+    s = NodeSession(node_bundle_root, extra_files=[bad])
+    try:
+        sc = _small("harness/node_startup_error", (load(),), (auto(),))
+        res = run(s, sc, headless_out / "controls", test_ref=__file__)
+        pol = [o for o in res.outcomes if o.check == "console error"]
+        assert not res.ok and pol and "unexpected error at start-up" in pol[0].detail, res.text()
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------------------------- D: isolation
+def test_globals_do_not_leak_between_documents(node_session, headless_out):
+    first = _small("harness/node_isolation_sets_a_global",
+                   (load(), js_action("window.__leak = 42; setTimeout(() => {}, 60000);", until="window.__leak === 42")),
+                   (js_value("window.__leak", 42, steps=(1,)),))
+    second = _small("harness/node_isolation_reads_the_global",
+                    (load(), js_action("window.__seen = typeof window.__leak;", until="true")),
+                    (js_value("window.__seen", "undefined", steps=(1,)),))
+    r1 = run(node_session, first, headless_out, test_ref=__file__)
+    r2 = run(node_session, second, headless_out, test_ref=__file__)
+    assert r1.ok and r2.ok, r1.text() + r2.text()
+    assert "__leak" in r2.isolation["globals_removed"] and r2.isolation["leftover_timers_cleared"] >= 1, r2.isolation

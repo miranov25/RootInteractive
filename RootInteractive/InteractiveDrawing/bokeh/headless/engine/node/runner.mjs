@@ -15,6 +15,9 @@
 //   1. realm: everything handed to Bokeh is created inside the window (arguments are parsed with window.eval);
 //   2. construction: models only through Document.from_json, from documents the Python builder produced;
 //   3. asynchronous callbacks: no fixed waits here; the engine's settle rule (helper JavaScript) decides completion.
+// Isolation (4.2c-1 v0.2): the window lives for the whole process, so every new_doc first clears the timers the previous
+// document left pending and removes every global added since the harness finished loading (the fault execution
+// counter __riFault, globals set by a scenario's js_action, ...), and reports what it removed.
 // Stand-ins (they concern drawing only; parity with the browser is their standing control): Node's MessageChannel,
 // and an inert canvas context that accepts every call and draws nothing (Bokeh touches a canvas while loading).
 import fs from "node:fs";
@@ -34,6 +37,7 @@ function inert() {
   return p;
 }
 
+const pendingTimers = new Map();                                  // id -> clear function, for isolation
 const vc = new VirtualConsole();
 vc.on("jsdomError", e => pageErrors.push(String(e && (e.message || e)).slice(0, 300)));
 vc.on("error", (...a) => consoleErrors.push(a.map(String).join(" ").slice(0, 300)));
@@ -44,11 +48,21 @@ const t0 = Date.now();
 const scripts = bundleFiles.concat([helperPath]).map(f => `<script>${fs.readFileSync(f, "utf8").replace(/<\/script>/g, "<\\/script>")}</script>`);
 const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body>${scripts.join("\n")}</body></html>`, {
   runScripts: "dangerously", virtualConsole: vc,
-  beforeParse(w) { w.MessageChannel = MessageChannel; w.HTMLCanvasElement.prototype.getContext = () => inert(); },
+  beforeParse(w) {
+    w.MessageChannel = MessageChannel;
+    w.HTMLCanvasElement.prototype.getContext = () => inert();
+    const [st, ct, si, ci] = [w.setTimeout, w.clearTimeout, w.setInterval, w.clearInterval];
+    w.setTimeout = (fn, ms, ...a) => { const id = st.call(w, (...b) => { pendingTimers.delete(id); if (typeof fn === "function") fn(...b); }, ms, ...a);
+                                       pendingTimers.set(id, () => ct.call(w, id)); return id; };
+    w.clearTimeout = id => { pendingTimers.delete(id); ct.call(w, id); };
+    w.setInterval = (fn, ms, ...a) => { const id = si.call(w, fn, ms, ...a); pendingTimers.set(id, () => ci.call(w, id)); return id; };
+    w.clearInterval = id => { pendingTimers.delete(id); ci.call(w, id); };
+  },
 });
 const w = dom.window;
 const Document = w.Bokeh.require("document").Document;
 const loadMs = Date.now() - t0;
+const baseline = new Set(Object.getOwnPropertyNames(w));             // the window as the harness left it
 
 // numbers travel as base64 Float64 (NaN, +-Inf, -0 survive); other values as JSON
 function enc(x) {
@@ -68,11 +82,18 @@ const fn = code => w.eval("(" + code + ")");
 async function handle(req) {
   switch (req.op) {
     case "new_doc": {                                                // rule 2: Bokeh's deserializer, fresh document
+      const leftoverTimers = pendingTimers.size;                     // isolation from the previous document
+      for (const clear of pendingTimers.values()) clear();
+      pendingTimers.clear();
+      const removed = Object.getOwnPropertyNames(w).filter(k => !baseline.has(k));
+      for (const k of removed) { try { delete w[k]; } catch (e) { /* not configurable */ } }
+      const notRemoved = removed.filter(k => Object.prototype.hasOwnProperty.call(w, k));
+      w.Bokeh.documents.length = 0;
       const json = w.eval("(" + fs.readFileSync(req.path, "utf8") + ")");
       const doc = Document.from_json(json);
-      w.Bokeh.documents.length = 0;
       w.Bokeh.documents.push(doc);
-      return { models: doc._all_models.size };
+      return { models: doc._all_models.size, leftover_timers: leftoverTimers, removed_globals: removed,
+               not_removed: notRemoved };
     }
     case "eval": {
       let r = fn(req.code)(inWindow(req.arg));
@@ -97,10 +118,13 @@ async function handle(req) {
       const out = {};
       try { new CDS({ data: { x: [1, 2] } }); out.node_realm = "accepted"; } catch (e) { out.node_realm = "rejected: " + String(e.message).slice(0, 120); }
       try { new CDS(w.eval("({data: {x: [1, 2]}})")); out.window_realm = "accepted"; } catch (e) { out.window_realm = "rejected: " + String(e.message).slice(0, 120); }
-      try {
-        new HN(w.eval("({source: null, sample_variables: ['x', 'y'], nbins: [2, 2], range: [[0, 1], [0, 1]]})"));
+      try {                                                          // a VALID window-realm source (4.2c-1 v0.2)
+        const src = new CDS(w.eval("({data: {x: [0.1, 0.5], y: [0.2, 0.7]}})"));
+        const attrs = w.eval("({sample_variables: ['x', 'y'], nbins: [2, 2], range: [[0, 1], [0, 1]]})");
+        attrs.source = src;
+        new HN(attrs);
         out.direct_histo_nd = "constructed";
-      } catch (e) { out.direct_histo_nd = "failed: " + String(e.message).slice(0, 120); }
+      } catch (e) { out.direct_histo_nd = "failed: " + String(e.message).slice(0, 160); }
       return out;
     }
     case "quit":

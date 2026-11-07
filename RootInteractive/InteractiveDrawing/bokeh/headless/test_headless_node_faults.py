@@ -10,6 +10,8 @@ import pytest
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults, node_bundle
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
+    Labels, Page, Scenario, TableSpec, Tables, auto, hist, load, range_, set_)
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import known_defects
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.histograms import PLAIN
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
@@ -71,7 +73,7 @@ def test_lost_update_on_b1_is_not_masked_as_b1(fault_sessions, headless_out):
 
 
 def test_session_and_run_must_carry_the_same_fault(node_session, headless_out):
-    res = run(node_session, PLAIN, headless_out, test_ref=__file__, fault=faults.ND_BIN_SHIFTED)
+    res = run(node_session, PLAIN, headless_out / "controls", test_ref=__file__, fault=faults.ND_BIN_SHIFTED)
     assert not res.ok and [o.check for o in res.outcomes] == ["fault applied"]
 
 
@@ -81,3 +83,24 @@ def test_fault_known_defect_matrix(fault, scenario, fault_sessions, headless_out
     res = run(fault_sessions[fault.id], scenario, headless_out, test_ref=__file__, fault=fault)
     assert res.fault_executions >= 1, res.text()
     assert not res.ok, "fault masked by a known defect:\n" + res.text()
+
+
+ONLY_1D = Scenario(
+    id="harness/node_fault_proof_only_1d", data=Tables(TableSpec(5000, 11, {"x": "uniform(0,1)", "a": "normal(0,1)"})),
+    page=Page(histograms=(hist("h1", ["x"], 10, [0, 1]),), widgets=(range_("a"),)),
+    steps=(load(), set_("a", [-1, 1])), checks=(auto(),),
+    labels=Labels(family="harness", technique="fault execution proof per document (reviewers Claude3, GPT24)"))
+
+
+def test_fault_execution_proof_is_per_document(fault_sessions, headless_out):
+    """Claude3's and GPT24's counterexample: in one fault session, a page that cannot run the N-D fault must report
+    zero executions and the ERROR "the fault proves nothing" also after a page that did run it."""
+    s, f = fault_sessions["nd_bin_shifted"], faults.ND_BIN_SHIFTED
+    out = headless_out / "controls"
+    before = run(s, ONLY_1D, out / "before", test_ref=__file__, fault=f)
+    plain = run(s, PLAIN, out / "plain", test_ref=__file__, fault=f)
+    after = run(s, ONLY_1D, out / "after", test_ref=__file__, fault=f)
+    assert plain.fault_executions > 1000
+    for r in (before, after):
+        assert r.fault_executions == 0 and [o for o in r.outcomes if o.check == "fault executed"], r.text()
+    assert "__riFault" in after.isolation["globals_removed"], after.isolation

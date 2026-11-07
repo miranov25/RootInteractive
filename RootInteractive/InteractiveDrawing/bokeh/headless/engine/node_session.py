@@ -9,14 +9,15 @@ A fault (engine/faults.py) is applied to a disposable copy of the model bundle w
 never the stored healthy bundle. Numbers come back as base64 Float64 arrays, so NaN, +-Inf and -0 survive.
 """
 import base64
-import importlib.metadata as md
 import json
+import os
 import platform
+import tempfile
 import queue
 import subprocess
 import threading
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,15 @@ from . import faults as faults_mod
 from . import node_bundle
 
 RUNNER = Path(__file__).resolve().parent / "node" / "runner.mjs"
+JSDOM_PIN = "24.1.3"                                         # proposal v0.3 D-26; checked when required (conftest)
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """Write via a temporary file and a rename, so a parallel process never reads half a file (4.2c-1 v0.2)."""
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
 
 
 class NodeUnavailable(RuntimeError):
@@ -46,7 +56,9 @@ def decode(x: Any) -> Any:
 class NodeSession:
     backend = "node"
 
-    def __init__(self, out_root: Path, fault: Optional[faults_mod.Fault] = None, timeout_s: float = 120.0):
+    def __init__(self, out_root: Path, fault: Optional[faults_mod.Fault] = None, timeout_s: float = 120.0,
+                 extra_files: Sequence[Path] = ()):
+        """`extra_files`: scripts loaded after the helper — for tests of the start-up error policy only."""
         from .runner import HELPER_JS, REPO_ROOT, _git          # local import: runner imports this module too
         out_root = Path(out_root)
         healthy = node_bundle.model_bundle(out_root)
@@ -54,10 +66,10 @@ class NodeSession:
         if fault is not None:                                    # disposable copy; never shares the stored bundle
             mutated = faults_mod.apply(healthy.read_text(encoding="utf-8"), fault)
             models = healthy.parent / f"fault_{fault.id}_{healthy.name}"
-            models.write_text(mutated, encoding="utf-8")
+            _write_atomic(models, mutated)
         helper = healthy.parent / "helper.js"
-        helper.write_text(HELPER_JS, encoding="utf-8")
-        files = node_bundle.bundle_files(out_root, models)
+        _write_atomic(helper, HELPER_JS)
+        files = node_bundle.bundle_files(out_root, models) + [Path(f) for f in extra_files]
         try:
             self.proc = subprocess.Popen(["node", str(RUNNER), str(helper)] + [str(f) for f in files],
                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -72,14 +84,18 @@ class NodeSession:
             raise NodeUnavailable(f"Node harness did not start: {ready}")
         info = ready["result"]
         self.load_ms = info["load_ms"]
-        registered = self.request("registered", names=list(node_bundle.EXPECTED_MODELS))["result"]
-        self.missing_models = sorted(set(node_bundle.EXPECTED_MODELS) - set(registered))
+        reg = self.request("registered", names=list(node_bundle.EXPECTED_MODELS))
+        # errors raised while the harness loaded are part of every run of this session (4.2c-1 v0.2, GPT24)
+        self.startup_page_errors = ready.get("page_errors", []) + reg.get("page_errors", [])
+        self.startup_console_errors = ready.get("console_errors", []) + reg.get("console_errors", [])
+        self.missing_models = sorted(set(node_bundle.EXPECTED_MODELS) - set(reg["result"]))
         self.versions = {
             "backend": "node (jsdom)", "python": platform.python_version(), "numpy": np.__version__,
             "pandas": pd.__version__, "bokeh": info["bokeh"], "node": info["node"], "jsdom": info["jsdom"],
             "machine": platform.machine(),
             "rootinteractive": f"{_git('rev-parse', '--short', 'HEAD')} ({_git('rev-parse', '--abbrev-ref', 'HEAD')})",
             "model_bundle_sha256": node_bundle.sha256_of(models)[:16],
+            "model_bundle_key": node_bundle.current_key()[:16] + (f" + fault {fault.id}" if fault else ""),
         }
         self.exit_code: Optional[int] = None
 
@@ -121,6 +137,8 @@ class NodeSession:
         return self.exit_code
 
     def new_page(self, res) -> "NodePage":
+        res.page_errors.extend(f"at harness start-up: {e}" for e in self.startup_page_errors)
+        res.console_errors.extend(f"at harness start-up: {e}" for e in self.startup_console_errors)
         return NodePage(self, res)
 
 
@@ -142,7 +160,9 @@ class NodePage:
         return decode(r.get("result"))
 
     def goto(self, target, timeout: Optional[int] = None) -> None:
-        self._call("new_doc", path=str(target), timeout_s=(timeout or 60_000) / 1000)
+        r = self._call("new_doc", path=str(target), timeout_s=(timeout or 60_000) / 1000)
+        self.res.isolation = {"leftover_timers_cleared": r["leftover_timers"],
+                              "globals_removed": r["removed_globals"], "globals_not_removable": r["not_removed"]}
 
     def wait_for_function(self, code: str, timeout: int = 20_000) -> None:
         self._call("wait_for", code=code, timeout_ms=timeout, timeout_s=timeout / 1000 + 10)

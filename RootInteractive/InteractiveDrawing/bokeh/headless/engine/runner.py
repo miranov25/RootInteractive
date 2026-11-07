@@ -86,8 +86,17 @@ window.__riH = {
     }
     return out;
   },
+  encode(x) {                       // JSON that keeps NaN, +-Infinity and -0 apart (4.2c-1 v0.2, parity)
+    return JSON.stringify(x, (k, v) => typeof v === 'number' && (!Number.isFinite(v) || Object.is(v, -0))
+                                       ? (Object.is(v, -0) ? '-0' : String(v)) : v);
+  },
+  maskHash(mask) {                  // FNV-1a over the 0/1 selection mask: which rows, not only how many
+    let h = 0x811c9dc5;
+    for (let i = 0; i < mask.length; i++) { h ^= mask[i] ? 1 : 0; h = Math.imul(h, 0x01000193) >>> 0; }
+    return h >>> 0;
+  },
   snapshot(probes) {
-    return JSON.stringify(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));
+    return this.encode(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));
   },
   async settle(probes, maxRounds) {
     await Promise.resolve();
@@ -106,13 +115,13 @@ window.__riH = {
     const m = this.model(name, types);
     if (!m) return {error: name + ': ' + this.why(name, types)};
     const f = m.filter;
-    if (f == null || !f.active) return {count: n, filter: null};
+    if (f == null || !f.active) return {count: n, filter: null, mask_fnv: this.maskHash(new Array(n).fill(1))};
     const v = f.v_compute();
     if (v == null || v.length < n) return {error: 'filter vector of length ' + (v == null ? 'null' : v.length) +
                                                     ' is shorter than the table (' + n + ' rows)'};
     let c = 0;
     for (let i = 0; i < n; i++) if (v[i]) c++;
-    return {count: c, filter: f.type, length: v.length};
+    return {count: c, filter: f.type, length: v.length, mask_fnv: this.maskHash(Array.from(v).slice(0, n))};
   },
   limits(title) {
     const s = this.slider(title);
@@ -409,7 +418,8 @@ def _drive(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, fault:
         if scenario.page.widgets and page_mod.histogram_models(scenario.page):
             sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)",
                               [page_mod.histogram_models(scenario.page)[0][0], HIST_TYPES, len(df)])
-            res.probe_values[f"{i}:selected"] = sel.get("count", sel.get("error"))
+            res.probe_values[f"{i}:selected"] = ({"count": sel["count"], "mask_fnv": sel["mask_fnv"]}
+                                                 if "count" in sel else sel.get("error"))
         for check in scenario.checks:
             if isinstance(check, Responds) and i in check.steps:
                 recorded.setdefault((check.model, check.column), {})[i] = \

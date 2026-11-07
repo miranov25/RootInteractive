@@ -40,6 +40,8 @@ def bokeh_js_dir() -> Path:
 def _custom_model_names() -> List[str]:
     """Names of the custom models Bokeh would bundle now (cheap: no compilation)."""
     import RootInteractive.InteractiveDrawing.bokeh.bokehTools  # noqa: F401  registers the models
+    # private Bokeh function (pinned Bokeh); if a Bokeh upgrade removes or renames it, this fails loudly at the
+    # first Node run, never silently (4.2c-1 review, Claude10 P2-4)
     from bokeh.util.compiler import _get_custom_models
     return sorted(m.name for m in (_get_custom_models(None) or {}).values())
 
