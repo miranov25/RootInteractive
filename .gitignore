@@ -40,3 +40,9 @@ package-lock.json
 *.zip
 *.diff
 ctx_raw/
+
+# Headless browser tests (PHASE_4): run output and fetched pinned page scripts
+RootInteractive/InteractiveDrawing/bokeh/headless/_out/
+RootInteractive/InteractiveDrawing/bokeh/headless/vendor/*
+!RootInteractive/InteractiveDrawing/bokeh/headless/vendor/VENDOR.md
+.hypothesis/
