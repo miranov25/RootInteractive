@@ -10,13 +10,19 @@ profiles `<histogram>_<axis>` shown in a figure; lossless transport; steps `load
 read from the page) and `js_action` (only with a stated completion condition); checks `auto` (automatic oracle),
 `audit` (re-read after a delay), `js_value`, and `responds` (a probed value changes on a move and returns on the
 move back). Every scenario declares at least one check, and every step selector names an existing step (v0.3).
-Expected failures, raw `fromArray` pages and further constructs arrive in later stages.
+Known defects are declared as expected failures with machine-checked signatures (engine/expect.py, stage 4.2b);
+their check names are validated against the checks the page declaration produces. Raw `fromArray` pages and
+further constructs arrive in later stages.
 """
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
+from .expect import ExpectedFailure
+
 LOSSLESS = ((".*", (("code", 0), ("zip", 0), ("base64", 0))),)
+LOAD_CHECK = "load.finite_rows_selected"      # the engine's load check: rows selected by the page at default limits
+_NUMBER = r"(?<![\w.])(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"      # a number, never inside a name like x2
 
 
 class ScenarioError(ValueError):
@@ -188,11 +194,14 @@ def js_value(expr: str, expected: Any, steps=None) -> JsValue:
 # ----------------------------------------------------------------------------------------------- scenario
 @dataclass(frozen=True)
 class Labels:
+    """`models`: every model the scenario exercises; `verified`: the subset whose output a check compares with an
+    oracle or an explicit relation (v0.3 review, Claude3 C-4) — a model only exercised is not verified."""
     family: str
     models: Tuple[str, ...] = ()
     features: Tuple[str, ...] = ()
     technique: str = ""
     priority: str = "p1"
+    verified: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -210,8 +219,9 @@ class Scenario:
         where = f"scenario {self.id!r}"
         if not self.id or "/" not in self.id:
             raise ScenarioError(f"{where}: the id must start with its family, e.g. 'histograms/…'")
-        if self.expect:
-            raise ScenarioError(f"{where}: expected failures arrive in stage 4.2b")
+        unknown = set(self.labels.verified) - set(self.labels.models)
+        if unknown:
+            raise ScenarioError(f"{where}: labels.verified lists {sorted(unknown)}, which are not in labels.models")
         if tuple(self.transport.array_compression) != LOSSLESS:
             raise ScenarioError(f"{where}: stage 4.2a supports only lossless transport {LOSSLESS}")
         if not self.steps or not isinstance(self.steps[0], Load):
@@ -226,7 +236,7 @@ class Scenario:
             if not re.fullmatch(r"[A-Za-z_0-9.\s+\-*/()]+", expr) or "**" in expr or "//" in expr:
                 raise ScenarioError(f"{where}: alias {a!r} = {expr!r} uses more than names, numbers, + - * / and "
                                     f"parentheses (the oracle's alias subset until rulebook RB-6)")
-            for t in re.findall(r"[A-Za-z_]\w*", expr):
+            for t in re.findall(r"[A-Za-z_]\w*", re.sub(_NUMBER, " ", expr)):   # numbers, also 1e-3, removed first
                 if t not in columns:
                     raise ScenarioError(f"{where}: alias {a!r} uses {t!r}, which is not a column of the main table")
         hists = {h.name: h for h in self.page.histograms}
@@ -276,4 +286,20 @@ class Scenario:
                 if c.model not in models:
                     raise ScenarioError(f"{where}: responds() probes {c.model!r}, which the page declaration does not "
                                         f"create")
+        checks_known = {f"{n}.bin_count" for n in
+                         [h.name for h in self.page.histograms if h.weights not in params] +
+                         [f"{h.name}[{o}]" for h in self.page.histograms if h.weights in params
+                          for o in params[h.weights].options]}
+        if self.page.widgets and all(w.limits is None for w in self.page.widgets):
+            checks_known.add(LOAD_CHECK)
+        for e in self.expect:
+            if not isinstance(e, ExpectedFailure):
+                raise ScenarioError(f"{where}: expect holds {type(e).__name__}; use expected_failure(...)")
+            if not e.bug:
+                raise ScenarioError(f"{where}: an expected failure needs the bug id it documents")
+            if e.check not in checks_known:
+                raise ScenarioError(f"{where}: expected failure {e.bug} names check {e.check!r}, which this page "
+                                    f"does not produce (known: {sorted(checks_known)})")
+            if not e.steps or any(not (0 <= k < n) for k in e.steps):
+                raise ScenarioError(f"{where}: expected failure {e.bug} names step(s) {e.steps} outside 0 … {n - 1}")
         return self

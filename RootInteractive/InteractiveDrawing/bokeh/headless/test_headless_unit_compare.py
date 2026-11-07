@@ -79,7 +79,6 @@ def test_valid_scenario_passes_validation():
     ({"page": Page(widgets=(range_("zz"),))}, "unknown column"),
     ({"page": Page(), "steps": (load(),), "checks": (auto(),)}, "at least one supported model"),
     ({"transport": Transport(((".*", (("relative", 8),)),))}, "lossless"),
-    ({"expect": ("B1",)}, "4.2b"),
     # v0.3 (GPT24 P1-2): no check, or checks only on steps that never run
     ({"checks": ()}, "no check declared"),
     ({"checks": (auto(steps=(99,)),)}, "names step"),

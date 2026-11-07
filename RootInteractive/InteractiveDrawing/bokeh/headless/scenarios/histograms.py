@@ -32,6 +32,7 @@ PLAIN = Scenario(
     steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
     checks=(auto(),),
     labels=Labels(family="histograms", models=("HistogramCDS", "HistoNdCDS", "RangeFilter"),
+                  verified=("HistogramCDS", "HistoNdCDS", "RangeFilter"),
                   features=("HIST.histogram_1d", "HIST.histogram_nd"), technique="differential, state sequence",
                   priority="p0"),
 )
@@ -44,8 +45,9 @@ RB1_NAN = Scenario(
               widgets=(range_("a"),)),
     steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
     checks=(auto(),),
-    labels=Labels(family="selection", models=("RangeFilter", "HistoNdCDS"), features=("HIST.histogram_nd",),
-                  technique="boundary value (missing values at full bounds)", priority="p0"),
+    labels=Labels(family="selection", models=("RangeFilter", "HistoNdCDS"), verified=("RangeFilter", "HistoNdCDS"),
+                  features=("HIST.histogram_nd",), technique="boundary value (missing values at full bounds)",
+                  priority="p0"),
 )
 
 DEEP_CHAIN = Scenario(
@@ -61,6 +63,9 @@ DEEP_CHAIN = Scenario(
     checks=(auto(), audit(delay_s=1.0), responds("h_1", "mean", moved=1, restored=2)),
     labels=Labels(family="chain", models=("RangeFilter", "LazyIntersectionFilter", "CDSAlias", "HistoNdCDS",
                                           "CDSStack", "HistoNdProfile"),
+                  # the stack is exercised only; the profile is verified by an explicit relation (responds), its
+                  # values by an oracle only from stage 4.4 (RB-3)
+                  verified=("RangeFilter", "LazyIntersectionFilter", "CDSAlias", "HistoNdCDS", "HistoNdProfile"),
                   features=("HIST.histogram_nd",), technique="state sequence, completion audit", priority="p0"),
 )
 
@@ -72,7 +77,9 @@ C3_LIMITS = Scenario(
               widgets=(range_("a", (-1, 1)),)),
     steps=(load(), set_("a", [-0.5, 0.5]), set_("a", "full")),
     checks=(auto(),),
-    labels=Labels(family="histograms", models=("HistoNdCDS", "RangeFilter"), features=("HIST.histogram_nd",),
+    labels=Labels(family="histograms", models=("HistoNdCDS", "RangeFilter"),
+                  verified=("HistoNdCDS", "RangeFilter"),
+                  features=("HIST.histogram_nd",),
                   technique="state sequence, explicit widget limits (reviewer Claude3)", priority="p1"),
 )
 
@@ -86,7 +93,9 @@ C10_TWO_WIDGETS = Scenario(
     steps=(load(), set_("a", [-1, 1]), set_("b", [0, 2]), set_("a", "full"), set_("b", "full"),
            set_("b", [-2, -0.5]), set_("a", [0.5, 3])),
     checks=(auto(), audit(delay_s=0.5)),
-    labels=Labels(family="histograms", models=("HistogramCDS", "HistoNdCDS", "RangeFilter", "LazyIntersectionFilter"),
+    labels=Labels(family="histograms",
+                  models=("HistogramCDS", "HistoNdCDS", "RangeFilter", "LazyIntersectionFilter"),
+                  verified=("HistogramCDS", "HistoNdCDS", "RangeFilter", "LazyIntersectionFilter"),
                   features=("HIST.histogram_1d", "HIST.histogram_nd"),
                   technique="state sequence, intersection (reviewer Claude10)", priority="p1"),
 )
@@ -101,6 +110,7 @@ GPT24_EMPTY = Scenario(
     steps=(load(), set_("a", [0, 0]), set_("a", "full")),
     checks=(auto(),),
     labels=Labels(family="histograms", models=("HistogramCDS", "HistoNdCDS", "RangeFilter"),
+                  verified=("HistogramCDS", "HistoNdCDS", "RangeFilter"),
                   technique="empty selection, shifted range, recovery (reviewer GPT24)", priority="p1"),
 )
 

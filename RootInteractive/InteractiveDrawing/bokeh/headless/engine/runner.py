@@ -1,9 +1,9 @@
-"""Browser runner (proposal v0.2 §5, §6, §7.4, §7.5) — stage 4.2a.
+"""Browser runner (proposal v0.2 §5, §6, §7.4, §7.5, §8, §12) — stage 4.2b.
 
 One Chromium per worker process (`Session`); a fresh browser context and page per scenario, closed on success and
 on failure. Error capture, console capture and request routing start before the page opens. Every script the page
 requests from the internet is served from the pinned local copies (engine.vendor); any other external request is
-blocked and reported.
+blocked and reported as an ERROR.
 
 Completion conditions (§5.3):
   load      — Bokeh document present and idle, then the stability rule below;
@@ -11,12 +11,22 @@ Completion conditions (§5.3):
               then read the probed model columns until two consecutive reads around setTimeout(0) agree
               (at most 50 rounds);
   js_action — only with a stated condition (`until`), polled until true or until its timeout (then ERROR).
-The engine never waits for a value to equal the oracle.
+After every step the probed models must all exist before anything is read. The engine never waits for a value to
+equal the oracle.
+
+Probes name their model types (contract since v0.3): several page models can share a name — a histogram and the
+DownsamplerCDS that plots it (bokehTools.py 2333) — so every lookup states the accepted types and must find exactly
+one model; none or several is an ERROR, never a guess. The same exactly-one rule holds for widgets (by title) and
+for the transport source `cdsOrig`.
+
+Outcomes (engine/expect.py): PASS, FAIL, XFAIL (a declared known defect whose signature holds), XPASS (strict), ERROR,
+SKIP (a declared check on a step never reached). Prerequisites (transport, build, fault application, console policy,
+page errors, blocked requests) never make a scenario pass on their own.
 """
 import importlib.metadata as md
 import platform
+import re
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -25,33 +35,55 @@ import numpy as np
 import pandas as pd
 
 from . import data as data_mod
+from . import faults as faults_mod
 from . import page as page_mod
 from . import transport, vendor
 from .compare import compare
+from .expect import classify
 from .report import ScenarioResult
-from .scenario import Audit, Auto, JsAction, JsValue, Load, Responds, Scenario, SetRange
+from .scenario import LOAD_CHECK, Audit, Auto, JsAction, JsValue, Load, Responds, Scenario, SetRange
 from ..oracles import filters, histograms
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 LOAD_TIMEOUT_MS = 20_000
 SETTLE_ROUNDS = 50
 
+HIST_TYPES = ["HistogramCDS", "HistoNdCDS"]
+PROFILE_TYPES = ["HistoNdProfile", "CDSStack"]
+# models whose output a scenario could verify; any of them on the page without a check is listed in the report
+INVENTORY_TYPES = ["HistogramCDS", "HistoNdCDS", "HistoNdProfile", "CDSStack", "HistoStatsCDS", "CDSJoin",
+                   "ClientLinearFitter", "CustomJSNAryFunction", "OrtFunction"]
+
+# Console-error policy (stage 4.2b): every console error is an ERROR unless it is listed here, with its reason.
+CONSOLE_ALLOWED = (
+    (r"^\[bokeh\] Bad column name on label",
+     "Bokeh legend validation on the weights-stacked profile figure (factor_cmap on 'weights', bokehTools.py 960); "
+     "cosmetic, the figure renders; seen only in chain/deep_widget_filter_alias_stack_profile"),
+)
+
 HELPER_JS = r"""
 window.__riH = {
   models() { return (window.Bokeh && Bokeh.documents.length) ? Array.from(Bokeh.documents[0]._all_models.values()) : []; },
-  byName(n) { return this.models().find(m => m.name === n); },
-  model(n, types) {
-    // several models may share a name (a histogram and its plotting DownsamplerCDS); the probe names the model
-    // types it accepts, and exactly one model must match (v0.3)
-    const c = this.models().filter(m => m.name === n && (!types || types.includes(m.type)));
-    return c.length === 1 ? c[0] : null;
+  find(n, types) { return this.models().filter(m => m.name === n && (!types || types.includes(m.type))); },
+  model(n, types) { const c = this.find(n, types); return c.length === 1 ? c[0] : null; },
+  why(n, types) {
+    const c = this.find(n, types);
+    if (c.length > 1) return 'ambiguous: ' + c.length + ' models of type ' + (types || []).join('|') + ' named ' + n;
+    const all = this.models().filter(m => m.name === n).map(m => m.type);
+    return 'not found: no model of type ' + (types || []).join('|') + ' named ' + n +
+           (all.length ? ' (models with that name: ' + all.join(', ') + ')' : '');
   },
-  slider(title) { return this.models().find(m => m.type === 'RangeSlider' && m.title === title); },
+  sliders(title) { return this.models().filter(m => m.type === 'RangeSlider' && m.title === title); },
+  slider(title) { const c = this.sliders(title); return c.length === 1 ? c[0] : null; },
   col(n, c, types) { const m = this.model(n, types); if (!m) return null; const v = m.get_column(c); return v == null ? null : Array.from(v); },
   missing(probes) {
-    return probes.filter(([n, c, t]) => { const m = this.model(n, t); return !m || m.get_column(c) == null; })
-                 .map(([n, c, t]) => n + '.' + c + ' (' + (t || []).join('|') + ', found ' +
-                      this.models().filter(m => m.name === n).map(m => m.type).join(',') + ')');
+    const out = [];
+    for (const [n, c, t] of probes) {
+      const m = this.model(n, t);
+      if (!m) out.push(n + '.' + c + ' — ' + this.why(n, t));
+      else if (m.get_column(c) == null) out.push(n + '.' + c + ' — column not found on ' + m.type + ' ' + n);
+    }
+    return out;
   },
   snapshot(probes) {
     return JSON.stringify(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));
@@ -59,7 +91,7 @@ window.__riH = {
   async settle(probes, maxRounds) {
     await Promise.resolve();
     const miss = this.missing(probes);
-    if (miss.length) return {settled: false, error: 'probed model or column not on the page: ' + miss.join(', ')};
+    if (miss.length) return {settled: false, error: 'probed model or column: ' + miss.join('; ')};
     let prev = this.snapshot(probes);
     for (let r = 1; r <= maxRounds; r++) {
       await new Promise(res => setTimeout(res, 0));
@@ -71,27 +103,36 @@ window.__riH = {
   },
   selected(name, types, n) {
     const m = this.model(name, types);
-    if (!m) return {error: 'model ' + name + ' of type ' + types.join('|') + ' not found exactly once on the page'};
+    if (!m) return {error: name + ': ' + this.why(name, types)};
     const f = m.filter;
     if (f == null || !f.active) return {count: n, filter: null};
     const v = f.v_compute();
+    if (v == null || v.length < n) return {error: 'filter vector of length ' + (v == null ? 'null' : v.length) +
+                                                    ' is shorter than the table (' + n + ' rows)'};
     let c = 0;
     for (let i = 0; i < n; i++) if (v[i]) c++;
     return {count: c, filter: f.type, length: v.length};
   },
-  limits(title) { const s = this.slider(title); return s ? {start: s.start, end: s.end, value: Array.from(s.value)} : null; },
+  limits(title) {
+    const s = this.slider(title);
+    return s ? {start: s.start, end: s.end, value: Array.from(s.value)} : {error: 'range widget titled ' + title +
+           ' found ' + this.sliders(title).length + ' times (must be exactly once)'};
+  },
   decoded(cols) {
-    const src = this.byName('cdsOrig'); const out = {};
-    if (!src) return out;
-    for (const c of cols) { const v = src.get_column(c); if (v != null) out[c] = {type: v.constructor.name, values: Array.from(v)}; }
+    const src = this.find('cdsOrig', null);
+    if (src.length !== 1) return {__error: 'transport source cdsOrig found ' + src.length + ' times (must be exactly once)'};
+    const out = {};
+    for (const c of cols) { const v = src[0].get_column(c); if (v != null) out[c] = {type: v.constructor.name, values: Array.from(v)}; }
     return out;
   },
+  inventory(types) { return this.models().filter(m => types.includes(m.type)).map(m => [m.type, m.name]); },
 };
 """
 
 SET_JS = """async ([title, value, probes, rounds]) => {
   const s = window.__riH.slider(title);
-  if (!s) return {error: 'no range widget titled ' + title};
+  if (!s) return {error: 'range widget titled ' + title + ' found ' + window.__riH.sliders(title).length +
+                         ' times (must be exactly once)'};
   s.value = (value === 'full') ? [s.start, s.end] : value;
   return await window.__riH.settle(probes, rounds);
 }"""
@@ -154,8 +195,8 @@ def _widget_mask(pg, scenario: Scenario, df: pd.DataFrame) -> Tuple[np.ndarray, 
     masks = []
     for w in scenario.page.widgets:
         lim = pg.evaluate("t => window.__riH.limits(t)", w.column)
-        if lim is None:
-            raise StepNotComplete(f"range widget {w.column!r} not found on the page")
+        if lim.get("error"):
+            raise StepNotComplete(lim["error"])
         states[w.column] = lim
         masks.append(filters.range_mask(df[w.column].to_numpy(), lim["value"][0], lim["value"][1]))
     return filters.intersection(masks, len(df)), states
@@ -166,10 +207,6 @@ def _variable(df: pd.DataFrame, scenario: Scenario, name: str) -> np.ndarray:
         return df[name].to_numpy()
     expr = dict(scenario.page.aliases)[name]
     return np.asarray(df.eval(expr), dtype=np.float64)       # aliases: arithmetic subset (RB-6), evaluated by pandas
-
-
-HIST_TYPES = ["HistogramCDS", "HistoNdCDS"]
-PROFILE_TYPES = ["HistoNdProfile", "CDSStack"]
 
 
 def _types(scenario: Scenario, model: str) -> List[str]:
@@ -186,11 +223,15 @@ def _applies(check, step: int) -> bool:
     return check.steps is None or step in check.steps
 
 
-def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: int, name: str) -> None:
+def _check_label(check) -> str:
+    return {Auto: "auto", Audit: "audit", JsValue: "js value", Responds: "responds"}.get(type(check), type(check).__name__)
+
+
+def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: int, name: str, feature: str) -> None:
     label = f"{c.model}.{c.column} responds to step {c.moved} and returns at step {c.restored}"
     if any(values.get(k) is None for k in c.steps):
         res.add(step, name, label, "ERROR", f"probed column missing at step(s) "
-                f"{[k for k in c.steps if values.get(k) is None]}")
+                f"{[k for k in c.steps if values.get(k) is None]}", feature=feature)
         return
     ref, moved, back = (np.asarray(values[k], dtype=np.float64) for k in (c.reference, c.moved, c.restored))
     changed = not compare(moved, ref, kind="float", rel_tol=c.rel_tol, nan_equal=True).ok
@@ -200,29 +241,52 @@ def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: i
         ([f"not restored: {restored.message}"] if not restored.ok else []) + \
         (["no finite value at the reference step"] if not (ref.size > 0 and np.isfinite(ref).any()) else [])
     res.add(step, name, label, "PASS" if ok else "FAIL",
-            f"{ref.size} values; changed on the move, restored exactly" if ok else "; ".join(why))
+            f"{ref.size} values; changed on the move, restored within relative {c.rel_tol:g}" if ok else "; ".join(why),
+            feature=feature)
 
 
 # ------------------------------------------------------------------------------------------- the run
-def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = "") -> ScenarioResult:
+def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = "",
+        fault: Optional[faults_mod.Fault] = None) -> ScenarioResult:
+    """Run one scenario; with `fault`, on a disposable copy of its page with that fault applied exactly once.
+    The report is written in every case, also after a build failure or an unexpected exception."""
     scenario.validate()
-    outdir = Path(out_root) / scenario.id.replace("/", "__")
+    outdir = Path(out_root) / (scenario.id.replace("/", "__") + (f"__fault_{fault.id}" if fault else ""))
     outdir.mkdir(parents=True, exist_ok=True)
-    res = ScenarioResult(id=scenario.id, outdir=str(outdir), versions=dict(session.versions),
+    res = ScenarioResult(id=scenario.id + (f" [fault {fault.id}]" if fault else ""), outdir=str(outdir),
+                         versions=dict(session.versions),
                          reproduce=f"pytest {test_ref} -k '{scenario.id}'" if test_ref else scenario.id)
+    res.fault = fault.id if fault else ""
     t0 = time.time()
-    df = data_mod.generate(scenario.data.main)
-    res.case_sha256 = data_mod.save_case(df, outdir / "case.npz")
     try:
-        html = page_mod.build(scenario, df, outdir / "page.html")
-    except Exception as exc:                                         # v0.3, Claude3 C-2: never a bare crash
-        res.add(-1, "build", "page build", "ERROR", f"page build failed: {type(exc).__name__}: {str(exc)[:300]}",
-                assertion=False)
+        df = data_mod.generate(scenario.data.main)
+        res.case_sha256 = data_mod.save_case(df, outdir / "case.npz")
+        try:
+            html = page_mod.build(scenario, df, outdir / "page.html")
+        except Exception as exc:                                      # Claude3 C-2: never a bare crash
+            res.add(-1, "build", "page build", "ERROR", f"page build failed: {type(exc).__name__}: {str(exc)[:300]}",
+                    assertion=False)
+            return res
+        if fault is not None:
+            try:
+                mutated = faults_mod.apply(html.read_text(encoding="utf-8"), fault)
+            except faults_mod.FaultNotApplied as exc:
+                res.add(-1, "fault", "fault applied", "ERROR", str(exc), assertion=False)
+                return res
+            html = outdir / "page_fault.html"
+            html.write_text(mutated, encoding="utf-8")
+        res.timings["build_s"] = round(time.time() - t0, 3)
+        _browser_run(session, scenario, df, html, res, fault)
+    except Exception as exc:                                          # Claude3 N-1: anything else still reports
+        res.add(-1, "engine", "engine", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", assertion=False)
+    finally:
         res.timings["total_s"] = round(time.time() - t0, 3)
         res.write()
-        return res
-    res.timings["build_s"] = round(time.time() - t0, 3)
+    return res
 
+
+def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: Path, res: ScenarioResult,
+                 fault: Optional[faults_mod.Fault]) -> None:
     routes = {glob.replace("**/", "/"): path for glob, path in vendor.routes().items()}
     ctx = session.browser.new_context()
     try:
@@ -254,7 +318,8 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
                     pg.wait_for_function("() => window.Bokeh && Bokeh.documents.length > 0 && Bokeh.documents[0].is_idle",
                                          timeout=LOAD_TIMEOUT_MS)
                     done = pg.evaluate("([p, r]) => window.__riH.settle(p, r)", [probes, SETTLE_ROUNDS])
-                    _transport_check(pg, scenario, df, res)
+                    if done.get("settled"):
+                        _transport_check(pg, scenario, df, res)
                 elif isinstance(step, SetRange):
                     value = step.value if step.value == "full" else list(step.value)
                     done = pg.evaluate(SET_JS, [step.column, value, probes, SETTLE_ROUNDS])
@@ -266,9 +331,17 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
                     raise StepNotComplete(done["error"])
                 if not done.get("settled"):
                     raise StepNotComplete(f"completion condition not met ({done})")
+                miss = pg.evaluate("p => window.__riH.missing(p)", probes)     # Claude3 N-1: also after js_action
+                if miss:
+                    raise StepNotComplete("probed model or column: " + "; ".join(miss))
                 res.completion.append({"step": i, "name": name, **done, "seconds": round(time.time() - ts, 3)})
-            except Exception as exc:                                     # the step itself failed: ERROR, stop
-                res.add(i, name, "step completion", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}")
+            except Exception as exc:                                   # the step itself failed: ERROR, then SKIP
+                res.add(i, name, "step completion", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", assertion=False)
+                for k in range(i, len(scenario.steps)):
+                    for check in scenario.checks:
+                        if _applies(check, k):
+                            res.add(k, scenario.steps[k].describe(), _check_label(check), "SKIP",
+                                    "not executed: an earlier step did not complete", feature=_feature_of(scenario, check))
                 break
             snapshot = pg.evaluate("p => window.__riH.snapshot(p)", probes)
             for check in scenario.checks:
@@ -285,34 +358,63 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
                         pg.wait_for_timeout(int(check.delay_s * 1000))   # audit mode only: deliberate delay
                         miss = pg.evaluate("p => window.__riH.missing(p)", probes)
                         if miss:
-                            raise StepNotComplete(f"probed model or column not on the page: {miss}")
+                            raise StepNotComplete("probed model or column: " + "; ".join(miss))
                         again = pg.evaluate("p => window.__riH.snapshot(p)", probes)
                         res.add(i, name, f"audit after {check.delay_s} s", "PASS" if again == snapshot else "ERROR",
                                 "page unchanged after completion" if again == snapshot else
-                                "page changed after the completion condition was met: the condition is insufficient")
+                                "page changed after the completion condition was met: the condition is insufficient",
+                                feature="ENGINE.completion")
                     elif isinstance(check, JsValue):
                         got = pg.evaluate(f"() => ({check.expr})")
                         res.add(i, name, f"js value {check.expr}", "PASS" if got == check.expected else "FAIL",
-                                f"page {got!r}, expected {check.expected!r}")
+                                f"page {got!r}, expected {check.expected!r}", feature="ENGINE.harness")
                     elif isinstance(check, Responds) and i == max(check.steps):
-                        _responds(res, check, recorded.get((check.model, check.column), {}), i, name)
+                        _responds(res, check, recorded.get((check.model, check.column), {}), i, name,
+                                  _feature_of(scenario, check))
                 except Exception as exc:
-                    res.add(i, name, type(check).__name__, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}")
+                    res.add(i, name, _check_label(check), "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}",
+                            feature=_feature_of(scenario, check))
+
+        if fault is not None:                                          # proof that the mutated code ran
+            res.fault_executions = int(pg.evaluate("() => window.__riFault || 0"))
+            if res.fault_executions == 0:
+                res.add(-1, "fault", "fault executed", "ERROR",
+                        f"fault {fault.id!r} applied but the mutated code never ran: the fault proves nothing",
+                        assertion=False)
+        probed = {(n, tuple(t)) for n, _, t in probes}
+        for typ, nm in pg.evaluate("t => window.__riH.inventory(t)", INVENTORY_TYPES):
+            if not any(nm == n and typ in t for n, t in probed):
+                res.unchecked_models.append(f"{typ} {nm}")
+        for e in res.console_errors:                                   # console-error policy
+            allowed = next((why for pat, why in CONSOLE_ALLOWED if re.search(pat, e)), None)
+            if allowed:
+                res.console_allowed.append(f"{e[:120]} — allowed: {allowed}")
+            else:
+                res.add(-1, "page", "console error", "ERROR", f"not on the allowed list: {e}", assertion=False)
         for e in res.page_errors:
-            res.add(-1, "page", "page errors", "ERROR", e)
+            res.add(-1, "page", "page errors", "ERROR", e, assertion=False)
         for u in res.requests_blocked:
-            res.add(-1, "page", "external request", "ERROR", f"blocked, not a pinned local script: {u}")
+            res.add(-1, "page", "external request", "ERROR", f"blocked, not a pinned local script: {u}", assertion=False)
     finally:
         ctx.close()
-    res.timings["total_s"] = round(time.time() - t0, 3)
-    res.write()
-    return res
+
+
+def _feature_of(scenario: Scenario, check) -> str:
+    if isinstance(check, Audit):
+        return "ENGINE.completion"
+    if isinstance(check, JsValue):
+        return "ENGINE.harness"
+    if isinstance(check, Responds):
+        return "HIST.profile" if check.model in scenario.page.profiles else "HIST.histogram_nd"
+    return scenario.labels.features[0] if scenario.labels.features else ""
 
 
 def _transport_check(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult) -> None:
     cols = page_mod.input_columns(scenario)
     expected = transport.expected_decoded(df, cols, scenario.transport.array_compression)
     decoded = pg.evaluate("c => window.__riH.decoded(c)", cols)
+    if decoded.get("__error"):
+        raise StepNotComplete(decoded["__error"])
     for col, ok, msg in transport.check(decoded, expected):
         res.add(0, "load", f"transport {col}", "PASS" if ok else "FAIL", msg, assertion=False)
 
@@ -321,31 +423,43 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
     mask, states = _widget_mask(pg, scenario, df)
     defaults = scenario.page.widgets and all(w.limits is None for w in scenario.page.widgets)
     if step == 0 and defaults and all(s["value"] == [s["start"], s["end"]] for s in states.values()):
-        # v0.3 (Claude10 P1-1, Claude3 C-1): the page's own selected-row count, read from the filter every histogram
-        # consumes, against the number of rows whose widget columns are finite. Only when every widget is declared
-        # without limits, i.e. at RootInteractive's default limits (RB-1.4).
+        # the page's own selected-row count, read from the filter every histogram consumes, against the number of
+        # rows whose widget columns are finite; only at RootInteractive's default limits (RB-1.4)
         finite = np.ones(len(df), dtype=bool)
         for col in states:
             finite &= np.isfinite(df[col].to_numpy())
         first = page_mod.histogram_models(scenario.page)[0][0]
         sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)", [first, HIST_TYPES, len(df)])
         if sel.get("error"):
-            res.add(step, name, "load: every finite row selected at default limits", "ERROR", sel["error"])
+            res.add(step, name, LOAD_CHECK, "ERROR", sel["error"], feature="FILTER.range")
         else:
-            res.add(step, name, "load: every finite row selected at default limits",
-                    "PASS" if sel["count"] == int(finite.sum()) else "FAIL",
-                    f"page selects {sel['count']} rows ({sel['filter']}); rows with finite widget columns "
-                    f"{int(finite.sum())} of {len(df)}")
+            n_fin = int(finite.sum())
+            outcome, why = classify(LOAD_CHECK, step, sel["count"] == n_fin, [sel["count"]], [n_fin], {},
+                                    scenario.expect)
+            res.add(step, name, LOAD_CHECK, outcome,
+                    f"page selects {sel['count']} rows ({sel['filter']}); rows with finite widget columns {n_fin} of "
+                    f"{len(df)}" + (f"; {why}" if why else ""), feature="FILTER.range")
     for model, h, wcol in page_mod.histogram_models(scenario.page):
+        check = f"{model}.bin_count"
+        feature = "HIST.histogram_1d" if len(h.variables) == 1 else "HIST.histogram_nd"
         cols = [_variable(df, scenario, v) for v in h.variables]
         weights = None if wcol is None else df[wcol].to_numpy()
         expect = histograms.counts(cols, h.nbins, h.range, mask=mask, weights=weights)
         got = pg.evaluate("([n, c, t]) => window.__riH.col(n, c, t)", [model, "bin_count", HIST_TYPES])
         if got is None:
-            res.add(step, name, f"{model}.bin_count", "ERROR",
-                    f"no single {'|'.join(HIST_TYPES)} model named {model!r} with column bin_count on the page")
+            why = pg.evaluate("([n, t]) => window.__riH.why(n, t)", [model, HIST_TYPES])
+            res.add(step, name, check, "ERROR", f"{why} (or no column bin_count)", feature=feature)
             continue
         cmp = compare(got, expect, kind="count") if weights is None else \
             compare(got, expect, kind="float", abs_tol=1e-9, rel_tol=1e-12)
-        res.add(step, name, f"{model}.bin_count", "PASS" if cmp.ok else "FAIL",
-                f"{cmp.message}; selected rows {int(mask.sum())}" + (f"; ratio page/oracle {cmp.ratio_range}" if cmp.ratio_range else ""))
+        ctx = {}
+        if any(e.check == check and step in e.steps for e in scenario.expect):    # context for signatures
+            ctx["unselected"] = histograms.counts(cols, h.nbins, h.range, mask=None, weights=weights)
+            if len(cols) == 1:
+                nan_rows = mask & np.isnan(cols[0])
+                ctx["nan_rows"] = float(nan_rows.sum() if weights is None else weights[nan_rows].sum())
+        outcome, why = classify(check, step, cmp.ok, got, expect, ctx, scenario.expect)
+        res.add(step, name, check, outcome,
+                f"{cmp.message}; selected rows {int(mask.sum())}" +
+                (f"; ratio page/oracle {cmp.ratio_range}" if cmp.ratio_range else "") + (f"; {why}" if why else ""),
+                feature=feature)

@@ -12,15 +12,23 @@ Negative controls of the v0.3 fixes (each must FAIL or ERROR; the healthy contro
 6. A page that the builder rejects leaves a report with ERROR (Claude3 C-2).
 7. The load check reads the page: on a page with known defect B1 the page selects more rows than are finite in
    the widget columns, and the check FAILs (Claude10 P1-1; in v0.2 it said PASS there).
+
+Negative controls of stage 4.2b:
+8. A loader that never becomes ready, on a step that carries an expected failure, gives ERROR and SKIP — never XFAIL.
+9. A probed model that disappears after a JavaScript step is an ERROR, and the report is still written (Claude3 N-1).
+10. A console error that is not on the allowed list is an ERROR (console-error policy).
+11. An expected failure that does not occur is a strict XPASS and fails the scenario.
 """
 import pytest
 
 import json
 from pathlib import Path
 
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.expect import Mismatch, expected_failure
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import HELPER_JS, run
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
-    Labels, Page, Parameter, Scenario, TableSpec, Tables, auto, hist, js_action, js_value, load, range_, responds, set_)
+    LOAD_CHECK, Labels, Page, Parameter, Scenario, TableSpec, Tables, auto, hist, js_action, js_value, load, range_,
+    responds, set_)
 
 pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration")]
 
@@ -47,7 +55,8 @@ def test_condition_never_met_is_an_error(headless_session, headless_out):
     res = run(headless_session, sc, headless_out, test_ref=__file__)
     assert not res.ok
     step1 = [o for o in res.outcomes if o.step == 1]
-    assert [o.outcome for o in step1] == ["ERROR"] and "completion condition not met" in step1[0].detail
+    # the step itself is an ERROR; the check declared on it was never executed: SKIP (its feature is "Unverified")
+    assert [o.outcome for o in step1] == ["ERROR", "SKIP"] and "completion condition not met" in step1[0].detail
 
 
 def test_stability_rule_alone_accepts_a_stale_value(headless_session):
@@ -71,12 +80,12 @@ def test_missing_probe_is_an_error(headless_session):
         page.set_content("<html><body></body></html>")
         page.add_script_tag(content="window.Bokeh = {documents: [{_all_models: new Map()}]};" + HELPER_JS)
         out = page.evaluate("() => window.__riH.settle([['h_9', 'mean', ['HistoNdProfile']]], 5)")
-        assert out["settled"] is False and "not on the page: h_9.mean" in out["error"]
+        assert out["settled"] is False and "h_9.mean — not found" in out["error"]
         # two models of an accepted type with the same name are ambiguous: also an error, never a guess
         page.evaluate("""() => { const mk = () => ({name: 'h', type: 'HistoNdCDS', get_column: () => [1]});
             Bokeh.documents[0]._all_models.set(1, mk()); Bokeh.documents[0]._all_models.set(2, mk()); }""")
         out = page.evaluate("() => window.__riH.settle([['h', 'bin_count', ['HistoNdCDS']]], 5)")
-        assert out["settled"] is False and "not on the page: h.bin_count" in out["error"]
+        assert out["settled"] is False and "h.bin_count — ambiguous: 2 models" in out["error"]   # N-4 wording
     finally:
         page.close()
 
@@ -118,8 +127,55 @@ def test_load_check_reads_the_page_b1(headless_session, headless_out):
                             widgets=(range_("a"), range_("b"))),
                   steps=(load(),), checks=(auto(),), labels=Labels(family="harness", technique="negative control"))
     res = run(headless_session, sc, headless_out, test_ref=__file__)
-    chk = [o for o in res.outcomes if o.check.startswith("load: every finite row selected")]
+    chk = [o for o in res.outcomes if o.check == LOAD_CHECK]
     assert [o.outcome for o in chk] == ["FAIL"], res.text()
     page_n = int(chk[0].detail.split("page selects ")[1].split()[0])
     finite_n = int(chk[0].detail.split("finite widget columns ")[1].split()[0])
     assert page_n > finite_n                                             # the second filter is not applied
+
+
+def _page_with_widget(id_, steps, checks, expect=()):
+    return Scenario(id=id_, data=Tables(TableSpec(2000, 6, {"x": "uniform(0,1)", "a": "normal(0,1)"})),
+                    page=Page(histograms=(hist("h1", ["x"], 10, [0, 1]),), widgets=(range_("a"),)),
+                    steps=steps, checks=checks, expect=expect, labels=Labels(family="harness", technique="negative control"))
+
+
+def test_loader_never_ready_is_an_error_not_an_xfail(headless_session, headless_out):
+    sc = _page_with_widget("harness/loader_never_ready_with_expectation",
+                           (load(), js_action("window.__ready = false;", until="window.__ready === true", timeout_s=0.3),
+                            set_("a", [-1, 1])),
+                           (auto(),),
+                           expect=(expected_failure("B0", "h1.bin_count", (1, 2), Mismatch("page > oracle")),))
+    res = run(headless_session, sc, headless_out, test_ref=__file__)
+    steps12 = [(o.step, o.outcome) for o in res.outcomes if o.step in (1, 2)]
+    assert not res.ok and ("XFAIL" not in [x for _, x in steps12]), res.text()
+    assert (1, "ERROR") in steps12 and (1, "SKIP") in steps12 and (2, "SKIP") in steps12, res.text()
+
+
+def test_probe_lost_after_js_step_is_an_error_and_reported(headless_session, headless_out):
+    sc = _page_with_widget("harness/probe_lost_after_js_step",
+                           (load(), js_action("window.__riH.model('h1', ['HistogramCDS']).name = 'renamed';",
+                                              until="true")),
+                           (auto(),))
+    res = run(headless_session, sc, headless_out, test_ref=__file__)
+    err = [o for o in res.outcomes if o.step == 1 and o.outcome == "ERROR"]
+    assert not res.ok and err and "h1.bin_count" in err[0].detail and "not found" in err[0].detail, res.text()
+    assert (Path(res.outdir) / "report.json").exists()
+
+
+def test_console_error_not_allowed_is_an_error(headless_session, headless_out):
+    sc = _page_with_widget("harness/console_error_policy",
+                           (load(), js_action("console.error('an unexpected page error');", until="true"),
+                            set_("a", [-1, 1])),
+                           (auto(),))
+    res = run(headless_session, sc, headless_out, test_ref=__file__)
+    pol = [o for o in res.outcomes if o.check == "console error"]
+    assert not res.ok and [o.outcome for o in pol] == ["ERROR"] and "an unexpected page error" in pol[0].detail
+
+
+def test_expected_failure_that_does_not_occur_is_a_strict_xpass(headless_session, headless_out):
+    sc = _page_with_widget("harness/stale_expectation_xpass", (load(), set_("a", [-1, 1])), (auto(),),
+                           expect=(expected_failure("B0", "h1.bin_count", (1,), Mismatch("page > oracle")),))
+    res = run(headless_session, sc, headless_out, test_ref=__file__)
+    x = [o for o in res.outcomes if o.check == "h1.bin_count" and o.step == 1]
+    assert not res.ok and [o.outcome for o in x] == ["XPASS"] and "did not occur" in x[0].detail

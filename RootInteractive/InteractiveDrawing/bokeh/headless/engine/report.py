@@ -1,7 +1,9 @@
-"""Reports (proposal v0.2 §8, stage 4.2a subset): one outcome per scenario, step and check, written as JSON and
-as text next to the page and the saved case. Outcomes in 4.2a: PASS, FAIL, ERROR (XFAIL/XPASS arrive in 4.2b).
-A scenario is OK only if every outcome is PASS **and** at least one declared assertion (a check the scenario asked
-for) was executed; prerequisites such as the transport check do not count (v0.3, GPT24 P1-2).
+"""Reports (proposal v0.2 §8): one outcome per scenario, step and check, written as JSON and as text next to the
+page and the saved case. Outcomes: PASS, FAIL, ERROR, XFAIL (a declared known defect whose signature holds), XPASS
+(an expected failure that did not occur — strict, fails the scenario), SKIP (a declared check on a step never reached).
+A scenario is OK only if every outcome is PASS or XFAIL **and** at least one declared assertion (a check the scenario
+asked for) was executed; prerequisites such as the transport check do not count (v0.3, GPT24 P1-2). Each outcome
+carries the feature it verifies; `feature_status` aggregates them (engine/expect.py).
 
     python -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report outcomes <output folder>
 prints one normalised line per scenario, step and check ("scenario | step | check | outcome") plus each scenario's
@@ -11,6 +13,8 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from .expect import feature_status
 
 
 @dataclass
@@ -38,6 +42,10 @@ class ScenarioResult:
     timings: Dict[str, float] = field(default_factory=dict)
     completion: List[dict] = field(default_factory=list)
     reproduce: str = ""
+    fault: str = ""                                   # id of the deliberate fault this run carries, if any
+    fault_executions: int = 0                         # how often the mutated code ran (must be > 0)
+    unchecked_models: List[str] = field(default_factory=list)    # completeness: verifiable models nobody checked
+    console_allowed: List[str] = field(default_factory=list)     # console errors on the allowed list, with reason
 
     def add(self, step: int, step_name: str, check: str, outcome: str, detail: str, feature: str = "",
             assertion: bool = True) -> None:
@@ -45,11 +53,14 @@ class ScenarioResult:
 
     @property
     def assertions_executed(self) -> int:
-        return sum(1 for o in self.outcomes if o.assertion and o.outcome in ("PASS", "FAIL"))
+        return sum(1 for o in self.outcomes if o.assertion and o.outcome in ("PASS", "FAIL", "XFAIL", "XPASS"))
 
     @property
     def ok(self) -> bool:
-        return self.assertions_executed > 0 and all(o.outcome == "PASS" for o in self.outcomes)
+        return self.assertions_executed > 0 and all(o.outcome in ("PASS", "XFAIL") for o in self.outcomes)
+
+    def features(self) -> Dict[str, str]:
+        return feature_status(self.outcomes)
 
     def counts(self) -> Dict[str, int]:
         c: Dict[str, int] = {}
@@ -64,6 +75,13 @@ class ScenarioResult:
             lines.append(f"  [{o.outcome:5s}] step {o.step} ({o.step_name}) {o.check}: {o.detail}")
         if self.assertions_executed == 0:
             lines.append("  no declared assertion was executed — this is a failure")
+        lines.append(f"  features: {self.features()}")
+        for m in self.unchecked_models:
+            lines.append(f"  not checked (exercised only): {m}")
+        for e in self.console_allowed:
+            lines.append(f"  console error, allowed: {e}")
+        if self.fault:
+            lines.append(f"  fault: {self.fault}, mutated code executed {self.fault_executions} times")
         for e in self.page_errors:
             lines.append(f"  page error: {e}")
         for r in self.requests_blocked:
@@ -75,7 +93,7 @@ class ScenarioResult:
 
     def write(self) -> None:
         out = Path(self.outdir)
-        (out / "report.json").write_text(json.dumps(asdict(self), indent=1, default=str))
+        (out / "report.json").write_text(json.dumps({**asdict(self), "features": self.features()}, indent=1, default=str))
         (out / "report.txt").write_text(self.text() + "\n")
 
 

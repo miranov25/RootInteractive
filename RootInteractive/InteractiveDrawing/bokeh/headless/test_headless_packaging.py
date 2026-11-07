@@ -27,7 +27,13 @@ def test_no_typescript_file_under_headless():
 @pytest.mark.skipif(os.environ.get("RI_HEADLESS_WHEEL") != "1", reason="wheel build only with RI_HEADLESS_WHEEL=1")
 def test_wheel_contains_no_headless_file(tmp_path):
     """Built from the committed tree (`git archive HEAD`), never from the working tree, so untracked files of a
-    checkout cannot change the result (v0.3, GPT22: the alma2 wheel had 146 files from untracked leftovers)."""
+    checkout cannot change the result (v0.3, GPT22: the alma2 wheel had 146 files from untracked leftovers).
+    The build needs pip, setuptools and wheel in the running interpreter; without them the test is skipped with that
+    reason rather than failing as if the packaging were wrong (closure note N-7, Claude10)."""
+    import importlib.util
+    missing = [m for m in ("pip", "setuptools", "wheel") if importlib.util.find_spec(m) is None]
+    if missing:
+        pytest.skip(f"wheel build needs {missing} in this interpreter")
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
     assert head.returncode == 0, "not a git checkout"
     src = tmp_path / "src"
