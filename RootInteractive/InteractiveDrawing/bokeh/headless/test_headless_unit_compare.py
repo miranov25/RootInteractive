@@ -4,8 +4,10 @@ import numpy as np
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import compare as compare_mod
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine import report as report_mod
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
-    Labels, Page, Scenario, ScenarioError, TableSpec, Tables, Transport, auto, hist, js_action, load, range_, set_)
+    Labels, Page, Parameter, Scenario, ScenarioError, TableSpec, Tables, Transport, audit, auto, hist, js_action, js_value,
+    load, range_, responds, set_)
 
 pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python")]
 
@@ -14,7 +16,9 @@ INF, NAN = np.inf, np.nan
 CASES = [
     ([1, 2, 3], [1, 2, 3], "count", {}, True),
     ([1, 2, 3], [1, 2, 4], "count", {}, False),                         # a perturbed count
-    ([1, 2], [1, 2, 3], "count", {}, False),                            # shape mismatch
+    ([1, 2], [1, 2, 3], "count", {}, False),                            # shape mismatch (length)
+    ([[1, 2], [3, 4]], [1, 2, 3, 4], "count", {}, False),               # shape mismatch, equal size (v0.3, GPT24 P1-1)
+    ([[1, 2], [3, 4]], [[1, 2], [3, 4]], "count", {}, True),            # healthy control: same shape, same values
     ([NAN], [0], "count", {}, False),                                   # a NaN count is never a count
     ([0.0], [-0.0], "float", {}, True),                                 # -0 equals +0
     ([INF], [INF], "float", {}, True),
@@ -76,7 +80,46 @@ def test_valid_scenario_passes_validation():
     ({"page": Page(), "steps": (load(),), "checks": (auto(),)}, "at least one supported model"),
     ({"transport": Transport(((".*", (("relative", 8),)),))}, "lossless"),
     ({"expect": ("B1",)}, "4.2b"),
+    # v0.3 (GPT24 P1-2): no check, or checks only on steps that never run
+    ({"checks": ()}, "no check declared"),
+    ({"checks": (auto(steps=(99,)),)}, "names step"),
+    ({"checks": (audit(steps=(5,)),)}, "names step"),
+    # v0.3 (Claude3 C-2): profile names must be projections of a declared N-D histogram
+    ({"page": Page(histograms=(hist("h", ["x", "a"], [10, 4], [[0, 1], [-3, 3]]),), widgets=(range_("a"),),
+                   profiles=("h_9",))}, "not a projection"),
+    ({"page": Page(histograms=(hist("h", ["x"], 10, [0, 1]),), widgets=(range_("a"),), profiles=("h_1",))},
+     "not a projection"),
+    # v0.3 (Claude10 P2-4): alias subset
+    ({"page": Page(histograms=(hist("h", ["xa"], 10, [0, 1]),), widgets=(range_("a"),), aliases=(("xa", "x**2"),))},
+     "names, numbers"),
+    ({"page": Page(histograms=(hist("h", ["xa"], 10, [0, 1]),), widgets=(range_("a"),), aliases=(("xa", "q*2"),))},
+     "not a column"),
+    # v0.3: responds() needs three different existing steps and a declared model
+    ({"steps": (load(), set_("a", [-1, 1]), set_("a", "full")), "checks": (responds("nope", "bin_count", 1, 2),)},
+     "does not create"),
+    ({"steps": (load(), set_("a", [-1, 1]), set_("a", "full")), "checks": (responds("h", "bin_count", 1, 1),)},
+     "three different steps"),
 ])
 def test_invalid_scenarios_are_refused_with_a_readable_message(over, match):
     with pytest.raises(ScenarioError, match=match):
         _scenario(**over).validate()
+
+
+
+def test_valid_alias_profile_and_responds_pass_validation():
+    sc = _scenario(page=Page(histograms=(hist("h", ["xa", "a"], [10, 4], [[0, 2], [-3, 3]]),), widgets=(range_("a"),),
+                             aliases=(("xa", "x*2 + 0.5"),), profiles=("h_1",)),
+                   steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
+                   checks=(auto(), responds("h_1", "mean", moved=1, restored=2)))
+    assert sc.validate().id == "unit/valid"
+
+
+def test_result_needs_an_executed_declared_assertion():
+    """v0.3 (GPT24 P1-2): a PASSing prerequisite alone (the transport check) never makes a scenario OK."""
+    r = report_mod.ScenarioResult(id="unit/r", outdir="/tmp")
+    r.add(0, "load", "transport x", "PASS", "", assertion=False)
+    assert not r.ok and r.assertions_executed == 0                     # negative control
+    r.add(0, "load", "h.bin_count", "PASS", "")
+    assert r.ok and r.assertions_executed == 1                         # healthy control
+    r.add(1, "set", "h.bin_count", "ERROR", "")
+    assert not r.ok

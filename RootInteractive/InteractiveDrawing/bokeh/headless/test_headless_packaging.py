@@ -1,11 +1,13 @@
 """Packaging checks (proposal v0.2 D-14): the engine is never installed for users.
 
 - No `.ts` file anywhere under headless/ (a `.ts` would be shipped through setup.py's package_data). Always runs.
-- The built wheel contains no file of the headless tree. Builds a wheel of the repository, so it runs only when
-  RI_HEADLESS_WHEEL=1 is set (stage acceptance runs).
+- The wheel built from the committed tree contains no file of the headless tree. Builds a wheel, so it runs only
+  when RI_HEADLESS_WHEEL=1 is set (stage acceptance runs).
 """
+import io
 import os
 import subprocess
+import tarfile
 import sys
 import zipfile
 from pathlib import Path
@@ -24,12 +26,21 @@ def test_no_typescript_file_under_headless():
 
 @pytest.mark.skipif(os.environ.get("RI_HEADLESS_WHEEL") != "1", reason="wheel build only with RI_HEADLESS_WHEEL=1")
 def test_wheel_contains_no_headless_file(tmp_path):
-    out = subprocess.run([sys.executable, "-m", "pip", "wheel", str(REPO), "--no-deps", "--no-build-isolation",
-                          "-w", str(tmp_path)], capture_output=True, text=True, timeout=600)
+    """Built from the committed tree (`git archive HEAD`), never from the working tree, so untracked files of a
+    checkout cannot change the result (v0.3, GPT22: the alma2 wheel had 146 files from untracked leftovers)."""
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+    assert head.returncode == 0, "not a git checkout"
+    src = tmp_path / "src"
+    src.mkdir()
+    archive = subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", "HEAD"], capture_output=True)
+    assert archive.returncode == 0, archive.stderr[-500:]
+    tarfile.open(fileobj=io.BytesIO(archive.stdout)).extractall(src)
+    out = subprocess.run([sys.executable, "-m", "pip", "wheel", str(src), "--no-deps", "--no-build-isolation",
+                          "-w", str(tmp_path / "wheel")], capture_output=True, text=True, timeout=600)
     assert out.returncode == 0, out.stderr[-2000:]
-    wheels = list(tmp_path.glob("*.whl"))
+    wheels = list((tmp_path / "wheel").glob("*.whl"))
     assert len(wheels) == 1, wheels
     names = zipfile.ZipFile(wheels[0]).namelist()
     found = [n for n in names if "headless" in n]
-    print(f"wheel {wheels[0].name}: {len(names)} files, {len(found)} headless files")
+    print(f"\nwheel of commit {head.stdout.strip()}: {wheels[0].name}: {len(names)} files, {len(found)} headless files")
     assert found == []

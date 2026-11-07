@@ -5,11 +5,14 @@ step, and labels. Validation runs before any browser starts; a malformed scenari
 readable message, never a silent skip.
 
 Stage 4.2a supports: one main table; 1-D and N-D histograms (optionally weighted by a column, or by a parameter
-whose options create a stack of histograms); range widgets; aliases; profiles shown in a figure; lossless
-transport; steps `load`, `set_` (range widget, "full" read from the page) and `js_action` (only with a stated
-completion condition); checks `auto` (automatic oracle), `audit` (re-read after a delay) and `js_value`.
+whose options create a stack of histograms); range widgets; aliases (names, numbers, + - * /, parentheses);
+profiles `<histogram>_<axis>` shown in a figure; lossless transport; steps `load`, `set_` (range widget, "full"
+read from the page) and `js_action` (only with a stated completion condition); checks `auto` (automatic oracle),
+`audit` (re-read after a delay), `js_value`, and `responds` (a probed value changes on a move and returns on the
+move back). Every scenario declares at least one check, and every step selector names an existing step (v0.3).
 Expected failures, raw `fromArray` pages and further constructs arrive in later stages.
 """
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
@@ -149,6 +152,27 @@ class JsValue:
     steps: Optional[Tuple[int, ...]] = None
 
 
+@dataclass(frozen=True)
+class Responds:
+    """Metamorphic check (proposal §13): the probed column differs from the reference step after the move, and equals
+    it again after the move back. Needs no oracle of the statistic itself — it shows the model exists, is computed and
+    reacts. Evaluated at the last of the three steps."""
+    model: str
+    column: str
+    moved: int
+    restored: int
+    reference: int = 0
+    rel_tol: float = 1e-12
+
+    @property
+    def steps(self) -> Tuple[int, ...]:
+        return (self.reference, self.moved, self.restored)
+
+
+def responds(model: str, column: str, moved: int, restored: int, reference: int = 0) -> Responds:
+    return Responds(model, column, moved, restored, reference)
+
+
 def auto(steps=None) -> Auto:
     return Auto(None if steps is None else tuple(steps))
 
@@ -192,9 +216,26 @@ class Scenario:
             raise ScenarioError(f"{where}: stage 4.2a supports only lossless transport {LOSSLESS}")
         if not self.steps or not isinstance(self.steps[0], Load):
             raise ScenarioError(f"{where}: the first step must be load()")
+        if not self.checks:
+            raise ScenarioError(f"{where}: no check declared; a scenario must assert something (the transport "
+                                f"check alone is a prerequisite, not an assertion)")
         columns = set(self.data.main.columns)
         aliases = {a for a, _ in self.page.aliases}
         params = {p.name: p for p in self.page.parameters}
+        for a, expr in self.page.aliases:
+            if not re.fullmatch(r"[A-Za-z_0-9.\s+\-*/()]+", expr) or "**" in expr or "//" in expr:
+                raise ScenarioError(f"{where}: alias {a!r} = {expr!r} uses more than names, numbers, + - * / and "
+                                    f"parentheses (the oracle's alias subset until rulebook RB-6)")
+            for t in re.findall(r"[A-Za-z_]\w*", expr):
+                if t not in columns:
+                    raise ScenarioError(f"{where}: alias {a!r} uses {t!r}, which is not a column of the main table")
+        hists = {h.name: h for h in self.page.histograms}
+        for prof in self.page.profiles:
+            m = re.fullmatch(r"(.+)_(\d+)", prof)
+            if not m or m.group(1) not in hists or len(hists[m.group(1)].variables) < 2 or \
+                    int(m.group(2)) >= len(hists[m.group(1)].variables):
+                raise ScenarioError(f"{where}: profile {prof!r} is not a projection '<histogram>_<axis>' of a declared "
+                                    f"N-D histogram")
         widgets = {w.column for w in self.page.widgets}
         for w in self.page.widgets:
             if w.column not in columns:
@@ -217,9 +258,22 @@ class Scenario:
                                     f"condition (until=…); the engine does not guess when it has finished")
             if i > 0 and isinstance(s, Load):
                 raise ScenarioError(f"{where}: load() only as the first step")
+        n = len(self.steps)
         for c in self.checks:
             if isinstance(c, Auto) and not self.page.histograms:
                 raise ScenarioError(f"{where}: auto() needs at least one supported model on the page")
-            if not isinstance(c, (Auto, Audit, JsValue)):
+            if not isinstance(c, (Auto, Audit, JsValue, Responds)):
                 raise ScenarioError(f"{where}: unsupported check {type(c).__name__} in stage 4.2a")
+            if c.steps is not None and any(not (0 <= k < n) for k in c.steps):
+                raise ScenarioError(f"{where}: {type(c).__name__} names step(s) {c.steps}, but the scenario has steps "
+                                    f"0 … {n - 1}; a check on a step that never runs would never assert anything")
+            if isinstance(c, Responds):
+                if len(set(c.steps)) != 3:
+                    raise ScenarioError(f"{where}: responds() needs three different steps (reference, moved, restored)")
+                models = {name for name in hists} | set(self.page.profiles)
+                models |= {f"{h.name}[{o}]" for h in self.page.histograms if h.weights in params
+                           for o in params[h.weights].options}
+                if c.model not in models:
+                    raise ScenarioError(f"{where}: responds() probes {c.model!r}, which the page declaration does not "
+                                        f"create")
         return self

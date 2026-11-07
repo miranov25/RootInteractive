@@ -38,11 +38,14 @@ def _cell_equal(p: np.ndarray, o: np.ndarray, abs_tol: float, rel_tol: float, na
 
 def compare(page, oracle, kind: str = "count", abs_tol: float = 0.0, rel_tol: float = 0.0,
             nan_equal: bool = False) -> Comparison:
-    p = np.asarray(page, dtype=np.float64).ravel()
-    o = np.asarray(oracle, dtype=np.float64).ravel()
+    """Shapes are compared before anything is flattened (v0.3, GPT24 P1-1): a 2x2 array never equals four values.
+    A caller that means to compare flat data flattens it explicitly."""
+    p = np.asarray(page, dtype=np.float64)
+    o = np.asarray(oracle, dtype=np.float64)
     if p.shape != o.shape:
         return Comparison(False, kind, int(o.size), int(max(p.size, o.size)),
-                          f"shape mismatch: page {p.size} cells, oracle {o.size}")
+                          f"shape mismatch: page {p.shape}, oracle {o.shape}")
+    p, o = p.ravel(), o.ravel()
     if kind == "count":
         eq = _cell_equal(p, o, 0.0, 0.0, False)
     elif kind == "float":

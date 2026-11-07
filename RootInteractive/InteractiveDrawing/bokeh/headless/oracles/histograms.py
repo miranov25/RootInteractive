@@ -19,7 +19,9 @@ import numpy as np
 
 
 def _trunc_int32(x: np.ndarray) -> np.ndarray:
-    """JavaScript `x | 0` for the values that reach it (finite, inside the range): truncation toward zero."""
+    """JavaScript `x | 0` for the values that reach it: truncation toward zero. Supported domain: finite values with
+    |x| < 2**31, which holds for bin positions inside the range (0 <= x <= nbins). JavaScript's ToInt32 wrap-around
+    for larger values is not reproduced; histograms with more than 2**31 bins per axis are outside the domain."""
     return np.trunc(x).astype(np.int64)
 
 

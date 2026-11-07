@@ -2,7 +2,7 @@
 `bokehDrawSA.fromArray` call and writes a self-contained HTML file (inline Bokeh resources).
 
 The declaration, not the built page, is what the automatic oracle reads, so the oracle never depends on how
-RootInteractive interpreted it. `expected_models()` lists the model names the page must contain.
+RootInteractive interpreted it. `histogram_models()` lists the histogram model names the page must contain.
 """
 import os
 import re
