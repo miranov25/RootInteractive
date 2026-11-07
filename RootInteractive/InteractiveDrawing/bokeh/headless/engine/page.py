@@ -1,5 +1,6 @@
 """Page builder (proposal v0.2 §4, field `page`): turns a page declaration into RootInteractive's own
-`bokehDrawSA.fromArray` call and writes a self-contained HTML file (inline Bokeh resources).
+`bokehDrawSA.fromArray` call and writes a self-contained HTML file (inline Bokeh resources) for the browser, or the
+page document (JSON) for the Node model harness (`build_document`, proposal v0.3).
 
 The declaration, not the built page, is what the automatic oracle reads, so the oracle never depends on how
 RootInteractive interpreted it. `histogram_models()` lists the histogram model names the page must contain.
@@ -67,6 +68,37 @@ def build(scenario: Scenario, df: pd.DataFrame, html_path: Path) -> Path:
         arrayCompression=[(pat, list(actions)) for pat, actions in scenario.transport.array_compression],
     )
     return Path(html_path)
+
+
+def build_document(scenario: Scenario, df: pd.DataFrame, json_path: Path) -> Path:
+    """The page *document* for the Node model harness (proposal v0.3 D-24): the same `fromArray` call as `build`, but
+    `show` is suppressed, so no HTML is written and no model set is compiled; the layout `fromArray` produced is put into
+    a fresh Bokeh Document and written as JSON with its data inlined. Node builds it with Bokeh's own deserializer."""
+    import json
+    from bokeh.document import Document
+    import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
+
+    page = scenario.page
+    figs = figure_array(page)
+    widgets = widget_params(page)
+    shown = sa.show
+    sa.show = lambda *a, **k: None                       # build only: nothing written, nothing compiled
+    try:
+        obj = sa.bokehDrawSA.fromArray(
+            df, None, figs, widgets,
+            sourceArray=[h.source() for h in page.histograms],
+            aliasArray=[tuple(a) for a in page.aliases],
+            parameterArray=[{"name": p.name, "value": list(p.value), "options": list(p.options)} for p in page.parameters],
+            layout=[list(range(len(figs)))],
+            widgetLayout=[list(range(len(widgets)))],
+            arrayCompression=[(pat, list(actions)) for pat, actions in scenario.transport.array_compression],
+        )
+    finally:
+        sa.show = shown
+    doc = Document()
+    doc.add_root(obj.pAll)
+    Path(json_path).write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    return Path(json_path)
 
 
 def input_columns(scenario: Scenario) -> List[str]:

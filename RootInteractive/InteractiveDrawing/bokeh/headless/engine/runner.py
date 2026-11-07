@@ -277,16 +277,33 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
     """Run one scenario; with `fault`, on a disposable copy of its page with that fault applied exactly once.
     The report is written in every case, also after a build failure or an unexpected exception."""
     scenario.validate()
-    outdir = Path(out_root) / (scenario.id.replace("/", "__") + (f"__fault_{fault.id}" if fault else ""))
+    node = getattr(session, "backend", "browser") == "node"
+    outdir = Path(out_root) / (scenario.id.replace("/", "__") + ("__node" if node else "")
+                               + (f"__fault_{fault.id}" if fault else ""))
     outdir.mkdir(parents=True, exist_ok=True)
-    res = ScenarioResult(id=scenario.id + (f" [fault {fault.id}]" if fault else ""), outdir=str(outdir),
-                         versions=dict(session.versions),
+    res = ScenarioResult(id=scenario.id + (" [node]" if node else "") + (f" [fault {fault.id}]" if fault else ""),
+                         outdir=str(outdir), versions=dict(session.versions),
                          reproduce=f"pytest {test_ref} -k '{scenario.id}'" if test_ref else scenario.id)
     res.fault = fault.id if fault else ""
+    res.backend = "node" if node else "browser"
     t0 = time.time()
     try:
         df = data_mod.generate(scenario.data.main)
         res.case_sha256 = data_mod.save_case(df, outdir / "case.npz")
+        if node:                                                      # tier T2: the page document, no HTML
+            if (fault.id if fault else None) != (session.fault.id if session.fault else None):
+                res.add(-1, "fault", "fault applied", "ERROR", "the Node session does not carry this fault "
+                        "(a fault is applied to the session's bundle copy)", assertion=False)
+                return res
+            try:
+                target = page_mod.build_document(scenario, df, outdir / "page_document.json")
+            except Exception as exc:
+                res.add(-1, "build", "page build", "ERROR",
+                        f"page build failed: {type(exc).__name__}: {str(exc)[:300]}", assertion=False)
+                return res
+            res.timings["build_s"] = round(time.time() - t0, 3)
+            _drive(session.new_page(res), scenario, df, res, fault, target)
+            return res
         try:
             html = page_mod.build(scenario, df, outdir / "page.html")
         except Exception as exc:                                      # Claude3 C-2: never a bare crash
@@ -332,101 +349,118 @@ def _browser_run(session: Session, scenario: Scenario, df: pd.DataFrame, html: P
             return r.abort()
         pg.route("**/*", route)
         pg.add_init_script(HELPER_JS)
-        probes = _probes(scenario)
-        recorded: Dict[Tuple[str, str], Dict[int, list]] = {}
-        state: Dict[str, list] = {}               # widget masks at load (selection rules of known defects need them)
-
-        for i, step in enumerate(scenario.steps):
-            name = step.describe()
-            ts = time.time()
-            try:
-                if isinstance(step, Load):
-                    pg.goto(html.resolve().as_uri(), timeout=LOAD_TIMEOUT_MS)
-                    pg.wait_for_function("() => window.Bokeh && Bokeh.documents.length > 0 && Bokeh.documents[0].is_idle",
-                                         timeout=LOAD_TIMEOUT_MS)
-                    done = pg.evaluate("([p, r]) => window.__riH.settle(p, r)", [probes, SETTLE_ROUNDS])
-                    if done.get("settled"):
-                        _transport_check(pg, scenario, df, res)
-                elif isinstance(step, SetRange):
-                    value = step.value if step.value == "full" else list(step.value)
-                    done = pg.evaluate(SET_JS, [step.column, value, probes, SETTLE_ROUNDS])
-                elif isinstance(step, JsAction):
-                    done = pg.evaluate(JS_ACTION_JS, [step.script, step.until, step.timeout_s * 1000])
-                else:
-                    raise StepNotComplete(f"unsupported step {type(step).__name__}")
-                if done.get("error"):
-                    raise StepNotComplete(done["error"])
-                if not done.get("settled"):
-                    raise StepNotComplete(f"completion condition not met ({done})")
-                miss = pg.evaluate("p => window.__riH.missing(p)", probes)     # Claude3 N-1: also after js_action
-                if miss:
-                    raise StepNotComplete("probed model or column: " + "; ".join(miss))
-                res.completion.append({"step": i, "name": name, **done, "seconds": round(time.time() - ts, 3)})
-                if isinstance(step, Load) and scenario.page.widgets:
-                    state["load_masks"] = _widget_mask(pg, scenario, df)[2]
-            except Exception as exc:                                   # the step itself failed: ERROR, then SKIP
-                res.add(i, name, "step completion", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", assertion=False)
-                for k in range(i, len(scenario.steps)):
-                    for check in scenario.checks:
-                        if _applies(check, k):
-                            for cname, feat in _concrete_checks(scenario, check, k):
-                                res.add(k, scenario.steps[k].describe(), cname, "SKIP",
-                                        "not executed: an earlier step did not complete", feature=feat)
-                break
-            snapshot = pg.evaluate("p => window.__riH.snapshot(p)", probes)
-            for check in scenario.checks:
-                if isinstance(check, Responds) and i in check.steps:
-                    recorded.setdefault((check.model, check.column), {})[i] = \
-                        pg.evaluate("([n, c, t]) => window.__riH.col(n, c, t)",
-                                    [check.model, check.column, _types(scenario, check.model)])
-                if not _applies(check, i):
-                    continue
-                try:
-                    if isinstance(check, Auto):
-                        _auto(pg, scenario, df, res, i, name, state)
-                    elif isinstance(check, Audit):
-                        pg.wait_for_timeout(int(check.delay_s * 1000))   # audit mode only: deliberate delay
-                        miss = pg.evaluate("p => window.__riH.missing(p)", probes)
-                        if miss:
-                            raise StepNotComplete("probed model or column: " + "; ".join(miss))
-                        again = pg.evaluate("p => window.__riH.snapshot(p)", probes)
-                        res.add(i, name, f"audit after {check.delay_s} s", "PASS" if again == snapshot else "ERROR",
-                                "page unchanged after completion" if again == snapshot else
-                                "page changed after the completion condition was met: the condition is insufficient",
-                                feature="ENGINE.completion")
-                    elif isinstance(check, JsValue):
-                        got = pg.evaluate(f"() => ({check.expr})")
-                        res.add(i, name, f"js value {check.expr}", "PASS" if got == check.expected else "FAIL",
-                                f"page {got!r}, expected {check.expected!r}", feature="ENGINE.harness")
-                    elif isinstance(check, Responds) and i == max(check.steps):
-                        _responds(res, check, recorded.get((check.model, check.column), {}), i, name,
-                                  _feature_of(scenario, check))
-                except Exception as exc:                                # ERROR on each affected concrete check
-                    for cname, feat in _concrete_checks(scenario, check, i):
-                        res.add(i, name, cname, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=feat)
-
-        if fault is not None:                                          # proof that the mutated code ran
-            res.fault_executions = int(pg.evaluate("() => window.__riFault || 0"))
-            if res.fault_executions == 0:
-                res.add(-1, "fault", "fault executed", "ERROR",
-                        f"fault {fault.id!r} applied but the mutated code never ran: the fault proves nothing",
-                        assertion=False)
-        probed = {(n, tuple(t)) for n, _, t in probes}
-        for typ, nm in pg.evaluate("t => window.__riH.inventory(t)", INVENTORY_TYPES):
-            if not any(nm == n and typ in t for n, t in probed):
-                res.unchecked_models.append(f"{typ} {nm}")
-        for e in res.console_errors:                                   # console-error policy
-            allowed = next((why for pat, why in CONSOLE_ALLOWED if re.search(pat, e)), None)
-            if allowed:
-                res.console_allowed.append(f"{e[:120]} — allowed: {allowed}")
-            else:
-                res.add(-1, "page", "console error", "ERROR", f"not on the allowed list: {e}", assertion=False)
-        for e in res.page_errors:
-            res.add(-1, "page", "page errors", "ERROR", e, assertion=False)
-        for u in res.requests_blocked:
-            res.add(-1, "page", "external request", "ERROR", f"blocked, not a pinned local script: {u}", assertion=False)
+        _drive(pg, scenario, df, res, fault, html.resolve().as_uri())
     finally:
         ctx.close()
+
+
+BROWSER_LOAD_CONDITION = "() => window.Bokeh && Bokeh.documents.length > 0 && Bokeh.documents[0].is_idle"
+
+
+def _drive(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, fault: Optional[faults_mod.Fault],
+           target) -> None:
+    """The step loop and the checks after it, shared by both backends. `pg` is a Playwright page (browser) or a
+    NodePage (Node model harness); both offer goto, wait_for_function, evaluate and wait_for_timeout. The load
+    condition differs: the browser waits until the document is idle (its views rendered); Node has no views, and
+    `Document.from_json` builds, initialises and connects every model before it returns. In both, the settle rule on
+    the probed models then decides when the load is complete."""
+    probes = _probes(scenario)
+    recorded: Dict[Tuple[str, str], Dict[int, list]] = {}
+    state: Dict[str, list] = {}               # widget masks at load (selection rules of known defects need them)
+
+    for i, step in enumerate(scenario.steps):
+        name = step.describe()
+        ts = time.time()
+        try:
+            if isinstance(step, Load):
+                pg.goto(target, timeout=LOAD_TIMEOUT_MS)
+                pg.wait_for_function(getattr(pg, "load_condition", BROWSER_LOAD_CONDITION), timeout=LOAD_TIMEOUT_MS)
+                done = pg.evaluate("([p, r]) => window.__riH.settle(p, r)", [probes, SETTLE_ROUNDS])
+                if done.get("settled"):
+                    _transport_check(pg, scenario, df, res)
+            elif isinstance(step, SetRange):
+                value = step.value if step.value == "full" else list(step.value)
+                done = pg.evaluate(SET_JS, [step.column, value, probes, SETTLE_ROUNDS])
+            elif isinstance(step, JsAction):
+                done = pg.evaluate(JS_ACTION_JS, [step.script, step.until, step.timeout_s * 1000])
+            else:
+                raise StepNotComplete(f"unsupported step {type(step).__name__}")
+            if done.get("error"):
+                raise StepNotComplete(done["error"])
+            if not done.get("settled"):
+                raise StepNotComplete(f"completion condition not met ({done})")
+            miss = pg.evaluate("p => window.__riH.missing(p)", probes)     # Claude3 N-1: also after js_action
+            if miss:
+                raise StepNotComplete("probed model or column: " + "; ".join(miss))
+            res.completion.append({"step": i, "name": name, **done, "seconds": round(time.time() - ts, 3)})
+            if isinstance(step, Load) and scenario.page.widgets:
+                state["load_masks"] = _widget_mask(pg, scenario, df)[2]
+        except Exception as exc:                                   # the step itself failed: ERROR, then SKIP
+            res.add(i, name, "step completion", "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", assertion=False)
+            for k in range(i, len(scenario.steps)):
+                for check in scenario.checks:
+                    if _applies(check, k):
+                        for cname, feat in _concrete_checks(scenario, check, k):
+                            res.add(k, scenario.steps[k].describe(), cname, "SKIP",
+                                    "not executed: an earlier step did not complete", feature=feat)
+            break
+        snapshot = pg.evaluate("p => window.__riH.snapshot(p)", probes)
+        res.probe_values[str(i)] = snapshot
+        if scenario.page.widgets and page_mod.histogram_models(scenario.page):
+            sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)",
+                              [page_mod.histogram_models(scenario.page)[0][0], HIST_TYPES, len(df)])
+            res.probe_values[f"{i}:selected"] = sel.get("count", sel.get("error"))
+        for check in scenario.checks:
+            if isinstance(check, Responds) and i in check.steps:
+                recorded.setdefault((check.model, check.column), {})[i] = \
+                    pg.evaluate("([n, c, t]) => window.__riH.col(n, c, t)",
+                                [check.model, check.column, _types(scenario, check.model)])
+            if not _applies(check, i):
+                continue
+            try:
+                if isinstance(check, Auto):
+                    _auto(pg, scenario, df, res, i, name, state)
+                elif isinstance(check, Audit):
+                    pg.wait_for_timeout(int(check.delay_s * 1000))   # audit mode only: deliberate delay
+                    miss = pg.evaluate("p => window.__riH.missing(p)", probes)
+                    if miss:
+                        raise StepNotComplete("probed model or column: " + "; ".join(miss))
+                    again = pg.evaluate("p => window.__riH.snapshot(p)", probes)
+                    res.add(i, name, f"audit after {check.delay_s} s", "PASS" if again == snapshot else "ERROR",
+                            "page unchanged after completion" if again == snapshot else
+                            "page changed after the completion condition was met: the condition is insufficient",
+                            feature="ENGINE.completion")
+                elif isinstance(check, JsValue):
+                    got = pg.evaluate(f"() => ({check.expr})")
+                    res.add(i, name, f"js value {check.expr}", "PASS" if got == check.expected else "FAIL",
+                            f"page {got!r}, expected {check.expected!r}", feature="ENGINE.harness")
+                elif isinstance(check, Responds) and i == max(check.steps):
+                    _responds(res, check, recorded.get((check.model, check.column), {}), i, name,
+                              _feature_of(scenario, check))
+            except Exception as exc:                                # ERROR on each affected concrete check
+                for cname, feat in _concrete_checks(scenario, check, i):
+                    res.add(i, name, cname, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=feat)
+
+    if fault is not None:                                          # proof that the mutated code ran
+        res.fault_executions = int(pg.evaluate("() => window.__riFault || 0"))
+        if res.fault_executions == 0:
+            res.add(-1, "fault", "fault executed", "ERROR",
+                    f"fault {fault.id!r} applied but the mutated code never ran: the fault proves nothing",
+                    assertion=False)
+    probed = {(n, tuple(t)) for n, _, t in probes}
+    for typ, nm in pg.evaluate("t => window.__riH.inventory(t)", INVENTORY_TYPES):
+        if not any(nm == n and typ in t for n, t in probed):
+            res.unchecked_models.append(f"{typ} {nm}")
+    for e in res.console_errors:                                   # console-error policy
+        allowed = next((why for pat, why in CONSOLE_ALLOWED if re.search(pat, e)), None)
+        if allowed:
+            res.console_allowed.append(f"{e[:120]} — allowed: {allowed}")
+        else:
+            res.add(-1, "page", "console error", "ERROR", f"not on the allowed list: {e}", assertion=False)
+    for e in res.page_errors:
+        res.add(-1, "page", "page errors", "ERROR", e, assertion=False)
+    for u in res.requests_blocked:
+        res.add(-1, "page", "external request", "ERROR", f"blocked, not a pinned local script: {u}", assertion=False)
 
 
 def _feature_of(scenario: Scenario, check) -> str:

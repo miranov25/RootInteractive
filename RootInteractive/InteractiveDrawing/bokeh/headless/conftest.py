@@ -48,3 +48,39 @@ def headless_session():
         _unavailable(f"Chromium could not start: {exc}")
     yield session
     session.close()
+
+
+def _node_unavailable(reason: str):
+    if os.environ.get("RI_HEADLESS_REQUIRED") == "1":
+        pytest.fail(f"Node model harness required (RI_HEADLESS_REQUIRED=1) but unavailable: {reason}", pytrace=False)
+    pytest.skip(f"Node model harness tests skipped: {reason}")
+
+
+@pytest.fixture(scope="session")
+def node_bundle_root() -> Path:
+    """Where the stored model bundle lives: the output root, shared by all workers (written atomically)."""
+    root = Path(os.environ.get("RI_HEADLESS_OUT", HERE / "_out"))
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+@pytest.fixture(scope="session")
+def node_session(node_bundle_root):
+    """The Node model harness (proposal v0.3 D-26): missing node or jsdom -> skipped locally, ERROR when required."""
+    import shutil
+    if shutil.which("node") is None:
+        _node_unavailable("node is not installed")
+    if not (HERE.parent / "node_modules" / "jsdom").exists():
+        _node_unavailable("jsdom 24.1.3 is not installed — run: npm install   (in RootInteractive/InteractiveDrawing/bokeh)")
+    from .engine import vendor
+    problems = vendor.check()
+    if problems:
+        _node_unavailable("pinned page scripts missing: " + "; ".join(problems))
+    from .engine.node_session import NodeSession, NodeUnavailable
+    try:
+        session = NodeSession(node_bundle_root)
+    except NodeUnavailable as exc:
+        _node_unavailable(str(exc))
+    yield session
+    session.close()
+

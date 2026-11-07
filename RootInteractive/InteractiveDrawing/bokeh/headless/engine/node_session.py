@@ -1,0 +1,154 @@
+"""Python side of the Node model harness (tier T2; proposal v0.3 §3; stage 4.2c-1).
+
+`NodeSession` starts one Node.js process (engine/node/runner.mjs) that loads Bokeh and RootInteractive's compiled
+models into jsdom once; `NodePage` offers the four page operations the engine's step loop uses — goto (here: build a
+fresh document from a page document through Bokeh's deserializer), wait_for_function, evaluate, wait_for_timeout — so
+the same steps, probes, oracles, signatures and reports run against Node and against Chromium.
+
+A fault (engine/faults.py) is applied to a disposable copy of the model bundle when the session starts; that copy is
+never the stored healthy bundle. Numbers come back as base64 Float64 arrays, so NaN, +-Inf and -0 survive.
+"""
+import base64
+import importlib.metadata as md
+import json
+import platform
+import queue
+import subprocess
+import threading
+from pathlib import Path
+from typing import Any, List, Optional
+
+import numpy as np
+import pandas as pd
+
+from . import faults as faults_mod
+from . import node_bundle
+
+RUNNER = Path(__file__).resolve().parent / "node" / "runner.mjs"
+
+
+class NodeUnavailable(RuntimeError):
+    """Node.js or jsdom missing, or the harness could not start."""
+
+
+def decode(x: Any) -> Any:
+    if isinstance(x, dict):
+        if "__f64" in x:
+            return np.frombuffer(base64.b64decode(x["__f64"]), dtype=np.float64).tolist()
+        if "__num" in x:
+            return {"NaN": float("nan"), "Infinity": float("inf"), "-Infinity": float("-inf"), "-0": -0.0}[x["__num"]]
+        return {k: decode(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [decode(v) for v in x]
+    return x
+
+
+class NodeSession:
+    backend = "node"
+
+    def __init__(self, out_root: Path, fault: Optional[faults_mod.Fault] = None, timeout_s: float = 120.0):
+        from .runner import HELPER_JS, REPO_ROOT, _git          # local import: runner imports this module too
+        out_root = Path(out_root)
+        healthy = node_bundle.model_bundle(out_root)
+        models, self.fault = healthy, fault
+        if fault is not None:                                    # disposable copy; never shares the stored bundle
+            mutated = faults_mod.apply(healthy.read_text(encoding="utf-8"), fault)
+            models = healthy.parent / f"fault_{fault.id}_{healthy.name}"
+            models.write_text(mutated, encoding="utf-8")
+        helper = healthy.parent / "helper.js"
+        helper.write_text(HELPER_JS, encoding="utf-8")
+        files = node_bundle.bundle_files(out_root, models)
+        try:
+            self.proc = subprocess.Popen(["node", str(RUNNER), str(helper)] + [str(f) for f in files],
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                         text=True, bufsize=1)
+        except FileNotFoundError as exc:
+            raise NodeUnavailable(f"node not found: {exc}")
+        self._lines: "queue.Queue[str]" = queue.Queue()
+        threading.Thread(target=self._pump, daemon=True).start()
+        self._next = 0
+        ready = self._read(timeout_s)
+        if not ready.get("ok"):
+            raise NodeUnavailable(f"Node harness did not start: {ready}")
+        info = ready["result"]
+        self.load_ms = info["load_ms"]
+        registered = self.request("registered", names=list(node_bundle.EXPECTED_MODELS))["result"]
+        self.missing_models = sorted(set(node_bundle.EXPECTED_MODELS) - set(registered))
+        self.versions = {
+            "backend": "node (jsdom)", "python": platform.python_version(), "numpy": np.__version__,
+            "pandas": pd.__version__, "bokeh": info["bokeh"], "node": info["node"], "jsdom": info["jsdom"],
+            "machine": platform.machine(),
+            "rootinteractive": f"{_git('rev-parse', '--short', 'HEAD')} ({_git('rev-parse', '--abbrev-ref', 'HEAD')})",
+            "model_bundle_sha256": node_bundle.sha256_of(models)[:16],
+        }
+        self.exit_code: Optional[int] = None
+
+    def _pump(self) -> None:
+        for line in self.proc.stdout:
+            self._lines.put(line)
+        self._lines.put("")                                      # end of stream
+
+    def _read(self, timeout_s: float) -> dict:
+        try:
+            line = self._lines.get(timeout=timeout_s)
+        except queue.Empty:
+            raise NodeUnavailable(f"no answer from the Node harness within {timeout_s} s")
+        if not line:
+            err = self.proc.stderr.read()[-800:] if self.proc.stderr else ""
+            raise NodeUnavailable(f"the Node harness ended: {err}")
+        return json.loads(line)
+
+    def request(self, op: str, timeout_s: float = 60.0, **kw) -> dict:
+        self._next += 1
+        self.proc.stdin.write(json.dumps({"id": self._next, "op": op, **kw}) + "\n")
+        self.proc.stdin.flush()
+        reply = self._read(timeout_s)
+        if reply.get("id") != self._next:
+            raise NodeUnavailable(f"protocol out of step: sent {self._next}, got {reply.get('id')}")
+        return reply
+
+    def close(self) -> int:
+        """Ask the process to exit and wait; the exit code must be 0 (the harness never hangs)."""
+        if self.exit_code is not None:
+            return self.exit_code
+        try:
+            self.proc.stdin.write(json.dumps({"id": self._next + 1, "op": "quit"}) + "\n")
+            self.proc.stdin.flush()
+            self.exit_code = self.proc.wait(timeout=10)
+        except Exception:
+            self.proc.kill()
+            self.exit_code = self.proc.wait(timeout=10)
+        return self.exit_code
+
+    def new_page(self, res) -> "NodePage":
+        return NodePage(self, res)
+
+
+class NodePage:
+    """The page operations the engine's step loop uses, against one fresh document in the Node harness."""
+
+    # no views in Node: the document is complete when Document.from_json has returned (see runner._drive)
+    load_condition = "() => window.Bokeh && Bokeh.documents.length > 0"
+
+    def __init__(self, session: NodeSession, res):
+        self.session, self.res = session, res
+
+    def _call(self, op: str, timeout_s: float = 60.0, **kw) -> Any:
+        r = self.session.request(op, timeout_s=timeout_s, **kw)
+        self.res.page_errors.extend(r.get("page_errors", []))
+        self.res.console_errors.extend(r.get("console_errors", []))
+        if not r.get("ok"):
+            raise RuntimeError(r.get("error", "Node harness error"))
+        return decode(r.get("result"))
+
+    def goto(self, target, timeout: Optional[int] = None) -> None:
+        self._call("new_doc", path=str(target), timeout_s=(timeout or 60_000) / 1000)
+
+    def wait_for_function(self, code: str, timeout: int = 20_000) -> None:
+        self._call("wait_for", code=code, timeout_ms=timeout, timeout_s=timeout / 1000 + 10)
+
+    def evaluate(self, code: str, arg: Any = None) -> Any:
+        return self._call("eval", code=code, arg=arg)
+
+    def wait_for_timeout(self, ms: int) -> None:
+        self._call("sleep", ms=ms, timeout_s=ms / 1000 + 10)

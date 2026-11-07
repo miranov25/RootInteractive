@@ -1,0 +1,112 @@
+"""The Node model harness itself (tier T2; proposal v0.3 §3, stage 4.2c-1, acceptance items A-C).
+
+A  the stored model bundle: key (erratum V-4), inventory of the 20 model classes with a negative control;
+B  the three rules, each shown to hold and shown to be necessary: realm, construction path, settle rule (V-3);
+   the delayed-update control (two timer rounds) and the never-ready control, as in the browser harness;
+C  errors in the page and console errors are ERROR outcomes; the harness exits cleanly with code 0.
+"""
+import pytest
+
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine import data as data_mod
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine import node_bundle
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine import page as page_mod
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import SET_JS, SETTLE_ROUNDS, _probes, run
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
+    Labels, Page, Scenario, TableSpec, Tables, auto, hist, js_action, js_value, load, range_, set_)
+from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
+
+pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
+
+
+def _small(id_, steps, checks, widget=False):
+    return Scenario(id=id_, data=Tables(TableSpec(1000, 3, {"x": "uniform(0,1)", "a": "normal(0,1)"})),
+                    page=Page(histograms=(hist("h1", ["x"], 10, [0, 1]),), widgets=(range_("a"),) if widget else ()),
+                    steps=steps, checks=checks, labels=Labels(family="harness", technique="node harness"))
+
+
+# ---------------------------------------------------------------------------------------------- A: bundle, inventory
+def test_bundle_key_follows_bokeh_sources_and_model_list():
+    base = node_bundle.cache_key("3.3.2", {"A.ts": "x", "B.ts": "y"}, ["M1", "M2"])
+    assert base == node_bundle.cache_key("3.3.2", {"B.ts": "y", "A.ts": "x"}, ["M2", "M1"])      # order does not matter
+    assert base != node_bundle.cache_key("3.3.4", {"A.ts": "x", "B.ts": "y"}, ["M1", "M2"])      # Bokeh version
+    assert base != node_bundle.cache_key("3.3.2", {"A.ts": "x ", "B.ts": "y"}, ["M1", "M2"])     # a changed source
+    assert base != node_bundle.cache_key("3.3.2", {"A.ts": "x", "B.ts": "y"}, ["M1", "M2", "M3"])  # an added import
+
+
+def test_inventory_is_complete_and_the_check_can_fail(node_session):
+    assert node_session.missing_models == [], f"models not registered in Node: {node_session.missing_models}"
+    got = node_session.request("registered", names=["HistogramCDS", "NoSuchModel"])["result"]
+    assert got == ["HistogramCDS"]                                   # negative control: an absent class is reported
+    assert len(node_bundle.EXPECTED_MODELS) == 20
+
+
+# ---------------------------------------------------------------------------------------------- B: the three rules
+def test_realm_and_construction_rules(node_session):
+    r = node_session.request("selftest")["result"]
+    assert r["node_realm"].startswith("rejected"), r              # rule 1 is necessary: Node-realm data is refused
+    assert r["window_realm"] == "accepted", r                     # ... and sufficient
+    assert r["direct_histo_nd"].startswith("failed"), r           # rule 2 is necessary: direct construction fails
+
+
+def test_settle_rule_waits_for_a_timer_round(node_session, node_bundle_root):
+    """Erratum V-3: after a widget change the selection changes only after a setTimeout(0) round; one microtask
+    reads the old value. The engine's settle rule (microtask, then timer rounds until two equal snapshots) sees it."""
+    out = node_bundle_root / "unit"
+    out.mkdir(exist_ok=True)
+    df = data_mod.generate(B1_TWO_FILTERS.data.main)
+    doc = page_mod.build_document(B1_TWO_FILTERS, df, out / "b1_document.json")
+    sel = "() => window.__riH.selected('h2', ['HistogramCDS', 'HistoNdCDS'], 20000).count"
+    node_session.request("new_doc", path=str(doc))
+    before = node_session.request("eval", code=sel)["result"]
+    one_microtask = node_session.request("eval", code="""async () => { window.__riH.slider('a').value = [-1, 1];
+        await Promise.resolve(); return window.__riH.selected('h2', ['HistogramCDS', 'HistoNdCDS'], 20000).count; }""")
+    node_session.request("new_doc", path=str(doc))                 # fresh document for the settled read
+    settled = node_session.request("eval", code=SET_JS, arg=["a", [-1, 1], _probes(B1_TWO_FILTERS), SETTLE_ROUNDS])
+    after = node_session.request("eval", code=sel)["result"]
+    assert one_microtask["result"] == before == 18039                # stale after one microtask
+    assert settled["ok"] and settled["result"]["settled"] and after == 12361 and after != before
+
+
+def test_delayed_update_completes_by_its_condition(node_session, headless_out):
+    sc = _small("harness/node_delayed_update_two_rounds",
+                (load(), js_action("window.__d = 0; setTimeout(() => setTimeout(() => { window.__d = 1; }, 0), 0);",
+                                   until="window.__d === 1")),
+                (js_value("window.__d", 1, steps=(1,)),))
+    res = run(node_session, sc, headless_out, test_ref=__file__)
+    assert res.ok, res.text()
+
+
+def test_condition_never_met_is_an_error(node_session, headless_out):
+    sc = _small("harness/node_condition_never_met",
+                (load(), js_action("window.__e = 0;", until="window.__e === 1", timeout_s=0.3)),
+                (js_value("window.__e", 1, steps=(1,)),))
+    res = run(node_session, sc, headless_out, test_ref=__file__)
+    step1 = [o for o in res.outcomes if o.step == 1]
+    assert not res.ok and [o.outcome for o in step1] == ["ERROR", "SKIP"] and "completion condition not met" in step1[0].detail
+
+
+# ---------------------------------------------------------------------------------------------- C: errors, exit
+def test_page_error_is_an_error(node_session, headless_out):
+    sc = _small("harness/node_page_error",
+                (load(), js_action("setTimeout(() => { throw new Error('boom in a timer'); }, 0); window.__t = 1;",
+                                   until="window.__t === 1"), set_("a", [-1, 1])),
+                (auto(),), widget=True)
+    res = run(node_session, sc, headless_out, test_ref=__file__)
+    pe = [o for o in res.outcomes if o.check == "page errors"]
+    assert not res.ok and pe and "boom in a timer" in pe[0].detail, res.text()
+
+
+def test_console_error_not_allowed_is_an_error(node_session, headless_out):
+    sc = _small("harness/node_console_error_policy",
+                (load(), js_action("console.error('an unexpected page error');", until="true"), set_("a", [-1, 1])),
+                (auto(),), widget=True)
+    res = run(node_session, sc, headless_out, test_ref=__file__)
+    pol = [o for o in res.outcomes if o.check == "console error"]
+    assert not res.ok and [o.outcome for o in pol] == ["ERROR"] and "an unexpected page error" in pol[0].detail
+
+
+def test_harness_exits_cleanly(node_bundle_root):
+    s = NodeSession(node_bundle_root)
+    assert s.missing_models == []
+    assert s.close() == 0 and s.proc.poll() == 0                  # no hang (jsdom keeps timers alive otherwise)

@@ -46,6 +46,8 @@ class ScenarioResult:
     fault_executions: int = 0                         # how often the mutated code ran (must be > 0)
     unchecked_models: List[str] = field(default_factory=list)    # completeness: verifiable models nobody checked
     console_allowed: List[str] = field(default_factory=list)     # console errors on the allowed list, with reason
+    backend: str = "browser"                          # "browser" (tier T3) or "node" (tier T2, proposal v0.3)
+    probe_values: Dict[str, object] = field(default_factory=dict)  # per step: probed models' columns, selected rows
 
     def add(self, step: int, step_name: str, check: str, outcome: str, detail: str, feature: str = "",
             assertion: bool = True) -> None:
