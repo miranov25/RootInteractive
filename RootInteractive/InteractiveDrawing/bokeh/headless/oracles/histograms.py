@@ -88,7 +88,7 @@ def counts(columns, nbins, ranges, mask=None, weights=None) -> np.ndarray:
 def rule_bounds(columns, nbins, ranges, weights=None, ulps: int = 4):
     """RB-2 as a rule, independent of RootInteractive's arithmetic (4.2c-2a review, Claude10's per-cell rule): a
     finite row inside [lo, hi] on every axis is counted once, in a cell whose bin on each axis contains it — the top
-    edge belongs to the last bin; a value within `ulps` rounding steps of an INTERIOR edge may go to either
+    edge belongs to the last bin; a value within `ulps` rounding steps (of max(|lo|, |hi|)) of an INTERIOR edge may go to either
     neighbouring bin (which one is arithmetic, not rule). Returns (lower, upper, total): per cell the weight that
     must be there and the weight that may be there, and the total weight that must be counted."""
     n = len(columns[0])
@@ -102,7 +102,9 @@ def rule_bounds(columns, nbins, ranges, weights=None, ulps: int = 4):
         edges = lo + (hi - lo) * np.arange(nb + 1) / nb
         edges[-1] = hi
         interior = edges[1:-1]
-        tol = ulps * np.spacing(np.abs(interior))
+        # the tolerance follows the arithmetic's resolution on this axis (v * scale - lo * scale rounds on the scale of
+        # max(|lo|, |hi|)), not the edge's own value: an interior edge at 0 would otherwise get none (4.2c-2a, Claude10)
+        tol = np.full(interior.shape, ulps * np.spacing(max(abs(lo), abs(hi))))
         vv = np.where(np.isfinite(v), v, lo)[:, None]
         kmin.append((vv > interior + tol).sum(axis=1))
         kmax.append((vv >= interior - tol).sum(axis=1))

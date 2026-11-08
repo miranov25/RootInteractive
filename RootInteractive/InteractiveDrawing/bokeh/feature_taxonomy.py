@@ -191,6 +191,39 @@ FEATURE_TAXONOMY = {
         "planned": True,
     },
 
+    "HIST.profile": {
+        "name": "Histogram profile",
+        "description": "Profile of an N-D histogram along one axis: mean, sigma, quantiles per bin (HistoNdProfile)",
+        "priority": "P2",
+        "backends": ["browser"],
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
+    },
+
+    # =========================================================================
+    # Selection filters (PHASE_4 stage 4.2c-2b: identifiers used by the headless tests; evidence enters in 4.7)
+    # =========================================================================
+    "FILTER.range": {
+        "name": "Range filter",
+        "description": "Row selection by a range widget (RangeFilter), inclusive limits, missing values excluded",
+        "priority": "P1",
+        "backends": ["browser"],
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
+    },
+
+    "FILTER.intersection": {
+        "name": "Filter intersection",
+        "description": "Intersection of several filters on one table (LazyIntersectionFilter)",
+        "priority": "P1",
+        "backends": ["browser"],
+        "layer": "integration",
+        "proof": None,
+        "planned": True,
+    },
+
     # =========================================================================
     # Alias Operations
     # =========================================================================

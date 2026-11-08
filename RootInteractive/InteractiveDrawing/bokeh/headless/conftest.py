@@ -59,8 +59,8 @@ def _node_unavailable(reason: str):
 @pytest.fixture(scope="session")
 def node_bundle_root() -> Path:
     """Where the stored model bundle lives: the output root, shared by all workers (written atomically)."""
-    root = Path(os.environ.get("RI_HEADLESS_OUT", HERE / "_out"))
-    root.mkdir(parents=True, exist_ok=True)
+    root = Path(os.environ.get("RI_HEADLESS_BUNDLE", os.environ.get("RI_HEADLESS_OUT", HERE / "_out")))
+    root.mkdir(parents=True, exist_ok=True)              # RI_HEADLESS_BUNDLE: a persistent store (run_tests.sh, 4.2c-2b)
     return root
 
 
@@ -83,4 +83,23 @@ def node_session(node_bundle_root):
         _node_unavailable(str(exc))
     yield session
     session.close()
+
+
+# ------------------------------------------------------------------ fast default suite and full suite (stage 4.2c-2b)
+# The fast default suite (`pytest -m "not slow"`, the default of run_tests.sh) keeps every check but samples the
+# mass cases (the family tests mark their large variants `slow`) and runs the browser only on its smoke set: ONE page,
+# so the browser compiles ONE set of models. Every other browser test is marked `slow` here; the full suite
+# (`run_tests.sh --full`, and CI at GSI on every pull request) runs everything.
+BROWSER_SMOKE = (
+    "test_headless_scenarios.py::test_scenario[histograms/plain_1d_2d_one_range_two_moves]",
+    "test_headless_parity.py::test_node_equals_browser[histograms/plain_1d_2d_one_range_two_moves]",
+)
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if HERE not in Path(str(item.fspath)).resolve().parents:
+            continue                                       # only the tests of this folder
+        if "headless_session" in getattr(item, "fixturenames", ()) and not item.nodeid.endswith(BROWSER_SMOKE):
+            item.add_marker(pytest.mark.slow)
 

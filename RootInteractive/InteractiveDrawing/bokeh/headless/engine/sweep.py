@@ -90,12 +90,13 @@ def content(doc: dict, rounds: int = 8, unordered=UNORDERED) -> Counter:
 class Template:
     """A page document built once; `document(df)` returns the JSON text of the same page with `df`'s data."""
 
-    def __init__(self, scenario: Scenario, df0: pd.DataFrame, path: Path):
+    def __init__(self, scenario: Scenario, df0: pd.DataFrame, path: Path, models_only: Sequence[str] = ()):
         if scenario.page.widgets:
             raise ValueError("template substitution is exact only for pages without widgets (widget limits are "
                              "computed from the data at build time): use document cases")
-        self.scenario = scenario
-        self.doc = json.loads(page_mod.build_document(scenario, df0, path).read_text(encoding="utf-8"))
+        self.scenario, self.models_only = scenario, tuple(models_only)
+        self.doc = json.loads(page_mod.build_document(scenario, df0, path, models_only=self.models_only)
+                              .read_text(encoding="utf-8"))
         nodes = _cds_nodes(self.doc, [])
         if len(nodes) != 1:
             raise ValueError(f"expected one CDSCompress source in the page, found {len(nodes)}")
@@ -120,7 +121,8 @@ class Template:
 
     def equivalent(self, df: pd.DataFrame, path: Path) -> bool:
         """The gate of erratum V-1: the substituted document equals a fresh Python build for the same data."""
-        fresh = json.loads(page_mod.build_document(self.scenario, df, path).read_text(encoding="utf-8"))
+        fresh = json.loads(page_mod.build_document(self.scenario, df, path, models_only=self.models_only)
+                           .read_text(encoding="utf-8"))
         return content(json.loads(self.document(df))) == content(fresh)
 
 

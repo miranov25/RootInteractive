@@ -42,6 +42,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 # Test directories (without glob - pytest discovers test_*.py)
 TEST_DIRS=(
     "RootInteractive/InteractiveDrawing/bokeh"
+    "RootInteractive/InteractiveDrawing/bokeh/headless"
     "RootInteractive/Tools"
     "RootInteractive/onnx"
     "RootInteractive/MLpipeline/tests"
@@ -122,9 +123,13 @@ Options:
   --quick          Run tests only (skip CAPABILITY_MATRIX generation)
   --matrix         Generate CAPABILITY_MATRIX only (skip running tests)
   --dry-run        Show what would be done without doing it
+  --full           Headless tests: the full suite (all generated cases, every browser test);
+                   default: the fast suite (tests marked slow are left out)
 
 Test Directories:
-  - RootInteractive/InteractiveDrawing/bokeh/
+  - RootInteractive/InteractiveDrawing/bokeh/ (without headless/, which has its own entry)
+  - RootInteractive/InteractiveDrawing/bokeh/headless/ (Node and browser tests; fast suite unless --full)
+  - RootInteractive/joins/ (Node tests, node --test)
   - RootInteractive/Tools/
 
 Output Structure:
@@ -170,6 +175,7 @@ VERBOSE=""
 QUICK_MODE=0
 MATRIX_ONLY=0
 DRY_RUN=0
+FULL_MODE=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -183,6 +189,7 @@ while [[ $# -gt 0 ]]; do
         --quick) QUICK_MODE=1 ;;
         --matrix) MATRIX_ONLY=1 ;;
         --dry-run) DRY_RUN=1 ;;
+        --full) FULL_MODE=1 ;;
         *) echo "Unknown option: $1"; show_help; return 2 ;;
     esac
     shift
@@ -275,13 +282,27 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
         echo "${BOLD}Testing: $test_dir ($test_count test files)${RESET}"
         echo "Output: $output_dir/"
         
+        # Per-folder arguments (PHASE_4 stage 4.2c-2b): the bokeh entry leaves out headless/, which has its own entry;
+        # the headless entry runs the fast suite unless --full, writes its reports into this run's log folder and keeps
+        # the Node model bundle in a persistent store (built once, about a minute).
+        EXTRA_ARGS=()
+        case "$test_dir" in
+            RootInteractive/InteractiveDrawing/bokeh)
+                EXTRA_ARGS=(--ignore=RootInteractive/InteractiveDrawing/bokeh/headless) ;;
+            RootInteractive/InteractiveDrawing/bokeh/headless)
+                [[ $FULL_MODE -eq 1 ]] || EXTRA_ARGS=(-m "not slow")
+                export RI_HEADLESS_OUT="$PROJECT_ROOT/$output_dir/headless_out"
+                export RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/RootInteractive/InteractiveDrawing/bokeh/headless/_out}" ;;
+        esac
+
         if [[ $DRY_RUN -eq 1 ]]; then
-            echo "  [DRY RUN] Would run: pytest $test_dir/ -n $PARALLEL_WORKERS"
+            echo "  [DRY RUN] Would run: pytest $test_dir/ -n $PARALLEL_WORKERS ${EXTRA_ARGS[*]}"
         else
             # Run pytest with parallel workers
             if [[ "$PARALLEL_WORKERS" -gt 1 ]]; then
                 python3 -m pytest "$test_dir/" \
                     -n "$PARALLEL_WORKERS" \
+                    "${EXTRA_ARGS[@]}" \
                     $VERBOSE \
                     --json-report \
                     --json-report-file="$report_file" \
@@ -289,6 +310,7 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             else
                 # Sequential run
                 python3 -m pytest "$test_dir/" \
+                    "${EXTRA_ARGS[@]}" \
                     $VERBOSE \
                     --json-report \
                     --json-report-file="$report_file" \
@@ -296,6 +318,17 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             fi
             exit_code=${PIPESTATUS[0]}
             if [[ $exit_code -ne 0 ]]; then RUN_FAILED=1; fi
+            if [[ "$test_dir" == "RootInteractive/InteractiveDrawing/bokeh/headless" ]]; then
+                # the normalised outcome list (compared across platforms by reviewers) and the required scenarios
+                python3 -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report outcomes "$RI_HEADLESS_OUT" \
+                    > "$output_dir/headless_outcomes.txt"
+                if ! python3 -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report required "$RI_HEADLESS_OUT" \
+                        RootInteractive/InteractiveDrawing/bokeh/headless/required_scenarios.txt >> "$log_file" 2>&1; then
+                    print_warning "required headless scenarios missing (see $log_file)"
+                    RUN_FAILED=1
+                fi
+                unset RI_HEADLESS_OUT
+            fi
 
             if [[ -f "$report_file" ]]; then
                 REPORT_FILES+=("$report_file")
@@ -348,6 +381,24 @@ for t in r.get('tests', []):
             fi
         fi
     done
+
+    # Node tests of the joins prototypes (PHASE_4 stage 4.2c-2b). The files are listed explicitly: their names
+    # (test_*.mjs) do not match node --test's default patterns, so a folder argument would find nothing.
+    if ls RootInteractive/joins/test_*.mjs > /dev/null 2>&1; then
+        joins_dir="$LOG_BASE_DIR/joins_${TIMESTAMP}"
+        echo ""
+        echo "${BOLD}Testing: RootInteractive/joins (node --test)${RESET}"
+        if [[ $DRY_RUN -eq 1 ]]; then
+            echo "  [DRY RUN] Would run: node --test RootInteractive/joins/test_*.mjs"
+        elif ! command -v node > /dev/null 2>&1; then
+            print_warning "node not found: joins tests not run"
+            RUN_FAILED=1
+        else
+            mkdir -p "$joins_dir"
+            node --test RootInteractive/joins/test_*.mjs 2>&1 | tee "$joins_dir/test.log"
+            [[ ${PIPESTATUS[0]} -eq 0 ]] || RUN_FAILED=1
+        fi
+    fi
     
     # Summary
     print_header "Test Summary"

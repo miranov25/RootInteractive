@@ -38,7 +38,8 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms
 pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
 
 CONFIGS = (("unit_10", 10, 0.0, 1.0), ("claude3_b10_6", 6, -2.0, 2.28), ("odd_7", 7, -1.3, 2.9))
-GENERATED_PER_CONFIG = 3400                     # 3 x 3400 = 10 200 generated cases (proposal item E: >= 10 000)
+GENERATED_PER_CONFIG = {"fast": 300, "full": 3400}  # generated tables per configuration (full: 3 x 3400 = 10 200)
+MODELS = ("h1", "h2", "hw")                      # documents hold only these models and what they reference (4.2c-2b)                     # 3 x 3400 = 10 200 generated cases (proposal item E: >= 10 000)
 READ = """() => [window.__riH.col('h1', 'bin_count', ['HistogramCDS']), window.__riH.col('h2', 'bin_count', ['HistoNdCDS']),
                  window.__riH.col('hw', 'bin_count', ['HistogramCDS'])]"""
 B1_RULE = "b1_later_filters_keep_rows_excluded_at_load"
@@ -117,25 +118,31 @@ def _histogram_family_run(node_session, tpl, frames):
     return pages, t_sub, t["node_s"]
 
 
+SIZES = [pytest.param("fast", id="fast"), pytest.param("full", id="full", marks=pytest.mark.slow)]
+
+
+@pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("config", CONFIGS, ids=[c[0] for c in CONFIGS])
-def test_histogram_family(config, node_session, headless_out):
-    """One test per configuration (parallel workers can run them side by side)."""
+def test_histogram_family(config, size, node_session, headless_out):
+    """One test per configuration and size (parallel workers run them side by side). The fast default suite judges
+    every named case and 300 generated tables per configuration; the full suite (marker `slow`, the existing RootInteractive marker) 3 400."""
     name, nb, lo, hi = config
-    outdir = headless_out / f"families__histograms_node_{name}"
+    outdir = headless_out / f"families__histograms_node_{name}_{size}"
     outdir.mkdir(parents=True, exist_ok=True)
-    res = ScenarioResult(id=f"families/histograms_node_{name} [node]", outdir=str(outdir),
+    res = ScenarioResult(id=f"families/histograms_node_{name}_{size} [node]", outdir=str(outdir),
                          versions=dict(node_session.versions), reproduce=f"pytest {__file__} -k {name}")
     res.backend = "node"
     timings, failures = {}, []
     sc = _page(name, nb, lo, hi)
     t0 = time.perf_counter()
-    tpl = sweep.Template(sc, data_mod.generate(sc.data.main), outdir / "template_document.json")
+    tpl = sweep.Template(sc, data_mod.generate(sc.data.main), outdir / "template_document.json",
+                         models_only=MODELS)
     timings["template_build_s"] = round(time.perf_counter() - t0, 3)
     sample = _generated_frames(nb, lo, hi, 11) + [_named_frames(nb, lo, hi)[4]]   # includes a one-row table
     eq = sum(tpl.equivalent(df, outdir / "fresh_document.json") for df in sample)
     res.add(0, name, f"template equals a fresh build ({len(sample)} sampled tables)", "PASS" if eq == len(sample) else "FAIL",
             f"{eq} of {len(sample)} substituted documents equal a fresh Python build as model graphs")
-    for kind, frames in (("named", _named_frames(nb, lo, hi)), ("generated", _generated_frames(nb, lo, hi, GENERATED_PER_CONFIG))):
+    for kind, frames in (("named", _named_frames(nb, lo, hi)), ("generated", _generated_frames(nb, lo, hi, GENERATED_PER_CONFIG[size]))):
         pages, t_sub, t_node = _histogram_family_run(node_session, tpl, frames)
         verdicts = [judge(df, p, nb, lo, hi) for df, p in zip(frames, pages)]
         compared = len(verdicts)
@@ -176,6 +183,34 @@ def test_rule_check_catches_a_row_missing_from_page_and_oracle():
     empty = [np.zeros(10), np.zeros(40), np.zeros(10)]
     v = judge(df, empty, 10, 0.0, 1.0)
     assert v.unexplained and any("total" in u for u in v.unexplained), v
+
+
+def _oracle_pages(df, nb, lo, hi):
+    return [ho.counts([df.x], [nb], [(lo, hi)]), ho.counts([df.x, df.y], [nb, 4], [(lo, hi), (0.0, 1.0)]),
+            ho.counts([df.x], [nb], [(lo, hi)], weights=df.w)]
+
+
+def test_rule_guards_2d_and_weighted_on_their_own():
+    """4.2c-2a approval A-1 (Claude10, GPT23): each must leave an unexplained violation in ITS histogram, while the
+    other histograms are healthy — a 2-D row moved to another bin of y (total unchanged), a weight moved to a far
+    bin, and a row missing from the 2-D histogram only (also from its oracle)."""
+    df = pd.DataFrame({"x": [0.33], "y": [0.5], "w": [1.5]})
+    p1, p2, pw = _oracle_pages(df, 10, 0.0, 1.0)
+    moved_y = p2.copy(); moved_y[3 + 10 * 2] = 0; moved_y[3 + 10 * 0] = 1
+    moved_w = pw.copy(); moved_w[3] = 0; moved_w[7] = 1.5
+    missing_2d = np.zeros_like(p2)
+    for page, which in (([p1, moved_y, pw], "2-D"), ([p1, p2, moved_w], "weighted"), ([p1, missing_2d, pw], "2-D")):
+        v = judge(df, page, 10, 0.0, 1.0)
+        assert v.unexplained and all(u.startswith(which) for u in v.unexplained), (which, v)
+
+
+def test_rule_tolerance_at_an_edge_at_zero():
+    """4.2c-2a approval A-2 (Claude10): a range [-1, 1] has an interior edge at 0; values a few 1e-17 below it may land
+    on either side, and a healthy page must not be flagged."""
+    for xv in (-1e-18, -1e-17, -5e-17, -1e-16, 1e-17):
+        df = pd.DataFrame({"x": [xv], "y": [0.5], "w": [1.5]})
+        v = judge(df, _oracle_pages(df, 10, -1.0, 1.0), 10, -1.0, 1.0)
+        assert not v.unexplained, (xv, v)
 
 
 def test_b10_destination_in_2d_moved_or_dropped():
@@ -235,8 +270,11 @@ def test_batch_refuses_a_session_with_startup_errors(node_bundle_root, tmp_path)
     bad.write_text("console.error('unexpected error at start-up');")
     s = NodeSession(node_bundle_root, extra_files=[bad])
     try:
-        with pytest.raises(RuntimeError, match="start-up"):
-            sweep.run_batch(s, ["{}"], "() => 1")
+        name, nb, lo, hi = CONFIGS[0]
+        sc = _page(name, nb, lo, hi)
+        valid = sweep.Template(sc, data_mod.generate(sc.data.main), tmp_path / "t.json", models_only=MODELS)
+        with pytest.raises(RuntimeError, match="start-up"):       # a valid document (approval note A-3)
+            sweep.run_batch(s, [valid.document(data_mod.generate(sc.data.main))], READ)
     finally:
         s.close()
 
@@ -272,12 +310,16 @@ def _b1_scenario(n, first_has_nan):
     return replace(base, expect=tuple(expect)), df
 
 
+ROWS = {"fast": (1, 2, 3, 31, 32, 33, 63, 64, 65, 200), "full": tuple(range(1, 201))}
+
+
+@pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("first_has_nan", [False, True], ids=["first_filter_finite", "first_filter_with_nan"])
-def test_b1_row_count_sweep(first_has_nan, node_session, headless_out):
+def test_b1_row_count_sweep(first_has_nan, size, node_session, headless_out):
     out = headless_out / "b1_sweep"
     bad, with_b1, without, skipped, trigger = [], [], [], [], []
     t0 = time.perf_counter()
-    for n in range(1, 201):
+    for n in ROWS[size]:
         sc, df = _b1_scenario(n, first_has_nan)
         if sc is None:
             skipped.append(n)
@@ -288,7 +330,7 @@ def test_b1_row_count_sweep(first_has_nan, node_session, headless_out):
         if not r.ok:
             bad.append((n, [f"{o.step}:{o.check}={o.outcome}" for o in r.outcomes if o.outcome not in ("PASS", "XFAIL")][:3]))
     dt = time.perf_counter() - t0
-    (out / f"summary_{'first_nan' if first_has_nan else 'first_finite'}.json").write_text(json.dumps(
+    (out / f"summary_{'first_nan' if first_has_nan else 'first_finite'}_{size}.json").write_text(json.dumps(
         {"with_b1": with_b1, "without_b1": without, "skipped_no_finite_value": skipped, "seconds": round(dt, 1)}))
     assert not bad, f"{len(bad)} row counts not as the refined rule predicts: {bad[:5]}"
     if not first_has_nan:
@@ -337,7 +379,9 @@ def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
     return replace(base, expect=tuple(expect))
 
 
-@pytest.mark.parametrize("k", [2, 3, 4, 5], ids=[f"{k}_filters" for k in (2, 3, 4, 5)])
+@pytest.mark.parametrize("k", [pytest.param(2, id="2_filters"), pytest.param(3, id="3_filters"),
+                               pytest.param(4, id="4_filters", marks=pytest.mark.slow),
+                               pytest.param(5, id="5_filters", marks=pytest.mark.slow)])
 def test_filters_every_move_order(k, node_session, headless_out):
     import itertools
     out, bad, counts = headless_out / "filter_orders", [], {"with_b1": 0, "without_b1": 0}

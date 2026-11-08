@@ -1,0 +1,11 @@
+# Scenarios every headless run must produce (fast and full suite), one report id per line. Checked by run_tests.sh
+# after the headless entry (python -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report required ...).
+# A missing id fails the run: a test that silently stopped producing its scenario cannot pass unnoticed.
+histograms/plain_1d_2d_one_range_two_moves
+histograms/plain_1d_2d_one_range_two_moves [node]
+known_defects/b1_two_filters_missing_values [node]
+known_defects/b2_1d_histogram_ignores_selection_at_load [node]
+known_defects/b8_1d_histogram_counts_nan_in_bin0 [node]
+families/histograms_node_unit_10_fast [node]
+families/histograms_node_claude3_b10_6_fast [node]
+families/histograms_node_odd_7_fast [node]

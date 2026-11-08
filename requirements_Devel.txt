@@ -1,12 +1,13 @@
 # requerements for tests and tutorials
-pytest
+pytest==8.4.2          # pinned in PHASE_4 (keyword markers, headless tests); was unpinned
 nbval
 pytest_tornasync
 pytest-json-report
 pytest-regressions
 pytest-datadir
 pytest-parallel        # this is not working with the python3.10 and default path
-pytest-xdist           # this is proven to work with python3.10 standard running - pytest -n 24
+pytest-xdist==3.6.1    # this is proven to work with python3.10 standard running - pytest -n 24
+pytest-timeout==2.4.0  # outer time limit per test (PHASE_4 headless tests)
 playwright==1.56.0     # headless browser tests (PHASE_4); then: python -m playwright install chromium
 jq
 pyparsing

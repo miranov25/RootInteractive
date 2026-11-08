@@ -70,10 +70,13 @@ def build(scenario: Scenario, df: pd.DataFrame, html_path: Path) -> Path:
     return Path(html_path)
 
 
-def build_document(scenario: Scenario, df: pd.DataFrame, json_path: Path) -> Path:
+def build_document(scenario: Scenario, df: pd.DataFrame, json_path: Path, models_only=()) -> Path:
     """The page *document* for the Node model harness (proposal v0.3 D-24): the same `fromArray` call as `build`, but
     `show` is suppressed, so no HTML is written and no model set is compiled; the layout `fromArray` produced is put into
-    a fresh Bokeh Document and written as JSON with its data inlined. Node builds it with Bokeh's own deserializer."""
+    a fresh Bokeh Document and written as JSON with its data inlined. Node builds it with Bokeh's own deserializer.
+    `models_only` (stage 4.2c-2b): the document's roots are only the named data models (histograms, profiles, …) with
+    everything they reference — the same builder, the same objects, without plots, axes and tools (measured: 157 → 15
+    models, 11 times faster per case in Node). For mass cases that read only those models."""
     import json
     from bokeh.document import Document
     import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
@@ -96,7 +99,15 @@ def build_document(scenario: Scenario, df: pd.DataFrame, json_path: Path) -> Pat
     finally:
         sa.show = shown
     doc = Document()
-    doc.add_root(obj.pAll)
+    if models_only:                                      # stage 4.2c-2b: only the named models and what they reference
+        wanted = [m for m in obj.pAll.references() if getattr(m, "name", None) in set(models_only)
+                  and type(m).__name__ in ("HistogramCDS", "HistoNdCDS", "HistoNdProfile", "CDSJoin", "CDSStack")]
+        if sorted(m.name for m in wanted) != sorted(models_only):
+            raise ValueError(f"models {sorted(models_only)} requested, found {sorted(m.name for m in wanted)}")
+        for m in wanted:
+            doc.add_root(m)
+    else:
+        doc.add_root(obj.pAll)
     Path(json_path).write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
     return Path(json_path)
 

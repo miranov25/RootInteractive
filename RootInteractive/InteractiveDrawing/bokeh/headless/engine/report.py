@@ -101,18 +101,34 @@ class ScenarioResult:
 
 
 def outcomes(folder) -> list:
-    """Normalised outcome lines of every report.json below `folder`, sorted."""
-    lines = []
+    """Normalised outcome lines of every report.json below `folder`, sorted. Identical reports of the same scenario
+    count once (stage 4.2c-2b): with parallel workers a scenario run by several tests (e.g. a healthy control) lands
+    in several workers' folders, and the list must not depend on how tests were spread over workers. Repeated runs
+    of a scenario that DIFFER all stay in the list."""
+    blocks = set()
     for f in sorted(Path(folder).rglob("report.json")):
         r = json.loads(f.read_text())
-        lines.append(f"{r['id']} | case | content sha256 {r['case_sha256']}")
-        for o in r["outcomes"]:
-            lines.append(f"{r['id']} | step {o['step']} | {o['check']} | {o['outcome']}")
-    return sorted(lines)
+        block = [f"{r['id']} | case | content sha256 {r['case_sha256']}"]
+        block += [f"{r['id']} | step {o['step']} | {o['check']} | {o['outcome']}" for o in r["outcomes"]]
+        blocks.add(tuple(block))
+    return sorted(line for block in blocks for line in block)
+
+
+def required(folder, manifest) -> list:
+    """Scenario ids listed in `manifest` (one per line, # comments) that have no report below `folder` — an empty list
+    means every required scenario ran (stage 4.2c-2b; the required-case manifest of proposal v0.3 item I)."""
+    present = {json.loads(f.read_text())["id"] for f in Path(folder).rglob("report.json")}
+    wanted = [l.strip() for l in Path(manifest).read_text().splitlines() if l.strip() and not l.lstrip().startswith("#")]
+    return [w for w in wanted if w not in present]
 
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 3 or sys.argv[1] != "outcomes":
-        sys.exit("usage: python -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report outcomes <folder>")
-    print("\n".join(outcomes(sys.argv[2])))
+    if len(sys.argv) == 3 and sys.argv[1] == "outcomes":
+        print("\n".join(outcomes(sys.argv[2])))
+    elif len(sys.argv) == 4 and sys.argv[1] == "required":
+        missing = required(sys.argv[2], sys.argv[3])
+        print("required headless scenarios: " + ("all present" if not missing else "MISSING: " + ", ".join(missing)))
+        sys.exit(1 if missing else 0)
+    else:
+        sys.exit("usage: python -m ...engine.report outcomes <folder> | required <folder> <manifest>")
