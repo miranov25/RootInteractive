@@ -7,6 +7,7 @@ The full suite additionally runs them in the browser (test_headless_scenarios.py
 """
 import pytest
 
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.assertions import assert_as_declared
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import histograms, known_defects
 
@@ -17,4 +18,15 @@ SCENARIOS = tuple(histograms.SCENARIOS) + tuple(known_defects.SCENARIOS)
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
 def test_scenario_in_node(scenario, node_session, headless_out):
     res = run(node_session, scenario, headless_out, test_ref=__file__)
-    assert res.ok, res.text()
+    assert_as_declared(scenario, res)
+
+
+def test_a_declared_defect_check_that_never_ran_fails(tmp_path):
+    """GPT23 (review of 4.2c-2b): a report holding one unrelated PASS and no B1 outcome must not be accepted."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.report import ScenarioResult
+    b1 = next(s for s in known_defects.SCENARIOS if s.id.startswith("known_defects/b1_"))
+    res = ScenarioResult(id=b1.id + " [node]", outdir=str(tmp_path))
+    res.add(0, "load", "unrelated", "PASS", "")
+    assert res.ok
+    with pytest.raises(AssertionError, match="expected failure B1"):
+        assert_as_declared(b1, res)

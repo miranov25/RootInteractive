@@ -5,7 +5,9 @@ Missing browser or missing pinned scripts: the browser tests are SKIPPED locally
 ERROR when RI_HEADLESS_REQUIRED=1 is set (CI and acceptance runs), so a missing browser can never pass.
 Output folder: RI_HEADLESS_OUT, default `headless/_out/` (git-ignored); one sub-folder per pytest-xdist worker.
 """
+import json
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -42,10 +44,12 @@ def headless_session():
         _unavailable("pinned page scripts missing: " + "; ".join(problems) +
                      " — run: python -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.vendor fetch")
     from .engine.runner import Session
+    t0 = time.perf_counter()
     try:
         session = Session()
     except Exception as exc:                                   # Chromium not downloaded, missing system libraries
         _unavailable(f"Chromium could not start: {exc}")
+    _session_timing("browser_session_start", time.perf_counter() - t0)
     yield session
     session.close()
 
@@ -77,10 +81,14 @@ def node_session(node_bundle_root):
     if problems:
         _node_unavailable("pinned page scripts missing: " + "; ".join(problems))
     from .engine.node_session import NodeSession, NodeUnavailable
+    from .engine import node_bundle
+    warm = (node_bundle_root / "node_bundle" / f"ri_models_{node_bundle.current_key()[:16]}.js").exists()
+    t0 = time.perf_counter()
     try:
         session = NodeSession(node_bundle_root)
     except NodeUnavailable as exc:
         _node_unavailable(str(exc))
+    _session_timing("node_session_start", time.perf_counter() - t0, bundle="warm" if warm else "cold")
     yield session
     session.close()
 
@@ -100,6 +108,131 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if HERE not in Path(str(item.fspath)).resolve().parents:
             continue                                       # only the tests of this folder
-        if "headless_session" in getattr(item, "fixturenames", ()) and not item.nodeid.endswith(BROWSER_SMOKE):
+        names = getattr(item, "fixturenames", ())
+        if "headless_session" in names and not item.nodeid.endswith(BROWSER_SMOKE):
             item.add_marker(pytest.mark.slow)
+        if "node_session" in names or "node_bundle_root" in names:
+            item.add_marker(pytest.mark.node_backend)          # select with -m node_backend (4.2c-2b v0.2)
+        if "headless_session" in names:
+            item.add_marker(pytest.mark.browser_backend)       # parity tests carry both markers
+
+
+
+
+# --------------------------------------- measurements, outcome list and required scenarios (stage 4.2c-2b v0.2)
+# At the end of every headless session — run_tests.sh, a reviewer's pytest, CI — the main pytest process writes into
+# the output root (RI_HEADLESS_OUT, default headless/_out):
+#   outcomes.txt    the normalised outcome list reviewers compare across machines;
+#   timings.jsonl   one line per test: worker, start, stop, duration of setup + call + teardown, outcome;
+#   timings.txt     wall time, sum, busy time per worker, the slowest tests, session starts (Node bundle cold/warm),
+#                   and the browser page builds per worker (a build over 3 s compiled a new set of models);
+# and, when RI_HEADLESS_CHECK_REQUIRED=1 (run_tests.sh), checks required_scenarios.txt. A failure of any of these
+# fails the pytest run itself, so it can never pass unnoticed (review of 4.2c-2b: an ignored export failure).
+_TIMES = {}
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "node_backend: runs the Node model harness (set by the headless conftest)")
+    config.addinivalue_line("markers", "browser_backend: runs Chromium (set by the headless conftest)")
+
+
+def _out_root() -> Path:
+    return Path(os.environ.get("RI_HEADLESS_OUT", HERE / "_out"))
+
+
+def _session_timing(what: str, seconds: float, **extra) -> None:
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    folder = _out_root() / worker
+    folder.mkdir(parents=True, exist_ok=True)
+    with open(folder / "session_timing.jsonl", "a") as fh:
+        fh.write(json.dumps({"worker": worker, "what": what, "seconds": round(seconds, 3), **extra}) + "\n")
+
+
+def pytest_runtest_logreport(report):
+    if "bokeh/headless/" not in report.nodeid:
+        return
+    node = getattr(report, "node", None)
+    worker = getattr(getattr(node, "gateway", None), "id", None) or os.environ.get("PYTEST_XDIST_WORKER", "main")
+    t = _TIMES.setdefault(report.nodeid, {"test": report.nodeid.split("bokeh/headless/")[-1], "worker": worker,
+                                           "duration": 0.0, "start": None, "stop": None, "outcome": "passed"})
+    t["duration"] += report.duration
+    start, stop = getattr(report, "start", None), getattr(report, "stop", None)
+    if start is not None:
+        t["start"] = start if t["start"] is None else min(t["start"], start)
+    if stop is not None:
+        t["stop"] = stop if t["stop"] is None else max(t["stop"], stop)
+    if report.outcome != "passed":
+        t["outcome"] = report.outcome
+
+
+def _timing_summary(out: Path, times: list) -> str:
+    lines = []
+    starts = [t["start"] for t in times if t["start"] is not None]
+    stops = [t["stop"] for t in times if t["stop"] is not None]
+    wall = (max(stops) - min(starts)) if starts and stops else float("nan")
+    total = sum(t["duration"] for t in times)
+    workers = sorted({t["worker"] for t in times})
+    lines.append(f"tests: {len(times)}; workers: {len(workers)}; wall time (first test start to last test end): "
+                 f"{wall:.1f} s; sum of test times: {total:.1f} s; speed-up sum/wall: {total / wall:.2f}")
+    lines.append("busy time per worker (s, tests): " + ", ".join(
+        f"{w} {sum(t['duration'] for t in times if t['worker'] == w):.1f} ({sum(t['worker'] == w for t in times)})"
+        for w in workers))
+    lines.append("slowest tests (s, worker):")
+    for t in sorted(times, key=lambda t: -t["duration"])[:15]:
+        lines.append(f"  {t['duration']:7.2f}  {t['worker']:5s} {t['test'][:110]}")
+    lines.append("session starts (s):")
+    for f in sorted(out.glob("*/session_timing.jsonl")):
+        for line in f.read_text().splitlines():
+            r = json.loads(line)
+            lines.append(f"  {r['worker']:5s} {r['what']}: {r['seconds']:.2f}" + (f" (model bundle {r['bundle']})" if "bundle" in r else ""))
+    lines.append("browser page builds per worker (count, sum s, builds over 3 s = new model set compiled):")
+    builds = {}
+    for f in out.rglob("report*.json"):
+        try:
+            r = json.loads(f.read_text())
+        except ValueError:
+            continue
+        if r.get("backend", "browser") == "browser" and "build_s" in r.get("timings", {}):
+            worker = f.relative_to(out).parts[0]
+            builds.setdefault(worker, []).append(r["timings"]["build_s"])
+    for w, b in sorted(builds.items()):
+        big = sorted((x for x in b if x > 3), reverse=True)
+        lines.append(f"  {w:5s} {len(b)} builds, {sum(b):.1f} s; compiles: {len(big)} = {sum(big):.1f} s {[round(x, 1) for x in big]}")
+    return "\n".join(lines) + "\n"
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if hasattr(session.config, "workerinput") or not _TIMES:
+        return                                             # workers, and sessions without headless tests
+    from .engine import report
+    out = _out_root()
+    out.mkdir(parents=True, exist_ok=True)
+    times = sorted(_TIMES.values(), key=lambda t: (t["start"] or 0))
+    problems = []
+    try:
+        (out / "timings.jsonl").write_text("".join(json.dumps(t) + "\n" for t in times))
+        (out / "timings.txt").write_text(_timing_summary(out, times))
+    except Exception as exc:                               # timings are evidence: their failure fails the run
+        problems.append(f"timing summary failed: {exc!r}")
+    try:
+        lines = report.outcomes(out)
+        (out / "outcomes.txt").write_text("\n".join(lines) + "\n")
+    except Exception as exc:
+        problems.append(f"outcome list failed: {exc!r}")
+    if os.environ.get("RI_HEADLESS_CHECK_REQUIRED") == "1":
+        full = "not slow" not in (session.config.getoption("markexpr") or "")
+        try:
+            missing = report.required(out, HERE / "required_scenarios.txt", full=full)
+        except Exception as exc:
+            missing = [f"(check failed: {exc!r})"]
+        if missing:
+            problems.append(f"required scenarios missing ({'full' if full else 'fast'} suite): {missing}")
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    for p in problems:
+        if reporter:
+            reporter.write_line(f"HEADLESS: {p}", red=True)
+    if problems and session.exitstatus == 0:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+    elif reporter:
+        reporter.write_line(f"HEADLESS: outcome list, timings{' and required scenarios' if os.environ.get('RI_HEADLESS_CHECK_REQUIRED') == '1' else ''} written to {out}")
 

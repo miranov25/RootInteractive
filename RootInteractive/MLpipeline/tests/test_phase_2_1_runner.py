@@ -12,7 +12,7 @@ class ReviewRunnerContracts(unittest.TestCase):
         source=Path(__file__).resolve().parents[3]/'run_tests.sh'
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); shutil.copy2(source,root/'run_tests.sh')
-            dirs=['RootInteractive/InteractiveDrawing/bokeh','RootInteractive/Tools','RootInteractive/onnx','RootInteractive/MLpipeline/tests']
+            dirs=['RootInteractive/InteractiveDrawing/bokeh','RootInteractive/Tools','RootInteractive/onnx','RootInteractive/MLpipeline/tests','RootInteractive/InteractiveDrawing/bokeh/headless']  # headless: own entry since PHASE_4 stage 4.2c-2b (last, so dirs[1] stays Tools)
             for directory in dirs:
                 p=root/directory;p.mkdir(parents=True);(p/'test_smoke.py').write_text('def test_ok(): assert True\n')
             example=root/'RootInteractive/MLpipeline/examples/phase_2_1_reducible_example.py';example.parent.mkdir();example.write_text("print('example PASS')\n")

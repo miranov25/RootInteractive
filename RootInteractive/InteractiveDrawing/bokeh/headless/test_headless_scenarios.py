@@ -7,6 +7,7 @@ failure really occurred, as XFAIL, at each of its steps — an expectation that 
 not a silent success."""
 import pytest
 
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.assertions import assert_as_declared
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import histograms, known_defects
 
@@ -18,8 +19,4 @@ SCENARIOS = histograms.SCENARIOS + known_defects.SCENARIOS
 def test_scenario(scenario, headless_session, headless_out):
     result = run(headless_session, scenario, headless_out, test_ref=__file__)
     print(result.text())
-    assert result.ok, result.text()
-    for e in scenario.expect:
-        for k in e.steps:
-            got = [o.outcome for o in result.outcomes if o.check == e.check and o.step == k]
-            assert got == ["XFAIL"], f"expected failure {e.bug} at step {k} on {e.check}: got {got}\n{result.text()}"
+    assert_as_declared(scenario, result)

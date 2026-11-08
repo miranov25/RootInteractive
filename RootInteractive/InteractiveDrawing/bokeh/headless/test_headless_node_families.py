@@ -16,6 +16,7 @@ Filters (document cases): B1 with the refined rule (b1_first_changed) swept over
   move order; the 20 000 / 20 001-row pair. Every expected B1 step is computed from the rule, every other must PASS.
 """
 import json
+import os
 import random
 import time
 from dataclasses import dataclass
@@ -39,7 +40,7 @@ pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
 
 CONFIGS = (("unit_10", 10, 0.0, 1.0), ("claude3_b10_6", 6, -2.0, 2.28), ("odd_7", 7, -1.3, 2.9))
 GENERATED_PER_CONFIG = {"fast": 300, "full": 3400}  # generated tables per configuration (full: 3 x 3400 = 10 200)
-MODELS = ("h1", "h2", "hw")                      # documents hold only these models and what they reference (4.2c-2b)                     # 3 x 3400 = 10 200 generated cases (proposal item E: >= 10 000)
+MODELS = ("h1", "h2", "hw")                      # documents hold only these models and what they reference (4.2c-2b)
 READ = """() => [window.__riH.col('h1', 'bin_count', ['HistogramCDS']), window.__riH.col('h2', 'bin_count', ['HistoNdCDS']),
                  window.__riH.col('hw', 'bin_count', ['HistogramCDS'])]"""
 B1_RULE = "b1_later_filters_keep_rows_excluded_at_load"
@@ -130,7 +131,7 @@ def test_histogram_family(config, size, node_session, headless_out):
     outdir = headless_out / f"families__histograms_node_{name}_{size}"
     outdir.mkdir(parents=True, exist_ok=True)
     res = ScenarioResult(id=f"families/histograms_node_{name}_{size} [node]", outdir=str(outdir),
-                         versions=dict(node_session.versions), reproduce=f"pytest {__file__} -k {name}")
+                         versions=dict(node_session.versions), reproduce=f"pytest '{os.environ.get('PYTEST_CURRENT_TEST', __file__).rsplit(' (', 1)[0]}'")
     res.backend = "node"
     timings, failures = {}, []
     sc = _page(name, nb, lo, hi)
@@ -407,3 +408,22 @@ def test_b1_twenty_thousand_rows_boundary(node_session, headless_out):
         r = run(node_session, sc, out, test_ref=__file__)
         results[n] = (bool(sc.expect), r.ok)
     assert results == {20_000: (False, True), 20_001: (True, True)}, results
+
+
+@pytest.mark.parametrize("config", CONFIGS, ids=[c[0] for c in CONFIGS])
+def test_models_only_document_computes_what_the_full_page_computes(config, node_session, tmp_path):
+    """Review of 4.2c-2b (Claude10, GPT23, GPT24): the family reads documents holding only the histogram models; the
+    same tables read from the FULL page must give identical counts in every bin (1-D, 2-D, weighted), including the
+    B10 values (one rounding step below the top edge, with y in a middle and in the last bin)."""
+    name, nb, lo, hi = config
+    sc = _page(name, nb, lo, hi)
+    df0 = data_mod.generate(sc.data.main)
+    full = sweep.Template(sc, df0, tmp_path / "full.json")
+    reduced = sweep.Template(sc, df0, tmp_path / "reduced.json", models_only=MODELS)
+    named = _named_frames(nb, lo, hi)
+    frames = _generated_frames(nb, lo, hi, 10) + [f for f in named if f.x[0] == np.nextafter(hi, -np.inf)]
+    a, _ = sweep.run_batch(node_session, sweep.substitute_all(full, frames)[0], READ)
+    b, _ = sweep.run_batch(node_session, sweep.substitute_all(reduced, frames)[0], READ)
+    assert len(a) == len(b) == len(frames) >= 12
+    differ = [i for i, (x, y) in enumerate(zip(a, b)) if json.dumps(x) != json.dumps(y)]
+    assert not differ, f"tables whose counts differ between the full page and the reduced document: {differ}"

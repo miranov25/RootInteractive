@@ -95,9 +95,28 @@ class ScenarioResult:
         return "\n".join(lines)
 
     def write(self) -> None:
+        """Write report.json / report.txt. A scenario run again into the same folder (one worker, two tests running
+        the same scenario) replaces an IDENTICAL earlier report but never a differing one: that one is kept as
+        report.1.json, report.2.json, … so a FAIL cannot vanish behind a later PASS (stage 4.2c-2b review, GPT24)."""
         out = Path(self.outdir)
-        (out / "report.json").write_text(json.dumps({**asdict(self), "features": self.features()}, indent=1, default=str))
-        (out / "report.txt").write_text(self.text() + "\n")
+        data = {**asdict(self), "features": self.features()}
+        target, k = out / "report.json", 0
+        while target.exists() and _block(json.loads(target.read_text())) != _block(data):
+            k += 1
+            target = out / f"report.{k}.json"
+        target.write_text(json.dumps(data, indent=1, default=str))
+        target.with_suffix(".txt").write_text(self.text() + "\n")
+
+
+def _block(r: dict) -> tuple:
+    """The normalised outcome lines of one report (what reviewers compare across machines)."""
+    block = [f"{r['id']} | case | content sha256 {r['case_sha256']}"]
+    block += [f"{r['id']} | step {o['step']} | {o['check']} | {o['outcome']}" for o in r["outcomes"]]
+    return tuple(block)
+
+
+def _reports(folder):
+    return sorted(Path(folder).rglob("report*.json"))
 
 
 def outcomes(folder) -> list:
@@ -105,30 +124,60 @@ def outcomes(folder) -> list:
     count once (stage 4.2c-2b): with parallel workers a scenario run by several tests (e.g. a healthy control) lands
     in several workers' folders, and the list must not depend on how tests were spread over workers. Repeated runs
     of a scenario that DIFFER all stay in the list."""
-    blocks = set()
-    for f in sorted(Path(folder).rglob("report.json")):
-        r = json.loads(f.read_text())
-        block = [f"{r['id']} | case | content sha256 {r['case_sha256']}"]
-        block += [f"{r['id']} | step {o['step']} | {o['check']} | {o['outcome']}" for o in r["outcomes"]]
-        blocks.add(tuple(block))
+    blocks = {_block(json.loads(f.read_text())) for f in _reports(folder)}
     return sorted(line for block in blocks for line in block)
 
 
-def required(folder, manifest) -> list:
+def required(folder, manifest, full: bool = False) -> list:
     """Scenario ids listed in `manifest` (one per line, # comments) that have no report below `folder` — an empty list
     means every required scenario ran (stage 4.2c-2b; the required-case manifest of proposal v0.3 item I)."""
-    present = {json.loads(f.read_text())["id"] for f in Path(folder).rglob("report.json")}
-    wanted = [l.strip() for l in Path(manifest).read_text().splitlines() if l.strip() and not l.lstrip().startswith("#")]
+    present = {json.loads(f.read_text())["id"] for f in _reports(folder)}
+    wanted, section = [], "fast"
+    for line in Path(manifest).read_text().splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]                     # [fast]: every run; [full]: only runs of the full suite
+        elif line and not line.startswith("#") and (section == "fast" or full):
+            wanted.append(line)
     return [w for w in wanted if w not in present]
+
+
+def timing_table(folders) -> str:
+    """One comparison table of several headless runs (stage 4.2c-2b v0.2): per run its workers, wall time, sum of test
+    times, speed-up against the first run, efficiency (speed-up / workers) and the browser compile seconds summed over
+    all workers. Each folder is a headless output root holding timings.jsonl (written at the end of the session)."""
+    rows = []
+    for f in folders:
+        times = [json.loads(l) for l in (Path(f) / "timings.jsonl").read_text().splitlines()]
+        starts = [t["start"] for t in times if t.get("start") is not None]
+        stops = [t["stop"] for t in times if t.get("stop") is not None]
+        wall = max(stops) - min(starts)
+        compile_s = 0.0
+        for r in _reports(f):
+            d = json.loads(r.read_text())
+            b = d.get("timings", {}).get("build_s")
+            if d.get("backend", "browser") == "browser" and b is not None and b > 3:
+                compile_s += b
+        rows.append((Path(f).as_posix(), len({t["worker"] for t in times}), len(times), wall,
+                     sum(t["duration"] for t in times), compile_s))
+    base = rows[0][3]
+    out = ["| run | workers | tests | wall s | sum of test times s | speed-up vs first | efficiency | browser compile s (all workers) |",
+           "|---|---|---|---|---|---|---|---|"]
+    for name, w, n, wall, total, comp in rows:
+        out.append(f"| {name} | {w} | {n} | {wall:.1f} | {total:.1f} | {base / wall:.2f} | {base / wall / w:.2f} | {comp:.1f} |")
+    return "\n".join(out)
 
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) == 3 and sys.argv[1] == "outcomes":
         print("\n".join(outcomes(sys.argv[2])))
-    elif len(sys.argv) == 4 and sys.argv[1] == "required":
-        missing = required(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) in (4, 5) and sys.argv[1] == "required":
+        missing = required(sys.argv[2], sys.argv[3], full=sys.argv[4:] == ["--full"])
         print("required headless scenarios: " + ("all present" if not missing else "MISSING: " + ", ".join(missing)))
         sys.exit(1 if missing else 0)
+    elif len(sys.argv) >= 3 and sys.argv[1] == "timing-table":
+        print(timing_table(sys.argv[2:]))
     else:
-        sys.exit("usage: python -m ...engine.report outcomes <folder> | required <folder> <manifest>")
+        sys.exit("usage: python -m ...engine.report outcomes <folder> | required <folder> <manifest> [--full] | "
+                 "timing-table <folder> [<folder> ...]")

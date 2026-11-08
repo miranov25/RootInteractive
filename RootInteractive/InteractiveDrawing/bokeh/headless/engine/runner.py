@@ -296,7 +296,7 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
     outdir.mkdir(parents=True, exist_ok=True)
     res = ScenarioResult(id=scenario.id + (" [node]" if node else "") + (f" [fault {fault.id}]" if fault else ""),
                          outdir=str(outdir), versions=dict(session.versions),
-                         reproduce=f"pytest {test_ref} -k '{scenario.id}'" if test_ref else scenario.id)
+                         reproduce=_reproduce(test_ref, scenario.id))
     res.fault = fault.id if fault else ""
     res.backend = "node" if node else "browser"
     t0 = time.time()
@@ -564,3 +564,14 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
                     feature=feature)
         except Exception as exc:
             res.add(step, name, check, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=feature)
+
+
+def _reproduce(test_ref, scenario_id) -> str:
+    """An executable reproduction line: the exact pytest node id of the running test (4.2c-2b review, GPT23: `-k` with
+    a scenario id selected nothing when several scenarios run inside one test, as in the B1 sweep)."""
+    import os
+    current = os.environ.get("PYTEST_CURRENT_TEST", "").rsplit(" (", 1)[0]
+    if current:
+        return f"pytest '{current}'   # scenario {scenario_id}"
+    return f"pytest {test_ref}   # scenario {scenario_id}" if test_ref else scenario_id
+

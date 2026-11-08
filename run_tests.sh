@@ -290,9 +290,14 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             RootInteractive/InteractiveDrawing/bokeh)
                 EXTRA_ARGS=(--ignore=RootInteractive/InteractiveDrawing/bokeh/headless) ;;
             RootInteractive/InteractiveDrawing/bokeh/headless)
+                # required browser and Node (a wrong jsdom version fails), the required-scenario check, an outer time
+                # limit per test, and no X display for this entry (4.2c-2b v0.2)
                 [[ $FULL_MODE -eq 1 ]] || EXTRA_ARGS=(-m "not slow")
+                EXTRA_ARGS+=(--timeout=900)
                 export RI_HEADLESS_OUT="$PROJECT_ROOT/$output_dir/headless_out"
-                export RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/RootInteractive/InteractiveDrawing/bokeh/headless/_out}" ;;
+                export RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/RootInteractive/InteractiveDrawing/bokeh/headless/_out}"
+                export RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1
+                HEADLESS_SAVED_DISPLAY="${DISPLAY-}"; unset DISPLAY ;;
         esac
 
         if [[ $DRY_RUN -eq 1 ]]; then
@@ -319,15 +324,13 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             exit_code=${PIPESTATUS[0]}
             if [[ $exit_code -ne 0 ]]; then RUN_FAILED=1; fi
             if [[ "$test_dir" == "RootInteractive/InteractiveDrawing/bokeh/headless" ]]; then
-                # the normalised outcome list (compared across platforms by reviewers) and the required scenarios
-                python3 -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report outcomes "$RI_HEADLESS_OUT" \
-                    > "$output_dir/headless_outcomes.txt"
-                if ! python3 -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.report required "$RI_HEADLESS_OUT" \
-                        RootInteractive/InteractiveDrawing/bokeh/headless/required_scenarios.txt >> "$log_file" 2>&1; then
-                    print_warning "required headless scenarios missing (see $log_file)"
-                    RUN_FAILED=1
-                fi
-                unset RI_HEADLESS_OUT
+                # The outcome list, the timings and the required-scenario check are written and checked by the headless
+                # session itself (its conftest.py): a failure there is pytest's own exit status, never ignored here.
+                for f in outcomes.txt timings.txt; do
+                    if [[ -f "$RI_HEADLESS_OUT/$f" ]]; then cp "$RI_HEADLESS_OUT/$f" "$output_dir/$f"; fi
+                done
+                unset RI_HEADLESS_OUT RI_HEADLESS_REQUIRED RI_HEADLESS_CHECK_REQUIRED
+                if [[ -n "$HEADLESS_SAVED_DISPLAY" ]]; then export DISPLAY="$HEADLESS_SAVED_DISPLAY"; fi
             fi
 
             if [[ -f "$report_file" ]]; then
@@ -383,20 +386,35 @@ for t in r.get('tests', []):
     done
 
     # Node tests of the joins prototypes (PHASE_4 stage 4.2c-2b). The files are listed explicitly: their names
-    # (test_*.mjs) do not match node --test's default patterns, so a folder argument would find nothing.
-    if ls RootInteractive/joins/test_*.mjs > /dev/null 2>&1; then
+    # (test_*.mjs) do not match node --test's default patterns, so a folder argument would find nothing. An empty list
+    # fails the run; three of the files read ao2d_fixture.json, which is generated (joins/README.md), so it is checked
+    # first and its generation command printed.
+    if [[ -d RootInteractive/joins ]]; then
         joins_dir="$LOG_BASE_DIR/joins_${TIMESTAMP}"
+        joins_files=(RootInteractive/joins/test_*.mjs)
         echo ""
-        echo "${BOLD}Testing: RootInteractive/joins (node --test)${RESET}"
-        if [[ $DRY_RUN -eq 1 ]]; then
-            echo "  [DRY RUN] Would run: node --test RootInteractive/joins/test_*.mjs"
+        echo "${BOLD}Testing: RootInteractive/joins (node --test, ${#joins_files[@]} files)${RESET}"
+        if [[ ! -e "${joins_files[0]}" ]]; then
+            print_warning "no joins test files found (RootInteractive/joins/test_*.mjs)"
+            RUN_FAILED=1
+        elif [[ $DRY_RUN -eq 1 ]]; then
+            echo "  [DRY RUN] Would run: node --test ${joins_files[*]}"
         elif ! command -v node > /dev/null 2>&1; then
             print_warning "node not found: joins tests not run"
             RUN_FAILED=1
+        elif [[ ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+            print_warning "RootInteractive/joins/ao2d_fixture.json is missing (generated, not in git); create it with:"
+            echo "    (cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"
+            RUN_FAILED=1
         else
             mkdir -p "$joins_dir"
-            node --test RootInteractive/joins/test_*.mjs 2>&1 | tee "$joins_dir/test.log"
+            node --test "${joins_files[@]}" 2>&1 | tee "$joins_dir/test.log"
             [[ ${PIPESTATUS[0]} -eq 0 ]] || RUN_FAILED=1
+            joins_passed=$(grep -E "^# pass [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
+            joins_failed=$(grep -E "^# fail [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
+            TOTAL_PASSED=$((TOTAL_PASSED + ${joins_passed:-0}))
+            TOTAL_FAILED=$((TOTAL_FAILED + ${joins_failed:-0}))
+            echo "  Results: ${joins_passed:-0} passed, ${joins_failed:-0} failed"
         fi
     fi
     
@@ -583,13 +601,19 @@ for test_dir in "${TEST_DIRS[@]}"; do
     if [[ $MATRIX_ONLY -eq 1 && -L "$LOG_BASE_DIR/${dir_name}_latest" ]]; then
         latest_dir="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/${dir_name}_latest")"
     fi
-    for f in test.log summary.txt report.json; do
+    for f in test.log summary.txt report.json outcomes.txt timings.txt; do     # outcomes/timings: headless entry
         if [[ -f "$latest_dir/$f" ]]; then
             cp "$latest_dir/$f" "$REVIEWER_STAGE/${dir_name}_${f}"
             REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
         fi
     done
 done
+
+# Collect the joins Node tests' log (PHASE_4 stage 4.2c-2b)
+if [[ -f "$LOG_BASE_DIR/joins_${TIMESTAMP}/test.log" ]]; then
+    cp "$LOG_BASE_DIR/joins_${TIMESTAMP}/test.log" "$REVIEWER_STAGE/joins_test.log"
+    REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+fi
 
 # Collect matrix (unique name, no prefix needed)
 if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then

@@ -222,13 +222,18 @@ def test_recorded_mask_fingerprint_is_the_live_mask(node_session, headless_out):
 
 # A-6: a model that reacts two timer rounds late — the settle rule accepts the stale state, the audit catches it
 def test_late_update_is_caught_by_the_audit(node_session, headless_out):
-    sc = _small("harness/node_late_update_two_rounds",
-                (load(), js_action("setTimeout(() => setTimeout(() => { window.__riH.slider('a').value = [-1, 1]; }, 0), 0);",
+    # 4.2c-2b review (all four reviewers): "two timer rounds" late was timing-dependent — the read came before or after
+    # the update depending on the machine. 100 ms is longer than the gap between the step and its reads on any
+    # machine and shorter than the audit's 0.3 s, so both outcomes are fixed: the read is stale, the audit sees the change.
+    sc = _small("harness/node_late_update_100ms",
+                (load(), js_action("setTimeout(() => { window.__riH.slider('a').value = [-1, 1]; }, 100);",
                                    until="true")),
                 (auto(), audit(0.3, steps=(1,))), widget=True)
     r = run(node_session, sc, headless_out / "controls", test_ref=__file__)
     aud = [o for o in r.outcomes if o.check.startswith("audit")]
+    stale = [o for o in r.outcomes if o.step == 1 and o.check == "h1.bin_count"]
     assert aud and aud[0].outcome == "ERROR" and not r.ok, r.text()
+    assert stale and stale[0].outcome == "PASS", r.text()         # the read sees the state BEFORE the late change
 
 
 # ---------------------------------------------------------------------------------------------- F: 4.2c-2a v0.2
