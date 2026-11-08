@@ -108,6 +108,10 @@ def pytest_collection_modifyitems(config, items):
         names = getattr(item, "fixturenames", ())
         if "headless_session" in names and not item.get_closest_marker("browser_smoke"):
             item.add_marker(pytest.mark.slow)
+        if "node_session" in names or "node_bundle_root" in names:
+            item.add_marker(pytest.mark.node_backend)          # select with -m node_backend (4.2c-2b v0.2)
+        if "headless_session" in names:
+            item.add_marker(pytest.mark.browser_backend)       # parity tests carry both markers
 
 
 
@@ -126,8 +130,12 @@ _TIMES = {}
 
 def pytest_configure(config):
     # target markers are registered in pytest.ini and the root conftest.py (4.2c-2c), like every other marker
-    # the session's start, inherited by xdist workers (started after this hook); reports older than it are stale
-    os.environ.setdefault("RI_HEADLESS_SESSION_START", repr(time.time()))
+    # the session's id, inherited by xdist workers (started after this hook); reports of another session are stale
+    import uuid
+    os.environ.setdefault("RI_HEADLESS_SESSION", uuid.uuid4().hex)
+    # backend selectors (4.2c-2b v0.2; kept as the approved specification says — their future is a later consensus)
+    config.addinivalue_line("markers", "node_backend: runs the Node model harness (set by the headless conftest)")
+    config.addinivalue_line("markers", "browser_backend: runs Chromium (set by the headless conftest)")
 
 
 def _out_root() -> Path:
@@ -139,7 +147,8 @@ def _session_timing(what: str, seconds: float, **extra) -> None:
     folder = _out_root() / worker
     folder.mkdir(parents=True, exist_ok=True)
     with open(folder / "session_timing.jsonl", "a") as fh:
-        fh.write(json.dumps({"worker": worker, "what": what, "seconds": round(seconds, 3), "at": time.time(), **extra}) + "\n")
+        fh.write(json.dumps({"worker": worker, "what": what, "seconds": round(seconds, 3),
+                             "session": os.environ.get("RI_HEADLESS_SESSION"), **extra}) + "\n")
 
 
 def pytest_runtest_logreport(report):
@@ -178,13 +187,13 @@ def _timing_summary(out: Path, times: list) -> str:
     for f in sorted(out.glob("*/session_timing.jsonl")):
         for line in f.read_text().splitlines():
             r = json.loads(line)
-            if r.get("at", 0) < float(os.environ.get("RI_HEADLESS_SESSION_START", "0")):
-                continue                                   # an earlier session's entry (re-used output folder)
+            if r.get("session") != os.environ.get("RI_HEADLESS_SESSION"):
+                continue                                   # another session's entry (re-used output folder)
             lines.append(f"  {r['worker']:5s} {r['what']}: {r['seconds']:.2f}" + (f" (model bundle {r['bundle']})" if "bundle" in r else ""))
     lines.append("browser page builds per worker (count, sum s, builds over 3 s = new model set compiled):")
     builds = {}
-    from .engine.report import _reports, session_start
-    for f in _reports(out, session_start()):
+    from .engine.report import _reports, session_id
+    for f in _reports(out, session_id()):
         try:
             r = json.loads(f.read_text())
         except ValueError:
@@ -212,14 +221,14 @@ def pytest_sessionfinish(session, exitstatus):
     except Exception as exc:                               # timings are evidence: their failure fails the run
         problems.append(f"timing summary failed: {exc!r}")
     try:
-        lines = report.outcomes(out, since=report.session_start())
+        lines = report.outcomes(out, session=report.session_id())
         (out / "outcomes.txt").write_text("\n".join(lines) + "\n")
     except Exception as exc:
         problems.append(f"outcome list failed: {exc!r}")
     if os.environ.get("RI_HEADLESS_CHECK_REQUIRED") == "1":
         full = "not slow" not in (session.config.getoption("markexpr") or "")
         try:
-            missing = report.required(out, HERE / "required_scenarios.txt", full=full, since=report.session_start(),
+            missing = report.required(out, HERE / "required_scenarios.txt", full=full, session=report.session_id(),
                                       target=os.environ.get("RI_HEADLESS_TARGET", ""))
         except Exception as exc:
             missing = [f"(check failed: {exc!r})"]

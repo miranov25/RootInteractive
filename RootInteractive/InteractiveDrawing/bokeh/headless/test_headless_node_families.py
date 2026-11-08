@@ -129,8 +129,6 @@ B1_SIZES = [pytest.param("fast", id="fast", marks=pytest.mark.node_filters),
 
 @pytest.mark.parametrize("size", HIST_SIZES)
 @pytest.mark.parametrize("config", CONFIGS, ids=[c[0] for c in CONFIGS])
-@pytest.mark.feature("HIST.histogram_1d")
-@pytest.mark.feature("HIST.histogram_nd")
 def test_histogram_family(config, size, node_session, headless_out):
     """One test per configuration and size (parallel workers run them side by side). The fast default suite judges
     every named case and 300 generated tables per configuration; the full suite (marker `slow`, the existing RootInteractive marker) 3 400."""
@@ -330,8 +328,6 @@ ROWS = {"fast": (1, 2, 3, 31, 32, 33, 63, 64, 65, 200), "full": tuple(range(1, 2
 
 @pytest.mark.parametrize("size", B1_SIZES)
 @pytest.mark.parametrize("first_has_nan", [False, True], ids=["first_filter_finite", "first_filter_with_nan"])
-@pytest.mark.feature("FILTER.range")
-@pytest.mark.feature("FILTER.intersection")
 def test_b1_row_count_sweep(first_has_nan, size, node_session, headless_out):
     out = headless_out / "b1_sweep"
     bad, with_b1, without, skipped, trigger = [], [], [], [], []
@@ -400,8 +396,6 @@ def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
                                pytest.param(3, id="3_filters", marks=pytest.mark.node_filters),
                                pytest.param(4, id="4_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full]),
                                pytest.param(5, id="5_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full])])
-@pytest.mark.feature("FILTER.range")
-@pytest.mark.feature("FILTER.intersection")
 def test_filters_every_move_order(k, node_session, headless_out):
     import itertools
     out, bad, counts = headless_out / "filter_orders", [], {"with_b1": 0, "without_b1": 0}
@@ -419,8 +413,6 @@ def test_filters_every_move_order(k, node_session, headless_out):
 
 
 @pytest.mark.node_filters
-@pytest.mark.feature("FILTER.range")
-@pytest.mark.feature("FILTER.intersection")
 def test_b1_twenty_thousand_rows_boundary(node_session, headless_out):
     """Claude3's pair: first filter without missing values — 20 000 rows (a multiple of 32): no B1; 20 001: B1."""
     out = headless_out / "filter_orders"

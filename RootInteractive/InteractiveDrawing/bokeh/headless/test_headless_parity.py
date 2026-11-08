@@ -48,9 +48,6 @@ SMOKE_ID = "histograms/plain_1d_2d_one_range_two_moves"            # also in tar
 
 @pytest.mark.parametrize("scenario", [pytest.param(s, id=s.id, marks=[pytest.mark.browser_smoke] if s.id == SMOKE_ID else [])
                                       for s in SCENARIOS])
-@pytest.mark.feature("HIST.histogram_1d")
-@pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.feature("FILTER.intersection")
 def test_node_equals_browser(scenario, headless_session, node_session, headless_out):
     out = headless_out / "parity"
     browser = run(headless_session, scenario, out, test_ref=__file__)

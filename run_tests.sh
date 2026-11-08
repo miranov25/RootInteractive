@@ -128,7 +128,7 @@ Options:
   --target NAME    Run only this target (repeatable; each target runs separately, with its own log folder,
                    timing and summary line). A target is a pytest marker of the headless tests (hyphens may be
                    used for underscores), or "joins" (node --test). "all": everything, as --full.
-  --list-targets   List the targets, their test counts and descriptions
+  --list-targets   List the targets, their test counts and descriptions (with --ids: also every test id)
 
 Test Directories:
   - RootInteractive/InteractiveDrawing/bokeh/ (without headless/, which has its own entry)
@@ -182,6 +182,7 @@ DRY_RUN=0
 FULL_MODE=0
 TARGETS=()
 LIST_TARGETS=0
+LIST_IDS=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -202,6 +203,7 @@ while [[ $# -gt 0 ]]; do
             TARGETS+=("$1")
             ;;
         --list-targets) LIST_TARGETS=1 ;;
+        --ids) LIST_IDS=1 ;;
         *) echo "Unknown option: $1"; show_help; return 2 ;;
     esac
     shift
@@ -277,20 +279,21 @@ tap_counts() {                               # "selected passed failed skipped t
     f=$(grep -E "^# fail [0-9]+" "$1" | tail -1 | awk '{print $3}')
     s=$(grep -E "^# skipped [0-9]+" "$1" | tail -1 | awk '{print $3}')
     if [[ -z "$p" || -z "$f" ]]; then return 1; fi
+    if [[ $((p + f + ${s:-0})) -le 0 ]]; then return 1; fi           # a run with no tests is not a pass (4.2c-2c v0.2)
     echo "$((p + f + ${s:-0})) $p $f ${s:-0} 0 0"
 }
 
 json_counts() {                              # the same six numbers from pytest-json-report; ids to selected_tests.txt
     python3 - "$1" "$2" <<'COUNTPY'
 import json, sys
-try:
+try:                                         # an unreadable or missing report is a failure, never counted as zero tests
     r = json.load(open(sys.argv[1]))
-except Exception:
-    print("0 0 0 0 0 1"); sys.exit(0)
-s = r.get("summary", {})
-coll = sum(1 for c in r.get("collectors", []) if c.get("outcome") == "failed")
-tests = [t["nodeid"] for t in r.get("tests", [])]
-open(sys.argv[2], "w").write("".join(t + "\n" for t in tests))
+    s = r["summary"]
+    coll = sum(1 for c in r.get("collectors", []) if c.get("outcome") == "failed")
+    tests = [t["nodeid"] for t in r["tests"]]
+    open(sys.argv[2], "w").write("".join(t + "\n" for t in tests))
+except Exception as exc:
+    print(f"report unreadable: {exc!r}", file=sys.stderr); sys.exit(3)
 print(len(tests), s.get("passed", 0), s.get("failed", 0), s.get("skipped", 0), s.get("error", 0), coll)
 COUNTPY
 }
@@ -328,9 +331,11 @@ run_target() {
     fi
     t1=$(date +%s.%N)
     if [[ "$name" == "joins" ]]; then
-        counts=$(tap_counts "$out/test.log") || { counts="0 0 0 0 0 0"; note="${note:-  COUNT UNREADABLE}"; rc=1; }
+        counts=$(tap_counts "$out/test.log") || { counts="0 0 0 0 0 0"; note="${note:-  COUNT UNREADABLE OR NO TESTS}"; rc=1; }
     else
-        counts=$(json_counts "$out/report.json" "$out/selected_tests.txt")
+        if ! counts=$(json_counts "$out/report.json" "$out/selected_tests.txt" 2>> "$out/test.log"); then
+            counts="0 0 0 0 0 0"; note="  REPORT UNREADABLE"; [[ $rc -eq 0 ]] && rc=1
+        fi
         [[ $rc -eq 5 ]] && note="  EMPTY SELECTION"
     fi
     read -r sel pas fai ski ter cer <<< "$counts"
@@ -345,6 +350,9 @@ if [[ $LIST_TARGETS -eq 1 ]]; then
     while IFS='|' read -r m about; do
         n=$(python3 -m pytest --collect-only -qq -p no:cacheprovider -m "$m" "$HEADLESS_DIR" 2>/dev/null | grep -c "::")
         printf "%-22s %6s  %s\n" "$m" "$n" "$about"
+        if [[ $LIST_IDS -eq 1 ]]; then
+            python3 -m pytest --collect-only -qq -p no:cacheprovider -m "$m" "$HEADLESS_DIR" 2>/dev/null | grep "::" | sed 's/^/    /'
+        fi
     done < <(target_markers)
     printf "%-22s %6s  %s\n" joins "$(ls RootInteractive/joins/test_*.mjs 2>/dev/null | wc -l) files" "JavaScript tests of the joins prototypes (node --test, TAP)"
     echo "Run one:   ./run_tests.sh --target node_histograms      (the same tests: pytest $HEADLESS_DIR -m node_histograms)"
@@ -353,11 +361,19 @@ if [[ $LIST_TARGETS -eq 1 ]]; then
 fi
 
 if [[ ${#TARGETS[@]} -gt 0 ]]; then
+    KNOWN_TARGETS=$(target_markers)
+    bad=()                                   # every name is checked before anything runs, also with "all" (4.2c-2c v0.2)
+    for t in "${TARGETS[@]}"; do
+        if [[ "$t" != all && "$t" != joins ]] && ! grep -q "^${t//-/_}|" <<< "$KNOWN_TARGETS"; then bad+=("$t"); fi
+    done
+    if [[ ${#bad[@]} -gt 0 ]]; then
+        echo "unknown target(s): ${bad[*]} (see ./run_tests.sh --list-targets)"
+        return 1
+    fi
     if [[ " ${TARGETS[*]} " == *" all "* ]]; then
         FULL_MODE=1                          # --target all: the existing full acceptance path below
     else
         print_header "Targets: ${TARGETS[*]}"
-        KNOWN_TARGETS=$(target_markers)
         TARGET_SUMMARY="$LOG_BASE_DIR/targets_${TIMESTAMP}.txt"
         TARGET_FAILED=0
         {
@@ -372,16 +388,20 @@ if [[ ${#TARGETS[@]} -gt 0 ]]; then
 import collections, pathlib, sys
 seen = collections.defaultdict(list)
 for f in sorted(pathlib.Path(sys.argv[1]).glob(f"target_*_{sys.argv[2]}/selected_tests.txt")):
-    for t in f.read_text().split():
+    for t in f.read_text().splitlines():
         seen[t].append(f.parent.name.split("_" + sys.argv[2])[0][len("target_"):])
 over = {t: ts for t, ts in seen.items() if len(ts) > 1}
 print(f"overlap between targets: {len(over)} test(s)" + "".join(f"\n  {t}: {', '.join(ts)}" for t, ts in sorted(over.items())))
 OVERPY
         fi
         if [[ $DRY_RUN -eq 0 ]]; then                                        # the evidence of this invocation
-            (cd "$LOG_BASE_DIR" && zip -qr "targets_${TIMESTAMP}.zip" "targets_${TIMESTAMP}.txt" target_*_"${TIMESTAMP}" \
-                -x '*.npz' -x '*.html' -x '*_document.json')
-            echo "Evidence: $LOG_BASE_DIR/targets_${TIMESTAMP}.zip"
+            if (cd "$LOG_BASE_DIR" && zip -qr "targets_${TIMESTAMP}.zip" "targets_${TIMESTAMP}.txt" target_*_"${TIMESTAMP}" \
+                    -x '*.npz' -x '*.html' -x '*_document.json') && [[ -s "$LOG_BASE_DIR/targets_${TIMESTAMP}.zip" ]]; then
+                echo "Evidence: $LOG_BASE_DIR/targets_${TIMESTAMP}.zip"
+            else
+                print_warning "the evidence zip could not be written; the target folders remain in $LOG_BASE_DIR"
+                TARGET_FAILED=1
+            fi
         fi
         return $TARGET_FAILED
     fi

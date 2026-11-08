@@ -99,9 +99,9 @@ class ScenarioResult:
         the same scenario) replaces an IDENTICAL earlier report but never a differing one: that one is kept as
         report.1.json, report.2.json, … so a FAIL cannot vanish behind a later PASS (stage 4.2c-2b review, GPT24)."""
         out = Path(self.outdir)
-        data = {**asdict(self), "features": self.features()}
+        data = {**asdict(self), "features": self.features(), "session": session_id()}
         target, k = out / "report.json", 0
-        # a report left by an EARLIER session (re-used output folder) is stale: overwritten, never kept (4.2c-2c, C-2)
+        # a report written by ANOTHER session (re-used output folder) is stale: overwritten, never kept (4.2c-2c, C-2)
         while target.exists() and not _stale(target) and _block(json.loads(target.read_text())) != _block(data):
             k += 1
             target = out / f"report.{k}.json"
@@ -116,36 +116,46 @@ def _block(r: dict) -> tuple:
     return tuple(block)
 
 
-def session_start() -> float:
-    """The start of the current headless pytest session (set by the headless conftest for the main process and
-    inherited by its workers); 0 outside a session, so every report counts."""
+def session_id() -> str:
+    """The id of the current headless pytest session (set by the headless conftest, inherited by its xdist workers);
+    "" outside a session, and then every report counts."""
     import os
-    return float(os.environ.get("RI_HEADLESS_SESSION_START", "0"))
+    return os.environ.get("RI_HEADLESS_SESSION", "")
+
+
+def _session_of(path: Path):
+    """The session that wrote a report; None if the file cannot be read (it is then never dropped silently)."""
+    try:
+        return json.loads(path.read_text()).get("session", "")
+    except Exception:
+        return None
 
 
 def _stale(path: Path) -> bool:
-    return path.stat().st_mtime < session_start()
+    sid = session_id()
+    return bool(sid) and _session_of(path) not in (sid, None)
 
 
-def _reports(folder, since: float = 0.0):
-    """report*.json below `folder`; with `since`, only those written at or after it (the current session — a re-used
-    output folder may hold reports of earlier sessions, which must not enter this session's list; 4.2c-2c, C-2)."""
-    return sorted(f for f in Path(folder).rglob("report*.json") if f.stat().st_mtime >= since)
+def _reports(folder, session: str = ""):
+    """report*.json below `folder`; with `session`, only those written by it — a re-used output folder may hold reports
+    of earlier sessions (4.2c-2c, C-2; by session id, not by file time, since v0.2). An unreadable report is always
+    included, so that reading it fails visibly."""
+    return sorted(f for f in Path(folder).rglob("report*.json") if not session or _session_of(f) in (session, None))
 
 
-def outcomes(folder, since: float = 0.0) -> list:
+def outcomes(folder, session: str = "") -> list:
     """Normalised outcome lines of every report.json below `folder`, sorted. Identical reports of the same scenario
     count once (stage 4.2c-2b): with parallel workers a scenario run by several tests (e.g. a healthy control) lands
     in several workers' folders, and the list must not depend on how tests were spread over workers. Repeated runs
     of a scenario that DIFFER all stay in the list."""
-    blocks = {_block(json.loads(f.read_text())) for f in _reports(folder, since)}
+    blocks = {_block(json.loads(f.read_text())) for f in _reports(folder, session)}
     return sorted(line for block in blocks for line in block)
 
 
-def required(folder, manifest, full: bool = False, since: float = 0.0, target: str = "") -> list:
+def required(folder, manifest, full: bool = False, session: str = "", target: str = "") -> list:
     """Scenario ids listed in `manifest` (one per line, # comments) that have no report below `folder` — an empty list
     means every required scenario ran (stage 4.2c-2b; the required-case manifest of proposal v0.3 item I)."""
-    present = {json.loads(f.read_text())["id"] for f in _reports(folder, since)}
+    present = {json.loads(f.read_text())["id"] for f in _reports(folder, session)}
     wanted, section = [], "fast"
     for line in Path(manifest).read_text().splitlines():
         line = line.strip()

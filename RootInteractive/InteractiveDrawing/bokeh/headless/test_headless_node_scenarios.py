@@ -16,9 +16,6 @@ SCENARIOS = tuple(histograms.SCENARIOS) + tuple(known_defects.SCENARIOS)
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
-@pytest.mark.feature("HIST.histogram_1d")
-@pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.feature("FILTER.intersection")
 def test_scenario_in_node(scenario, node_session, headless_out):
     res = run(node_session, scenario, headless_out, test_ref=__file__)
     assert_as_declared(scenario, res)
