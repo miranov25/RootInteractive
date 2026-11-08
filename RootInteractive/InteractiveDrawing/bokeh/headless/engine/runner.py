@@ -90,10 +90,14 @@ window.__riH = {
     return JSON.stringify(x, (k, v) => typeof v === 'number' && (!Number.isFinite(v) || Object.is(v, -0))
                                        ? (Object.is(v, -0) ? '-0' : String(v)) : v);
   },
-  maskHash(mask) {                  // FNV-1a over the 0/1 selection mask: which rows, not only how many
-    let h = 0x811c9dc5;
-    for (let i = 0; i < mask.length; i++) { h ^= mask[i] ? 1 : 0; h = Math.imul(h, 0x01000193) >>> 0; }
-    return h >>> 0;
+  maskHash(mask) {                  // 64-bit fingerprint of the 0/1 selection mask: which rows, not only how many —
+    let a = 0x811c9dc5, b = 0x050c5d1f;   // two FNV-1a passes, forwards and backwards, different offsets (4.2c-2a)
+    const n = mask.length;
+    for (let i = 0; i < n; i++) {
+      a ^= mask[i] ? 1 : 0; a = Math.imul(a, 0x01000193) >>> 0;
+      b ^= mask[n - 1 - i] ? 1 : 0; b = Math.imul(b, 0x01000193) >>> 0;
+    }
+    return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0') + ':' + n;
   },
   snapshot(probes) {
     return this.encode(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));

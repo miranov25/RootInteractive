@@ -8,6 +8,11 @@
 //   {"id": n, "op": "wait_for", "code": "<function source>", "timeout_ms": t}  poll until the function returns truthy
 //   {"id": n, "op": "sleep", "ms": t}                            let the window's timers run for t ms
 //   {"id": n, "op": "selftest"}                                  the realm and construction rules (proposal §3.3)
+//   {"id": n, "op": "batch_docs", "docs": ["<document JSON>", ...], "code": "<function source>"}
+//        for each document: the same isolation as new_doc, a fresh document, then the function; returns all results
+//        (mass cases by template substitution, proposal v0.3 erratum V-1; stage 4.2c-2a)
+//   {"id": n, "op": "new_window"}                                a completely fresh window (bundle reloaded), used
+//                                                                 before every document of a fault session (4.2c-2a)
 //   {"id": n, "op": "quit"}                                      exit (process.exit; jsdom keeps timers alive)
 // Every reply carries the page errors and console errors collected since the previous reply.
 //
@@ -17,7 +22,11 @@
 //   3. asynchronous callbacks: no fixed waits here; the engine's settle rule (helper JavaScript) decides completion.
 // Isolation (4.2c-1 v0.2): the window lives for the whole process, so every new_doc first clears the timers the previous
 // document left pending and removes every global added since the harness finished loading (the fault execution
-// counter __riFault, globals set by a scenario's js_action, ...), and reports what it removed.
+// counter __riFault, globals set by a scenario's js_action, ...), and reports what it removed. Since 4.2c-2a it also
+// closes every MessageChannel a page opened after the harness loaded (work queued there could otherwise run inside the
+// next document). Documented limits: a page that changes a built-in (e.g. Date.now) or makes a global non-removable
+// is not repaired here — a non-removable global is reported (and is an ERROR in the run), and fault sessions avoid all
+// of it by building a fresh window per document (op new_window).
 // Stand-ins (they concern drawing only; parity with the browser is their standing control): Node's MessageChannel,
 // and an inert canvas context that accepts every call and draws nothing (Bokeh touches a canvas while loading).
 import fs from "node:fs";
@@ -38,6 +47,8 @@ function inert() {
 }
 
 const pendingTimers = new Map();                                  // id -> clear function, for isolation
+const channels = new Set();                                       // MessageChannels opened after the baseline
+let trackChannels = false;
 const vc = new VirtualConsole();
 vc.on("jsdomError", e => pageErrors.push(String(e && (e.message || e)).slice(0, 300)));
 vc.on("error", (...a) => consoleErrors.push(a.map(String).join(" ").slice(0, 300)));
@@ -46,23 +57,36 @@ process.on("uncaughtException", e => pageErrors.push("uncaught exception: " + St
 
 const t0 = Date.now();
 const scripts = bundleFiles.concat([helperPath]).map(f => `<script>${fs.readFileSync(f, "utf8").replace(/<\/script>/g, "<\\/script>")}</script>`);
-const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body>${scripts.join("\n")}</body></html>`, {
-  runScripts: "dangerously", virtualConsole: vc,
-  beforeParse(w) {
-    w.MessageChannel = MessageChannel;
-    w.HTMLCanvasElement.prototype.getContext = () => inert();
-    const [st, ct, si, ci] = [w.setTimeout, w.clearTimeout, w.setInterval, w.clearInterval];
-    w.setTimeout = (fn, ms, ...a) => { const id = st.call(w, (...b) => { pendingTimers.delete(id); if (typeof fn === "function") fn(...b); }, ms, ...a);
-                                       pendingTimers.set(id, () => ct.call(w, id)); return id; };
-    w.clearTimeout = id => { pendingTimers.delete(id); ct.call(w, id); };
-    w.setInterval = (fn, ms, ...a) => { const id = si.call(w, fn, ms, ...a); pendingTimers.set(id, () => ci.call(w, id)); return id; };
-    w.clearInterval = id => { pendingTimers.delete(id); ci.call(w, id); };
-  },
-});
-const w = dom.window;
-const Document = w.Bokeh.require("document").Document;
+const html = `<!DOCTYPE html><html><head></head><body>${scripts.join("\n")}</body></html>`;
+let dom, w, Document, baseline;
+
+function makeWindow() {
+  if (dom) { try { dom.window.close(); } catch (e) { /* already closed */ } }
+  pendingTimers.clear(); channels.clear(); trackChannels = false;
+  dom = new JSDOM(html, {
+    runScripts: "dangerously", virtualConsole: vc,
+    beforeParse(win) {
+      win.MessageChannel = class extends MessageChannel {             // stand-in: Node's MessageChannel, tracked
+        constructor() { super(); if (trackChannels) channels.add(this); }
+      };
+      win.HTMLCanvasElement.prototype.getContext = () => inert();
+      const [st, ct, si, ci] = [win.setTimeout, win.clearTimeout, win.setInterval, win.clearInterval];
+      win.setTimeout = (fn, ms, ...a) => {                          // non-function callbacks pass through (4.2c-2a)
+        const id = typeof fn === "function" ? st.call(win, (...b) => { pendingTimers.delete(id); fn(...b); }, ms, ...a)
+                                            : st.call(win, fn, ms, ...a);
+        pendingTimers.set(id, () => ct.call(win, id)); return id; };
+      win.clearTimeout = id => { pendingTimers.delete(id); ct.call(win, id); };
+      win.setInterval = (fn, ms, ...a) => { const id = si.call(win, fn, ms, ...a); pendingTimers.set(id, () => ci.call(win, id)); return id; };
+      win.clearInterval = id => { pendingTimers.delete(id); ci.call(win, id); };
+    },
+  });
+  w = dom.window;
+  Document = w.Bokeh.require("document").Document;
+  baseline = new Set(Object.getOwnPropertyNames(w));                // the window as the harness left it
+  trackChannels = true;
+}
+makeWindow();
 const loadMs = Date.now() - t0;
-const baseline = new Set(Object.getOwnPropertyNames(w));             // the window as the harness left it
 
 // numbers travel as base64 Float64 (NaN, +-Inf, -0 survive); other values as JSON
 function enc(x) {
@@ -79,21 +103,37 @@ function enc(x) {
 const inWindow = v => w.eval("(" + JSON.stringify(v === undefined ? null : v) + ")");     // rule 1: window realm
 const fn = code => w.eval("(" + code + ")");
 
+function freshDocument(text) {                                     // rule 2 + isolation, one place for both ops
+  const leftoverTimers = pendingTimers.size;
+  for (const clear of pendingTimers.values()) clear();
+  pendingTimers.clear();
+  const closedChannels = channels.size;
+  for (const ch of channels) { try { ch.port1.close(); ch.port2.close(); } catch (e) { /* closed */ } }
+  channels.clear();
+  const removed = Object.getOwnPropertyNames(w).filter(k => !baseline.has(k));
+  for (const k of removed) { try { delete w[k]; } catch (e) { /* not configurable */ } }
+  const notRemoved = removed.filter(k => Object.prototype.hasOwnProperty.call(w, k));
+  w.Bokeh.documents.length = 0;
+  const doc = Document.from_json(w.JSON.parse(text));                // the window's JSON: window-realm objects
+  w.Bokeh.documents.push(doc);
+  return { models: doc._all_models.size, leftover_timers: leftoverTimers, removed_globals: removed,
+           not_removed: notRemoved, closed_channels: closedChannels };
+}
+
 async function handle(req) {
   switch (req.op) {
-    case "new_doc": {                                                // rule 2: Bokeh's deserializer, fresh document
-      const leftoverTimers = pendingTimers.size;                     // isolation from the previous document
-      for (const clear of pendingTimers.values()) clear();
-      pendingTimers.clear();
-      const removed = Object.getOwnPropertyNames(w).filter(k => !baseline.has(k));
-      for (const k of removed) { try { delete w[k]; } catch (e) { /* not configurable */ } }
-      const notRemoved = removed.filter(k => Object.prototype.hasOwnProperty.call(w, k));
-      w.Bokeh.documents.length = 0;
-      const json = w.eval("(" + fs.readFileSync(req.path, "utf8") + ")");
-      const doc = Document.from_json(json);
-      w.Bokeh.documents.push(doc);
-      return { models: doc._all_models.size, leftover_timers: leftoverTimers, removed_globals: removed,
-               not_removed: notRemoved };
+    case "new_doc":
+      return freshDocument(fs.readFileSync(req.path, "utf8"));
+    case "batch_docs": {
+      const f = fn(req.code), out = [];
+      for (const text of req.docs) {
+        const iso = freshDocument(text);
+        let r = f();
+        if (r && typeof r.then === "function") r = await r;
+        out.push({ result: enc(r), isolation: { timers: iso.leftover_timers, channels: iso.closed_channels,
+                                                not_removed: iso.not_removed } });
+      }
+      return out;
     }
     case "eval": {
       let r = fn(req.code)(inWindow(req.arg));
@@ -111,6 +151,11 @@ async function handle(req) {
     case "sleep":
       await new Promise(r => w.setTimeout(r, req.ms));
       return true;
+    case "new_window": {                                           // fault sessions: nothing survives (4.2c-2a)
+      const t1 = Date.now();
+      makeWindow();
+      return { load_ms: Date.now() - t1 };
+    }
     case "registered":                                               // inventory check (Python passes the names)
       return req.names.filter(n => { try { return !!w.Bokeh.Models.get(n); } catch (e) { return false; } });
     case "selftest": {

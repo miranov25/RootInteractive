@@ -77,15 +77,10 @@ def node_session(node_bundle_root):
     if problems:
         _node_unavailable("pinned page scripts missing: " + "; ".join(problems))
     from .engine.node_session import NodeSession, NodeUnavailable
-    from .engine.node_session import JSDOM_PIN
     try:
         session = NodeSession(node_bundle_root)
     except NodeUnavailable as exc:
         _node_unavailable(str(exc))
-    if os.environ.get("RI_HEADLESS_REQUIRED") == "1" and session.versions.get("jsdom") != JSDOM_PIN:
-        session.close()
-        pytest.fail(f"jsdom {session.versions.get('jsdom')} installed, {JSDOM_PIN} required (proposal v0.3 D-26) "
-                    f"— run: npm install   (in RootInteractive/InteractiveDrawing/bokeh)", pytrace=False)
     yield session
     session.close()
 

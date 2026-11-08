@@ -57,8 +57,11 @@ class NodeSession:
     backend = "node"
 
     def __init__(self, out_root: Path, fault: Optional[faults_mod.Fault] = None, timeout_s: float = 120.0,
-                 extra_files: Sequence[Path] = ()):
-        """`extra_files`: scripts loaded after the helper — for tests of the start-up error policy only."""
+                 extra_files: Sequence[Path] = (), fresh_window: Optional[bool] = None):
+        """`extra_files`: scripts loaded after the helper — for tests of the start-up error policy only.
+        `fresh_window`: build a completely fresh window before every document (default: on for fault sessions, so
+        a fault's execution proof can never be touched by an earlier document — 4.2c-1 review note A-1)."""
+        self.fresh_window = (fault is not None) if fresh_window is None else fresh_window
         from .runner import HELPER_JS, REPO_ROOT, _git          # local import: runner imports this module too
         out_root = Path(out_root)
         healthy = node_bundle.model_bundle(out_root)
@@ -98,6 +101,10 @@ class NodeSession:
             "model_bundle_key": node_bundle.current_key()[:16] + (f" + fault {fault.id}" if fault else ""),
         }
         self.exit_code: Optional[int] = None
+        if os.environ.get("RI_HEADLESS_REQUIRED") == "1" and info["jsdom"] != JSDOM_PIN:   # note A-4: every session
+            self.close()
+            raise NodeUnavailable(f"jsdom {info['jsdom']} installed, {JSDOM_PIN} required (proposal v0.3 D-26) — run: "
+                                  f"npm install   (in RootInteractive/InteractiveDrawing/bokeh)")
 
     def _pump(self) -> None:
         for line in self.proc.stdout:
@@ -160,9 +167,15 @@ class NodePage:
         return decode(r.get("result"))
 
     def goto(self, target, timeout: Optional[int] = None) -> None:
+        fresh = self._call("new_window", timeout_s=60) if self.session.fresh_window else None
         r = self._call("new_doc", path=str(target), timeout_s=(timeout or 60_000) / 1000)
-        self.res.isolation = {"leftover_timers_cleared": r["leftover_timers"],
-                              "globals_removed": r["removed_globals"], "globals_not_removable": r["not_removed"]}
+        self.res.isolation = {"fresh_window": bool(fresh), "leftover_timers_cleared": r["leftover_timers"],
+                              "channels_closed": r["closed_channels"], "globals_removed": r["removed_globals"],
+                              "globals_not_removable": r["not_removed"]}
+        if r["not_removed"]:                                     # note A-1: state this document inherits
+            self.res.add(-1, "isolation", "isolation", "ERROR", "an earlier document left non-removable globals: "
+                         + ", ".join(r["not_removed"]) + " (use a fresh window, NodeSession(fresh_window=True))",
+                         assertion=False)
 
     def wait_for_function(self, code: str, timeout: int = 20_000) -> None:
         self._call("wait_for", code=code, timeout_ms=timeout, timeout_s=timeout / 1000 + 10)

@@ -32,22 +32,41 @@ def intersection(masks, n: int) -> np.ndarray:
 # signatures (engine/expect.py, EqualsSelection): a page with the defect must match the defect's selection exactly,
 # so that any other deviation stays a normal failure. Each rule states its mechanism and the measurement behind it.
 
+def b1_first_changed(masks_at_load) -> int:
+    """Index of the filter whose load report starts B1's chain: the first filter whose packed load vector is not all
+    ones. RangeFilter.as_bits packs 32 rows per word and leaves the unused bits of the last word 0, so when the row count
+    is not a multiple of 32 even the first filter "changes" at load; otherwise the first filter that excludes a row
+    (Claude3, 4.2b v0.2 review, measured; refined rule since stage 4.2c-2a). -1 if no filter changes: then all apply."""
+    masks_at_load = [np.asarray(m, dtype=bool) for m in masks_at_load]
+    n = len(masks_at_load[0]) if masks_at_load else 0
+    if n % 32:
+        return 0
+    for k, m in enumerate(masks_at_load):
+        if not m.all():
+            return k
+    return -1
+
+
 def b1_selection(masks_now, masks_at_load) -> np.ndarray:
     """Known defect B1 (LazyIntersectionFilter.ts 191/193/208/210, `_changed_values ||= …` short-circuits the merge of
-    later filters at load). Mechanism, measured: the first filter is applied correctly; every later filter keeps the
-    rows it excluded at load and otherwise follows its widget — rows it excluded at load stay selected while it still
-    excludes them. With RootInteractive's default limits the rows excluded at load are the filter's missing values.
+    later filters at load). Mechanism, measured: at load, the first filter whose packed load vector is not all ones
+    (b1_first_changed) is merged and every LATER filter is skipped; filters before it changed nothing at load and are
+    applied normally. Each skipped filter then keeps the rows it excluded at load and otherwise follows its widget.
+    With RootInteractive's default limits the rows excluded at load are the filter's missing values; with explicit
+    widget limits they are also the rows outside those limits (Claude10, 4.2b v0.2 review: the rule held at all five
+    steps). Without a changing filter at load (row count a multiple of 32 and no filter excluding a row) B1 is absent.
 
-    Measured 2026-11-07 on RootInteractive 4e8d783 (coder, after the 4.2b review by Claude3): the page equals the
-    histogram of this selection in every cell, and the page's selected-row count equals its size, at every step —
-    two filters 18 039 / 12 361 / 8 798 rows, three filters 17 989 / 12 256 / 8 751 / 6 279."""
+    Measured 2026-11-07 on RootInteractive 4e8d783: the page equals the histogram of this selection in every cell, and
+    the page's selected-row count equals its size, at every step — two filters 18 039 / 12 361 / 8 798 rows, three
+    filters 17 989 / 12 256 / 8 751 / 6 279; first filter without missing values: 20 000 rows → no B1, 20 001 → B1."""
     masks_now = [np.asarray(m, dtype=bool) for m in masks_now]
     masks_at_load = [np.asarray(m, dtype=bool) for m in masks_at_load]
     if not masks_now:
         raise ValueError("B1 needs at least one filter")
-    out = masks_now[0].copy()
-    for now, load in zip(masks_now[1:], masks_at_load[1:]):
-        out &= now | ~load
+    k_star = b1_first_changed(masks_at_load)
+    out = np.ones_like(masks_now[0])
+    for k, (now, load) in enumerate(zip(masks_now, masks_at_load)):
+        out &= now if (k_star < 0 or k <= k_star) else (now | ~load)
     return out
 
 

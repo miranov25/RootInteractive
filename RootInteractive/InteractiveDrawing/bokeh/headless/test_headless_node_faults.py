@@ -103,4 +103,4 @@ def test_fault_execution_proof_is_per_document(fault_sessions, headless_out):
     assert plain.fault_executions > 1000
     for r in (before, after):
         assert r.fault_executions == 0 and [o for o in r.outcomes if o.check == "fault executed"], r.text()
-    assert "__riFault" in after.isolation["globals_removed"], after.isolation
+    assert after.isolation["fresh_window"], after.isolation       # fault sessions: a fresh window per document (A-1)

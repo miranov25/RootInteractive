@@ -75,3 +75,30 @@ def test_case_file_round_trip(tmp_path):
     sha = data.save_case(df, tmp_path / "case.npz")
     assert sha == data.content_sha256(df) == data.content_sha256(data.load_case(tmp_path / "case.npz"))
     assert np.array_equal(data.load_case(tmp_path / "case.npz").x.to_numpy(), df.x.to_numpy(), equal_nan=True)
+
+
+# ---------------------------------------------------------------------------------------- stage 4.2c-2a
+def test_edge_value_column_kind():
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import TableSpec
+    x = data.generate(TableSpec(4000, 3, {"x": "edges(-2,2.28,6)"})).x.to_numpy()
+    lo, hi = -2.0, 2.28
+    edges = lo + (hi - lo) * np.arange(7) / 6                           # as the generator computes them
+    edges[-1] = hi
+    assert (x == 2.28).sum() > 0 and (x == np.nextafter(2.28, -np.inf)).sum() > 0 and np.isinf(x).sum() > 0
+    assert 800 < np.isin(x, edges).sum() < 1200                            # about a quarter on exact edges
+    with pytest.raises(ValueError):
+        data.parse_spec("edges(0,1)")                                      # nbins is required
+    with pytest.raises(ValueError):
+        data.parse_spec("uniform(0,1,5)")                                  # only edges takes nbins
+
+
+def test_b1_chain_start():
+    from RootInteractive.InteractiveDrawing.bokeh.headless.oracles.filters import b1_first_changed, b1_selection
+    n = 64
+    full, some = np.ones(n, bool), np.ones(n, bool)
+    some[5] = False
+    assert b1_first_changed([full, some]) == 1                            # n % 32 == 0: the first excluding filter
+    assert b1_first_changed([np.ones(65, bool), np.ones(65, bool)]) == 0  # n % 32 != 0: the first filter always
+    assert b1_first_changed([full, full]) == -1                           # nothing changes: no B1
+    now = [full, np.ones(n, bool)]                                        # b's widget moved to keep everything
+    assert b1_selection([some, now[1]], [some, some]).tolist() == some.tolist()   # first filter itself applies
