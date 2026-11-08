@@ -52,6 +52,13 @@ def checkout(tmp_path):
     for directory in ("RootInteractive/InteractiveDrawing/bokeh", "RootInteractive/Tools", "RootInteractive/onnx",
                       "RootInteractive/MLpipeline/tests"):
         (tmp_path / directory).mkdir(parents=True, exist_ok=True)
+    (tmp_path / "RootInteractive/Tools/test_sentinel.py").write_text(textwrap.dedent("""\
+        import os
+
+        def test_writes_sentinel():              # proves that the normal run started (GPT23's sentinel)
+            if os.environ.get("SENTINEL"):
+                open(os.environ["SENTINEL"], "w").write("started")
+        """))
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     return tmp_path
 
@@ -92,9 +99,12 @@ def test_an_unreadable_report_fails_the_run(checkout):
     assert r.returncode != 0 and "REPORT UNREADABLE" in r.stdout, r.stdout + r.stderr
 
 
-def test_a_misspelled_name_next_to_all_runs_nothing(checkout):
-    r = _run(checkout, "--target", "all", "--target", "demo_passs")
-    assert r.returncode != 0 and "unknown target(s): demo_passs" in r.stdout, r.stdout + r.stderr
+@pytest.mark.parametrize("name", ["demo_passs", "demo.pass"])   # a dot must not match as a pattern (4.2c-2c F-1)
+def test_a_misspelled_name_next_to_all_runs_nothing(checkout, name):
+    sentinel = checkout / "sentinel"
+    r = _run(checkout, "--quick", "--target", "all", "--target", name, SENTINEL=str(sentinel))
+    assert r.returncode != 0 and f"unknown target(s): {name}" in r.stdout, r.stdout + r.stderr
+    assert not sentinel.exists(), "a test started although a target name was unknown"
     assert "Testing:" not in r.stdout and "Target:" not in r.stdout, r.stdout                  # nothing was run
 
 
@@ -111,3 +121,18 @@ def test_a_joins_run_with_zero_tests_fails(checkout, tmp_path_factory):
     (fake / "node").chmod(0o755)
     r = _run(checkout, "--target", "joins", PATH=f"{fake}:{os.environ['PATH']}")
     assert r.returncode != 0 and "NO TESTS" in r.stdout, r.stdout + r.stderr
+
+
+def test_the_normal_run_rejects_a_joins_result_with_zero_tests(checkout, tmp_path_factory):
+    """GPT23 (4.2c-2c F-2): the normal run (no --target) must not accept a joins TAP summary with zero tests."""
+    joins = checkout / "RootInteractive/joins"
+    joins.mkdir(parents=True)
+    (joins / "test_empty.mjs").write_text("// no tests\n")
+    (joins / "ao2d_fixture.json").write_text("{}")
+    fake = tmp_path_factory.mktemp("fakenode_normal")
+    (fake / "node").write_text('#!/bin/sh\ncase "$*" in *--help*) echo "--test-reporter";; '
+                               '*) printf "TAP version 13\\n# tests 0\\n# pass 0\\n# fail 0\\n";; esac\nexit 0\n')
+    (fake / "node").chmod(0o755)
+    r = _run(checkout, "--quick", PATH=f"{fake}:{os.environ['PATH']}")
+    assert r.returncode != 0 and "joins: no test counted" in r.stdout, r.stdout[-3000:] + r.stderr
+

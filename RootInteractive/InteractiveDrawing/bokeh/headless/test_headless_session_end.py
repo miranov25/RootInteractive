@@ -22,7 +22,7 @@ QUICK = HERE / "test_headless_unit_expect.py"            # passes in about a sec
 
 def _session(out: Path, **env):
     e = {k: v for k, v in os.environ.items()                  # the caller's headless settings must not leak in
-         if k not in ("PYTEST_XDIST_WORKER", "RI_HEADLESS_CHECK_REQUIRED", "PYTEST_ADDOPTS", "RI_HEADLESS_SESSION", "RI_HEADLESS_TARGET")}
+         if k not in ("PYTEST_XDIST_WORKER", "RI_HEADLESS_CHECK_REQUIRED", "PYTEST_ADDOPTS", "RI_HEADLESS_SESSION", "RI_HEADLESS_TEST_SESSION_ID", "RI_HEADLESS_TARGET")}
     e.update({"RI_HEADLESS_OUT": str(out), **env})
     return subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(QUICK)],
                           cwd=ROOT, env=e, capture_output=True, text=True, timeout=300)
@@ -39,7 +39,7 @@ def test_a_broken_outcome_export_fails_the_run(tmp_path):
     bad = tmp_path / "main" / "some_scenario"
     bad.mkdir(parents=True)
     (bad / "report.json").write_text(json.dumps({"id": "x", "session": "probe"}))   # no checksum, no outcomes
-    r = _session(tmp_path, RI_HEADLESS_SESSION="probe")                 # the planted report belongs to this session
+    r = _session(tmp_path, RI_HEADLESS_TEST_SESSION_ID="probe")         # the planted report belongs to this session
     assert r.returncode != 0 and "outcome list failed" in r.stdout, r.stdout + r.stderr
     (bad / "report.json").write_text("{not json")                       # unreadable: never dropped silently
     r = _session(tmp_path)
@@ -110,4 +110,18 @@ def test_backend_markers_select_their_tests():
     assert len(node) >= 80 and len(browser) >= 50, (len(node), len(browser))     # measured at v0.2: 84 and 56
     both = set(node) & set(browser)
     assert both and all("test_headless_parity.py::" in t for t in both), sorted(both)[:5]   # only parity needs both
+
+
+def test_an_inherited_session_id_is_not_reused(tmp_path):
+    """GPT22 (4.2c-2c F-3): a session id already set in the shell must not make an earlier session's reports current.
+    A report written under the id "inherited" is planted; a new session started with RI_HEADLESS_SESSION=inherited in
+    its environment must create its own id and leave that report out."""
+    old_dir = tmp_path / "main" / "earlier"
+    old_dir.mkdir(parents=True)
+    (old_dir / "report.json").write_text(json.dumps({"id": "earlier/inherited_scenario", "case_sha256": "x",
+                                                     "session": "inherited",
+                                                     "outcomes": [{"step": 0, "check": "c", "outcome": "FAIL"}]}))
+    r = _session(tmp_path, RI_HEADLESS_SESSION="inherited")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "earlier/inherited_scenario" not in (tmp_path / "outcomes.txt").read_text()
 

@@ -130,9 +130,12 @@ _TIMES = {}
 
 def pytest_configure(config):
     # target markers are registered in pytest.ini and the root conftest.py (4.2c-2c), like every other marker
-    # the session's id, inherited by xdist workers (started after this hook); reports of another session are stale
+    # the session's id: NEW in every main pytest process — an id inherited from the shell is never reused (4.2c-2c F-3,
+    # GPT22) — and inherited by its xdist workers (started after this hook); reports of another session are stale.
+    # A test may fix the id only through the explicitly test-only RI_HEADLESS_TEST_SESSION_ID.
     import uuid
-    os.environ.setdefault("RI_HEADLESS_SESSION", uuid.uuid4().hex)
+    if not hasattr(config, "workerinput"):
+        os.environ["RI_HEADLESS_SESSION"] = os.environ.get("RI_HEADLESS_TEST_SESSION_ID") or uuid.uuid4().hex
     # backend selectors (4.2c-2b v0.2; kept as the approved specification says — their future is a later consensus)
     config.addinivalue_line("markers", "node_backend: runs the Node model harness (set by the headless conftest)")
     config.addinivalue_line("markers", "browser_backend: runs Chromium (set by the headless conftest)")

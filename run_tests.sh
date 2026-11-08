@@ -273,6 +273,10 @@ target_markers() {                           # the registered target markers ("<
         | sed -n 's/^@pytest\.mark\.\([a-z_0-9]*\): target: \(.*\)/\1|\2/p' | sort -u -t'|' -k1,1
 }
 
+is_target() {                                # a registered target marker: exact name, never a pattern (4.2c-2c F-1)
+    cut -d'|' -f1 <<< "$KNOWN_TARGETS" | grep -qxF -- "${1//-/_}"
+}
+
 tap_counts() {                               # "selected passed failed skipped test-errors collection-errors"
     local p f s
     p=$(grep -E "^# pass [0-9]+" "$1" | tail -1 | awk '{print $3}')
@@ -305,7 +309,7 @@ run_target() {
     if [[ "$name" == "joins" ]]; then
         local files=(RootInteractive/joins/test_*.mjs)
         cmd=(node --test "${NODE_TAP[@]}" "${files[@]}")
-    elif grep -q "^${marker}|" <<< "$KNOWN_TARGETS"; then
+    elif is_target "$name"; then
         cmd=(env -u DISPLAY RI_HEADLESS_OUT="$PROJECT_ROOT/$out/headless_out"
              RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/$HEADLESS_DIR/_out}"
              RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1 RI_HEADLESS_TARGET="$marker"
@@ -355,6 +359,7 @@ if [[ $LIST_TARGETS -eq 1 ]]; then
         fi
     done < <(target_markers)
     printf "%-22s %6s  %s\n" joins "$(ls RootInteractive/joins/test_*.mjs 2>/dev/null | wc -l) files" "JavaScript tests of the joins prototypes (node --test, TAP)"
+    if [[ $LIST_IDS -eq 1 ]]; then ls RootInteractive/joins/test_*.mjs 2>/dev/null | sed 's/^/    /'; fi
     echo "Run one:   ./run_tests.sh --target node_histograms      (the same tests: pytest $HEADLESS_DIR -m node_histograms)"
     echo "Test ids:  pytest --collect-only -qq -m <target> $HEADLESS_DIR"
     return 0
@@ -364,7 +369,7 @@ if [[ ${#TARGETS[@]} -gt 0 ]]; then
     KNOWN_TARGETS=$(target_markers)
     bad=()                                   # every name is checked before anything runs, also with "all" (4.2c-2c v0.2)
     for t in "${TARGETS[@]}"; do
-        if [[ "$t" != all && "$t" != joins ]] && ! grep -q "^${t//-/_}|" <<< "$KNOWN_TARGETS"; then bad+=("$t"); fi
+        if [[ "$t" != all && "$t" != joins ]] && ! is_target "$t"; then bad+=("$t"); fi
     done
     if [[ ${#bad[@]} -gt 0 ]]; then
         echo "unknown target(s): ${bad[*]} (see ./run_tests.sh --list-targets)"
@@ -572,8 +577,8 @@ for t in r.get('tests', []):
             [[ ${PIPESTATUS[0]} -eq 0 ]] || RUN_FAILED=1
             joins_passed=$(grep -E "^# pass [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
             joins_failed=$(grep -E "^# fail [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
-            if [[ -z "$joins_passed" || -z "$joins_failed" ]]; then
-                print_warning "joins: the test count could not be read from the log (C-3)"; RUN_FAILED=1
+            if [[ -z "$joins_passed" || -z "$joins_failed" ]] || (( joins_passed + joins_failed <= 0 )); then
+                print_warning "joins: no test counted, or the count could not be read from the log"; RUN_FAILED=1
             fi
             TOTAL_PASSED=$((TOTAL_PASSED + ${joins_passed:-0}))
             TOTAL_FAILED=$((TOTAL_FAILED + ${joins_failed:-0}))
