@@ -33,7 +33,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     LOAD_CHECK, Labels, Page, Parameter, Scenario, TableSpec, Tables, auto, hist, js_action, js_value, load, range_,
     responds, set_)
 
-pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration"), pytest.mark.browser_harness]   # target (4.2c-2c)
 
 
 def _small(id_, steps, checks):

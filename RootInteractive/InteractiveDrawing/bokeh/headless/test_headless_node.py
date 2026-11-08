@@ -20,7 +20,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     Labels, Page, Scenario, TableSpec, Tables, audit, auto, hist, js_action, js_value, load, range_, set_)
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
 
-pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration"), pytest.mark.node_harness]   # target (4.2c-2c)
 
 
 def _small(id_, steps, checks, widget=False):

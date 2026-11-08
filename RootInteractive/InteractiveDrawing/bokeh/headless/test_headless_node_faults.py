@@ -16,7 +16,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import known_de
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.histograms import PLAIN
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
 
-pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration"), pytest.mark.node_harness]   # target (4.2c-2c)
 
 
 def _by(res):

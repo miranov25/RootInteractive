@@ -16,3 +16,19 @@ families/histograms_node_claude3_b10_6_full [node]
 families/histograms_node_odd_7_full [node]
 known_defects/b1_two_filters_missing_values
 chain/deep_widget_filter_alias_stack_profile
+# --- per target (run_tests.sh --target <name>, stage 4.2c-2c): a run of one target checks only its own section
+[node_scenarios]
+known_defects/b1_two_filters_missing_values [node]
+known_defects/b2_1d_histogram_ignores_selection_at_load [node]
+known_defects/b8_1d_histogram_counts_nan_in_bin0 [node]
+[node_histograms]
+families/histograms_node_unit_10_fast [node]
+families/histograms_node_claude3_b10_6_fast [node]
+families/histograms_node_odd_7_fast [node]
+[node_histograms_full]
+families/histograms_node_unit_10_full [node]
+families/histograms_node_claude3_b10_6_full [node]
+families/histograms_node_odd_7_full [node]
+[browser_smoke]
+histograms/plain_1d_2d_one_range_two_moves
+histograms/plain_1d_2d_one_range_two_moves [node]

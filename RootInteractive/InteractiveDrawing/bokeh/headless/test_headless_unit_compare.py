@@ -9,7 +9,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     Labels, Page, Parameter, Scenario, ScenarioError, TableSpec, Tables, Transport, audit, auto, hist, js_action, js_value,
     load, range_, responds, set_)
 
-pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python")]
+pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python"), pytest.mark.headless_unit]   # target (4.2c-2c)
 
 INF, NAN = np.inf, np.nan
 # (page, oracle, kind, kwargs, expected ok)

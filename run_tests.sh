@@ -125,6 +125,10 @@ Options:
   --dry-run        Show what would be done without doing it
   --full           Headless tests: the full suite (all generated cases, every browser test);
                    default: the fast suite (tests marked slow are left out)
+  --target NAME    Run only this target (repeatable; each target runs separately, with its own log folder,
+                   timing and summary line). A target is a pytest marker of the headless tests (hyphens may be
+                   used for underscores), or "joins" (node --test). "all": everything, as --full.
+  --list-targets   List the targets, their test counts and descriptions
 
 Test Directories:
   - RootInteractive/InteractiveDrawing/bokeh/ (without headless/, which has its own entry)
@@ -176,6 +180,8 @@ QUICK_MODE=0
 MATRIX_ONLY=0
 DRY_RUN=0
 FULL_MODE=0
+TARGETS=()
+LIST_TARGETS=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -190,6 +196,12 @@ while [[ $# -gt 0 ]]; do
         --matrix) MATRIX_ONLY=1 ;;
         --dry-run) DRY_RUN=1 ;;
         --full) FULL_MODE=1 ;;
+        --target)
+            shift
+            if [[ -z "${1:-}" ]]; then echo "--target needs a name (see --list-targets)"; return 2; fi
+            TARGETS+=("$1")
+            ;;
+        --list-targets) LIST_TARGETS=1 ;;
         *) echo "Unknown option: $1"; show_help; return 2 ;;
     esac
     shift
@@ -245,6 +257,134 @@ root=pathlib.Path(sys.argv[1]); files=[root/'run_tests.sh',*(root/'RootInteracti
 pathlib.Path(sys.argv[2]).write_text(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()},indent=2))
 BEFOREPY
     if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+fi
+
+# =============================================================================
+# Targets (PHASE_4 stage 4.2c-2c): pytest markers of the headless tests, plus "joins" (node --test)
+# =============================================================================
+HEADLESS_DIR="RootInteractive/InteractiveDrawing/bokeh/headless"
+NODE_TAP=()                                  # TAP output gives a readable count on every Node version (C-3)
+if command -v node > /dev/null 2>&1 && node --help 2>/dev/null | grep -q -- "--test-reporter"; then NODE_TAP=(--test-reporter=tap); fi
+
+target_markers() {                           # the registered target markers ("<name>: target: <description>")
+    python3 -m pytest --markers -p no:cacheprovider "$HEADLESS_DIR" 2>/dev/null \
+        | sed -n 's/^@pytest\.mark\.\([a-z_0-9]*\): target: \(.*\)/\1|\2/p' | sort -u -t'|' -k1,1
+}
+
+tap_counts() {                               # "selected passed failed skipped test-errors collection-errors"
+    local p f s
+    p=$(grep -E "^# pass [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    f=$(grep -E "^# fail [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    s=$(grep -E "^# skipped [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    if [[ -z "$p" || -z "$f" ]]; then return 1; fi
+    echo "$((p + f + ${s:-0})) $p $f ${s:-0} 0 0"
+}
+
+json_counts() {                              # the same six numbers from pytest-json-report; ids to selected_tests.txt
+    python3 - "$1" "$2" <<'COUNTPY'
+import json, sys
+try:
+    r = json.load(open(sys.argv[1]))
+except Exception:
+    print("0 0 0 0 0 1"); sys.exit(0)
+s = r.get("summary", {})
+coll = sum(1 for c in r.get("collectors", []) if c.get("outcome") == "failed")
+tests = [t["nodeid"] for t in r.get("tests", [])]
+open(sys.argv[2], "w").write("".join(t + "\n" for t in tests))
+print(len(tests), s.get("passed", 0), s.get("failed", 0), s.get("skipped", 0), s.get("error", 0), coll)
+COUNTPY
+}
+
+run_target() {
+    local name="$1" marker="${1//-/_}" out="$LOG_BASE_DIR/target_${1}_${TIMESTAMP}" rc=0 counts note="" t0 t1
+    local cmd=()
+    mkdir -p "$out"
+    if [[ "$name" == "joins" ]]; then
+        local files=(RootInteractive/joins/test_*.mjs)
+        cmd=(node --test "${NODE_TAP[@]}" "${files[@]}")
+    elif grep -q "^${marker}|" <<< "$KNOWN_TARGETS"; then
+        cmd=(env -u DISPLAY RI_HEADLESS_OUT="$PROJECT_ROOT/$out/headless_out"
+             RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/$HEADLESS_DIR/_out}"
+             RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1 RI_HEADLESS_TARGET="$marker"
+             python3 -m pytest "$HEADLESS_DIR" -m "$marker" -n "$PARALLEL_WORKERS" --timeout=900 -q -p no:cacheprovider
+             --json-report --json-report-file="$PROJECT_ROOT/$out/report.json")
+    else
+        echo "unknown target: $name (see ./run_tests.sh --list-targets)" | tee "$out/test.log"
+        printf "%-22s %8s %6s %6s %7s %8s %11s %7s %4s  %s\n" "$name" 0 0 0 0 0 0 0.0 2 "$out  UNKNOWN TARGET" >> "$TARGET_SUMMARY"
+        TARGET_FAILED=1; return
+    fi
+    printf '%q ' "${cmd[@]}" > "$out/command.txt"; echo >> "$out/command.txt"
+    if [[ $DRY_RUN -eq 1 ]]; then echo "  [DRY RUN] $(cat "$out/command.txt")"; return; fi
+    echo "${BOLD}Target: $name${RESET}"
+    t0=$(date +%s.%N)
+    if [[ "$name" == "joins" && ! -e "${files[0]}" ]]; then
+        echo "no joins test files (RootInteractive/joins/test_*.mjs)" > "$out/test.log"; rc=1
+    elif [[ "$name" == "joins" && ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+        { echo "RootInteractive/joins/ao2d_fixture.json is missing (generated, not in git); create it with:"
+          echo "    (cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"; } | tee "$out/test.log"
+        rc=1; note="  FIXTURE MISSING"
+    else
+        "${cmd[@]}" > "$out/test.log" 2>&1; rc=$?
+    fi
+    t1=$(date +%s.%N)
+    if [[ "$name" == "joins" ]]; then
+        counts=$(tap_counts "$out/test.log") || { counts="0 0 0 0 0 0"; note="${note:-  COUNT UNREADABLE}"; rc=1; }
+    else
+        counts=$(json_counts "$out/report.json" "$out/selected_tests.txt")
+        [[ $rc -eq 5 ]] && note="  EMPTY SELECTION"
+    fi
+    read -r sel pas fai ski ter cer <<< "$counts"
+    printf "%-22s %8s %6s %6s %7s %8s %11s %7.1f %4s  %s\n" "$name" "$sel" "$pas" "$fai" "$ski" "$ter" "$cer" \
+        "$(python3 -c "print($t1 - $t0)")" "$rc" "$out$note" | tee -a "$TARGET_SUMMARY"
+    [[ $rc -eq 0 ]] || TARGET_FAILED=1
+}
+
+if [[ $LIST_TARGETS -eq 1 ]]; then
+    print_header "Targets"
+    printf "%-22s %6s  %s\n" target tests description
+    while IFS='|' read -r m about; do
+        n=$(python3 -m pytest --collect-only -qq -p no:cacheprovider -m "$m" "$HEADLESS_DIR" 2>/dev/null | grep -c "::")
+        printf "%-22s %6s  %s\n" "$m" "$n" "$about"
+    done < <(target_markers)
+    printf "%-22s %6s  %s\n" joins "$(ls RootInteractive/joins/test_*.mjs 2>/dev/null | wc -l) files" "JavaScript tests of the joins prototypes (node --test, TAP)"
+    echo "Run one:   ./run_tests.sh --target node_histograms      (the same tests: pytest $HEADLESS_DIR -m node_histograms)"
+    echo "Test ids:  pytest --collect-only -qq -m <target> $HEADLESS_DIR"
+    return 0
+fi
+
+if [[ ${#TARGETS[@]} -gt 0 ]]; then
+    if [[ " ${TARGETS[*]} " == *" all "* ]]; then
+        FULL_MODE=1                          # --target all: the existing full acceptance path below
+    else
+        print_header "Targets: ${TARGETS[*]}"
+        KNOWN_TARGETS=$(target_markers)
+        TARGET_SUMMARY="$LOG_BASE_DIR/targets_${TIMESTAMP}.txt"
+        TARGET_FAILED=0
+        {
+            echo "commit $(git rev-parse --short HEAD 2>/dev/null) | workers $PARALLEL_WORKERS | $(python3 --version 2>&1) | pytest $(python3 -c 'import pytest; print(pytest.__version__)' 2>/dev/null) | node $(node --version 2>/dev/null) | bokeh $(python3 -c 'import bokeh; print(bokeh.__version__)' 2>/dev/null)"
+            printf "%-22s %8s %6s %6s %7s %8s %11s %7s %4s  %s\n" target selected passed failed skipped test-err collect-err wall_s exit log
+        } | tee "$TARGET_SUMMARY"
+        all0=$(date +%s.%N)
+        for t in "${TARGETS[@]}"; do run_target "$t"; done
+        echo "total wall time: $(python3 -c "print(f'{$(date +%s.%N) - $all0:.1f}')") s" | tee -a "$TARGET_SUMMARY"
+        if [[ ${#TARGETS[@]} -gt 1 && $DRY_RUN -eq 0 ]]; then                  # tests selected by several targets
+            python3 - "$LOG_BASE_DIR" "$TIMESTAMP" <<'OVERPY' | tee -a "$TARGET_SUMMARY"
+import collections, pathlib, sys
+seen = collections.defaultdict(list)
+for f in sorted(pathlib.Path(sys.argv[1]).glob(f"target_*_{sys.argv[2]}/selected_tests.txt")):
+    for t in f.read_text().split():
+        seen[t].append(f.parent.name.split("_" + sys.argv[2])[0][len("target_"):])
+over = {t: ts for t, ts in seen.items() if len(ts) > 1}
+print(f"overlap between targets: {len(over)} test(s)" + "".join(f"\n  {t}: {', '.join(ts)}" for t, ts in sorted(over.items())))
+OVERPY
+        fi
+        if [[ $DRY_RUN -eq 0 ]]; then                                        # the evidence of this invocation
+            (cd "$LOG_BASE_DIR" && zip -qr "targets_${TIMESTAMP}.zip" "targets_${TIMESTAMP}.txt" target_*_"${TIMESTAMP}" \
+                -x '*.npz' -x '*.html' -x '*_document.json')
+            echo "Evidence: $LOG_BASE_DIR/targets_${TIMESTAMP}.zip"
+        fi
+        return $TARGET_FAILED
+    fi
 fi
 
 # =============================================================================
@@ -408,10 +548,13 @@ for t in r.get('tests', []):
             RUN_FAILED=1
         else
             mkdir -p "$joins_dir"
-            node --test "${joins_files[@]}" 2>&1 | tee "$joins_dir/test.log"
+            node --test "${NODE_TAP[@]}" "${joins_files[@]}" 2>&1 | tee "$joins_dir/test.log"
             [[ ${PIPESTATUS[0]} -eq 0 ]] || RUN_FAILED=1
             joins_passed=$(grep -E "^# pass [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
             joins_failed=$(grep -E "^# fail [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
+            if [[ -z "$joins_passed" || -z "$joins_failed" ]]; then
+                print_warning "joins: the test count could not be read from the log (C-3)"; RUN_FAILED=1
+            fi
             TOTAL_PASSED=$((TOTAL_PASSED + ${joins_passed:-0}))
             TOTAL_FAILED=$((TOTAL_FAILED + ${joins_failed:-0}))
             echo "  Results: ${joins_passed:-0} passed, ${joins_failed:-0} failed"

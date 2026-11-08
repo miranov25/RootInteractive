@@ -119,11 +119,18 @@ def _histogram_family_run(node_session, tpl, frames):
     return pages, t_sub, t["node_s"]
 
 
-SIZES = [pytest.param("fast", id="fast"), pytest.param("full", id="full", marks=pytest.mark.slow)]
+# targets (4.2c-2c): the sample size belongs to node_histograms / node_filters, the full size to the *_full targets;
+# `slow` remains only for the run without --target (today's default suite leaves the full sizes out)
+HIST_SIZES = [pytest.param("fast", id="fast", marks=pytest.mark.node_histograms),
+              pytest.param("full", id="full", marks=[pytest.mark.slow, pytest.mark.node_histograms_full])]
+B1_SIZES = [pytest.param("fast", id="fast", marks=pytest.mark.node_filters),
+            pytest.param("full", id="full", marks=[pytest.mark.slow, pytest.mark.node_filters_full])]
 
 
-@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("size", HIST_SIZES)
 @pytest.mark.parametrize("config", CONFIGS, ids=[c[0] for c in CONFIGS])
+@pytest.mark.feature("HIST.histogram_1d")
+@pytest.mark.feature("HIST.histogram_nd")
 def test_histogram_family(config, size, node_session, headless_out):
     """One test per configuration and size (parallel workers run them side by side). The fast default suite judges
     every named case and 300 generated tables per configuration; the full suite (marker `slow`, the existing RootInteractive marker) 3 400."""
@@ -178,6 +185,7 @@ def test_histogram_family(config, size, node_session, headless_out):
 
 
 # ------------------------------------------------------------------- controls: the reviewers' counterexamples
+@pytest.mark.node_histograms
 def test_rule_check_catches_a_row_missing_from_page_and_oracle():
     """GPT23: oracle and page both missing a healthy row must fail the rule (the oracle shares the error)."""
     df = pd.DataFrame({"x": [0.33], "y": [0.5], "w": [1.5]})
@@ -191,6 +199,7 @@ def _oracle_pages(df, nb, lo, hi):
             ho.counts([df.x], [nb], [(lo, hi)], weights=df.w)]
 
 
+@pytest.mark.node_histograms
 def test_rule_guards_2d_and_weighted_on_their_own():
     """4.2c-2a approval A-1 (Claude10, GPT23): each must leave an unexplained violation in ITS histogram, while the
     other histograms are healthy — a 2-D row moved to another bin of y (total unchanged), a weight moved to a far
@@ -205,6 +214,7 @@ def test_rule_guards_2d_and_weighted_on_their_own():
         assert v.unexplained and all(u.startswith(which) for u in v.unexplained), (which, v)
 
 
+@pytest.mark.node_histograms
 def test_rule_tolerance_at_an_edge_at_zero():
     """4.2c-2a approval A-2 (Claude10): a range [-1, 1] has an interior edge at 0; values a few 1e-17 below it may land
     on either side, and a healthy page must not be flagged."""
@@ -214,6 +224,7 @@ def test_rule_tolerance_at_an_edge_at_zero():
         assert not v.unexplained, (xv, v)
 
 
+@pytest.mark.node_histograms
 def test_b10_destination_in_2d_moved_or_dropped():
     """GPT22/GPT23/GPT24/Claude10: a B10 value moves to bin 0 of x in the next bin of y, or is dropped when y is in
     its last bin; both are classified, repaired, and leave no unexplained violation."""
@@ -226,6 +237,7 @@ def test_b10_destination_in_2d_moved_or_dropped():
         assert (v.b10_2d_moved, v.b10_2d_dropped, v.b10_1d_dropped) == (moved, dropped, 1) and not v.unexplained, v
 
 
+@pytest.mark.node_histograms
 def test_template_check_sees_swapped_data_sources(headless_out):
     """GPT23/GPT24: two renderers with exchanged data sources must not count as the same document."""
     name, nb, lo, hi = CONFIGS[0]
@@ -253,6 +265,7 @@ def test_template_check_sees_swapped_data_sources(headless_out):
     assert sweep.content(doc) != sweep.content(swapped)
 
 
+@pytest.mark.node_histograms
 def test_short_batch_reply_is_an_error():
     """GPT23/GPT24: fewer results than documents must fail, with the batch's index."""
     class Short:
@@ -264,6 +277,7 @@ def test_short_batch_reply_is_an_error():
         sweep.run_batch(Short(), ["{}", "{}", "{}"], "() => 1")
 
 
+@pytest.mark.node_histograms
 def test_batch_refuses_a_session_with_startup_errors(node_bundle_root, tmp_path):
     """GPT24: the start-up error policy applies to batches too."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
@@ -314,8 +328,10 @@ def _b1_scenario(n, first_has_nan):
 ROWS = {"fast": (1, 2, 3, 31, 32, 33, 63, 64, 65, 200), "full": tuple(range(1, 201))}
 
 
-@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("size", B1_SIZES)
 @pytest.mark.parametrize("first_has_nan", [False, True], ids=["first_filter_finite", "first_filter_with_nan"])
+@pytest.mark.feature("FILTER.range")
+@pytest.mark.feature("FILTER.intersection")
 def test_b1_row_count_sweep(first_has_nan, size, node_session, headless_out):
     out = headless_out / "b1_sweep"
     bad, with_b1, without, skipped, trigger = [], [], [], [], []
@@ -380,9 +396,12 @@ def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
     return replace(base, expect=tuple(expect))
 
 
-@pytest.mark.parametrize("k", [pytest.param(2, id="2_filters"), pytest.param(3, id="3_filters"),
-                               pytest.param(4, id="4_filters", marks=pytest.mark.slow),
-                               pytest.param(5, id="5_filters", marks=pytest.mark.slow)])
+@pytest.mark.parametrize("k", [pytest.param(2, id="2_filters", marks=pytest.mark.node_filters),
+                               pytest.param(3, id="3_filters", marks=pytest.mark.node_filters),
+                               pytest.param(4, id="4_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full]),
+                               pytest.param(5, id="5_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full])])
+@pytest.mark.feature("FILTER.range")
+@pytest.mark.feature("FILTER.intersection")
 def test_filters_every_move_order(k, node_session, headless_out):
     import itertools
     out, bad, counts = headless_out / "filter_orders", [], {"with_b1": 0, "without_b1": 0}
@@ -399,6 +418,9 @@ def test_filters_every_move_order(k, node_session, headless_out):
     assert not bad, f"{len(bad)} move orders not as the refined rule predicts: {bad[:3]}"
 
 
+@pytest.mark.node_filters
+@pytest.mark.feature("FILTER.range")
+@pytest.mark.feature("FILTER.intersection")
 def test_b1_twenty_thousand_rows_boundary(node_session, headless_out):
     """Claude3's pair: first filter without missing values — 20 000 rows (a multiple of 32): no B1; 20 001: B1."""
     out = headless_out / "filter_orders"
@@ -410,6 +432,7 @@ def test_b1_twenty_thousand_rows_boundary(node_session, headless_out):
     assert results == {20_000: (False, True), 20_001: (True, True)}, results
 
 
+@pytest.mark.node_histograms
 @pytest.mark.parametrize("config", CONFIGS, ids=[c[0] for c in CONFIGS])
 def test_models_only_document_computes_what_the_full_page_computes(config, node_session, tmp_path):
     """Review of 4.2c-2b (Claude10, GPT23, GPT24): the family reads documents holding only the histogram models; the

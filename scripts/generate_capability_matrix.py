@@ -721,6 +721,7 @@ Examples:
         nargs="*",
         default=[
             "RootInteractive/InteractiveDrawing/bokeh/test_*.py",
+            "RootInteractive/InteractiveDrawing/bokeh/headless/test_*.py",   # PHASE_4 headless tests (4.2c-2c)
             "RootInteractive/Tools/test_*.py",
             "RootInteractive/onnx/test_*.py"
         ],

@@ -7,7 +7,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine import data
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import TableSpec
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import filters, histograms
 
-pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python")]
+pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python"), pytest.mark.headless_unit]   # target (4.2c-2c)
 
 
 def test_rb2_bin_formula_is_rootinteractive_not_numpy():

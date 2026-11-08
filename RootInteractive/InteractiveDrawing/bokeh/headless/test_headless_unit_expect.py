@@ -10,7 +10,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import filters
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     LOAD_CHECK, Labels, Page, Scenario, ScenarioError, TableSpec, Tables, auto, hist, load, range_, set_)
 
-pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python")]
+pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python"), pytest.mark.headless_unit]   # target (4.2c-2c)
 A = lambda *v: np.array(v, dtype=np.float64)
 
 

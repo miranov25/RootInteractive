@@ -11,11 +11,14 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.assertions import 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import histograms, known_defects
 
-pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration"), pytest.mark.node_scenarios]   # target (4.2c-2c)
 SCENARIOS = tuple(histograms.SCENARIOS) + tuple(known_defects.SCENARIOS)
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
+@pytest.mark.feature("HIST.histogram_1d")
+@pytest.mark.feature("HIST.histogram_nd")
+@pytest.mark.feature("FILTER.intersection")
 def test_scenario_in_node(scenario, node_session, headless_out):
     res = run(node_session, scenario, headless_out, test_ref=__file__)
     assert_as_declared(scenario, res)

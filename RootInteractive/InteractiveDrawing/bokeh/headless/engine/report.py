@@ -101,7 +101,8 @@ class ScenarioResult:
         out = Path(self.outdir)
         data = {**asdict(self), "features": self.features()}
         target, k = out / "report.json", 0
-        while target.exists() and _block(json.loads(target.read_text())) != _block(data):
+        # a report left by an EARLIER session (re-used output folder) is stale: overwritten, never kept (4.2c-2c, C-2)
+        while target.exists() and not _stale(target) and _block(json.loads(target.read_text())) != _block(data):
             k += 1
             target = out / f"report.{k}.json"
         target.write_text(json.dumps(data, indent=1, default=str))
@@ -115,30 +116,46 @@ def _block(r: dict) -> tuple:
     return tuple(block)
 
 
-def _reports(folder):
-    return sorted(Path(folder).rglob("report*.json"))
+def session_start() -> float:
+    """The start of the current headless pytest session (set by the headless conftest for the main process and
+    inherited by its workers); 0 outside a session, so every report counts."""
+    import os
+    return float(os.environ.get("RI_HEADLESS_SESSION_START", "0"))
 
 
-def outcomes(folder) -> list:
+def _stale(path: Path) -> bool:
+    return path.stat().st_mtime < session_start()
+
+
+def _reports(folder, since: float = 0.0):
+    """report*.json below `folder`; with `since`, only those written at or after it (the current session — a re-used
+    output folder may hold reports of earlier sessions, which must not enter this session's list; 4.2c-2c, C-2)."""
+    return sorted(f for f in Path(folder).rglob("report*.json") if f.stat().st_mtime >= since)
+
+
+def outcomes(folder, since: float = 0.0) -> list:
     """Normalised outcome lines of every report.json below `folder`, sorted. Identical reports of the same scenario
     count once (stage 4.2c-2b): with parallel workers a scenario run by several tests (e.g. a healthy control) lands
     in several workers' folders, and the list must not depend on how tests were spread over workers. Repeated runs
     of a scenario that DIFFER all stay in the list."""
-    blocks = {_block(json.loads(f.read_text())) for f in _reports(folder)}
+    blocks = {_block(json.loads(f.read_text())) for f in _reports(folder, since)}
     return sorted(line for block in blocks for line in block)
 
 
-def required(folder, manifest, full: bool = False) -> list:
+def required(folder, manifest, full: bool = False, since: float = 0.0, target: str = "") -> list:
     """Scenario ids listed in `manifest` (one per line, # comments) that have no report below `folder` — an empty list
     means every required scenario ran (stage 4.2c-2b; the required-case manifest of proposal v0.3 item I)."""
-    present = {json.loads(f.read_text())["id"] for f in _reports(folder)}
+    present = {json.loads(f.read_text())["id"] for f in _reports(folder, since)}
     wanted, section = [], "fast"
     for line in Path(manifest).read_text().splitlines():
         line = line.strip()
         if line.startswith("[") and line.endswith("]"):
             section = line[1:-1]                     # [fast]: every run; [full]: only runs of the full suite
-        elif line and not line.startswith("#") and (section == "fast" or full):
-            wanted.append(line)
+        elif line and not line.startswith("#"):
+            # a run of one target (run_tests.sh --target, 4.2c-2c) checks only that target's section;
+            # a whole-folder run checks [fast], and [full] when slow tests were not deselected
+            if (section == target) if target else (section == "fast" or (section == "full" and full)):
+                wanted.append(line)
     return [w for w in wanted if w not in present]
 
 

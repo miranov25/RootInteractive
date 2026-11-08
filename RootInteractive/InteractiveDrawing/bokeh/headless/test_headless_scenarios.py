@@ -11,11 +11,18 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.assertions import 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import histograms, known_defects
 
-pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("browser"), pytest.mark.layer("integration"), pytest.mark.browser_scenarios]   # target (4.2c-2c)
 SCENARIOS = histograms.SCENARIOS + known_defects.SCENARIOS
 
 
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
+SMOKE_ID = "histograms/plain_1d_2d_one_range_two_moves"            # also in target browser_smoke (4.2c-2c)
+
+
+@pytest.mark.parametrize("scenario", [pytest.param(s, id=s.id, marks=[pytest.mark.browser_smoke] if s.id == SMOKE_ID else [])
+                                      for s in SCENARIOS])
+@pytest.mark.feature("HIST.histogram_1d")
+@pytest.mark.feature("HIST.histogram_nd")
+@pytest.mark.feature("FILTER.intersection")
 def test_scenario(scenario, headless_session, headless_out):
     result = run(headless_session, scenario, headless_out, test_ref=__file__)
     print(result.text())

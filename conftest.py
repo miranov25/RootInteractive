@@ -121,3 +121,51 @@ def pytest_configure(config):
         "markers",
         "unittest: Unit test marker (legacy)"
     )
+
+    # -------------------------------------------------------------------------
+    # Target markers (PHASE_4 stage 4.2c-2c): ./run_tests.sh --target <name> == pytest <headless folder> -m <name>
+    # -------------------------------------------------------------------------
+    config.addinivalue_line(
+        "markers",
+        "headless_unit: target: Python-only headless tests: oracles, comparison, expectations, packaging, session end, targets"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_harness: target: the Node model harness and its fault controls"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_scenarios: target: every computing scenario of 4.2a/4.2b in Node alone (B1, B2, B8 by their exact descriptions)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_histograms: target: histogram families at sample size, rule and B10 controls, template, batch and reduced-document checks"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_histograms_full: target: histogram families at full size (3 x 3 400 generated tables)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_filters: target: B1 row-count sweep at sample row counts, 2 and 3 filters in every move order, 20 000 / 20 001 rows"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_filters_full: target: B1 row-count sweep 1-200 rows, 4 and 5 filters in every move order"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_scenarios: target: every scenario in Chromium"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_parity: target: browser = Node parity for every scenario, and the parity controls"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_harness: target: the browser engine's harness and fault controls"
+    )

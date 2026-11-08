@@ -19,7 +19,7 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     Labels, Page, Scenario, TableSpec, Tables, auto, hist, load, range_, set_)
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import histograms, known_defects
 
-pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration")]
+pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration"), pytest.mark.browser_parity]   # target (4.2c-2c)
 SCENARIOS = tuple(histograms.SCENARIOS) + tuple(known_defects.SCENARIOS)
 
 
@@ -43,7 +43,14 @@ def parity_problems(browser, node) -> list:
     return out
 
 
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
+SMOKE_ID = "histograms/plain_1d_2d_one_range_two_moves"            # also in target browser_smoke (4.2c-2c)
+
+
+@pytest.mark.parametrize("scenario", [pytest.param(s, id=s.id, marks=[pytest.mark.browser_smoke] if s.id == SMOKE_ID else [])
+                                      for s in SCENARIOS])
+@pytest.mark.feature("HIST.histogram_1d")
+@pytest.mark.feature("HIST.histogram_nd")
+@pytest.mark.feature("FILTER.intersection")
 def test_node_equals_browser(scenario, headless_session, node_session, headless_out):
     out = headless_out / "parity"
     browser = run(headless_session, scenario, out, test_ref=__file__)

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python")]
+pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python"), pytest.mark.headless_unit]   # target (4.2c-2c)
 
 HEADLESS = Path(__file__).resolve().parent
 REPO = HEADLESS.parents[3]

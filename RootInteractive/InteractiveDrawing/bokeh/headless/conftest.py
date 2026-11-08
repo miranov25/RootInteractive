@@ -98,10 +98,7 @@ def node_session(node_bundle_root):
 # mass cases (the family tests mark their large variants `slow`) and runs the browser only on its smoke set: ONE page,
 # so the browser compiles ONE set of models. Every other browser test is marked `slow` here; the full suite
 # (`run_tests.sh --full`, and CI at GSI on every pull request) runs everything.
-BROWSER_SMOKE = (
-    "test_headless_scenarios.py::test_scenario[histograms/plain_1d_2d_one_range_two_moves]",
-    "test_headless_parity.py::test_node_equals_browser[histograms/plain_1d_2d_one_range_two_moves]",
-)
+# The smoke set is the tests marked browser_smoke (a target marker, registered in pytest.ini).
 
 
 def pytest_collection_modifyitems(config, items):
@@ -109,12 +106,8 @@ def pytest_collection_modifyitems(config, items):
         if HERE not in Path(str(item.fspath)).resolve().parents:
             continue                                       # only the tests of this folder
         names = getattr(item, "fixturenames", ())
-        if "headless_session" in names and not item.nodeid.endswith(BROWSER_SMOKE):
+        if "headless_session" in names and not item.get_closest_marker("browser_smoke"):
             item.add_marker(pytest.mark.slow)
-        if "node_session" in names or "node_bundle_root" in names:
-            item.add_marker(pytest.mark.node_backend)          # select with -m node_backend (4.2c-2b v0.2)
-        if "headless_session" in names:
-            item.add_marker(pytest.mark.browser_backend)       # parity tests carry both markers
 
 
 
@@ -132,8 +125,9 @@ _TIMES = {}
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "node_backend: runs the Node model harness (set by the headless conftest)")
-    config.addinivalue_line("markers", "browser_backend: runs Chromium (set by the headless conftest)")
+    # target markers are registered in pytest.ini and the root conftest.py (4.2c-2c), like every other marker
+    # the session's start, inherited by xdist workers (started after this hook); reports older than it are stale
+    os.environ.setdefault("RI_HEADLESS_SESSION_START", repr(time.time()))
 
 
 def _out_root() -> Path:
@@ -145,7 +139,7 @@ def _session_timing(what: str, seconds: float, **extra) -> None:
     folder = _out_root() / worker
     folder.mkdir(parents=True, exist_ok=True)
     with open(folder / "session_timing.jsonl", "a") as fh:
-        fh.write(json.dumps({"worker": worker, "what": what, "seconds": round(seconds, 3), **extra}) + "\n")
+        fh.write(json.dumps({"worker": worker, "what": what, "seconds": round(seconds, 3), "at": time.time(), **extra}) + "\n")
 
 
 def pytest_runtest_logreport(report):
@@ -173,7 +167,7 @@ def _timing_summary(out: Path, times: list) -> str:
     total = sum(t["duration"] for t in times)
     workers = sorted({t["worker"] for t in times})
     lines.append(f"tests: {len(times)}; workers: {len(workers)}; wall time (first test start to last test end): "
-                 f"{wall:.1f} s; sum of test times: {total:.1f} s; speed-up sum/wall: {total / wall:.2f}")
+                 f"{wall:.1f} s; sum of test times: {total:.1f} s; occupancy (sum / wall, average busy workers): {total / wall:.2f}")
     lines.append("busy time per worker (s, tests): " + ", ".join(
         f"{w} {sum(t['duration'] for t in times if t['worker'] == w):.1f} ({sum(t['worker'] == w for t in times)})"
         for w in workers))
@@ -184,10 +178,13 @@ def _timing_summary(out: Path, times: list) -> str:
     for f in sorted(out.glob("*/session_timing.jsonl")):
         for line in f.read_text().splitlines():
             r = json.loads(line)
+            if r.get("at", 0) < float(os.environ.get("RI_HEADLESS_SESSION_START", "0")):
+                continue                                   # an earlier session's entry (re-used output folder)
             lines.append(f"  {r['worker']:5s} {r['what']}: {r['seconds']:.2f}" + (f" (model bundle {r['bundle']})" if "bundle" in r else ""))
     lines.append("browser page builds per worker (count, sum s, builds over 3 s = new model set compiled):")
     builds = {}
-    for f in out.rglob("report*.json"):
+    from .engine.report import _reports, session_start
+    for f in _reports(out, session_start()):
         try:
             r = json.loads(f.read_text())
         except ValueError:
@@ -215,14 +212,15 @@ def pytest_sessionfinish(session, exitstatus):
     except Exception as exc:                               # timings are evidence: their failure fails the run
         problems.append(f"timing summary failed: {exc!r}")
     try:
-        lines = report.outcomes(out)
+        lines = report.outcomes(out, since=report.session_start())
         (out / "outcomes.txt").write_text("\n".join(lines) + "\n")
     except Exception as exc:
         problems.append(f"outcome list failed: {exc!r}")
     if os.environ.get("RI_HEADLESS_CHECK_REQUIRED") == "1":
         full = "not slow" not in (session.config.getoption("markexpr") or "")
         try:
-            missing = report.required(out, HERE / "required_scenarios.txt", full=full)
+            missing = report.required(out, HERE / "required_scenarios.txt", full=full, since=report.session_start(),
+                                      target=os.environ.get("RI_HEADLESS_TARGET", ""))
         except Exception as exc:
             missing = [f"(check failed: {exc!r})"]
         if missing:
