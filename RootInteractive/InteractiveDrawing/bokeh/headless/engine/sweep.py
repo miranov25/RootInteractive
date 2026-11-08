@@ -6,11 +6,14 @@ Bokeh's serializer — and Node builds a FRESH document from it (batch_docs). No
 
 Measured (2026-11-08, coder): exact only for pages WITHOUT widgets — a range widget's start, end, step and value are
 computed from the data at build time, so pages with widgets (filter families, load-time behaviour) are document cases
-built by the Python builder per case. `content()` compares two documents model by model with ids and definition order
-ignored, and the toolbar's tools as a set (Bokeh merges them in no fixed order, also between two fresh builds of the
-same data); `equivalent()` is the gate that a substituted document equals a fresh build for the same data.
+built by the Python builder per case. `content()` compares two documents as model graphs with ids and definition order
+ignored, the toolbar's tools as a set (Bokeh merges them in no fixed order, also between two fresh builds), and which
+model each reference points to kept; `equivalent()` is the gate that a substituted document equals a fresh build.
+The toolbar's and the tool proxies' tool lists are compared as sets: Bokeh merges the tools of several plots in no
+fixed order, also between two fresh builds of the same data (measured: 1-5 of 12 builds differ otherwise).
 """
 import copy
+import hashlib
 import json
 import time
 from collections import Counter
@@ -35,10 +38,16 @@ def _cds_nodes(o, out: list) -> list:
     return out
 
 
-def content(doc: dict) -> Counter:
-    """Every model definition with nested definitions and references reduced to the referenced model's type: two
-    documents are equal for Bokeh if these multisets are equal (ids and definition order do not matter)."""
-    defs = {}
+UNORDERED = (("Toolbar", "tools"), ("ToolProxy", "tools"))     # lists Bokeh fills in no fixed order (UI tools only)
+
+
+def content(doc: dict, rounds: int = 8, unordered=UNORDERED) -> Counter:
+    """The documents' model graph as a multiset of labels that ignore generated ids, definition order and the
+    toolbar's and tool proxies' tool order, but keep WHICH model each reference points to (4.2c-2a review, GPT23/GPT24: references
+    reduced to their type could not see two plots with swapped data sources). Each model starts from its type and
+    attributes with references blanked; in each round its label absorbs the labels of the models it references, at
+    their attribute positions (the toolbar's tools as a set). Two documents are equal for Bokeh if the multisets are."""
+    defs, neigh = {}, {}
 
     def collect(o):
         if isinstance(o, dict):
@@ -51,21 +60,31 @@ def content(doc: dict) -> Counter:
                 collect(v)
     collect(doc)
 
-    def flat(o):
+    def blank(o, path, refs, unordered):
         if isinstance(o, dict):
             if "id" in o and (o.get("type") == "object" or set(o) == {"id"}):
-                return "REF:" + defs.get(o["id"], {}).get("name", "?")
-            return {k: flat(v) for k, v in o.items()}
+                refs.append(("*" + path if unordered else path, o["id"]))
+                return "@"
+            return {k: blank(v, f"{path}/{k}", refs, unordered) for k, v in o.items()}
         if isinstance(o, list):
-            return [flat(v) for v in o]
+            return [blank(v, path if unordered else f"{path}[{i}]", refs, unordered) for i, v in enumerate(o)]
         return o
-    out = Counter()
-    for d in defs.values():
-        attrs = flat(d["attributes"])
-        if d.get("name") == "Toolbar" and isinstance(attrs.get("tools"), list):
-            attrs["tools"] = sorted(attrs["tools"])          # Bokeh merges toolbar tools in no fixed order (UI only)
-        out[d.get("name", "") + json.dumps(attrs, sort_keys=True)] += 1
-    return out
+
+    label = {}
+    for mid, d in defs.items():
+        refs, attrs = [], {}
+        for k, v in d["attributes"].items():
+            attrs[k] = blank(v, k, refs, (d.get("name"), k) in unordered)
+        neigh[mid] = refs
+        label[mid] = d.get("name", "") + json.dumps(attrs, sort_keys=True)
+    for _ in range(rounds):
+        new = {}
+        for mid in defs:
+            ordered = [(p, label.get(r, "?")) for p, r in neigh[mid] if not p.startswith("*")]
+            as_set = sorted((p, label.get(r, "?")) for p, r in neigh[mid] if p.startswith("*"))
+            new[mid] = hashlib.sha256(json.dumps([label[mid], ordered, as_set]).encode()).hexdigest()
+        label = new
+    return Counter(label.values())
 
 
 class Template:
@@ -106,19 +125,29 @@ class Template:
 
 
 def run_batch(session, docs: Sequence[str], code: str, chunk: int = 200) -> Tuple[List, Dict[str, float]]:
-    """Run `code` on a fresh document for each JSON text in `docs`; returns the decoded results and timings."""
+    """Run `code` on a fresh document for each JSON text in `docs`; returns the decoded results and timings.
+    Refuses a session that had errors while starting (the start-up policy, as for single documents), and requires
+    exactly one result per document, per chunk and in total (4.2c-2a review: a short reply was silently accepted)."""
     from .node_session import decode
+    if getattr(session, "startup_page_errors", None) or getattr(session, "startup_console_errors", None):
+        raise RuntimeError(f"errors at harness start-up: {session.startup_page_errors} {session.startup_console_errors}")
     out, t0 = [], time.perf_counter()
     for i in range(0, len(docs), chunk):
-        r = session.request("batch_docs", docs=list(docs[i:i + chunk]), code=code, timeout_s=600)
+        part = list(docs[i:i + chunk])
+        r = session.request("batch_docs", docs=part, code=code, timeout_s=600)
         if not r.get("ok"):
             raise RuntimeError(r.get("error"))
         if r.get("page_errors") or r.get("console_errors"):
             raise RuntimeError(f"errors during the batch: {r.get('page_errors')} {r.get('console_errors')}")
+        if len(r["result"]) != len(part):
+            raise RuntimeError(f"batch starting at document {i}: {len(part)} documents sent, "
+                               f"{len(r['result'])} results returned")
         for item in r["result"]:
             if item["isolation"]["not_removed"]:
                 raise RuntimeError(f"isolation: non-removable globals {item['isolation']['not_removed']}")
             out.append(decode(item["result"]))
+    if len(out) != len(docs):
+        raise RuntimeError(f"{len(docs)} documents, {len(out)} results")
     return out, {"node_s": time.perf_counter() - t0, "cases": len(docs)}
 
 

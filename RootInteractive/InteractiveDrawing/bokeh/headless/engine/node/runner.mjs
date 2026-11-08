@@ -61,6 +61,10 @@ const html = `<!DOCTYPE html><html><head></head><body>${scripts.join("\n")}</bod
 let dom, w, Document, baseline;
 
 function makeWindow() {
+  // retire the old window completely first: its timers cleared and its channels CLOSED, so nothing it queued can
+  // reach a later request (4.2c-2a review, GPT23: errors from a retired window reached the next reply)
+  for (const clear of pendingTimers.values()) { try { clear(); } catch (e) { /* gone */ } }
+  for (const ch of channels) { try { ch.port1.close(); ch.port2.close(); } catch (e) { /* closed */ } }
   if (dom) { try { dom.window.close(); } catch (e) { /* already closed */ } }
   pendingTimers.clear(); channels.clear(); trackChannels = false;
   dom = new JSDOM(html, {

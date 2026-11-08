@@ -15,6 +15,8 @@ RB-2.4  Values outside [min, max] are not counted (1-D: getbin returns -1 / nbin
 RB-2.5  Non-finite values are not counted. N-D: verified in code (337, `!isFinite(val)`).
         1-D: intended rule; known defect B8 (NaN is counted in bin 0).
 """
+import itertools
+
 import numpy as np
 
 
@@ -80,3 +82,55 @@ def counts(columns, nbins, ranges, mask=None, weights=None) -> np.ndarray:
         keep &= np.asarray(mask, dtype=bool)
     w = None if weights is None else np.asarray(weights, dtype=np.float64)[keep]
     return np.bincount(idx[keep], weights=w, minlength=length).astype(np.float64)
+
+
+# ----------------------------------------------------------------------------- the rule as a statement (4.2c-2a v0.2)
+def rule_bounds(columns, nbins, ranges, weights=None, ulps: int = 4):
+    """RB-2 as a rule, independent of RootInteractive's arithmetic (4.2c-2a review, Claude10's per-cell rule): a
+    finite row inside [lo, hi] on every axis is counted once, in a cell whose bin on each axis contains it — the top
+    edge belongs to the last bin; a value within `ulps` rounding steps of an INTERIOR edge may go to either
+    neighbouring bin (which one is arithmetic, not rule). Returns (lower, upper, total): per cell the weight that
+    must be there and the weight that may be there, and the total weight that must be counted."""
+    n = len(columns[0])
+    w = np.ones(n) if weights is None else np.asarray(weights, dtype=np.float64)
+    inside = np.ones(n, dtype=bool)
+    kmin, kmax = [], []
+    for col, nb, (lo, hi) in zip(columns, nbins, ranges):
+        v = np.asarray(col, dtype=np.float64)
+        with np.errstate(invalid="ignore"):
+            inside &= np.isfinite(v) & (v >= lo) & (v <= hi)
+        edges = lo + (hi - lo) * np.arange(nb + 1) / nb
+        edges[-1] = hi
+        interior = edges[1:-1]
+        tol = ulps * np.spacing(np.abs(interior))
+        vv = np.where(np.isfinite(v), v, lo)[:, None]
+        kmin.append((vv > interior + tol).sum(axis=1))
+        kmax.append((vv >= interior - tol).sum(axis=1))
+    size = int(np.prod(nbins))
+    lower, upper = np.zeros(size), np.zeros(size)
+    strides = np.cumprod([1] + list(nbins[:-1]))
+    certain = inside.copy()
+    for a, b in zip(kmin, kmax):
+        certain &= a == b
+    flat_min = sum(k * st for k, st in zip(kmin, strides))
+    np.add.at(lower, flat_min[certain], w[certain])
+    # a row may be in every cell kmin + c with c in {0, 1} per axis and c <= kmax - kmin: distinct cells by construction
+    for choice in itertools.product((0, 1), repeat=len(nbins)):
+        ok = inside.copy()
+        for a, b, c in zip(kmin, kmax, choice):
+            ok &= (a + c) <= b
+        flat = sum((a + c) * st for a, c, st in zip(kmin, choice, strides))
+        np.add.at(upper, flat[ok], w[ok])
+    return lower, upper, float(w[inside].sum())
+
+
+def rule_violations(page, lower, upper, total, rel: float = 1e-12, abs_: float = 1e-9) -> list:
+    """Cells where the page is outside [lower, upper], and the total if it differs (tolerances for weights)."""
+    page = np.asarray(page, dtype=np.float64)
+    tol = abs_ + rel * np.maximum(np.abs(upper), 1.0)
+    bad = [f"cell {i}: {page[i]:g} not in [{lower[i]:g}, {upper[i]:g}]"
+           for i in np.nonzero((page < lower - tol) | (page > upper + tol))[0]]
+    if abs(page.sum() - total) > abs_ + rel * max(abs(total), 1.0):
+        bad.append(f"total {page.sum():g} != {total:g} values in range")
+    return bad
+

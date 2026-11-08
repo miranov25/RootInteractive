@@ -229,3 +229,53 @@ def test_late_update_is_caught_by_the_audit(node_session, headless_out):
     r = run(node_session, sc, headless_out / "controls", test_ref=__file__)
     aud = [o for o in r.outcomes if o.check.startswith("audit")]
     assert aud and aud[0].outcome == "ERROR" and not r.ok, r.text()
+
+
+# ---------------------------------------------------------------------------------------------- F: 4.2c-2a v0.2
+def test_fresh_window_retires_the_old_windows_message_loop(node_bundle_root):
+    """GPT23: a message loop started in a window must not reach a request after new_window."""
+    s = NodeSession(node_bundle_root, fresh_window=True)
+    try:
+        s.request("eval", code="""() => { const ch = new MessageChannel(); const t0 = performance.now();
+            ch.port1.onmessage = () => { if (performance.now() - t0 < 300) ch.port2.postMessage(0);
+                                         else console.error('from the retired window'); };
+            ch.port2.postMessage(0); return 1; }""")
+        s.request("new_window")
+        r = s.request("sleep", ms=600)
+        assert r["ok"] and not any("retired" in e for e in r["console_errors"]), r
+    finally:
+        s.close()
+
+
+def test_string_timer_callback_runs(node_session, headless_out):
+    """Note A-3: a string callback (setTimeout("code", 0)) runs as in a browser."""
+    sc = _small("harness/node_string_timer", (load(), js_action("setTimeout('window.__s = 7', 0);", until="window.__s === 7")),
+                (js_value("window.__s", 7, steps=(1,)),))
+    assert run(node_session, sc, headless_out / "controls", test_ref=__file__).ok
+
+
+def test_required_run_refuses_another_jsdom(node_bundle_root, monkeypatch):
+    """Note A-4: under RI_HEADLESS_REQUIRED=1 a jsdom other than the pinned version is refused by the session."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import node_session as ns
+    monkeypatch.setenv("RI_HEADLESS_REQUIRED", "1")
+    monkeypatch.setattr(ns, "JSDOM_PIN", "0.0.0")
+    with pytest.raises(ns.NodeUnavailable, match="0.0.0 required"):
+        ns.NodeSession(node_bundle_root)
+
+
+def test_late_model_update_after_a_widget_step_is_not_accepted(node_session, headless_out):
+    """GPT24 (P2-1): through the SETTLE path — the slider's callbacks are made to run 100 ms late, then a widget step;
+    the settle rule sees two equal reads and accepts the stale state, so the check or the audit must catch it.
+    Measured (coder): a delay of a few TIMER ROUNDS is absorbed in Node — every read after the settle is a separate
+    request and Node's event loop runs between requests — so only a delay longer than the request gap can be stale."""
+    sc = _small("harness/node_late_update_settle_path",
+                (load(), js_action("""const s = window.__riH.slider('a');
+                    for (const cbs of Object.values(s.js_property_callbacks || {})) for (const cb of cbs) {
+                      const orig = cb.execute.bind(cb);
+                      cb.execute = (...a) => { setTimeout(() => orig(...a), 100); }; }
+                    window.__patched = Object.keys(s.js_property_callbacks || {}).length;""", until="window.__patched > 0"),
+                 set_("a", [-1, 1])),
+                (auto(), audit(0.3, steps=(2,))), widget=True)
+    r = run(node_session, sc, headless_out / "controls", test_ref=__file__)
+    late = [o for o in r.outcomes if o.step == 2 and o.outcome in ("FAIL", "ERROR")]
+    assert not r.ok and late, r.text()
