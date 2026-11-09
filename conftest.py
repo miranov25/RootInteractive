@@ -152,6 +152,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "node_filters_full: target: B1 row-count sweep 1-200 rows, 4 and 5 filters in every move order"
+    )
+    # node_joins has its own call (R-6: it was glued to the string above)
+    config.addinivalue_line(
+        "markers",
         "node_joins: target: production CDSJoin in Node - joins and recursive joins, oracle and invariant tests (PHASE_4_3)"
     )
     config.addinivalue_line(

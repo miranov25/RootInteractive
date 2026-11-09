@@ -65,3 +65,16 @@ def test_a_misspelled_target_marker_is_a_collection_error(tmp_path):
                         "-c", str(ROOT / "pytest.ini"), "--rootdir", str(ROOT), str(bad)],
                        cwd=ROOT, capture_output=True, text=True, timeout=120)
     assert r.returncode != 0 and "node_histogramz" in (r.stdout + r.stderr), r.stdout + r.stderr
+
+
+def test_every_target_has_its_own_registration_in_both_places():
+    """R-6 (GPT23, GPT25): each target marker is registered in pytest.ini AND by its own call in the root conftest.py;
+    no call holds two adjacent strings (Python would glue them into one marker description)."""
+    import re
+    root = Path(__file__).resolve().parents[4]
+    ini = {m.group(1) for m in re.finditer(r"^\s+([a-z_]+): target:", (root / "pytest.ini").read_text(), re.M)}
+    calls = re.findall(r'addinivalue_line\(\s*"markers",\s*((?:"[^"]*"\s*)+)\)', (root / "conftest.py").read_text())
+    assert all(c.count('"') == 2 for c in calls), [c for c in calls if c.count('"') != 2]
+    conf = {re.match(r'"([a-z_]+): target:', c.strip()).group(1) for c in calls if re.match(r'"[a-z_]+: target:', c.strip())}
+    assert ini and ini == conf, (sorted(ini ^ conf))
+
