@@ -43,7 +43,7 @@ def _collect(tmp_path, folder=HERE):
 def test_every_headless_test_belongs_to_a_target(tmp_path):
     r, names, collected = _collect(tmp_path)
     assert r.returncode == 0 and collected, r.stdout[-2000:] + r.stderr[-2000:]
-    assert len(names) == 11, names                             # the targets registered in pytest.ini
+    assert len(names) == 12, names                             # the targets registered in pytest.ini (node_joins added in PHASE_4_3)
     assert not targets.problems(collected, names), targets.problems(collected, names)
     over = targets.overlaps(collected)                         # only the smoke set is intended to overlap
     assert over and all(m == ["browser_parity", "browser_smoke"] or m == ["browser_scenarios", "browser_smoke"]
