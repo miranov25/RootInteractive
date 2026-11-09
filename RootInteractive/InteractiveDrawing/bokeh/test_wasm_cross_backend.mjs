@@ -109,7 +109,7 @@ for (const tc of testCases) {
     if (mode === "scalar") {
         // Call scalar WASM function per element
         const scalarFunc = ex[func];
-        if (!scalarFunc) { console.log(`  ⚠️  ${label}: function not exported`); continue; }
+        if (!scalarFunc) { console.log(`  ❌ ${label}: function not exported`); failed++; continue; }   // fail closed (order 0)
         result = new Float64Array(length);
         for (let i = 0; i < length; i++) {
             const args = fields.map(f => inputs[f][i]);
@@ -118,7 +118,7 @@ for (const tc of testCases) {
     } else if (mode === "vector") {
         // Call vector WASM function with memory pointers
         const vectorFunc = ex[func_v];
-        if (!vectorFunc) { console.log(`  ⚠️  ${label}: function not exported`); continue; }
+        if (!vectorFunc) { console.log(`  ❌ ${label}: function not exported`); failed++; continue; }   // fail closed (order 0)
 
         // Memory management: reset_heap (WAT) or malloc/free (emscripten)
         if (hasResetHeap) {
@@ -141,6 +141,8 @@ for (const tc of testCases) {
             for (const ptr of ptrs) ex.free(ptr);
             ex.free(outPtr);
         }
+    } else {
+        console.log(`  ❌ ${label}: unknown mode ${mode}`); failed++; continue;   // fail closed (order 0)
     }
 
     // Compare with numpy reference
@@ -167,7 +169,8 @@ if (consistencyMode) {
     console.log("\n--- Scalar vs Vector Consistency ---");
     for (const [func, modes] of Object.entries(results)) {
         if (!modes.scalar || !modes.vector) {
-            console.log(`  ⚠️  ${func}: missing ${modes.scalar ? 'vector' : 'scalar'} result`);
+            console.log(`  ❌ ${func}: missing ${modes.scalar ? 'vector' : 'scalar'} result`);
+            failed++;                                                          // fail closed (order 0)
             continue;
         }
         // Exact match required (same WASM code, same inputs)
@@ -186,4 +189,5 @@ if (consistencyMode) {
 // Summary
 // ============================================================
 console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+if (passed === 0) console.log("No comparison was made.");               // fail closed (order 0)
+process.exit(failed > 0 || passed === 0 ? 1 : 0);
