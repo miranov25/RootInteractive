@@ -774,9 +774,54 @@ def test_c8_cache_invalidation_on_an_already_used_model(node_session, tmp_path, 
 JOINS_DIR = Path(__file__).resolve().parents[3] / "joins"
 N_CLUSTERS = 5000                                      # a subset of the 363 261 clusters keeps the document small
 
+# The fixture is generated, not in git (joins/.gitignore); reviewed decision of the AO2D fixture addendum (GPT24, GPT25):
+# a missing, differently made or damaged fixture is a SETUP failure with the command that regenerates it - never a
+# skip, never an empty stand-in, never a KnownDefect. Its settings are checked before any comparison with production.
+FIXTURE_PATH = JOINS_DIR / "ao2d_fixture.json"
+FIXTURE_SETTINGS = {"generator": "Phase 0.1.F.ext generate_mc_reco()", "seed": 42, "n_events": 1000,
+                    "tracks_per_event": [3, 10], "version": "0.2.0"}
+FIXTURE_REGENERATE = "(cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"
+FIXTURE_FOREIGN_KEYS = {"tracks_event_idx": "tracks", "clusters_track_idx": "clusters", "clusters_event_idx": "clusters"}
+
+
+class FixtureSetupError(RuntimeError):
+    """The AO2D fixture is missing, made with other settings, or damaged. Deliberately NOT an AssertionError, so the
+    strict expected-failure checks (raises=KnownDefect) can never absorb it."""
+
+
+def _load_fixture(path: Path) -> dict:
+    """Load the AO2D fixture and refuse it unless it is the one the J3 tests were written for."""
+    regenerate = f"\nRegenerate it from the repository root with:\n    {FIXTURE_REGENERATE}"
+    if not path.is_file():
+        raise FixtureSetupError(f"{path} is missing (it is generated, not in git).{regenerate}")
+    try:
+        d = json.loads(path.read_text())
+    except ValueError as e:
+        raise FixtureSetupError(f"{path} is not readable JSON (damaged or truncated): {e}{regenerate}") from None
+    meta = d.get("metadata") if isinstance(d, dict) else None
+    if not isinstance(meta, dict):
+        raise FixtureSetupError(f"{path} has no settings record ('metadata').{regenerate}")
+    missing = object()
+    wrong = [f"{k}: expected {v!r}, found {'<missing>' if meta.get(k, missing) is missing else repr(meta[k])}"
+             for k, v in FIXTURE_SETTINGS.items() if meta.get(k, missing) != v]
+    if wrong:
+        raise FixtureSetupError(f"{path} was made with other settings - " + "; ".join(wrong) + regenerate)
+    counts, tables, fks = d.get("row_counts"), d.get("tables"), d.get("dense_fk")
+    if not (isinstance(counts, dict) and isinstance(tables, dict) and isinstance(fks, dict)
+            and all(isinstance(cols, dict) for cols in tables.values())):
+        raise FixtureSetupError(f"{path} lacks 'row_counts', 'tables' or 'dense_fk'.{regenerate}")
+    short = [f"tables.{t} is missing" for t in ("events", "tracks", "clusters") if t not in tables]
+    short += [f"tables.{t}.{c}: {len(v)} rows, row_counts says {counts.get(t)}"
+              for t, cols in tables.items() for c, v in cols.items() if len(v) != counts.get(t)]
+    short += [f"dense_fk.{k}: {len(fks.get(k, []))} rows, row_counts says {counts.get(t)}"
+              for k, t in FIXTURE_FOREIGN_KEYS.items() if len(fks.get(k, [])) != counts.get(t)]
+    if short:
+        raise FixtureSetupError(f"{path} is damaged - " + "; ".join(short) + regenerate)
+    return d
+
 
 def _fixture():
-    return json.loads((JOINS_DIR / "ao2d_fixture.json").read_text())
+    return _load_fixture(FIXTURE_PATH)
 
 
 def _prototype_parent_of(fk, n_parents):
@@ -851,6 +896,89 @@ def test_j3_clusters_left_nested_is_empty(node_session, tmp_path):
              "CTE": dict(left="CT", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
     out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
     assert out["length"] == 0 == Port(t, joins).length("CTE") and out["columns"]["ev_id"] == []
+
+
+# ===================================================================================== the AO2D fixture safeguards
+# Reviewed in the AO2D fixture addendum (GPT24, GPT25): a missing file, other or missing settings, and a damaged file
+# are refused with the regeneration command; a correct fixture is accepted; the refusal is never a KnownDefect.
+def _small_fixture(**meta_changes) -> dict:
+    """A tiny fixture with the pinned settings and consistent lengths (the loader's positive control)."""
+    meta = dict(FIXTURE_SETTINGS, **meta_changes)
+    return {"metadata": {k: v for k, v in meta.items() if v is not _DROP},
+            "tables": {"events": {"event_id": [0, 1], "n_tracks": [1, 2]},
+                       "tracks": {"event_id": [0, 1, 1], "track_id": [0, 1, 2], "pt": [1.0, 1.5, 2.0]},
+                       "clusters": {"event_id": [0, 1], "track_id": [0, 2], "layer": [3, 4]}},
+            "dense_fk": {"tracks_event_idx": [0, 1, 1], "clusters_track_idx": [0, 2], "clusters_event_idx": [0, 1]},
+            "row_counts": {"events": 2, "tracks": 3, "clusters": 2}}
+
+
+_DROP = object()
+
+
+def _write(tmp_path, d) -> Path:
+    p = tmp_path / "ao2d_fixture.json"
+    p.write_text(json.dumps(d))
+    return p
+
+
+def test_fixture_a_correct_fixture_is_accepted(tmp_path):
+    d = _small_fixture()
+    assert _load_fixture(_write(tmp_path, d)) == d
+
+
+def test_fixture_missing_fails_with_the_regeneration_command(tmp_path):
+    with pytest.raises(FixtureSetupError) as e:
+        _load_fixture(tmp_path / "ao2d_fixture.json")
+    assert "is missing" in str(e.value) and str(tmp_path / "ao2d_fixture.json") in str(e.value)
+    assert FIXTURE_REGENERATE in str(e.value)
+
+
+@pytest.mark.parametrize("key,value", [("seed", 43), ("n_events", 999), ("tracks_per_event", [3, 11]),
+                                       ("version", "0.3.0"), ("generator", "another generator")])
+def test_fixture_other_settings_are_refused_with_expected_and_found(tmp_path, key, value):
+    with pytest.raises(FixtureSetupError) as e:
+        _load_fixture(_write(tmp_path, _small_fixture(**{key: value})))
+    assert f"{key}: expected {FIXTURE_SETTINGS[key]!r}, found {value!r}" in str(e.value)
+    assert FIXTURE_REGENERATE in str(e.value)
+
+
+@pytest.mark.parametrize("key", sorted(FIXTURE_SETTINGS))
+def test_fixture_a_missing_setting_is_refused(tmp_path, key):
+    with pytest.raises(FixtureSetupError) as e:
+        _load_fixture(_write(tmp_path, _small_fixture(**{key: _DROP})))
+    assert f"{key}: expected {FIXTURE_SETTINGS[key]!r}, found <missing>" in str(e.value)
+
+
+@pytest.mark.parametrize("damage", ["no_metadata", "truncated_json", "short_column", "short_foreign_key",
+                                    "missing_table"])
+def test_fixture_a_damaged_file_is_refused(tmp_path, damage):
+    d = _small_fixture()
+    if damage == "no_metadata":
+        del d["metadata"]
+    elif damage == "short_column":
+        d["tables"]["tracks"]["pt"].pop()
+    elif damage == "short_foreign_key":
+        d["dense_fk"]["clusters_track_idx"].pop()
+    elif damage == "missing_table":
+        del d["tables"]["clusters"]
+    p = _write(tmp_path, d)
+    if damage == "truncated_json":
+        p.write_text(p.read_text()[:-20])
+    with pytest.raises(FixtureSetupError) as e:
+        _load_fixture(p)
+    assert FIXTURE_REGENERATE in str(e.value)
+
+
+def test_fixture_the_refusal_is_never_a_known_defect():
+    """The strict expected-failure checks accept only KnownDefect (an AssertionError); a setup error must stay red."""
+    assert not issubclass(FixtureSetupError, AssertionError) and not issubclass(FixtureSetupError, KnownDefect)
+    assert STRICT == {"strict": True, "raises": KnownDefect}
+
+
+def test_fixture_the_repository_fixture_has_the_pinned_settings():
+    """The real fixture, checked without Node: present, made with the pinned settings, not damaged."""
+    d = _fixture()
+    assert d["row_counts"]["tracks"] == len(d["dense_fk"]["tracks_event_idx"]) > 0
 
 
 # ===================================================================================== the checks can fail

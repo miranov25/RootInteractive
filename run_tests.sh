@@ -345,7 +345,8 @@ run_target() {
     t0=$(date +%s.%N)
     if [[ "$name" == "joins" && ! -e "${files[0]}" ]]; then
         echo "no joins test files (RootInteractive/joins/test_*.mjs)" > "$out/test.log"; rc=1
-    elif [[ "$name" == "joins" && ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+    elif [[ ( "$name" == "joins" || "$marker" == "node_joins" ) && ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+        # both read the generated AO2D fixture; node_joins too since PHASE_4_4 W0 (AO2D fixture addendum, GPT24/GPT25)
         { echo "RootInteractive/joins/ao2d_fixture.json is missing (generated, not in git); create it with:"
           echo "    (cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"; } | tee "$out/test.log"
         rc=1; note="  FIXTURE MISSING"
@@ -357,7 +358,7 @@ run_target() {
         counts=$(tap_counts "$out/test.log") || { counts="0 0 0 0 0 0"; note="${note:-  COUNT UNREADABLE OR NO TESTS}"; rc=1; }
     else
         if ! counts=$(json_counts "$out/report.json" "$out/selected_tests.txt" 2>> "$out/test.log"); then
-            counts="0 0 0 0 0 0"; note="  REPORT UNREADABLE"; [[ $rc -eq 0 ]] && rc=1
+            counts="0 0 0 0 0 0"; note="${note:-  REPORT UNREADABLE}"; [[ $rc -eq 0 ]] && rc=1   # keeps FIXTURE MISSING
         fi
         [[ $rc -eq 5 ]] && note="  EMPTY SELECTION"
         # the capability matrix of this target, in its own folder (4.2c-2d; never the canonical matrix)

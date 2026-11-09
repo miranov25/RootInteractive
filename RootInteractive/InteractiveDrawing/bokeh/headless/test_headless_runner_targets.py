@@ -149,6 +149,33 @@ def test_a_joins_run_with_zero_tests_fails(checkout, tmp_path_factory):
     assert r.returncode != 0 and "NO TESTS" in r.stdout, r.stdout + r.stderr
 
 
+def test_a_node_joins_run_without_the_ao2d_fixture_fails_before_any_test(checkout):
+    """PHASE_4_4 W0 (AO2D fixture addendum, GPT24/GPT25): --target node_joins checks for the generated fixture first,
+    like the joins target - non-zero exit, FIXTURE MISSING, the regeneration command in the log, no test started.
+    Control: with the fixture present, the same target runs its test and passes."""
+    ini = checkout / "pytest.ini"
+    ini.write_text(ini.read_text() + "    node_joins: target: a demo of the join tests\n")
+    (checkout / HEADLESS / "test_demo_joins.py").write_text(textwrap.dedent("""\
+        import os, pytest
+
+        @pytest.mark.node_joins
+        def test_writes_sentinel():
+            open(os.environ["SENTINEL"], "w").write("ran")
+        """))
+    sentinel = checkout / "sentinel"
+    r = _run(checkout, "--target", "node_joins", SENTINEL=str(sentinel))
+    line = [l for l in r.stdout.splitlines() if l.startswith("node_joins ")]
+    assert r.returncode != 0 and line and line[0].endswith("FIXTURE MISSING"), r.stdout + r.stderr
+    log = next((checkout / "test_logs").glob("target_node_joins_*/test.log")).read_text()
+    assert "ao2d_fixture.json is missing" in log and "python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json" in log
+    assert not sentinel.exists(), "a test started although the fixture was missing"
+
+    (checkout / "RootInteractive/joins").mkdir(parents=True, exist_ok=True)
+    (checkout / "RootInteractive/joins/ao2d_fixture.json").write_text("{}")
+    r = _run(checkout, "--target", "node_joins", SENTINEL=str(sentinel))
+    assert r.returncode == 0 and sentinel.read_text() == "ran", r.stdout + r.stderr
+
+
 def test_the_normal_run_rejects_a_joins_result_with_zero_tests(checkout, tmp_path_factory):
     """GPT23 (4.2c-2c F-2): the normal run (no --target) must not accept a joins TAP summary with zero tests."""
     joins = checkout / "RootInteractive/joins"
