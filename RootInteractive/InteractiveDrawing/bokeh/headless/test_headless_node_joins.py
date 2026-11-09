@@ -6,6 +6,8 @@ columns (`get_column`), length (`get_length`). Two independent references:
   * the ORACLE — what is correct: pandas `merge` / explicit row-number gathers;
   * the PORT — what production does today: a line-by-line Python port of CDSJoin.ts (compute_indices, get_column,
     join_column, get_length), defects included. It predicts the exact wrong result of every known defect.
+The port models the COLD-LOAD state (a joined input read through get_array is its empty cached data); it does not
+model later lazy population — its claims are limited to that path (GPT22 review, item 5).
 A known-defect check passes only if production equals the port exactly AND the port differs from the oracle; then it
 raises `KnownDefect`, the only failure the strict expected-failure tests accept (R-4). Any other failure — a Node
 error, a missing column, a result matching neither — stays red. RootInteractive's code is NOT changed.
@@ -138,7 +140,7 @@ class Port:
             return len(il)
         if ir not in (None, "UNSET"):
             return len(ir)
-        return self.length(self.j[m]["left"])
+        return min(self.length(self.j[m]["left"]), self.length(self.j[m]["right"]))    # get_length: min of the inputs
 
     def array(self, m, key):
         """get_array: a table's column; a JOIN's lazily cached data, empty at load (J-D5)."""
@@ -157,7 +159,8 @@ class Port:
             return (None, None) if not on_r else ("UNSET", "UNSET")                               # J-D3
         if len(on_l) == 1 and not on_r:
             idx, n = self.array(s["left"], on_l[0]), self.length(s["right"])
-            return None, ([x for x in idx if x is not None and 0 < x < n] if how == "inner" else idx)   # J-D2
+            keep_all = how in ("left", "outer")                                                  # line 89: !is_left_join
+            return None, (idx if keep_all else [x for x in idx if x is not None and 0 < x < n])  # J-D2
         L = [self.array(s["left"], k) for k in on_l]
         R = [self.array(s["right"], k) for k in on_r]
         return self._merge(L, R, how, self.length(s["left"]), self.length(s["right"]))   # lengths: left.length
@@ -263,6 +266,7 @@ def _check(node_session, tables, joins, tmp_path, m, keys, label, mutate=(), mta
     out = _read(node_session, tables, joins, tmp_path, m, keys, mutate)
     after = mtables or tables
     assert not out["throws"], out["throws"]
+    assert set(out["columns"]) == set(keys), sorted(out["columns"])                       # complete before comparing
     assert len({len(out["columns"][k]) for k in keys}) == 1, {k: len(out["columns"][k]) for k in keys}
     got = _records(out["columns"], keys)
     if got == _oracle_records(after, joins, m, keys):
@@ -516,22 +520,47 @@ def test_control_j_d3_the_same_relation_in_the_supported_direction(node_session,
     assert [_norm(v) for v in out["columns"]["a"]] == [_norm(v) for v in expected]
 
 
+def _is_j_d3(out, keys) -> bool:
+    """The exact J-D3 signature on one reply (fails closed — GPT25): both index arrays unset, EVERY requested column
+    throws the 'map' error, no column returned, and the length is the port's (min of the inputs)."""
+    return (out.get("il") is None and out.get("ir") is None and not out.get("columns")
+            and set(out.get("throws", {})) == set(keys) and bool(keys)
+            and all("reading 'map'" in out["throws"][k] for k in keys)
+            and out.get("length") == Port({"L": RL, "R": RR}, REV).length("J"))
+
+
+def test_the_j_d3_classifier_fails_closed():
+    """Negative controls (GPT22 item 1): an empty or mixed reply is never classified as J-D3."""
+    keys = ["lid", "rid"]
+    full = {"il": None, "ir": None, "columns": {}, "length": 5,
+            "throws": {k: "Cannot read properties of undefined (reading 'map')" for k in keys}}
+    assert _is_j_d3(full, keys)
+    assert not _is_j_d3({**full, "throws": {}}, keys)                                        # nothing thrown
+    assert not _is_j_d3({**full, "throws": {"lid": full["throws"]["lid"]}, "columns": {"rid": [1]}}, keys)   # mixed
+    assert not _is_j_d3({**full, "columns": {"lid": []}}, keys)                              # a column returned
+    assert not _is_j_d3({**full, "length": 0}, keys)                                         # wrong length
+    assert not _is_j_d3({**full, "throws": {k: "TypeError: x" for k in keys}}, keys)         # another error
+
+
 @pytest.mark.xfail(**STRICT, reason="J-D3")
 def test_strict_reverse_index_join_is_correct(node_session, tmp_path):
-    out = _read(node_session, {"L": RL, "R": RR}, REV, tmp_path, "J", ["lid", "rid", "a", "b"])
-    if not out["throws"] and _records(out["columns"], ["lid", "rid", "a", "b"]) == _oracle_records({"L": RL, "R": RR}, REV, "J", ["lid", "rid", "a", "b"]):
+    keys = ["lid", "rid", "a", "b"]
+    out = _read(node_session, {"L": RL, "R": RR}, REV, tmp_path, "J", keys)
+    if not out["throws"] and set(out["columns"]) == set(keys) and len({len(out["columns"][k]) for k in keys}) == 1 \
+            and _records(out["columns"], keys) == _oracle_records({"L": RL, "R": RR}, REV, "J", keys):
         return
-    known_defect(out["il"] is None and out["ir"] is None and all("reading 'map'" in m for m in out["throws"].values()), "J-D3")
+    known_defect(_is_j_d3(out, keys), "J-D3")
     raise AssertionError(f"J-D3: unexpected result {out}")
 
 
 # ===================================================================================== J2: recursive joins (AO2D-like)
 # events; tracks -> event row; V0 -> two daughter track rows; cascade -> V0 row and a bachelor track row.
 # Two V0s share track 2 as negative daughter; row 0 referenced at every level; an orphan at every level (-1) and an
-# out-of-range reference (cascade 3 -> V0 7); track 4 has no event (-1).
+# out-of-range reference at every level (cascade 3 -> V0 7, V0 4 -> negative track 8, track 5 -> event 9); track 4
+# has no event (-1).
 E = {"eid": [0, 1, 2, 3], "vz": [0.5, 1.5, 2.5, 3.5]}
-T = {"tid": [0, 1, 2, 3, 4, 5], "ev": [0, 0, 1, 3, -1, 2], "pt": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]}
-V0 = {"vid": [0, 1, 2, 3, 4], "pos": [0, 1, 3, 5, -1], "neg": [2, 2, 4, 0, 1], "mass": [0.49, 0.50, 0.51, 0.52, 0.53]}
+T = {"tid": [0, 1, 2, 3, 4, 5], "ev": [0, 0, 1, 3, -1, 9], "pt": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]}       # 9: out of range
+V0 = {"vid": [0, 1, 2, 3, 4], "pos": [0, 1, 3, 5, -1], "neg": [2, 2, 4, 0, 8], "mass": [0.49, 0.50, 0.51, 0.52, 0.53]}  # 8
 C = {"cid": [0, 1, 2, 3], "v0": [0, 2, 4, 7], "bach": [3, 0, 5, 1], "cmass": [1.32, 1.33, 1.34, 1.35]}
 AO2D = {"E": E, "T": T, "V0": V0, "C": C}
 
@@ -601,7 +630,7 @@ def test_signature_j_d5_left_nested_chain_is_empty_and_stays_empty(node_session,
     r = node_session.request("eval", code=code, arg=None)
     assert r.get("ok"), r
     out = decode(r["result"])
-    assert out == {"at_load": 0, "inner_ev": [0, 0, 3, 2, None], "after_inner_computed": 0, "after_recompute": 5}, out
+    assert out == {"at_load": 0, "inner_ev": [0, 0, 3, 9, None], "after_inner_computed": 0, "after_recompute": 5}, out
 
 
 def test_c6_two_daughters_join_of_two_joins_signature(node_session, tmp_path):
@@ -624,9 +653,61 @@ def test_signature_j_d5_key_join_of_joins_pairs_rows_by_position(node_session, t
              "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
     keys = ["vid", "p_tid", "n_tid"]
     _signature(node_session, AO2D, joins, tmp_path, "VPN", keys)
+    out = _read(node_session, AO2D, joins, tmp_path, "VPN", [])
+    assert ([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == Port(AO2D, joins).indices("VPN")   # exact pairs
 
 
-@pytest.mark.parametrize("how", ["inner"])
+def _vpn_joins():
+    return {"VP": dict(left="V0", right="T", on_left=["pos"], on_right=[], how="left", prefix_right="p_"),
+            "VN": dict(left="V0", right="T", on_left=["neg"], on_right=[], how="inner", prefix_right="n_"),
+            "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
+
+
+@pytest.mark.xfail(**STRICT, reason="J-D5: a key join of joins pairs rows by position")
+def test_strict_key_join_of_joins_pairs_by_v0_id(node_session, tmp_path):
+    """J-D5 strict guard (GPT22 item 4): (V0 x positive track) x (V0 x negative track) joined on the V0 id must pair
+    rows of the SAME V0. Here V0 0's negative daughter is track 0, so the inner negative-track join loses V0 0
+    (J-D2) and its rows start at V0 1: pairing by position then visibly mismatches the ids. Row identities are taken as
+    production defines them: the positive join keeps every V0 (left join); the negative join keeps the V0s whose
+    reference passes production's filter 0 < x < len(tracks)."""
+    v0 = {**V0, "neg": [0, 2, 4, 1, 3]}
+    tables = {**AO2D, "V0": v0}
+    joins = _vpn_joins()
+    out = _read(node_session, tables, joins, tmp_path, "VPN", ["vid"])
+    assert len(out["il"]) == len(out["ir"]) and out["il"]
+    vp_rows = list(range(len(v0["vid"])))
+    vn_rows = [i for i, x in enumerate(v0["neg"]) if 0 < x < len(T["tid"])]
+    pairs = [(vp_rows[int(a)], vn_rows[int(b)]) for a, b in zip(out["il"], out["ir"])]
+    if all(x == y for x, y in pairs):
+        return
+    port = Port(tables, joins).indices("VPN")
+    known_defect(([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == port, "J-D5")
+    raise AssertionError("J-D5 guard: production differs from the port")
+
+
+def _vpn_joins():
+    return {"VP": dict(left="V0", right="T", on_left=["pos"], on_right=[], how="left", prefix_right="p_"),
+            "VN": dict(left="V0", right="T", on_left=["neg"], on_right=[], how="inner", prefix_right="n_"),
+            "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
+
+
+@pytest.mark.xfail(**STRICT, reason="J-D5 / J-D1: the association order changes the result")
+def test_c7_strict_production_is_associative(node_session, tmp_path):
+    """C-7 directly on production (GPT22 item 2): (V0 x T) x E and V0 x (T x E) must give the same records. Left joins:
+    the only form in which both association orders keep the row numbering the references point to."""
+    a = _read(node_session, AO2D, _chain_v0("left"), tmp_path, "VTE", V0_KEYS)
+    b = _read(node_session, AO2D, _right_nested("left"), tmp_path, "VTE2", V0_KEYS)
+    for o in (a, b):
+        assert not o["throws"] and set(o["columns"]) == set(V0_KEYS), o["throws"]
+    if _records(a["columns"], V0_KEYS) == _records(b["columns"], V0_KEYS):
+        return
+    pa, pb = _port_columns(AO2D, _chain_v0("left"), "VTE", V0_KEYS), _port_columns(AO2D, _right_nested("left"), "VTE2", V0_KEYS)
+    same = lambda o, p: {k: [_norm(v) for v in o["columns"][k]] for k in V0_KEYS} == {k: [_norm(v) for v in p[k]] for k in V0_KEYS}
+    known_defect(same(a, pa) and same(b, pb) and _records(pa, V0_KEYS) != _records(pb, V0_KEYS), "C-7 violated (J-D5/J-D1)")
+    raise AssertionError("C-7: production differs from the port")
+
+
+@pytest.mark.parametrize("how", ["left"])
 def test_c7_associativity_v0_track_event(node_session, tmp_path, how):
     """C-7 (invariant): (V0 x T) x E and V0 x (T x E) — the oracle gives the same rows both ways; production gives
     each way exactly the port's result."""
@@ -652,6 +733,37 @@ def test_c8_a_change_of_the_innermost_table_reaches_the_outermost_join(node_sess
     expected = [_norm(v) for v in Port(new, _right_nested("left")).column("VTE2", "vz")]
     oracle = [_norm(v) for v in _oracle(new, _right_nested("left"), "VTE2")["vz"]]
     assert [_norm(v) for v in out["columns"]["vz"]] == expected == oracle
+
+
+USED = """(a) => {
+  const d = Bokeh.documents[Bokeh.documents.length - 1], m = d.get_model_by_name(a.name);
+  const read = () => Object.fromEntries(a.keys.map(k => [k, Array.from(m.get_column(k), v => v === undefined ? null : v)]));
+  const before = read();
+  for (const mu of a.mutate) { const t = d.get_model_by_name(mu.table); t.data = Object.assign({}, t.data, mu.data); }
+  return {before, after: read()};
+}"""
+
+
+@pytest.mark.parametrize("change", ["event_values", "track_to_event_mapping"])
+def test_c8_cache_invalidation_on_an_already_used_model(node_session, tmp_path, change):
+    """C-8 (GPT22 item 3): read the outermost join (its columns are now cached), change the innermost table, re-read
+    the SAME model: before equals the old tables' result, after the new tables' — changed and unchanged rows alike."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
+    if change == "event_values":
+        mutate, new = [{"table": "E", "data": {"vz": [9.5, 8.5, 7.5, 6.5]}}], {**AO2D, "E": {**E, "vz": [9.5, 8.5, 7.5, 6.5]}}
+    else:
+        mutate, new = [{"table": "T", "data": {"ev": [3, 2, 1, 0, 1, 0]}}], {**AO2D, "T": {**T, "ev": [3, 2, 1, 0, 1, 0]}}
+    joins = _right_nested("left")
+    r = node_session.request("new_doc", path=str(_document(tmp_path, AO2D, joins)))
+    assert r.get("ok"), r
+    r = node_session.request("eval", code=USED, arg={"name": "VTE2", "keys": ["vz", "eid"], "mutate": mutate})
+    assert r.get("ok"), r
+    out = decode(r["result"])
+    for phase, tables in (("before", AO2D), ("after", new)):
+        for k in ("vz", "eid"):
+            expected = [_norm(v) for v in _oracle(tables, joins, "VTE2")[k]]
+            assert [_norm(v) for v in out[phase][k]] == expected == [_norm(v) for v in Port(tables, joins).column("VTE2", k)], (phase, k)
+    assert out["before"]["vz"] != out["after"]["vz"]                     # the change is visible, not a stale cache
 
 
 # ===================================================================================== the checks can fail
