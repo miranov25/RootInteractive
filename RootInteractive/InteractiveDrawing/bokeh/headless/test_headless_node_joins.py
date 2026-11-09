@@ -288,6 +288,20 @@ def _signature(node_session, tables, joins, tmp_path, m, keys):
 
 STRICT = dict(strict=True, raises=KnownDefect)
 
+
+def _ints(xs):
+    """Production row numbers and ids as integers — only after checking each is a finite whole number (GPT22 review:
+    int() would truncate a fractional value and could hide a mismatch). None stays None."""
+    import math
+    out = []
+    for x in xs:
+        if x is None:
+            out.append(None)
+            continue
+        assert isinstance(x, (int, float)) and math.isfinite(x) and float(x).is_integer(), f"not an integral value: {x!r}"
+        out.append(int(x))
+    return out
+
 # ===================================================================================== J1 fixtures
 # key tables sorted ascending (J-H1); fan-out 2x1 and 1x2, row 0 joined, orphans only at the ENDS (J-D4 cannot show)
 KL = {"lid": [0, 1, 2, 3, 4], "k": [0, 1, 1, 2, 5], "a": [10.0, 11.0, 12.0, 13.0, 14.0]}
@@ -304,7 +318,7 @@ def _kj(how, left="L", right="R", **kw):
 
 def _pairs(out):
     assert len(out["il"]) == len(out["ir"]), (len(out["il"]), len(out["ir"]))                  # R-3: no silent zip
-    ids = lambda xs: [None if x is None or x < 0 else int(x) for x in xs]
+    ids = lambda xs: [None if x is None or x < 0 else x for x in _ints(xs)]
     return Counter(zip(ids(out["il"]), ids(out["ir"])))
 
 
@@ -352,7 +366,7 @@ def test_c2_right_columns_correct(node_session, tmp_path, how):
     keys = ["rid", "b"]
     out = _read(node_session, {"L": KL, "R": KR}, _kj(how), tmp_path, "J", keys)
     for k in keys:
-        assert out["columns"][k] == [None if r is None or r < 0 else KR[k][int(r)] for r in out["ir"]], k
+        assert out["columns"][k] == [None if r is None or r < 0 else KR[k][r] for r in _ints(out["ir"])], k
 
 
 @pytest.mark.parametrize("how", MODES)
@@ -379,7 +393,7 @@ def test_signature_j_d4_unmatched_key_inside_the_tables(node_session, tmp_path, 
     """J-D4, exact signature: an unmatched key inside sorted tables makes the merge advance the wrong side."""
     out = _read(node_session, {"L": KLI, "R": KRI}, _kj(how), tmp_path, "J", [])
     port = Port({"L": KLI, "R": KRI}, _kj(how)).indices("J")
-    assert ([None if x is None else int(x) for x in out["il"]], [None if x is None else int(x) for x in out["ir"]]) == port
+    assert (_ints(out["il"]), _ints(out["ir"])) == port
     ids = lambda xs: [None if x < 0 else x for x in xs]
     assert Counter(zip(ids(port[0]), ids(port[1]))) != _oracle_pairs(KLI, KRI, how)
 
@@ -391,7 +405,7 @@ def test_strict_key_join_with_an_unmatched_key_inside(node_session, tmp_path, ho
     if _pairs(out) == _oracle_pairs(KLI, KRI, how):
         return
     port = Port({"L": KLI, "R": KRI}, _kj(how)).indices("J")
-    known_defect(([None if x is None else int(x) for x in out["il"]], [None if x is None else int(x) for x in out["ir"]]) == port, "J-D4")
+    known_defect((_ints(out["il"]), _ints(out["ir"])) == port, "J-D4")
     raise AssertionError("J-D4: production matches neither pandas nor the port")
 
 
@@ -404,7 +418,7 @@ def test_j_h1_exact_result_on_unsorted_keys_and_its_sorted_control(node_session,
     give exactly pandas (the paired control)."""
     out = _read(node_session, {"L": KL, "R": UNSORTED_R}, _kj("inner"), tmp_path, "J", [])
     port = Port({"L": KL, "R": UNSORTED_R}, _kj("inner")).indices("J")
-    assert not out["throws"] and ([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == port
+    assert not out["throws"] and (_ints(out["il"]), _ints(out["ir"])) == port
     assert Counter(zip(*port)) != _oracle_pairs(KL, UNSORTED_R, "inner")
     order = sorted(range(5), key=lambda i: UNSORTED_R["kr"][i])
     sorted_r = {c: [v[i] for i in order] for c, v in UNSORTED_R.items()}
@@ -418,7 +432,7 @@ def test_strict_unsorted_keys_join_correctly_or_refuse_loudly(node_session, tmp_
     out = _read(node_session, {"L": KL, "R": UNSORTED_R}, _kj("inner"), tmp_path, "J", ["lid"])
     if out["throws"] or _pairs(out) == _oracle_pairs(KL, UNSORTED_R, "inner"):
         return
-    known_defect(([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == Port({"L": KL, "R": UNSORTED_R}, _kj("inner")).indices("J"), "J-H1")
+    known_defect((_ints(out["il"]), _ints(out["ir"])) == Port({"L": KL, "R": UNSORTED_R}, _kj("inner")).indices("J"), "J-H1")
     raise AssertionError("J-H1: silent result matches neither pandas nor the port")
 
 
@@ -447,7 +461,7 @@ def test_signature_j_d4_multi_key_unmatched_key_inside(node_session, tmp_path):
     L = {"lid": [0, 1, 2, 3, 4], "k1": [0, 1, 0, 1, 2], "k2": [0, 0, 1, 1, 1]}
     out = _read(node_session, {"L": L, "R": MR}, _mk("outer"), tmp_path, "J", [])
     port = Port({"L": L, "R": MR}, _mk("outer")).indices("J")
-    assert ([None if x is None else int(x) for x in out["il"]], [None if x is None else int(x) for x in out["ir"]]) == port
+    assert (_ints(out["il"]), _ints(out["ir"])) == port
     ids = Counter(zip([None if x < 0 else L["lid"][x] for x in port[0]], [None if x < 0 else MR["rid"][x] for x in port[1]]))
     assert ids != _oracle_pairs(L, MR, "outer", ("k1", "k2"), ("j1", "j2"))
 
@@ -460,7 +474,7 @@ def test_prefixed_names_route_to_their_side(node_session, tmp_path):
     _complete(out, keys, sum(_oracle_pairs(KL, KR, "inner").values()))
     assert {k: [_norm(v) for v in out["columns"][k]] for k in keys} == \
         {k: [_norm(v) for v in c] for k, c in _port_columns({"L": KL, "R": KR}, joins, "J", keys).items()}
-    assert out["columns"]["r_b"] == [KR["b"][int(r)] for r in out["ir"]]
+    assert out["columns"]["r_b"] == [KR["b"][r] for r in _ints(out["ir"])]
 
 
 # ===================================================================================== J1: index joins
@@ -523,10 +537,11 @@ def test_control_j_d3_the_same_relation_in_the_supported_direction(node_session,
 def _is_j_d3(out, keys) -> bool:
     """The exact J-D3 signature on one reply (fails closed — GPT25): both index arrays unset, EVERY requested column
     throws the 'map' error, no column returned, and the length is the port's (min of the inputs)."""
-    return (out.get("il") is None and out.get("ir") is None and not out.get("columns")
-            and set(out.get("throws", {})) == set(keys) and bool(keys)
-            and all("reading 'map'" in out["throws"][k] for k in keys)
-            and out.get("length") == Port({"L": RL, "R": RR}, REV).length("J"))
+    exact = "Cannot read properties of undefined (reading 'map')"         # the port's message, compared in full
+    return (bool(keys) and all(f in out for f in ("il", "ir", "columns", "throws", "length"))   # fields present
+            and out["il"] is None and out["ir"] is None and out["columns"] == {}
+            and set(out["throws"]) == set(keys) and all(out["throws"][k] == exact for k in keys)
+            and out["length"] == Port({"L": RL, "R": RR}, REV).length("J"))
 
 
 def test_the_j_d3_classifier_fails_closed():
@@ -540,6 +555,9 @@ def test_the_j_d3_classifier_fails_closed():
     assert not _is_j_d3({**full, "columns": {"lid": []}}, keys)                              # a column returned
     assert not _is_j_d3({**full, "length": 0}, keys)                                         # wrong length
     assert not _is_j_d3({**full, "throws": {k: "TypeError: x" for k in keys}}, keys)         # another error
+    for missing in ("il", "ir", "columns", "throws", "length"):                              # a field missing
+        assert not _is_j_d3({f: v for f, v in full.items() if f != missing}, keys), missing
+    assert not _is_j_d3({**full, "throws": {k: full["throws"][k] + " (extra)" for k in keys}}, keys)   # not exact
 
 
 @pytest.mark.xfail(**STRICT, reason="J-D3")
@@ -654,7 +672,7 @@ def test_signature_j_d5_key_join_of_joins_pairs_rows_by_position(node_session, t
     keys = ["vid", "p_tid", "n_tid"]
     _signature(node_session, AO2D, joins, tmp_path, "VPN", keys)
     out = _read(node_session, AO2D, joins, tmp_path, "VPN", [])
-    assert ([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == Port(AO2D, joins).indices("VPN")   # exact pairs
+    assert (_ints(out["il"]), _ints(out["ir"])) == Port(AO2D, joins).indices("VPN")   # exact pairs
 
 
 def _vpn_joins():
@@ -665,30 +683,13 @@ def _vpn_joins():
 
 @pytest.mark.xfail(**STRICT, reason="J-D5: a key join of joins pairs rows by position")
 def test_strict_key_join_of_joins_pairs_by_v0_id(node_session, tmp_path):
-    """J-D5 strict guard (GPT22 item 4): (V0 x positive track) x (V0 x negative track) joined on the V0 id must pair
-    rows of the SAME V0. Here V0 0's negative daughter is track 0, so the inner negative-track join loses V0 0
-    (J-D2) and its rows start at V0 1: pairing by position then visibly mismatches the ids. Row identities are taken as
-    production defines them: the positive join keeps every V0 (left join); the negative join keeps the V0s whose
-    reference passes production's filter 0 < x < len(tracks)."""
-    v0 = {**V0, "neg": [0, 2, 4, 1, 3]}
-    tables = {**AO2D, "V0": v0}
-    joins = _vpn_joins()
-    out = _read(node_session, tables, joins, tmp_path, "VPN", ["vid"])
-    assert len(out["il"]) == len(out["ir"]) and out["il"]
-    vp_rows = list(range(len(v0["vid"])))
-    vn_rows = [i for i, x in enumerate(v0["neg"]) if 0 < x < len(T["tid"])]
-    pairs = [(vp_rows[int(a)], vn_rows[int(b)]) for a, b in zip(out["il"], out["ir"])]
-    if all(x == y for x, y in pairs):
-        return
-    port = Port(tables, joins).indices("VPN")
-    known_defect(([int(x) for x in out["il"]], [int(x) for x in out["ir"]]) == port, "J-D5")
-    raise AssertionError("J-D5 guard: production differs from the port")
-
-
-def _vpn_joins():
-    return {"VP": dict(left="V0", right="T", on_left=["pos"], on_right=[], how="left", prefix_right="p_"),
-            "VN": dict(left="V0", right="T", on_left=["neg"], on_right=[], how="inner", prefix_right="n_"),
-            "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
+    """J-D5 strict guard (GPT22 item 4, tightened): (V0 x positive track) x (V0 x negative track) joined on the V0 id
+    must give the COMPLETE correct relation — per V0, its positive and negative daughter track ids — as a multiset
+    against the oracle (an aligned but incomplete subset cannot pass). Here V0 0's negative daughter is track 0, so
+    the inner negative-track join loses V0 0 (J-D2) and position pairing visibly mismatches. Known defect only if
+    production equals the port exactly (the same reply) and the port differs from the oracle."""
+    tables = {**AO2D, "V0": {**V0, "neg": [0, 2, 4, 1, 3]}}
+    _check(node_session, tables, _vpn_joins(), tmp_path, "VPN", ["p_tid", "n_tid"], "J-D5")
 
 
 @pytest.mark.xfail(**STRICT, reason="J-D5 / J-D1: the association order changes the result")
@@ -767,8 +768,8 @@ def test_c8_cache_invalidation_on_an_already_used_model(node_session, tmp_path, 
 
 
 # ===================================================================================== J3: production vs the prototype
-# The joins/ prototype (buildInverseIndex, childrenOf) on its own AO2D fixture, which also carries the dense foreign
-# keys. Three independent references must agree with production where they share behaviour: (1) the fixture's dense
+# The joins/ prototype (buildInverseIndex, childrenOf) on its own GENERATED, AO2D-shaped fixture (toy event generator;
+# not real AO2D data), which also carries the dense foreign keys. Three independent references must agree with production where they share behaviour: (1) the fixture's dense
 # foreign keys, (2) the prototype's inverse index read back as "parent of each child", (3) the production join.
 JOINS_DIR = Path(__file__).resolve().parents[3] / "joins"
 N_CLUSTERS = 5000                                      # a subset of the 363 261 clusters keeps the document small
@@ -809,19 +810,19 @@ def test_j3_tracks_to_events_three_references_agree(node_session, tmp_path):
     joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
     out = _read(node_session, t, joins, tmp_path, "TE", ["ev_id"])
     _complete(out, ["ev_id"], len(fk))
-    assert [int(x) for x in out["ir"]] == fk                                         # production = fixture
+    assert _ints(out["ir"]) == fk                                         # production = fixture
     assert _prototype_parent_of(fk, len(t["EV"]["ev_id"])) == fk                     # prototype = fixture
-    assert [int(x) for x in out["columns"]["ev_id"]] == [t["EV"]["ev_id"][p] for p in fk]
+    assert _ints(out["columns"]["ev_id"]) == [t["EV"]["ev_id"][p] for p in fk]
 
 
 def test_j3_inner_join_loses_exactly_the_tracks_of_event_0(node_session, tmp_path):
-    """J-D2 on real data, exact: the inner join keeps every track except the tracks of event 0 — exactly as many as the
+    """J-D2 on the generated AO2D-shaped fixture, exact: the inner join keeps every track except the tracks of event 0 — exactly as many as the
     prototype lists as event 0's children."""
     t, d = _ao2d_tables()
     fk = d["dense_fk"]["tracks_event_idx"]
     joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="inner")}
     out = _read(node_session, t, joins, tmp_path, "TE", [])
-    assert [int(x) for x in out["ir"]] == [p for p in fk if p > 0]                    # the port's signature (J-D2)
+    assert _ints(out["ir"]) == [p for p in fk if p > 0]                    # the port's signature (J-D2)
     lost = len(fk) - len(out["ir"])
     assert lost == _prototype_parent_of(fk, len(t["EV"]["ev_id"])).count(0) == fk.count(0) > 0
 
@@ -835,14 +836,16 @@ def test_j3_clusters_right_nested_event_per_cluster(node_session, tmp_path):
     out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
     _complete(out, ["ev_id"], N_CLUSTERS)
     want = d["dense_fk"]["clusters_event_idx"][:N_CLUSTERS]
-    track_parent = _prototype_parent_of(d["dense_fk"]["tracks_event_idx"], len(t["EV"]["ev_id"]))
-    composed = [track_parent[x] for x in d["dense_fk"]["clusters_track_idx"][:N_CLUSTERS]]
+    track_parent = _prototype_parent_of(d["dense_fk"]["tracks_event_idx"], len(t["EV"]["ev_id"]))          # leg 1
+    cluster_parent = _prototype_parent_of(d["dense_fk"]["clusters_track_idx"][:N_CLUSTERS], len(t["TR"]["trk_id"]))  # leg 2
+    assert cluster_parent == d["dense_fk"]["clusters_track_idx"][:N_CLUSTERS]
+    composed = [track_parent[c] for c in cluster_parent]                         # both prototype legs composed
     assert composed == want
-    assert [int(x) for x in out["columns"]["ev_id"]] == [t["EV"]["ev_id"][p] for p in want]
+    assert _ints(out["columns"]["ev_id"]) == [t["EV"]["ev_id"][p] for p in want]
 
 
 def test_j3_clusters_left_nested_is_empty(node_session, tmp_path):
-    """J-D5 on real data, exact: (clusters x tracks) x events is empty at load, as the port predicts."""
+    """J-D5 on the generated AO2D-shaped fixture, exact: (clusters x tracks) x events is empty at load, as the port predicts."""
     t, _ = _ao2d_tables()
     joins = {"CT": dict(left="CL", right="TR", on_left=["cl_track_fk"], on_right=[], how="left"),
              "CTE": dict(left="CT", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
