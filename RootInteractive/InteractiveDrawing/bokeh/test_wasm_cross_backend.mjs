@@ -88,7 +88,7 @@ const testCases = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
 // ============================================================
 // Execute tests
 // ============================================================
-let passed = 0, failed = 0;
+let passed = 0, failed = 0, comparedValues = 0;   // values actually compared (GPT23, order-0 condition O-2)
 const results = {}; // For consistency check: { "fun1": { scalar: [...], vector: [...] } }
 
 for (const tc of testCases) {
@@ -145,7 +145,11 @@ for (const tc of testCases) {
         console.log(`  ❌ ${label}: unknown mode ${mode}`); failed++; continue;   // fail closed (order 0)
     }
 
-    // Compare with numpy reference
+    // Compare with numpy reference; a case without values compares nothing and fails (order-0 condition O-2)
+    if (!result || result.length === 0 || ref.length === 0) {
+        console.log(`  ❌ ${label}: no values to compare (length ${result ? result.length : 0})`); failed++; continue;
+    }
+    comparedValues += result.length;
     const check = allclose(result, ref, abs_tol, rel_tol);
     if (check.ok) {
         console.log(`  ✅ ${label}`);
@@ -189,5 +193,5 @@ if (consistencyMode) {
 // Summary
 // ============================================================
 console.log(`\n${passed} passed, ${failed} failed`);
-if (passed === 0) console.log("No comparison was made.");               // fail closed (order 0)
-process.exit(failed > 0 || passed === 0 ? 1 : 0);
+if (passed === 0 || comparedValues === 0) console.log("No comparison was made.");   // fail closed (order 0)
+process.exit(failed > 0 || passed === 0 || comparedValues === 0 ? 1 : 0);

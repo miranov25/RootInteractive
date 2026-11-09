@@ -88,6 +88,14 @@ for(const test_case of data.test_cases){
         const table = data.data[test_case.table];
         const lhs_data = table.get_column(test_case.lhs);
         const rhs_data = table.get_column(test_case.rhs);
+        // fail closed (GPT23, order-0 condition O-1): an operand that cannot be resolved is a failure, never
+        // "undefined === undefined"
+        for (const [side, name, col] of [["lhs", test_case.lhs, lhs_data], ["rhs", test_case.rhs, rhs_data]]) {
+            if (col === undefined || col === null || typeof col.length !== "number") {
+                console.error(`Test case failed: missing column ${side} "${name}" in table "${test_case.table}"`);
+                process.exit(1);
+            }
+        }
         const delta = test_case.epsilon || 1e-10;
         if(!shallow_compare_absolute(lhs_data, rhs_data, delta)){
             console.error(`Test case failed:

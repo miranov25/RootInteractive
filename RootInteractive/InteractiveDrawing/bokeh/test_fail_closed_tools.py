@@ -23,9 +23,9 @@ def _b64(values):
     return {"data": base64.b64encode(np.asarray(values, dtype=np.float64)).decode(), "dtype": "float64"}
 
 
-def _dsl(tmp_path, lhs, rhs, cases=True):
+def _dsl(tmp_path, lhs, rhs, cases=True, names=("x", "y")):
     data = {"data": {"T": {"x": _b64(lhs), "y": _b64(rhs)}},
-            "test_cases": [{"type": "EQ", "table": "T", "lhs": "x", "rhs": "y", "epsilon": 1e-10}] if cases else []}
+            "test_cases": [{"type": "EQ", "table": "T", "lhs": names[0], "rhs": names[1], "epsilon": 1e-10}] if cases else []}
     f = tmp_path / "dsl.json"
     f.write_text(json.dumps(data))
     return subprocess.run([NODE, str(HERE / "test_dsl_customjs.mjs"), str(f)], capture_output=True, text=True, timeout=60)
@@ -89,3 +89,17 @@ def test_the_wasm_runner_fails_without_a_real_comparison(tmp_path, case):
     else:
         r = _wasm(tmp_path, [])
     assert r.returncode != 0, r.stdout + r.stderr
+
+
+def test_the_dsl_comparator_rejects_missing_columns(tmp_path):
+    """GPT23 (order-0 condition O-1): two columns that do not exist must not compare equal ("undefined === undefined")."""
+    r = _dsl(tmp_path, [1.0], [1.0], names=("missing1", "missing2"))
+    assert r.returncode != 0 and 'missing column lhs "missing1"' in r.stderr, r.stdout + r.stderr
+
+
+@pytest.mark.skipif(not WASM.exists(), reason="functions.wasm not present")
+def test_the_wasm_runner_fails_on_a_case_without_values(tmp_path):
+    """GPT23 (order-0 condition O-2): a case of length 0 compares nothing and must fail, with the reason."""
+    r = _wasm(tmp_path, [_case("fun2", "scalar", [], [])])
+    assert r.returncode != 0 and "no values to compare" in r.stdout, r.stdout + r.stderr
+
