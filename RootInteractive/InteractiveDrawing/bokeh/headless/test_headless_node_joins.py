@@ -766,6 +766,90 @@ def test_c8_cache_invalidation_on_an_already_used_model(node_session, tmp_path, 
     assert out["before"]["vz"] != out["after"]["vz"]                     # the change is visible, not a stale cache
 
 
+# ===================================================================================== J3: production vs the prototype
+# The joins/ prototype (buildInverseIndex, childrenOf) on its own AO2D fixture, which also carries the dense foreign
+# keys. Three independent references must agree with production where they share behaviour: (1) the fixture's dense
+# foreign keys, (2) the prototype's inverse index read back as "parent of each child", (3) the production join.
+JOINS_DIR = Path(__file__).resolve().parents[3] / "joins"
+N_CLUSTERS = 5000                                      # a subset of the 363 261 clusters keeps the document small
+
+
+def _fixture():
+    return json.loads((JOINS_DIR / "ao2d_fixture.json").read_text())
+
+
+def _prototype_parent_of(fk, n_parents):
+    """Run the prototype in Node: build the inverse index of `fk`, then read back each child's parent (-1: none)."""
+    import shutil, subprocess
+    script = (f"import {{ buildInverseIndex, childrenOf }} from {json.dumps((JOINS_DIR / 'buildInverseIndex.mjs').as_uri())};"
+              "import fs from 'fs'; const a = JSON.parse(fs.readFileSync(0, 'utf8'));"
+              "const idx = buildInverseIndex(Int32Array.from(a.fk), a.n); const back = new Array(a.fk.length).fill(-1);"
+              "for (let p = 0; p < a.n; p++) for (const c of childrenOf(idx, p)) back[c] = p;"
+              "process.stdout.write(JSON.stringify(back));")
+    r = subprocess.run([shutil.which("node"), "--input-type=module", "-e", script], input=json.dumps({"fk": fk, "n": n_parents}),
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        pytest.fail(f"prototype failed: {r.stderr[:500]}")
+    return json.loads(r.stdout)
+
+
+def _ao2d_tables():
+    d = _fixture()
+    ev, tr, cl, fk = d["tables"]["events"], d["tables"]["tracks"], d["tables"]["clusters"], d["dense_fk"]
+    return {"EV": {"ev_id": ev["event_id"], "n_tracks": ev["n_tracks"]},
+            "TR": {"trk_id": tr["track_id"], "trk_event_fk": fk["tracks_event_idx"], "pt": tr["pt"]},
+            "CL": {"cl_layer": cl["layer"][:N_CLUSTERS], "cl_track_fk": fk["clusters_track_idx"][:N_CLUSTERS]}}, d
+
+
+def test_j3_tracks_to_events_three_references_agree(node_session, tmp_path):
+    """J3: for every track, the production left index join's event row = the fixture's dense foreign key = the parent
+    the prototype's inverse index gives back; and the joined event id is the event table's id at that row."""
+    t, d = _ao2d_tables()
+    fk = d["dense_fk"]["tracks_event_idx"]
+    joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
+    out = _read(node_session, t, joins, tmp_path, "TE", ["ev_id"])
+    _complete(out, ["ev_id"], len(fk))
+    assert [int(x) for x in out["ir"]] == fk                                         # production = fixture
+    assert _prototype_parent_of(fk, len(t["EV"]["ev_id"])) == fk                     # prototype = fixture
+    assert [int(x) for x in out["columns"]["ev_id"]] == [t["EV"]["ev_id"][p] for p in fk]
+
+
+def test_j3_inner_join_loses_exactly_the_tracks_of_event_0(node_session, tmp_path):
+    """J-D2 on real data, exact: the inner join keeps every track except the tracks of event 0 — exactly as many as the
+    prototype lists as event 0's children."""
+    t, d = _ao2d_tables()
+    fk = d["dense_fk"]["tracks_event_idx"]
+    joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="inner")}
+    out = _read(node_session, t, joins, tmp_path, "TE", [])
+    assert [int(x) for x in out["ir"]] == [p for p in fk if p > 0]                    # the port's signature (J-D2)
+    lost = len(fk) - len(out["ir"])
+    assert lost == _prototype_parent_of(fk, len(t["EV"]["ev_id"])).count(0) == fk.count(0) > 0
+
+
+def test_j3_clusters_right_nested_event_per_cluster(node_session, tmp_path):
+    """J3, two levels: clusters x (tracks x events) gives each cluster's event exactly as the fixture's dense
+    clusters_event_idx and as the prototype's two inverse indices composed."""
+    t, d = _ao2d_tables()
+    joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="left"),
+             "CTE": dict(left="CL", right="TE", on_left=["cl_track_fk"], on_right=[], how="left")}
+    out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
+    _complete(out, ["ev_id"], N_CLUSTERS)
+    want = d["dense_fk"]["clusters_event_idx"][:N_CLUSTERS]
+    track_parent = _prototype_parent_of(d["dense_fk"]["tracks_event_idx"], len(t["EV"]["ev_id"]))
+    composed = [track_parent[x] for x in d["dense_fk"]["clusters_track_idx"][:N_CLUSTERS]]
+    assert composed == want
+    assert [int(x) for x in out["columns"]["ev_id"]] == [t["EV"]["ev_id"][p] for p in want]
+
+
+def test_j3_clusters_left_nested_is_empty(node_session, tmp_path):
+    """J-D5 on real data, exact: (clusters x tracks) x events is empty at load, as the port predicts."""
+    t, _ = _ao2d_tables()
+    joins = {"CT": dict(left="CL", right="TR", on_left=["cl_track_fk"], on_right=[], how="left"),
+             "CTE": dict(left="CT", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
+    out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
+    assert out["length"] == 0 == Port(t, joins).length("CTE") and out["columns"]["ev_id"] == []
+
+
 # ===================================================================================== the checks can fail
 def test_the_references_catch_a_wrong_join():
     """The oracle and the port must disagree with deliberately wrong results: a dropped pair, a shifted id."""
