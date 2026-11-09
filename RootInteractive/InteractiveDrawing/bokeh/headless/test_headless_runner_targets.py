@@ -42,7 +42,15 @@ def checkout(tmp_path):
             assert False, "deliberate failure"
         """))
     (h / "conftest.py").write_text(textwrap.dedent("""\
-        import os
+        import json, os
+        from pathlib import Path
+
+        def pytest_sessionfinish(session):       # a session artifact, complete only when FAKE_COMPLETE is set
+            out = os.environ.get("RI_HEADLESS_OUT")
+            if out and not hasattr(session.config, "workerinput"):
+                Path(out).mkdir(parents=True, exist_ok=True)
+                (Path(out) / "session.json").write_text(json.dumps(
+                    {"session": "mini", "complete": bool(os.environ.get("FAKE_COMPLETE"))}))
 
         def pytest_unconfigure(config):          # makes the pytest report unreadable after pytest wrote it
             path = getattr(config.option, "json_report_file", None)
@@ -58,6 +66,15 @@ def checkout(tmp_path):
         def test_writes_sentinel():              # proves that the normal run started (GPT23's sentinel)
             if os.environ.get("SENTINEL"):
                 open(os.environ["SENTINEL"], "w").write("started")
+        """))
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "generate_capability_matrix.py").write_text(textwrap.dedent("""\
+        import os, sys
+        from pathlib import Path
+        open(os.environ["STUB_LOG"], "a").write(" ".join(sys.argv[1:]) + "\\n")    # what run_tests.sh asked for
+        out = Path(sys.argv[sys.argv.index("--output") + 1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("matrix"); out.with_suffix(".json").write_text("{}")
         """))
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     return tmp_path
@@ -135,4 +152,21 @@ def test_the_normal_run_rejects_a_joins_result_with_zero_tests(checkout, tmp_pat
     (fake / "node").chmod(0o755)
     r = _run(checkout, "--quick", PATH=f"{fake}:{os.environ['PATH']}")
     assert r.returncode != 0 and "joins: no test counted" in r.stdout, r.stdout[-3000:] + r.stderr
+
+
+@pytest.mark.parametrize("complete", [False, True], ids=["partial_session", "complete_session"])
+def test_only_a_complete_session_updates_the_tracked_matrix(checkout, tmp_path_factory, complete):
+    """4.2c-2d A-6 (GPT22): the tracked matrix is written only from a complete headless session, and then with its
+    headless evidence; otherwise run_tests.sh writes a preview into test_logs/ and leaves the tracked file alone."""
+    log = tmp_path_factory.mktemp("stub") / "generator_calls.txt"
+    env = {"STUB_LOG": str(log)}
+    if complete:
+        env["FAKE_COMPLETE"] = "1"
+    _run(checkout, **env)
+    calls = log.read_text()
+    tracked = checkout / "RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md"
+    if complete:
+        assert "--from-headless" in calls and "bokeh/doc/CAPABILITY_MATRIX.md" in calls and tracked.exists(), calls
+    else:
+        assert "--from-headless" not in calls and "CAPABILITY_MATRIX_preview_" in calls and not tracked.exists(), calls
 

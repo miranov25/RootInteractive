@@ -218,6 +218,18 @@ def pytest_sessionfinish(session, exitstatus):
     out.mkdir(parents=True, exist_ok=True)
     times = sorted(_TIMES.values(), key=lambda t: (t["start"] or 0))
     problems = []
+    # the run artifact the capability-matrix generator reads (4.2c-2d A-5): which session wrote the reports here,
+    # and whether the run was complete (no marker or keyword deselection) — only a complete run may update the matrix
+    markexpr = session.config.getoption("markexpr") or ""
+    keyword = session.config.getoption("keyword") or ""
+    try:
+        (out / "session.json").write_text(json.dumps({
+            "session": os.environ.get("RI_HEADLESS_SESSION", ""), "markexpr": markexpr, "keyword": keyword,
+            "target": os.environ.get("RI_HEADLESS_TARGET", ""), "tests": len(times),
+            "complete": (not markexpr and not keyword and not os.environ.get("RI_HEADLESS_TARGET")
+                         and [Path(a).resolve() for a in session.config.args] == [HERE])}, indent=1))
+    except Exception as exc:
+        problems.append(f"session artifact failed: {exc!r}")
     try:
         (out / "timings.jsonl").write_text("".join(json.dumps(t) + "\n" for t in times))
         (out / "timings.txt").write_text(_timing_summary(out, times))

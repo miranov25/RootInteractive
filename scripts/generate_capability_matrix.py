@@ -315,6 +315,97 @@ def load_outcomes_from_reports(report_paths: List[Path], verbose: bool = False) 
     return outcomes
 
 
+
+# =============================================================================
+# HEADLESS EVIDENCE (PHASE_4 stage 4.2c-2d): the headless engine's own per-capability verdicts
+# =============================================================================
+# The headless tests express a known defect as an expected failure INSIDE a passing pytest test, so pytest's outcome
+# cannot carry it. The engine writes a verdict per capability into every scenario report (expect.py::feature_status).
+# With --from-headless, those verdicts enter the matrix: only reports of the folder's session (session.json), only
+# healthy runs (no deliberate faults, no harness controls), only taxonomy capabilities (engine labels skipped, any
+# other unknown id is an error). Order: Broken > Known Issue > Unverified > Working — a confirmed known defect is never
+# hidden by an unverified result elsewhere. Evidence of only "response" checks (a value changes and returns) verifies
+# a capability only in part. Without --from-headless nothing in this script's output changes.
+HEADLESS_RANK = {"Working": 0, "Unverified": 1, "Known Issue": 2, "Broken": 3}
+
+
+def load_headless_evidence(folders: List[str], taxonomy: Dict) -> Dict[str, dict]:
+    evidence: Dict[str, dict] = {}
+    for folder in folders:
+        folder = Path(folder)
+        meta_path = folder / "session.json"
+        if not meta_path.is_file():
+            raise SystemExit(f"--from-headless {folder}: no session.json (not the output folder of a finished headless session)")
+        meta = json.loads(meta_path.read_text())
+        sid = meta.get("session")
+        if not sid:
+            raise SystemExit(f"--from-headless {folder}: session.json names no session")
+        found = 0
+        for f in sorted(folder.rglob("report*.json")):
+            try:
+                r = json.loads(f.read_text())
+            except Exception as exc:
+                raise SystemExit(f"--from-headless: unreadable report {f}: {exc}")
+            if r.get("session") != sid:
+                continue                                 # another session's report in a re-used folder
+            found += 1
+            if r.get("kind") not in ("healthy", "fault", "harness"):
+                raise SystemExit(f"--from-headless: report without a valid kind: {f}")
+            if r["kind"] != "healthy":
+                continue
+            base = re.sub(r" \[node\]$", "", r["id"])
+            scopes: Dict[str, set] = {}
+            defects: Dict[str, set] = {}
+            for o in r.get("outcomes", []):
+                feat = o.get("feature") or ""
+                if feat and o.get("assertion", True):
+                    scopes.setdefault(feat, set()).add(o.get("scope", "value"))
+                    m = re.search(r"known defect (\S+?):", o.get("detail", "")) if o.get("outcome") == "XFAIL" else None
+                    if m:
+                        defects.setdefault(feat, set()).add(m.group(1))
+            for feat, status in (r.get("features") or {}).items():
+                if feat.startswith("ENGINE."):
+                    continue
+                if feat not in taxonomy:
+                    raise SystemExit(f"--from-headless: capability {feat!r} of {r['id']} is not in the taxonomy")
+                e = evidence.setdefault(feat, {"status": "Working", "value_evidence": False, "scenarios": {}})
+                if HEADLESS_RANK[status] > HEADLESS_RANK[e["status"]]:
+                    e["status"] = status
+                e["value_evidence"] |= "value" in scopes.get(feat, set())
+                sc = e["scenarios"].setdefault(base, {"backends": set(), "defects": set(), "status": "Working"})
+                sc["backends"].add(r.get("backend", "browser"))
+                sc["defects"] |= defects.get(feat, set())
+                if HEADLESS_RANK[status] > HEADLESS_RANK[sc["status"]]:
+                    sc["status"] = status
+        if found == 0:
+            raise SystemExit(f"--from-headless {folder}: no report of session {sid}")
+    return evidence
+
+
+MATRIX_RANK = [("Broken", 4), ("Known Issue", 3), ("Unknown", 2), ("Partly", 2), ("Working", 1)]
+
+
+def _matrix_rank(status: str) -> int:
+    return next((r for key, r in MATRIX_RANK if key in status), 0)      # Planned / No Tests: no evidence
+
+
+def headless_matrix_status(e: dict) -> str:
+    s = e["status"]
+    if s == "Broken":
+        return "🧨 Broken"
+    if s == "Known Issue":
+        return "⚠️ Known Issue"
+    if s == "Unverified":
+        return "❓ Unknown"
+    return "✅ Working" if e["value_evidence"] else "❓ Partly verified (response only)"
+
+
+def combine_status(status: str, test_count: int, tests: List[str], e: dict) -> Tuple[str, int]:
+    """The worse of the decorator status (if it has tests) and the headless status; counts add up."""
+    h = headless_matrix_status(e)
+    best = h if not tests or _matrix_rank(h) >= _matrix_rank(status) else status
+    return best, (test_count if tests else 0) + len(e["scenarios"])
+
 # =============================================================================
 # STATUS COMPUTATION (P1-2: Multiple matching strategies)
 # =============================================================================
@@ -428,6 +519,7 @@ def generate_matrix(
     test_outcomes: Dict[str, str],
     feature_tests: Dict[str, List[str]],
     verbose: bool = False,
+    headless: Optional[Dict[str, dict]] = None,
 ) -> Tuple[str, dict]:
     """
     Generate CAPABILITY_MATRIX content (Markdown + JSON).
@@ -508,6 +600,8 @@ def generate_matrix(
             tests = feature_tests.get(feature_id, [])
             
             status, test_count, failed = compute_status(feature_id, tests, test_outcomes, taxonomy)
+            if headless and feature_id in headless:                         # PHASE_4 4.2c-2d
+                status, test_count = combine_status(status, test_count, tests, headless[feature_id])
             
             # Update counts
             if "Working" in status:
@@ -526,7 +620,7 @@ def generate_matrix(
                 counts["unknown"] += 1
             
             # Format tests column
-            if tests:
+            if tests or (headless and feature_id in headless):
                 tests_display = f"{test_count} test{'s' if test_count > 1 else ''}"
             else:
                 tests_display = "-"
@@ -547,6 +641,10 @@ def generate_matrix(
                 "planned": info.get("planned", False),
                 "regression": info.get("regression"),
             }
+            if headless and feature_id in headless:                         # PHASE_4 4.2c-2d
+                json_data["features"][feature_id]["headless_scenarios"] = {
+                    sid: {"backends": sorted(v["backends"]), "status": v["status"], "defects": sorted(v["defects"])}
+                    for sid, v in sorted(headless[feature_id]["scenarios"].items())}
         
         lines.extend(["", ""])
     
@@ -582,6 +680,9 @@ def generate_matrix(
         name = info.get("name", feature_id)
         feature_test_list = feature_tests.get(feature_id, [])
         test_count = len(feature_test_list)
+        hl = (headless or {}).get(feature_id)
+        if hl:
+            test_count += len(hl["scenarios"])
         
         lines.append("<details>")
         lines.append(f"<summary><strong>{feature_id}</strong> — {name} ({test_count} tests)</summary>")
@@ -627,11 +728,16 @@ def generate_matrix(
                     status_emoji = "❓"
                 
                 lines.append(f"- {status_emoji} `{nodeid}`")
-        else:
+        elif not hl:
             if info.get("planned"):
                 lines.append("*Feature planned, not yet implemented*")
             else:
                 lines.append("*No tests with @pytest.mark.feature marker*")
+        if hl:                                                              # PHASE_4 4.2c-2d: headless evidence
+            mark = {"Working": "✅", "Known Issue": "⚠️", "Unverified": "❓", "Broken": "🧨"}
+            for sid, v in sorted(hl["scenarios"].items()):
+                extra = f" — known defect {', '.join(sorted(v['defects']))}" if v["defects"] else ""
+                lines.append(f"- {mark[v['status']]} headless scenario `{sid}` ({', '.join(sorted(v['backends']))}){extra}")
         
         lines.append("")
         lines.append("</details>")
@@ -735,6 +841,13 @@ Examples:
         "--from-reports",
         nargs="*",
         help="Read outcomes from existing JSON report files (pytest-json-report format)"
+    )
+    parser.add_argument(
+        "--from-headless",
+        nargs="*",
+        default=[],
+        help="Headless output folders of finished sessions (session.json + scenario reports): the engine's own "
+             "per-capability verdicts of healthy runs enter the matrix (PHASE_4 stage 4.2c-2d)"
     )
     parser.add_argument(
         "--skip-tests",
@@ -843,11 +956,13 @@ Examples:
     # Generate matrix
     # -------------------------------------------------------------------------
     print("\nGenerating capability matrix...")
+    headless = load_headless_evidence(args.from_headless, FEATURE_TAXONOMY) if args.from_headless else None
     markdown, json_data = generate_matrix(
         FEATURE_TAXONOMY,
         test_outcomes,
         feature_tests,
-        args.verbose
+        args.verbose,
+        headless=headless,
     )
     
     # -------------------------------------------------------------------------

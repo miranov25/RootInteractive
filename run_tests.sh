@@ -494,6 +494,7 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
                 for f in outcomes.txt timings.txt; do
                     if [[ -f "$RI_HEADLESS_OUT/$f" ]]; then cp "$RI_HEADLESS_OUT/$f" "$output_dir/$f"; fi
                 done
+                HEADLESS_OUT_DIR="$RI_HEADLESS_OUT"           # for the capability matrix (4.2c-2d)
                 unset RI_HEADLESS_OUT RI_HEADLESS_REQUIRED RI_HEADLESS_CHECK_REQUIRED
                 if [[ -n "$HEADLESS_SAVED_DISPLAY" ]]; then export DISPLAY="$HEADLESS_SAVED_DISPLAY"; fi
             fi
@@ -629,31 +630,51 @@ if [[ $QUICK_MODE -eq 0 ]]; then
         done
     fi
     
+    # PHASE_4 4.2c-2d: the headless engine's verdicts enter the matrix, and only a COMPLETE headless session (the
+    # whole folder, no marker or keyword selection: session.json "complete") may update the tracked matrix. A fast or
+    # partial run writes a preview into test_logs/ and leaves the tracked matrix untouched.
+    HL_DIR="${HEADLESS_OUT_DIR:-}"
+    if [[ -z "$HL_DIR" && -L "$LOG_BASE_DIR/headless_latest" ]]; then
+        HL_DIR="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/headless_latest")/headless_out"
+    fi
+    HL_ARGS=()
+    MATRIX_DEST="$LOG_BASE_DIR/CAPABILITY_MATRIX_preview_${TIMESTAMP}.md"
+    if [[ -n "$HL_DIR" && -f "$HL_DIR/session.json" ]] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("complete") else 1)' "$HL_DIR/session.json"; then
+        MATRIX_DEST="$MATRIX_OUTPUT"
+        HL_ARGS=(--from-headless "$HL_DIR")
+    elif [[ $MATRIX_ONLY -eq 1 ]]; then
+        MATRIX_DEST="$MATRIX_OUTPUT"                 # an explicit --matrix keeps its contract: the tracked matrix,
+        echo "Note: no complete headless session found; the matrix is generated without headless evidence."
+    else
+        echo "Note: no complete headless session in this run (the fast default run, or a partial one); the tracked"
+        echo "      matrix is not updated. Preview: $MATRIX_DEST. A complete run: ./run_tests.sh --full (or --target all)."
+    fi
+
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py"
+        echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py ${HL_ARGS[*]} --output $MATRIX_DEST"
         echo "  Reports: ${REPORT_FILES[*]}"
     else
         # Remove previous outputs so a failed/no-op generator cannot look successful.
-        rm -f "$MATRIX_OUTPUT" "${MATRIX_OUTPUT%.md}.json"
+        rm -f "$MATRIX_DEST" "${MATRIX_DEST%.md}.json"
         if [[ ${#REPORT_FILES[@]} -gt 0 ]]; then
             echo "Using reports:"
             for rf in "${REPORT_FILES[@]}"; do
                 echo "  - $rf"
             done
             python3 scripts/generate_capability_matrix.py \
-                --from-reports "${REPORT_FILES[@]}" \
-                --output "$MATRIX_OUTPUT"
+                --from-reports "${REPORT_FILES[@]}" "${HL_ARGS[@]}" \
+                --output "$MATRIX_DEST"
             if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
         else
             echo "No reports found, running pytest internally..."
-            python3 scripts/generate_capability_matrix.py \
-                --output "$MATRIX_OUTPUT"
+            python3 scripts/generate_capability_matrix.py "${HL_ARGS[@]}" \
+                --output "$MATRIX_DEST"
             if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
         fi
         
-        if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-            print_success "Generated: $MATRIX_OUTPUT"
-            print_success "Generated: ${MATRIX_OUTPUT%.md}.json"
+        if [[ -s "$MATRIX_DEST" && -s "${MATRIX_DEST%.md}.json" ]]; then
+            print_success "Generated: $MATRIX_DEST"
+            print_success "Generated: ${MATRIX_DEST%.md}.json"
         else
             RUN_FAILED=1
             print_error "Failed to generate fresh CAPABILITY_MATRIX outputs"
@@ -676,8 +697,8 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-    echo "Matrix: $MATRIX_OUTPUT"
+if [[ -s "${MATRIX_DEST:-$MATRIX_OUTPUT}" && -s "$(echo "${MATRIX_DEST:-$MATRIX_OUTPUT}" | sed 's/\.md$/.json/')" ]]; then
+    echo "Matrix: ${MATRIX_DEST:-$MATRIX_OUTPUT}"
 fi
 
 echo ""
@@ -745,7 +766,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-[[ -f "$MATRIX_OUTPUT" ]] && echo "  Matrix:    $PROJECT_ROOT/$MATRIX_OUTPUT"
+[[ -f "${MATRIX_DEST:-$MATRIX_OUTPUT}" ]] && echo "  Matrix:    $PROJECT_ROOT/${MATRIX_DEST:-$MATRIX_OUTPUT}"
 [[ -f "$DIFF_PHASE" ]] && echo "  Diff tag:  $PROJECT_ROOT/$DIFF_PHASE"
 [[ -f "$DIFF_LAST" ]] && echo "  Diff HEAD: $PROJECT_ROOT/$DIFF_LAST"
 
@@ -784,8 +805,8 @@ if [[ -f "$LOG_BASE_DIR/joins_${TIMESTAMP}/test.log" ]]; then
 fi
 
 # Collect matrix (unique name, no prefix needed)
-if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-    cp "$MATRIX_OUTPUT" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
+if [[ -s "${MATRIX_DEST:-$MATRIX_OUTPUT}" ]]; then                                  # the matrix of THIS run (4.2c-2d)
+    cp "${MATRIX_DEST:-$MATRIX_OUTPUT}" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
     REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
 fi
 

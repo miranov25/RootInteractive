@@ -26,6 +26,8 @@ class CheckOutcome:
     detail: str
     feature: str = ""
     assertion: bool = True          # False for prerequisites (transport); they never make a scenario OK alone
+    scope: str = "value"            # "value": compared with an oracle; "response": only that it changes and returns
+                                    # (4.2c-2d A-2: response-only evidence verifies a capability only in part)
 
 
 @dataclass
@@ -49,10 +51,12 @@ class ScenarioResult:
     backend: str = "browser"                          # "browser" (tier T3) or "node" (tier T2, proposal v0.3)
     probe_values: Dict[str, object] = field(default_factory=dict)  # per step: probed models' columns, selected rows
     isolation: Dict[str, object] = field(default_factory=dict)     # Node: what the previous document left behind
+    kind: str = "healthy"           # "healthy" | "fault" (a deliberate fault) | "harness" (a control of the engine)
+                                    # — set by the runner from explicit facts (4.2c-2d A-7); the matrix reads healthy only
 
     def add(self, step: int, step_name: str, check: str, outcome: str, detail: str, feature: str = "",
-            assertion: bool = True) -> None:
-        self.outcomes.append(CheckOutcome(step, step_name, check, outcome, detail, feature, assertion))
+            assertion: bool = True, scope: str = "value") -> None:
+        self.outcomes.append(CheckOutcome(step, step_name, check, outcome, detail, feature, assertion, scope))
 
     @property
     def assertions_executed(self) -> int:

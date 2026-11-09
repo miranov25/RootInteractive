@@ -270,7 +270,7 @@ def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: i
     label = f"{c.model}.{c.column} responds to step {c.moved} and returns at step {c.restored}"
     if any(values.get(k) is None for k in c.steps):
         res.add(step, name, label, "ERROR", f"probed column missing at step(s) "
-                f"{[k for k in c.steps if values.get(k) is None]}", feature=feature)
+                f"{[k for k in c.steps if values.get(k) is None]}", feature=feature, scope="response")
         return
     ref, moved, back = (np.asarray(values[k], dtype=np.float64) for k in (c.reference, c.moved, c.restored))
     changed = not compare(moved, ref, kind="float", rel_tol=c.rel_tol, nan_equal=True).ok
@@ -281,7 +281,7 @@ def _responds(res: ScenarioResult, c: Responds, values: Dict[int, list], step: i
         (["no finite value at the reference step"] if not (ref.size > 0 and np.isfinite(ref).any()) else [])
     res.add(step, name, label, "PASS" if ok else "FAIL",
             f"{ref.size} values; changed on the move, restored within relative {c.rel_tol:g}" if ok else "; ".join(why),
-            feature=feature)
+            feature=feature, scope="response")
 
 
 # ------------------------------------------------------------------------------------------- the run
@@ -299,6 +299,7 @@ def run(session: Session, scenario: Scenario, out_root: Path, test_ref: str = ""
                          reproduce=_reproduce(test_ref, scenario.id))
     res.fault = fault.id if fault else ""
     res.backend = "node" if node else "browser"
+    res.kind = _kind(scenario, fault)
     t0 = time.time()
     try:
         df = data_mod.generate(scenario.data.main)
@@ -512,6 +513,9 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
     rules = {e.signature.rule for e in scenario.expect if isinstance(e.signature, EqualsSelection) and step in e.steps}
     rule_masks = {r: SELECTION_RULES[r](masks, state.get("load_masks", masks)) for r in rules}
 
+    # 4.2c-2d A-1: with two or more filters the page's selection is their intersection (LazyIntersectionFilter),
+    # so the check counts for FILTER.intersection; with one filter for FILTER.range
+    sel_feature = "FILTER.intersection" if len(states) >= 2 else "FILTER.range"
     if _load_check_applies(scenario, step) and all(s["value"] == [s["start"], s["end"]] for s in states.values()):
         # the page's own selected-row count, read from the filter every histogram consumes, against the number of
         # rows whose widget columns are finite; only at RootInteractive's default limits (RB-1.4)
@@ -522,7 +526,7 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
             first = page_mod.histogram_models(scenario.page)[0][0]
             sel = pg.evaluate("([m, t, n]) => window.__riH.selected(m, t, n)", [first, HIST_TYPES, len(df)])
             if sel.get("error"):
-                res.add(step, name, LOAD_CHECK, "ERROR", sel["error"], feature="FILTER.range")
+                res.add(step, name, LOAD_CHECK, "ERROR", sel["error"], feature=sel_feature)
             else:
                 n_fin = int(finite.sum())
                 ctx = {f"selection:{r}": [int(m.sum())] for r, m in rule_masks.items()}
@@ -530,9 +534,9 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
                                         scenario.expect, (0.0, 0.0))
                 res.add(step, name, LOAD_CHECK, outcome,
                         f"page selects {sel['count']} rows ({sel['filter']}); rows with finite widget columns {n_fin} "
-                        f"of {len(df)}" + (f"; {why}" if why else ""), feature="FILTER.range")
+                        f"of {len(df)}" + (f"; {why}" if why else ""), feature=sel_feature)
         except Exception as exc:
-            res.add(step, name, LOAD_CHECK, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature="FILTER.range")
+            res.add(step, name, LOAD_CHECK, "ERROR", f"{type(exc).__name__}: {str(exc)[:300]}", feature=sel_feature)
 
     for model, h, wcol in page_mod.histogram_models(scenario.page):
         check = f"{model}.bin_count"
@@ -574,4 +578,14 @@ def _reproduce(test_ref, scenario_id) -> str:
     if current:
         return f"pytest '{current}'   # scenario {scenario_id}"
     return f"pytest {test_ref}   # scenario {scenario_id}" if test_ref else scenario_id
+
+
+def _kind(scenario, fault) -> str:
+    """The report's kind from explicit facts (4.2c-2d A-7): a run with a deliberate fault is "fault"; a scenario of the
+    family "harness" (a control of the engine itself) is "harness"; every other run is "healthy". The id namespace
+    must agree with the family, so the two can never diverge silently."""
+    harness = scenario.labels.family == "harness"
+    if scenario.id.startswith("harness/") != harness:
+        raise ValueError(f"scenario {scenario.id}: the harness/ id namespace and the family {scenario.labels.family!r} disagree")
+    return "fault" if fault else ("harness" if harness else "healthy")
 

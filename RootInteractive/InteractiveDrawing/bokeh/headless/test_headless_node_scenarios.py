@@ -30,3 +30,13 @@ def test_a_declared_defect_check_that_never_ran_fails(tmp_path):
     assert res.ok
     with pytest.raises(AssertionError, match="expected failure B1"):
         assert_as_declared(b1, res)
+
+
+def test_b1_counts_for_filter_intersection(node_session, headless_out):
+    """4.2c-2d A-1 (GPT24): B1 is an intersection defect — with two filters the page's selection check counts for
+    FILTER.intersection, not for FILTER.range; the run is healthy."""
+    b1 = next(s for s in known_defects.SCENARIOS if s.id.startswith("known_defects/b1_two_filters"))
+    res = run(node_session, b1, headless_out, test_ref=__file__)
+    f = res.features()
+    assert f.get("FILTER.intersection") == "Known Issue" and "FILTER.range" not in f and res.kind == "healthy", f
+
