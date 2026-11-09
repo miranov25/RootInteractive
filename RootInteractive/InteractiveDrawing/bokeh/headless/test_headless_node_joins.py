@@ -525,6 +525,135 @@ def test_strict_reverse_index_join_is_correct(node_session, tmp_path):
     raise AssertionError(f"J-D3: unexpected result {out}")
 
 
+# ===================================================================================== J2: recursive joins (AO2D-like)
+# events; tracks -> event row; V0 -> two daughter track rows; cascade -> V0 row and a bachelor track row.
+# Two V0s share track 2 as negative daughter; row 0 referenced at every level; an orphan at every level (-1) and an
+# out-of-range reference (cascade 3 -> V0 7); track 4 has no event (-1).
+E = {"eid": [0, 1, 2, 3], "vz": [0.5, 1.5, 2.5, 3.5]}
+T = {"tid": [0, 1, 2, 3, 4, 5], "ev": [0, 0, 1, 3, -1, 2], "pt": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]}
+V0 = {"vid": [0, 1, 2, 3, 4], "pos": [0, 1, 3, 5, -1], "neg": [2, 2, 4, 0, 1], "mass": [0.49, 0.50, 0.51, 0.52, 0.53]}
+C = {"cid": [0, 1, 2, 3], "v0": [0, 2, 4, 7], "bach": [3, 0, 5, 1], "cmass": [1.32, 1.33, 1.34, 1.35]}
+AO2D = {"E": E, "T": T, "V0": V0, "C": C}
+
+
+def _chain_v0(how):
+    return {"VT": dict(left="V0", right="T", on_left=["pos"], on_right=[], how=how),
+            "VTE": dict(left="VT", right="E", on_left=["ev"], on_right=[], how=how)}
+
+
+def _chain_cascade(how):
+    return {"CV": dict(left="C", right="V0", on_left=["v0"], on_right=[], how=how),
+            "CVT": dict(left="CV", right="T", on_left=["pos"], on_right=[], how=how),
+            "CVTE": dict(left="CVT", right="E", on_left=["ev"], on_right=[], how=how)}
+
+
+V0_KEYS = ["vid", "mass", "tid", "pt", "eid", "vz"]
+C_KEYS = ["cid", "cmass", "vid", "mass", "tid", "pt", "eid", "vz"]
+
+
+@pytest.mark.parametrize("how", ["inner", "left"])
+def test_c6_signature_v0_track_event(node_session, tmp_path, how):
+    """C-6, J2, exact signature: V0 -> track -> event gives exactly the port's result (J-D1 at both levels, J-D2 for
+    inner), which differs from the step-by-step oracle."""
+    _signature(node_session, AO2D, _chain_v0(how), tmp_path, "VTE", V0_KEYS)
+
+
+@pytest.mark.xfail(**STRICT, reason="J-D1 / J-D2 through the chain")
+@pytest.mark.parametrize("how", ["inner", "left"])
+def test_c6_strict_v0_track_event_is_correct(node_session, tmp_path, how):
+    _check(node_session, AO2D, _chain_v0(how), tmp_path, "VTE", V0_KEYS, "J-D1/J-D2 chain")
+
+
+@pytest.mark.parametrize("how", ["inner", "left"])
+def test_c6_signature_cascade_v0_track_event(node_session, tmp_path, how):
+    """C-6, J2, exact signature: cascade -> V0 -> track -> event (three levels)."""
+    _signature(node_session, AO2D, _chain_cascade(how), tmp_path, "CVTE", C_KEYS)
+
+
+@pytest.mark.xfail(**STRICT, reason="J-D1 / J-D2 through the chain")
+@pytest.mark.parametrize("how", ["inner", "left"])
+def test_c6_strict_cascade_v0_track_event_is_correct(node_session, tmp_path, how):
+    _check(node_session, AO2D, _chain_cascade(how), tmp_path, "CVTE", C_KEYS, "J-D1/J-D2 chain")
+
+
+def _right_nested(how):
+    return {"TE": dict(left="T", right="E", on_left=["ev"], on_right=[], how="left"),
+            "VTE2": dict(left="V0", right="TE", on_left=["pos"], on_right=[], how=how)}
+
+
+def test_c6_control_right_nested_identity_references(node_session, tmp_path):
+    """Control: V0 x (track x event) — the outer key lies in a plain table, so J-D5 cannot show; references equal to
+    the row numbers (left joins) make J-D1/J-D2 impossible: the two-level chain equals the oracle exactly."""
+    t = {"E": {"eid": [0, 1, 2, 3, 4, 5], "vz": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]}, "T": {**T, "ev": [0, 1, 2, 3, 4, 5]},
+         "V0": {**V0, "pos": [0, 1, 2, 3, 4]}}                    # identity references at every level
+    _check(node_session, t, _right_nested("left"), tmp_path, "VTE2", V0_KEYS, "control")
+
+
+def test_signature_j_d5_left_nested_chain_is_empty_and_stays_empty(node_session, tmp_path):
+    """J-D5, exact: V0 -> track -> event is empty at load (length 0), and stays empty after the inner join's key
+    column has been computed; only an explicit recomputation gives the rows."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
+    r = node_session.request("new_doc", path=str(_document(tmp_path, AO2D, _chain_v0("left"))))
+    assert r.get("ok"), r
+    code = """() => { const d = Bokeh.documents[Bokeh.documents.length-1], VT = d.get_model_by_name("VT"), VTE = d.get_model_by_name("VTE");
+      const out = {at_load: VTE.get_length(), inner_ev: Array.from(VT.get_column("ev"), v => v === undefined ? null : v)};
+      out.after_inner_computed = VTE.get_length(); VTE.compute_indices(); out.after_recompute = VTE.get_length(); return out; }"""
+    r = node_session.request("eval", code=code, arg=None)
+    assert r.get("ok"), r
+    out = decode(r["result"])
+    assert out == {"at_load": 0, "inner_ev": [0, 0, 3, 2, None], "after_inner_computed": 0, "after_recompute": 5}, out
+
+
+def test_c6_two_daughters_join_of_two_joins_signature(node_session, tmp_path):
+    """C-6, a join whose two inputs are joins: (V0 x positive track) joined with (V0 x negative track) on the V0 id —
+    exactly the port's result."""
+    joins = {"VP": dict(left="V0", right="T", on_left=["pos"], on_right=[], how="left", prefix_right="p_"),
+             "VN": dict(left="V0", right="T", on_left=["neg"], on_right=[], how="left", prefix_right="n_"),
+             "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
+    keys = ["vid", "mass", "p_tid", "p_pt", "n_tid", "n_pt"]
+    out = _read(node_session, AO2D, joins, tmp_path, "VPN", keys)
+    port = _port_columns(AO2D, joins, "VPN", keys)
+    assert not out["throws"] and {k: [_norm(v) for v in out["columns"][k]] for k in keys} == {k: [_norm(v) for v in port[k]] for k in keys}
+
+
+def test_signature_j_d5_key_join_of_joins_pairs_rows_by_position(node_session, tmp_path):
+    """J-D5, exact: when the two joined joins list the V0s at different positions (the negative-daughter join is an
+    inner join that lost a row), the key join pairs rows by position, not by V0 id — exactly the port's result."""
+    joins = {"VP": dict(left="V0", right="T", on_left=["pos"], on_right=[], how="left", prefix_right="p_"),
+             "VN": dict(left="V0", right="T", on_left=["neg"], on_right=[], how="inner", prefix_right="n_"),
+             "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
+    keys = ["vid", "p_tid", "n_tid"]
+    _signature(node_session, AO2D, joins, tmp_path, "VPN", keys)
+
+
+@pytest.mark.parametrize("how", ["inner"])
+def test_c7_associativity_v0_track_event(node_session, tmp_path, how):
+    """C-7 (invariant): (V0 x T) x E and V0 x (T x E) — the oracle gives the same rows both ways; production gives
+    each way exactly the port's result."""
+    right_nested = _right_nested(how)
+    assert _oracle_records(AO2D, _chain_v0(how), "VTE", V0_KEYS) == _oracle_records(AO2D, right_nested, "VTE2", V0_KEYS)
+    for joins, m in ((_chain_v0(how), "VTE"), (right_nested, "VTE2")):
+        out = _read(node_session, AO2D, joins, tmp_path, m, V0_KEYS)
+        assert {k: [_norm(v) for v in out["columns"][k]] for k in V0_KEYS} == \
+            {k: [_norm(v) for v in c] for k, c in _port_columns(AO2D, joins, m, V0_KEYS).items()}
+
+
+@pytest.mark.parametrize("change", ["event_values", "track_to_event_mapping"])
+def test_c8_a_change_of_the_innermost_table_reaches_the_outermost_join(node_session, tmp_path, change):
+    """C-8: after changing the innermost table in Node, the outermost join's event values equal a fresh computation
+    on the new tables — through two levels (V0 x (track x event), where J-D5 cannot show), with no stale cached
+    column. The event values are gathered with the right row numbers, so J-D1 does not touch them: a full oracle check."""
+    if change == "event_values":
+        mutate, new = [{"table": "E", "data": {"vz": [9.5, 8.5, 7.5, 6.5]}}], {**AO2D, "E": {**E, "vz": [9.5, 8.5, 7.5, 6.5]}}
+    else:
+        mutate, new = [{"table": "T", "data": {"ev": [3, 2, 1, 0, 1, 0]}}], {**AO2D, "T": {**T, "ev": [3, 2, 1, 0, 1, 0]}}
+    out = _read(node_session, AO2D, _right_nested("left"), tmp_path, "VTE2", ["vz", "eid"], mutate)
+    assert not out["throws"]
+    expected = [_norm(v) for v in Port(new, _right_nested("left")).column("VTE2", "vz")]
+    oracle = [_norm(v) for v in _oracle(new, _right_nested("left"), "VTE2")["vz"]]
+    assert [_norm(v) for v in out["columns"]["vz"]] == expected == oracle
+
+
 # ===================================================================================== the checks can fail
 def test_the_references_catch_a_wrong_join():
     """The oracle and the port must disagree with deliberately wrong results: a dropped pair, a shifted id."""
