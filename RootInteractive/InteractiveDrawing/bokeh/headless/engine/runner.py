@@ -252,7 +252,7 @@ def _concrete_checks(scenario: Scenario, check, step: int) -> List[Tuple[str, st
     for exactly the outputs that were not verified (4.2b v0.2, GPT24 P1-2), never for the scenario's first feature
     only."""
     if isinstance(check, Auto):
-        out = [(LOAD_CHECK, "FILTER.range")] if _load_check_applies(scenario, step) else []
+        out = [(LOAD_CHECK, _selection_feature(scenario))] if _load_check_applies(scenario, step) else []
         return out + [(f"{m}.bin_count", _hist_feature(h)) for m, h, _ in page_mod.histogram_models(scenario.page)]
     if isinstance(check, Audit):
         return [(f"audit after {check.delay_s} s", "ENGINE.completion")]
@@ -515,7 +515,7 @@ def _auto(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, step: i
 
     # 4.2c-2d A-1: with two or more filters the page's selection is their intersection (LazyIntersectionFilter),
     # so the check counts for FILTER.intersection; with one filter for FILTER.range
-    sel_feature = "FILTER.intersection" if len(states) >= 2 else "FILTER.range"
+    sel_feature = _selection_feature(scenario)
     if _load_check_applies(scenario, step) and all(s["value"] == [s["start"], s["end"]] for s in states.values()):
         # the page's own selected-row count, read from the filter every histogram consumes, against the number of
         # rows whose widget columns are finite; only at RootInteractive's default limits (RB-1.4)
@@ -578,6 +578,13 @@ def _reproduce(test_ref, scenario_id) -> str:
     if current:
         return f"pytest '{current}'   # scenario {scenario_id}"
     return f"pytest {test_ref}   # scenario {scenario_id}" if test_ref else scenario_id
+
+
+def _selection_feature(scenario) -> str:
+    """The capability of the page's selection check (4.2c-2d A-1, follow-up finding 4): with two or more filtered columns
+    the selection is their intersection (LazyIntersectionFilter) — FILTER.intersection; with one, FILTER.range. Used
+    for executed AND not-executed checks, so a skipped or failed check is attributed the same way."""
+    return "FILTER.intersection" if len({w.column for w in scenario.page.widgets}) >= 2 else "FILTER.range"
 
 
 def _kind(scenario, fault) -> str:

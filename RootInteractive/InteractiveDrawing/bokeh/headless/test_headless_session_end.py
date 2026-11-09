@@ -125,3 +125,23 @@ def test_an_inherited_session_id_is_not_reused(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     assert "earlier/inherited_scenario" not in (tmp_path / "outcomes.txt").read_text()
 
+
+def test_completeness_is_judged_from_what_ran():
+    """4.2c-2d follow-up (GPT23, GPT24): a session is complete only if the whole folder ran, nothing was selected away,
+    every test file and every collected test ran, and the session was not interrupted."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import report
+    full = dict(whole_folder=True, selecting=[], test_files={"a.py", "b.py"}, files_run={"a.py", "b.py"}, exitstatus=1,
+                collected=10, executed=10)
+    assert report.completeness(**full) == (True, [])                     # failed tests are measured, not partial
+    for change in ({"whole_folder": False}, {"selecting": ["--ignore"]}, {"files_run": {"a.py"}}, {"exitstatus": 2},
+                   {"executed": 9}):
+        complete, reasons = report.completeness(**{**full, **change})
+        assert not complete and reasons, change
+
+
+def test_a_one_file_session_is_not_complete(tmp_path):
+    r = _session(tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    meta = json.loads((tmp_path / "session.json").read_text())
+    assert meta["complete"] is False and any("whole headless folder" in x for x in meta["incomplete_because"]), meta
+

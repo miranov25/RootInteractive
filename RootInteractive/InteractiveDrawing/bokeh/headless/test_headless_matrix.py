@@ -29,10 +29,14 @@ def _out(folder: Path, session="s1", reports=()):
     return folder
 
 
+_CHECK_OF = {"Working": "PASS", "Known Issue": "XFAIL", "Unverified": "SKIP", "Broken": "FAIL"}
+
+
 def _report(sid, features, kind="healthy", session="s1", outcomes=(), backend="node"):
+    """A synthetic report whose checks agree with its declared statuses, as the engine's reports always do."""
     return {"id": sid, "kind": kind, "session": session, "backend": backend, "features": features,
-            "outcomes": list(outcomes) or [{"feature": f, "outcome": "PASS", "detail": "", "assertion": True, "scope": "value"}
-                                           for f in features]}
+            "outcomes": list(outcomes) or [{"feature": f, "outcome": _CHECK_OF[st], "detail": "", "assertion": True,
+                                            "scope": "value"} for f, st in features.items()]}
 
 
 def _status(tmp_path, *reports, session="s1"):
@@ -107,3 +111,44 @@ def test_report_kind_comes_from_explicit_facts():
     assert _kind(sc("harness/x", "harness"), None) == "harness"
     with pytest.raises(ValueError):
         _kind(sc("harness/x", "histograms"), None)            # the id namespace and the family must agree
+
+
+def _mixed_b1():
+    return _report("known_defects/b1 [node]", {"FILTER.intersection": "Unverified"}, outcomes=[
+        {"feature": "FILTER.intersection", "outcome": "XFAIL", "detail": "known defect B1: rows kept", "assertion": True,
+         "scope": "value"},
+        {"feature": "FILTER.intersection", "outcome": "SKIP", "detail": "not executed", "assertion": True, "scope": "value"}])
+
+
+def test_a_known_defect_and_a_skip_in_one_report_stay_a_known_issue(tmp_path):
+    """GPT23, GPT24: the engine rates such a report Unverified; the matrix must keep the confirmed B1 visible and note
+    the skipped check."""
+    st, ev = _status(tmp_path, _mixed_b1())
+    sc = ev["FILTER.intersection"]["scenarios"]["known_defects/b1"]
+    assert st["FILTER.intersection"] == "⚠️ Known Issue" and sc["defects"] == {"B1"} and sc["skipped"]
+
+
+def test_the_same_through_the_real_generator_command(tmp_path):
+    import subprocess, sys
+    folder = _out(tmp_path / "o", reports=[_mixed_b1()])
+    (tmp_path / "pytest_report.json").write_text(json.dumps({"tests": []}))
+    md = tmp_path / "m.md"
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "generate_capability_matrix.py"), "--from-reports",
+                        str(tmp_path / "pytest_report.json"), "--from-headless", str(folder), "--output", str(md)],
+                       cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
+    text = md.read_text()
+    assert "| `FILTER.intersection` | P1 | ⚠️ Known Issue |" in text and "known defect B1 — also skipped checks" in text
+    assert md.with_suffix(".json").exists()
+
+
+def test_a_not_executed_selection_check_is_attributed_like_an_executed_one():
+    """GPT24 (follow-up finding 4): with several filters a skipped or failed selection check counts for intersection."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import _selection_feature
+    page = lambda *cols: SimpleNamespace(page=SimpleNamespace(widgets=[SimpleNamespace(column=c) for c in cols]))
+    assert _selection_feature(page("a", "b")) == "FILTER.intersection"
+    assert _selection_feature(page("a")) == "FILTER.range"
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import runner
+    src = Path(runner.__file__).read_text()
+    assert "(LOAD_CHECK, _selection_feature(scenario))" in src and "sel_feature = _selection_feature(scenario)" in src
+

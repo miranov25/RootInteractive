@@ -51,6 +51,8 @@ def checkout(tmp_path):
                 Path(out).mkdir(parents=True, exist_ok=True)
                 (Path(out) / "session.json").write_text(json.dumps(
                     {"session": "mini", "complete": bool(os.environ.get("FAKE_COMPLETE"))}))
+                (Path(out) / "main" / "x").mkdir(parents=True, exist_ok=True)
+                (Path(out) / "main" / "x" / "report.json").write_text(json.dumps({"id": "x", "session": "mini"}))
 
         def pytest_unconfigure(config):          # makes the pytest report unreadable after pytest wrote it
             path = getattr(config.option, "json_report_file", None)
@@ -71,7 +73,10 @@ def checkout(tmp_path):
     (tmp_path / "scripts" / "generate_capability_matrix.py").write_text(textwrap.dedent("""\
         import os, sys
         from pathlib import Path
-        open(os.environ["STUB_LOG"], "a").write(" ".join(sys.argv[1:]) + "\\n")    # what run_tests.sh asked for
+        if os.environ.get("STUB_LOG"):
+            open(os.environ["STUB_LOG"], "a").write(" ".join(sys.argv[1:]) + "\\n")    # what run_tests.sh asked for
+        if os.environ.get("STUB_CRASH"):
+            raise RuntimeError("injected generator crash")
         out = Path(sys.argv[sys.argv.index("--output") + 1])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("matrix"); out.with_suffix(".json").write_text("{}")
@@ -93,6 +98,10 @@ def test_a_passing_target_succeeds_with_its_evidence(checkout):
     r = _run(checkout, "--target", "demo_pass")
     assert r.returncode == 0 and "Evidence:" in r.stdout, r.stdout + r.stderr
     assert list((checkout / "test_logs").glob("targets_*.zip"))
+    # its own capability matrix, in its own folder, never the canonical one (4.2c-2d, option C)
+    assert list((checkout / "test_logs").glob("target_demo_pass_*/CAP_MATRIX_demo_pass.md"))
+    assert list((checkout / "test_logs").glob("target_demo_pass_*/CAP_MATRIX_demo_pass.json"))
+    assert not (checkout / "RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md").exists()
 
 
 def test_a_failing_test_fails_the_target_and_keeps_the_evidence(checkout):
@@ -154,19 +163,27 @@ def test_the_normal_run_rejects_a_joins_result_with_zero_tests(checkout, tmp_pat
     assert r.returncode != 0 and "joins: no test counted" in r.stdout, r.stdout[-3000:] + r.stderr
 
 
-@pytest.mark.parametrize("complete", [False, True], ids=["partial_session", "complete_session"])
-def test_only_a_complete_session_updates_the_tracked_matrix(checkout, tmp_path_factory, complete):
-    """4.2c-2d A-6 (GPT22): the tracked matrix is written only from a complete headless session, and then with its
-    headless evidence; otherwise run_tests.sh writes a preview into test_logs/ and leaves the tracked file alone."""
+@pytest.mark.parametrize("case", ["fast_run", "complete_session", "crash"])
+def test_only_a_complete_session_publishes_the_canonical_matrix(checkout, tmp_path_factory, case):
+    """4.2c-2d, the Architect's decision (option C): a complete session publishes CAPABILITY_MATRIX.md/.json; the fast
+    run publishes CAP_MATRIX_fast.md/.json in test_logs/; a crashing generator keeps the previous canonical pair
+    unchanged and fails the run."""
     log = tmp_path_factory.mktemp("stub") / "generator_calls.txt"
-    env = {"STUB_LOG": str(log)}
-    if complete:
-        env["FAKE_COMPLETE"] = "1"
-    _run(checkout, **env)
-    calls = log.read_text()
     tracked = checkout / "RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md"
-    if complete:
-        assert "--from-headless" in calls and "bokeh/doc/CAPABILITY_MATRIX.md" in calls and tracked.exists(), calls
+    tracked.parent.mkdir(parents=True, exist_ok=True)
+    tracked.write_text("PREVIOUS"); tracked.with_suffix(".json").write_text('{"previous": true}')
+    env = {"STUB_LOG": str(log)}
+    if case in ("complete_session", "crash"):
+        env["FAKE_COMPLETE"] = "1"
+    if case == "crash":
+        env["STUB_CRASH"] = "1"
+    r = _run(checkout, **env)
+    calls = log.read_text()
+    fast = checkout / "test_logs" / "CAP_MATRIX_fast.md"
+    if case == "fast_run":
+        assert fast.exists() and fast.with_suffix(".json").exists() and tracked.read_text() == "PREVIOUS", calls
+    elif case == "complete_session":
+        assert "--from-headless" in calls and tracked.read_text() == "matrix" and not fast.exists(), calls
     else:
-        assert "--from-headless" not in calls and "CAPABILITY_MATRIX_preview_" in calls and not tracked.exists(), calls
-
+        assert tracked.read_text() == "PREVIOUS" and tracked.with_suffix(".json").read_text() == '{"previous": true}'
+        assert r.returncode != 0 and "generation failed" in r.stdout, r.stdout[-2000:]

@@ -74,8 +74,11 @@ class ReviewRunnerContracts(unittest.TestCase):
                     matrix.with_suffix('.json').write_text('{}')
                     result = run('--matrix', '-n', '1')
                     self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertFalse(matrix.exists())
-            generator.write_text("from pathlib import Path\np=Path('RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md')\np.write_text('fresh')\np.with_suffix('.json').write_text('{}')\n")
+                    # 4.2c-2d, the Architect's decision (option C, approved by three reviewers): a failed or
+                    # no-op generation keeps the previous matrix unchanged (it was deleted before) and fails the run
+                    self.assertEqual(matrix.read_text(), 'STALE')
+            # the stand-in honours --output, as the real generator does (run_tests.sh generates into a temporary folder)
+            generator.write_text("import sys\nfrom pathlib import Path\np=Path(sys.argv[sys.argv.index('--output')+1])\np.write_text('fresh')\np.with_suffix('.json').write_text('{}')\n")
             result = run('--matrix', '-n', '1')
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             git('tag', '-d', 'PHASE_BEGIN_RootInteractive')

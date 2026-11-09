@@ -222,12 +222,21 @@ def pytest_sessionfinish(session, exitstatus):
     # and whether the run was complete (no marker or keyword deselection) — only a complete run may update the matrix
     markexpr = session.config.getoption("markexpr") or ""
     keyword = session.config.getoption("keyword") or ""
+    opt = session.config.option
+    selecting = [name for name, value in (("-m", markexpr), ("-k", keyword), ("--target", os.environ.get("RI_HEADLESS_TARGET")),
+                                          ("--deselect", getattr(opt, "deselect", None)), ("--ignore", getattr(opt, "ignore", None)),
+                                          ("--ignore-glob", getattr(opt, "ignore_glob", None))) if value]
+    from .engine.report import completeness
+    complete, reasons = completeness(
+        whole_folder=[Path(a).resolve() for a in session.config.args] == [HERE], selecting=selecting,
+        test_files={p.name for p in HERE.glob("test_*.py")},
+        files_run={nid.split("::")[0].rsplit("/", 1)[-1] for nid in _TIMES}, exitstatus=int(exitstatus),
+        collected=int(getattr(session, "testscollected", 0) or 0), executed=len(_TIMES))
     try:
         (out / "session.json").write_text(json.dumps({
             "session": os.environ.get("RI_HEADLESS_SESSION", ""), "markexpr": markexpr, "keyword": keyword,
             "target": os.environ.get("RI_HEADLESS_TARGET", ""), "tests": len(times),
-            "complete": (not markexpr and not keyword and not os.environ.get("RI_HEADLESS_TARGET")
-                         and [Path(a).resolve() for a in session.config.args] == [HERE])}, indent=1))
+            "complete": complete, "incomplete_because": reasons}, indent=1))
     except Exception as exc:
         problems.append(f"session artifact failed: {exc!r}")
     try:

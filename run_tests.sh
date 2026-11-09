@@ -273,6 +273,25 @@ target_markers() {                           # the registered target markers ("<
         | sed -n 's/^@pytest\.mark\.\([a-z_0-9]*\): target: \(.*\)/\1|\2/p' | sort -u -t'|' -k1,1
 }
 
+publish_matrix() {                           # $1: destination .md; the rest: generator arguments
+    # The Architect's decision (4.2c-2d, option C, approved by three reviewers): both files are generated in a temporary
+    # folder and published TOGETHER only on success (both present, the JSON readable); if generation fails or crashes,
+    # the previous pair stays unchanged and the caller fails the run. Measured failures are published.
+    local dest="$1"; shift
+    local tmp; tmp=$(mktemp -d)
+    if python3 scripts/generate_capability_matrix.py "$@" --output "$tmp/matrix.md" \
+            && [[ -s "$tmp/matrix.md" && -s "$tmp/matrix.json" ]] \
+            && python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$tmp/matrix.json"; then
+        mkdir -p "$(dirname "$dest")"
+        mv "$tmp/matrix.md" "$dest" && mv "$tmp/matrix.json" "${dest%.md}.json"
+        local ok=$?
+        rm -rf "$tmp"
+        return $ok
+    fi
+    rm -rf "$tmp"
+    return 1
+}
+
 is_target() {                                # a registered target marker: exact name, never a pattern (4.2c-2c F-1)
     cut -d'|' -f1 <<< "$KNOWN_TARGETS" | grep -qxF -- "${1//-/_}"
 }
@@ -341,6 +360,13 @@ run_target() {
             counts="0 0 0 0 0 0"; note="  REPORT UNREADABLE"; [[ $rc -eq 0 ]] && rc=1
         fi
         [[ $rc -eq 5 ]] && note="  EMPTY SELECTION"
+        # the capability matrix of this target, in its own folder (4.2c-2d; never the canonical matrix)
+        if [[ -f "$out/headless_out/session.json" ]] && find "$out/headless_out" -name 'report*.json' -print -quit | grep -q .; then
+            if ! publish_matrix "$out/CAP_MATRIX_${marker}.md" --from-reports "$out/report.json" \
+                    --from-headless "$out/headless_out" >> "$out/test.log" 2>&1; then
+                note="${note}  MATRIX GENERATION FAILED"; [[ $rc -eq 0 ]] && rc=1
+            fi
+        fi
     fi
     read -r sel pas fai ski ter cer <<< "$counts"
     printf "%-22s %8s %6s %6s %7s %8s %11s %7.1f %4s  %s\n" "$name" "$sel" "$pas" "$fai" "$ski" "$ter" "$cer" \
@@ -630,54 +656,48 @@ if [[ $QUICK_MODE -eq 0 ]]; then
         done
     fi
     
-    # PHASE_4 4.2c-2d: the headless engine's verdicts enter the matrix, and only a COMPLETE headless session (the
-    # whole folder, no marker or keyword selection: session.json "complete") may update the tracked matrix. A fast or
-    # partial run writes a preview into test_logs/ and leaves the tracked matrix untouched.
+    # PHASE_4 4.2c-2d (the Architect's decision, option C, approved by three reviewers): only a COMPLETE full-suite headless
+    # session (session.json "complete") publishes the canonical matrix; any other run publishes CAP_MATRIX_fast (the
+    # fast suite) or CAP_MATRIX_partial (--matrix without a complete session) in test_logs/, each with the evidence it
+    # has. publish_matrix keeps the previous pair if generation fails, and the run then fails.
     HL_DIR="${HEADLESS_OUT_DIR:-}"
     if [[ -z "$HL_DIR" && -L "$LOG_BASE_DIR/headless_latest" ]]; then
         HL_DIR="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/headless_latest")/headless_out"
     fi
     HL_ARGS=()
-    MATRIX_DEST="$LOG_BASE_DIR/CAPABILITY_MATRIX_preview_${TIMESTAMP}.md"
-    if [[ -n "$HL_DIR" && -f "$HL_DIR/session.json" ]] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("complete") else 1)' "$HL_DIR/session.json"; then
-        MATRIX_DEST="$MATRIX_OUTPUT"
+    if [[ -n "$HL_DIR" && -f "$HL_DIR/session.json" ]] && find "$HL_DIR" -name 'report*.json' -print -quit | grep -q .; then
         HL_ARGS=(--from-headless "$HL_DIR")
+    fi
+    if [[ ${#HL_ARGS[@]} -gt 0 ]] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("complete") else 1)' "$HL_DIR/session.json"; then
+        MATRIX_DEST="$MATRIX_OUTPUT"
     elif [[ $MATRIX_ONLY -eq 1 ]]; then
-        MATRIX_DEST="$MATRIX_OUTPUT"                 # an explicit --matrix keeps its contract: the tracked matrix,
-        echo "Note: no complete headless session found; the matrix is generated without headless evidence."
+        MATRIX_DEST="$LOG_BASE_DIR/CAP_MATRIX_partial.md"
+        echo "Note: no complete headless session; the canonical matrix is not updated. Matrix: $MATRIX_DEST"
     else
-        echo "Note: no complete headless session in this run (the fast default run, or a partial one); the tracked"
-        echo "      matrix is not updated. Preview: $MATRIX_DEST. A complete run: ./run_tests.sh --full (or --target all)."
+        MATRIX_DEST="$LOG_BASE_DIR/CAP_MATRIX_fast.md"
+        echo "Note: not a complete full-suite run; the canonical matrix is not updated. Matrix of this run: $MATRIX_DEST"
     fi
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py ${HL_ARGS[*]} --output $MATRIX_DEST"
+        echo "[DRY RUN] Would publish: $MATRIX_DEST (generator ${HL_ARGS[*]})"
         echo "  Reports: ${REPORT_FILES[*]}"
     else
-        # Remove previous outputs so a failed/no-op generator cannot look successful.
-        rm -f "$MATRIX_DEST" "${MATRIX_DEST%.md}.json"
         if [[ ${#REPORT_FILES[@]} -gt 0 ]]; then
             echo "Using reports:"
             for rf in "${REPORT_FILES[@]}"; do
                 echo "  - $rf"
             done
-            python3 scripts/generate_capability_matrix.py \
-                --from-reports "${REPORT_FILES[@]}" "${HL_ARGS[@]}" \
-                --output "$MATRIX_DEST"
-            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+            publish_matrix "$MATRIX_DEST" --from-reports "${REPORT_FILES[@]}" "${HL_ARGS[@]}"
         else
             echo "No reports found, running pytest internally..."
-            python3 scripts/generate_capability_matrix.py "${HL_ARGS[@]}" \
-                --output "$MATRIX_DEST"
-            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+            publish_matrix "$MATRIX_DEST" "${HL_ARGS[@]}"
         fi
-        
-        if [[ -s "$MATRIX_DEST" && -s "${MATRIX_DEST%.md}.json" ]]; then
+        if [[ $? -eq 0 ]]; then
             print_success "Generated: $MATRIX_DEST"
             print_success "Generated: ${MATRIX_DEST%.md}.json"
         else
             RUN_FAILED=1
-            print_error "Failed to generate fresh CAPABILITY_MATRIX outputs"
+            print_error "Capability matrix generation failed; the previous $MATRIX_DEST (if any) is unchanged"
         fi
     fi
 fi

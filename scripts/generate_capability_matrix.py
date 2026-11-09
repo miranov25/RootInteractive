@@ -356,25 +356,33 @@ def load_headless_evidence(folders: List[str], taxonomy: Dict) -> Dict[str, dict
             base = re.sub(r" \[node\]$", "", r["id"])
             scopes: Dict[str, set] = {}
             defects: Dict[str, set] = {}
+            outs: Dict[str, set] = {}
             for o in r.get("outcomes", []):
                 feat = o.get("feature") or ""
                 if feat and o.get("assertion", True):
                     scopes.setdefault(feat, set()).add(o.get("scope", "value"))
+                    outs.setdefault(feat, set()).add(o.get("outcome", ""))
                     m = re.search(r"known defect (\S+?):", o.get("detail", "")) if o.get("outcome") == "XFAIL" else None
                     if m:
                         defects.setdefault(feat, set()).add(m.group(1))
             for feat, status in (r.get("features") or {}).items():
                 if feat.startswith("ENGINE."):
                     continue
+                o = outs.get(feat)
+                if o:            # this report's status from its checks: a known defect is never hidden by a skip
+                    status = ("Broken" if o & {"FAIL", "ERROR", "XPASS"} else "Known Issue" if "XFAIL" in o
+                              else "Unverified" if "SKIP" in o or "PASS" not in o else "Working")
                 if feat not in taxonomy:
                     raise SystemExit(f"--from-headless: capability {feat!r} of {r['id']} is not in the taxonomy")
                 e = evidence.setdefault(feat, {"status": "Working", "value_evidence": False, "scenarios": {}})
                 if HEADLESS_RANK[status] > HEADLESS_RANK[e["status"]]:
                     e["status"] = status
                 e["value_evidence"] |= "value" in scopes.get(feat, set())
-                sc = e["scenarios"].setdefault(base, {"backends": set(), "defects": set(), "status": "Working"})
+                sc = e["scenarios"].setdefault(base, {"backends": set(), "defects": set(), "status": "Working",
+                                                      "skipped": False})
                 sc["backends"].add(r.get("backend", "browser"))
                 sc["defects"] |= defects.get(feat, set())
+                sc["skipped"] |= bool(o and "SKIP" in o and status != "Unverified")
                 if HEADLESS_RANK[status] > HEADLESS_RANK[sc["status"]]:
                     sc["status"] = status
         if found == 0:
@@ -737,6 +745,7 @@ def generate_matrix(
             mark = {"Working": "✅", "Known Issue": "⚠️", "Unverified": "❓", "Broken": "🧨"}
             for sid, v in sorted(hl["scenarios"].items()):
                 extra = f" — known defect {', '.join(sorted(v['defects']))}" if v["defects"] else ""
+                extra += " — also skipped checks" if v.get("skipped") else ""
                 lines.append(f"- {mark[v['status']]} headless scenario `{sid}` ({', '.join(sorted(v['backends']))}){extra}")
         
         lines.append("")

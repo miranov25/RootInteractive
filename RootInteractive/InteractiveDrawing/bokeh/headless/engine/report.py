@@ -127,6 +127,25 @@ def session_id() -> str:
     return os.environ.get("RI_HEADLESS_SESSION", "")
 
 
+def completeness(*, whole_folder: bool, selecting: list, test_files: set, files_run: set, exitstatus: int,
+                 collected: int, executed: int):
+    """Whether a session is a complete run of the headless folder (4.2c-2d, follow-up finding 1): judged from what ran,
+    not only from options. Returns (complete, reasons)."""
+    reasons = []
+    if not whole_folder:
+        reasons.append("not the whole headless folder")
+    if selecting:
+        reasons.append("selected by " + ", ".join(selecting))
+    missing = sorted(set(test_files) - set(files_run))
+    if missing:
+        reasons.append(f"{len(missing)} test file(s) not run, e.g. {missing[:3]}")
+    if exitstatus not in (0, 1):
+        reasons.append(f"session ended with status {exitstatus} (interrupted or not run)")
+    if collected and executed < collected:
+        reasons.append(f"only {executed} of {collected} collected tests ran")
+    return not reasons, reasons
+
+
 def _session_of(path: Path):
     """The session that wrote a report; None if the file cannot be read (it is then never dropped silently)."""
     try:
