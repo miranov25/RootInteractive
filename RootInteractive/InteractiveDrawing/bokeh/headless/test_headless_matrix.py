@@ -142,6 +142,19 @@ def test_the_same_through_the_real_generator_command(tmp_path):
     assert md.with_suffix(".json").exists()
 
 
+def test_every_variant_of_a_parametrized_test_counts():
+    """PHASE_4_3 J4: a failing variant must not hide behind a passing first variant (the join tests are parametrized
+    over the four join modes); the status is the worst over all variants."""
+    st, n, failed = gen.compute_status("F", ["t.py::test_x"], {"t.py::test_x[a]": "passed", "t.py::test_x[b]": "failed"}, {})
+    assert st == "🧨 Broken" and failed == ["t.py::test_x[b]"] and n == 1
+    assert gen.compute_status("F", ["t.py::test_x"], {"t.py::test_x[a]": "passed", "t.py::test_x[b]": "xfailed"}, {})[0] \
+        == "⚠️ Known Issue"
+    assert gen.compute_status("F", ["t.py::test_x"], {"t.py::test_x[a]": "passed", "t.py::test_x[b]": "passed"}, {})[0] \
+        == "✅ Working"                                                       # control: all variants pass
+    assert gen.compute_status("F", ["t.py::test_y"], {"t.py::test_y": "passed", "t.py::test_y_other[a]": "failed"}, {})[0] \
+        == "✅ Working"                                                       # control: a similar name is not a variant
+
+
 def test_a_not_executed_selection_check_is_attributed_like_an_executed_one():
     """GPT24 (follow-up finding 4): with several filters a skipped or failed selection check counts for intersection."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import _selection_feature

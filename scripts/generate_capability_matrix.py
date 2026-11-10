@@ -450,9 +450,19 @@ def compute_status(
     failed_tests = []
     
     for nodeid in feature_test_nodeids:
+        # Strategy 0 (PHASE_4_3 J4): a parametrized test - EVERY variant counts. Before, strategy 4 below took the first
+        # variant found, so a failing later variant (e.g. test_x[outer]) was hidden behind a passing test_x[inner].
+        variants = [k for k in test_outcomes if k.startswith(nodeid + "[")]
+        if variants:
+            for k in variants:
+                outcomes.append(test_outcomes[k])
+                if test_outcomes[k] in ("failed", "error", "xpassed"):
+                    failed_tests.append(k)
+            continue
+
         outcome = None
         matched_nodeid = nodeid
-        
+
         # Strategy 1: Exact match
         outcome = test_outcomes.get(nodeid)
         if outcome:
@@ -836,6 +846,7 @@ Examples:
         nargs="*",
         default=[
             "RootInteractive/InteractiveDrawing/bokeh/test_*.py",
+            "RootInteractive/InteractiveDrawing/bokeh/headless/test_*.py",   # PHASE_4_3 J4: the Node join tests
             "RootInteractive/Tools/test_*.py",
             "RootInteractive/onnx/test_*.py"
         ],

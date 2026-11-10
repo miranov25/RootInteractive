@@ -29,8 +29,15 @@ Findings (provisional ids, B-numbers in the bug report):
         NaN differences pass the tolerance test as "equal", so rows are paired BY POSITION, not by key. Nothing is
         recomputed when the inner column is computed later. A join whose key column lies in a plain table — e.g.
         V0 x (track x event) — is not affected.
+J4 (W0 review, GPT24-GPT27; the contract crosswalk is PHASE_4_3_Joins_Contract_Crosswalk in the docs): C-1 in every
+mode with two keys and with a key repeated on both sides; C-7 as the contract states it (inner key joins on distinct
+keys: associative and correct when every unmatched key is at a table end; with an unmatched key inside a table the two
+orders differ - J-D4 carried by J-D5); C-8 with rows added and removed; J-H1's strict check accepts as a refusal only
+an error that names the sorted-key precondition. Every production test carries its capability feature, so the
+capability matrix shows this Node evidence (JOIN.*).
 """
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -329,6 +336,8 @@ def _oracle_pairs(left, right, how, on_left=("k",), on_right=("kr",)):
 
 
 # ===================================================================================== J1: key joins
+@pytest.mark.feature("JOIN.cdsjoin.outer")
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", MODES)
 def test_c1_key_join_row_pairs_equal_pandas(node_session, tmp_path, how):
     """C-1: on sorted keys with unmatched keys only at the ends, the row pairs equal pandas in every mode."""
@@ -336,6 +345,7 @@ def test_c1_key_join_row_pairs_equal_pandas(node_session, tmp_path, how):
     assert _pairs(out) == _oracle_pairs(KL, KR, how)
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", MODES)
 def test_c4_length_and_every_column(node_session, tmp_path, how):
     """C-4 (R-3): every requested column present, no read exception, each the join's length."""
@@ -344,6 +354,7 @@ def test_c4_length_and_every_column(node_session, tmp_path, how):
     _complete(out, keys, sum(_oracle_pairs(KL, KR, how).values()))
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("side", ["left", "right"])
 def test_c5_row_order_within_equal_keys_does_not_change_the_join(node_session, tmp_path, side):
     """C-5 (R-5): permuting rows inside runs of equal keys, of either input, leaves the id pairs unchanged. General
@@ -360,6 +371,7 @@ def test_c5_row_order_within_equal_keys_does_not_change_the_join(node_session, t
     assert base == _pairs(_read(node_session, {"L": KL, "R": KR}, _kj("outer"), tmp_path, "J", []))
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", MODES)
 def test_c2_right_columns_correct(node_session, tmp_path, how):
     """C-2: right columns equal the right table at the joined right rows (missing for an orphan)."""
@@ -369,18 +381,21 @@ def test_c2_right_columns_correct(node_session, tmp_path, how):
         assert out["columns"][k] == [None if r is None or r < 0 else KR[k][r] for r in _ints(out["ir"])], k
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", MODES)
 def test_signature_j_d1_left_columns(node_session, tmp_path, how):
     """J-D1, exact signature: production equals the port (left columns at the right row numbers) and differs from pandas."""
     _signature(node_session, {"L": KL, "R": KR}, _kj(how), tmp_path, "J", ["lid", "rid", "a", "b"])
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.xfail(**STRICT, reason="J-D1")
 @pytest.mark.parametrize("how", MODES)
 def test_strict_key_join_columns_are_correct(node_session, tmp_path, how):
     _check(node_session, {"L": KL, "R": KR}, _kj(how), tmp_path, "J", ["lid", "rid", "a", "b"], "J-D1")
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 def test_control_j_d1_aligned_rows(node_session, tmp_path):
     """Control: identical one-to-one keys give equal row numbers on both sides; J-D1 cannot show; columns correct."""
     L = {"lid": [0, 1, 2], "k": [1, 2, 3], "a": [10.0, 11.0, 12.0]}
@@ -388,6 +403,7 @@ def test_control_j_d1_aligned_rows(node_session, tmp_path):
     _check(node_session, {"L": L, "R": R}, _kj("inner"), tmp_path, "J", ["lid", "rid", "a", "b"], "control")
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", MODES)
 def test_signature_j_d4_unmatched_key_inside_the_tables(node_session, tmp_path, how):
     """J-D4, exact signature: an unmatched key inside sorted tables makes the merge advance the wrong side."""
@@ -398,6 +414,8 @@ def test_signature_j_d4_unmatched_key_inside_the_tables(node_session, tmp_path, 
     assert Counter(zip(ids(port[0]), ids(port[1]))) != _oracle_pairs(KLI, KRI, how)
 
 
+@pytest.mark.feature("JOIN.cdsjoin.outer")
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.xfail(**STRICT, reason="J-D4")
 @pytest.mark.parametrize("how", MODES)
 def test_strict_key_join_with_an_unmatched_key_inside(node_session, tmp_path, how):
@@ -413,6 +431,7 @@ def test_strict_key_join_with_an_unmatched_key_inside(node_session, tmp_path, ho
 UNSORTED_R = {"rid": [0, 1, 2, 3, 4], "kr": [2, 0, 3, 1, 2], "b": [20.0, 21.0, 22.0, 23.0, 24.0]}
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 def test_j_h1_exact_result_on_unsorted_keys_and_its_sorted_control(node_session, tmp_path):
     """J-H1, exact: the unsorted fixture gives exactly the port's pairs (not just 'different'); the same rows sorted
     give exactly pandas (the paired control)."""
@@ -427,13 +446,32 @@ def test_j_h1_exact_result_on_unsorted_keys_and_its_sorted_control(node_session,
     assert as_ids == _oracle_pairs(KL, sorted_r, "inner")
 
 
+def _is_loud_refusal(out) -> bool:
+    """J-H1 (Q-1 (b)): a refusal counts only if every reported error names the precondition it refuses - sorted keys.
+    Any other error (e.g. "Cannot read properties of undefined") is NOT a refusal: it stays red (GPT27, W0 review).
+    If the developer words the refusal differently, this test fails visibly and the wording is added here."""
+    msgs = list(out["throws"].values())
+    return bool(msgs) and all(re.search(r"sort", str(m), re.I) for m in msgs)
+
+
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.xfail(**STRICT, reason="J-H1 (Q-1 (b))")
 def test_strict_unsorted_keys_join_correctly_or_refuse_loudly(node_session, tmp_path):
     out = _read(node_session, {"L": KL, "R": UNSORTED_R}, _kj("inner"), tmp_path, "J", ["lid"])
-    if out["throws"] or _pairs(out) == _oracle_pairs(KL, UNSORTED_R, "inner"):
-        return
+    if _is_loud_refusal(out) or (not out["throws"] and _pairs(out) == _oracle_pairs(KL, UNSORTED_R, "inner")):
+        return                                                         # fixed: refuses loudly, or joins correctly
+    assert not out["throws"], f"J-H1: an error that is not a refusal of unsorted keys: {out['throws']}"
     known_defect((_ints(out["il"]), _ints(out["ir"])) == Port({"L": KL, "R": UNSORTED_R}, _kj("inner")).indices("J"), "J-H1")
     raise AssertionError("J-H1: silent result matches neither pandas nor the port")
+
+
+def test_the_j_h1_refusal_classifier_is_exact():
+    """Control (GPT27): only errors that name the sorting precondition count as a refusal."""
+    assert _is_loud_refusal({"throws": {"lid": "CDSJoin: keys must be sorted"}})
+    assert _is_loud_refusal({"throws": {"lid": "unsorted key column kr", "length": "Keys not sorted"}})
+    assert not _is_loud_refusal({"throws": {}})                                                   # no error at all
+    assert not _is_loud_refusal({"throws": {"lid": "Cannot read properties of undefined (reading 'map')"}})
+    assert not _is_loud_refusal({"throws": {"lid": "keys must be sorted", "length": "x is not a function"}})
 
 
 # ----- multi-key joins (R-8): which key column is most significant
@@ -445,6 +483,8 @@ def _mk(how="inner"):
     return {"J": dict(left="L", right="R", on_left=["k1", "k2"], on_right=["j1", "j2"], how=how)}
 
 
+@pytest.mark.feature("JOIN.cdsjoin.outer")
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("order", ["last_key_major", "first_key_major"])
 def test_multi_key_join_equals_pandas_in_both_sort_orders(node_session, tmp_path, order):
     """Multi-key (R-8): with the same keys on both sides, the two-key join equals pandas whichever key is major."""
@@ -456,16 +496,67 @@ def test_multi_key_join_equals_pandas_in_both_sort_orders(node_session, tmp_path
     assert got == _oracle_pairs(ML, MR, "outer", ("k1", "k2"), ("j1", "j2"))
 
 
-def test_signature_j_d4_multi_key_unmatched_key_inside(node_session, tmp_path):
-    """J-D4 with two keys, exact: an unmatched key (1, 1) inside the left table gives exactly the port's pairs."""
-    L = {"lid": [0, 1, 2, 3, 4], "k1": [0, 1, 0, 1, 2], "k2": [0, 0, 1, 1, 1]}
-    out = _read(node_session, {"L": L, "R": MR}, _mk("outer"), tmp_path, "J", [])
-    port = Port({"L": L, "R": MR}, _mk("outer")).indices("J")
+# C-1 breadth: a key repeated on BOTH sides gives every combination (many-to-many), in every mode.
+MMR_L = {"lid": [0, 1, 2, 3, 4], "k": [0, 1, 1, 2, 3], "a": [10.0, 11.0, 12.0, 13.0, 14.0]}
+MMR_R = {"rid": [0, 1, 2, 3, 4], "kr": [0, 1, 1, 1, 2], "b": [20.0, 21.0, 22.0, 23.0, 24.0]}
+
+
+@pytest.mark.feature("JOIN.cdsjoin.basic")
+@pytest.mark.parametrize("how", MODES)
+def test_c1_many_to_many_key_join_gives_every_combination(node_session, tmp_path, how):
+    out = _read(node_session, {"L": MMR_L, "R": MMR_R}, _kj(how), tmp_path, "J", [])
+    want = _oracle_pairs(MMR_L, MMR_R, how)
+    assert sum(1 for (l, r) in want.elements() if l in (1, 2) and r in (1, 2, 3)) == 6       # 2 x 3 for key 1
+    assert _pairs(out) == want
+
+
+# C-1 breadth (W0 review, GPT25/GPT26): two keys in every mode. Keys sorted with k2 most significant; an unmatched key
+# at the END of each table - (3, 1) left, (4, 1) right - the case the merge handles correctly, so all modes differ.
+MLX = {"lid": [0, 1, 2, 3, 4], "k1": [0, 1, 0, 2, 3], "k2": [0, 0, 1, 1, 1]}
+MRX = {"rid": [0, 1, 2, 3, 4, 5], "j1": [0, 1, 1, 0, 2, 4], "j2": [0, 0, 0, 1, 1, 1]}
+
+
+def _id_pairs(out, L, R):
+    return Counter((None if a is None else L["lid"][a], None if b is None else R["rid"][b]) for a, b in _pairs(out).elements())
+
+
+@pytest.mark.feature("JOIN.cdsjoin.outer")
+@pytest.mark.feature("JOIN.cdsjoin.basic")
+@pytest.mark.parametrize("how", MODES)
+def test_c1_multi_key_join_rows_equal_pandas_in_every_mode(node_session, tmp_path, how):
+    out = _read(node_session, {"L": MLX, "R": MRX}, _mk(how), tmp_path, "J", [])
+    want = _oracle_pairs(MLX, MRX, how, ("k1", "k2"), ("j1", "j2"))
+    assert _id_pairs(out, MLX, MRX) == want and len(set(map(str, [_oracle_pairs(MLX, MRX, h, ("k1", "k2"), ("j1", "j2")) for h in MODES]))) == 4
+
+
+MLD4 = {"lid": [0, 1, 2, 3, 4], "k1": [0, 1, 0, 1, 2], "k2": [0, 0, 1, 1, 1]}    # (1, 1): unmatched, inside the table
+
+
+@pytest.mark.feature("JOIN.cdsjoin.basic")
+@pytest.mark.parametrize("how", MODES)
+def test_signature_j_d4_multi_key_unmatched_key_inside(node_session, tmp_path, how):
+    """J-D4 with two keys, exact, in every mode: an unmatched key (1, 1) inside the left table gives exactly the
+    port's pairs, which differ from pandas."""
+    out = _read(node_session, {"L": MLD4, "R": MR}, _mk(how), tmp_path, "J", [])
+    port = Port({"L": MLD4, "R": MR}, _mk(how)).indices("J")
     assert (_ints(out["il"]), _ints(out["ir"])) == port
-    ids = Counter(zip([None if x < 0 else L["lid"][x] for x in port[0]], [None if x < 0 else MR["rid"][x] for x in port[1]]))
-    assert ids != _oracle_pairs(L, MR, "outer", ("k1", "k2"), ("j1", "j2"))
+    ids = Counter(zip([None if x < 0 else MLD4["lid"][x] for x in port[0]], [None if x < 0 else MR["rid"][x] for x in port[1]]))
+    assert ids != _oracle_pairs(MLD4, MR, how, ("k1", "k2"), ("j1", "j2"))
 
 
+@pytest.mark.feature("JOIN.cdsjoin.outer")
+@pytest.mark.feature("JOIN.cdsjoin.basic")
+@pytest.mark.xfail(**STRICT, reason="J-D4 (two keys)")
+@pytest.mark.parametrize("how", MODES)
+def test_strict_multi_key_join_with_an_unmatched_key_inside(node_session, tmp_path, how):
+    out = _read(node_session, {"L": MLD4, "R": MR}, _mk(how), tmp_path, "J", [])
+    if _id_pairs(out, MLD4, MR) == _oracle_pairs(MLD4, MR, how, ("k1", "k2"), ("j1", "j2")):
+        return
+    known_defect((_ints(out["il"]), _ints(out["ir"])) == Port({"L": MLD4, "R": MR}, _mk(how)).indices("J"), "J-D4 (two keys)")
+    raise AssertionError("J-D4 (two keys): result matches neither pandas nor the port")
+
+
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 def test_prefixed_names_route_to_their_side(node_session, tmp_path):
     """R-8, prefixes: "l_a" reads the left table's a, "r_b" the right table's b; values per the port (J-D1 applies)."""
     joins = _kj("inner", prefix_left="l_", prefix_right="r_")
@@ -486,6 +577,7 @@ def _ij(how, left="L", right="R"):
     return {"J": dict(left=left, right=right, on_left=["idx"], on_right=[], how=how)}
 
 
+@pytest.mark.feature("JOIN.cdsjoin.basic")
 def test_c3_left_index_join_right_values(node_session, tmp_path):
     """C-3: the left index join keeps every left row; the right values follow idx, row 0 included, missing for -1/7."""
     out = _read(node_session, {"L": IL, "R": IR}, _ij("left"), tmp_path, "J", ["rid", "b"])
@@ -493,16 +585,19 @@ def test_c3_left_index_join_right_values(node_session, tmp_path):
     assert out["columns"]["b"] == [IR["b"][x] if 0 <= x < 5 else None for x in IL["idx"]]
 
 
+@pytest.mark.feature("JOIN.cdsjoin.index0")
 def test_signature_j_d2_and_j_d1_inner_index_join(node_session, tmp_path):
     """J-D2 + J-D1, exact: the inner index join drops row 0 and reads the left columns at the idx values."""
     _signature(node_session, {"L": IL, "R": IR}, _ij("inner"), tmp_path, "J", ["lid", "rid", "a", "b"])
 
 
+@pytest.mark.feature("JOIN.cdsjoin.index0")
 @pytest.mark.xfail(**STRICT, reason="J-D2 / J-D1")
 def test_strict_inner_index_join_is_correct(node_session, tmp_path):
     _check(node_session, {"L": IL, "R": IR}, _ij("inner"), tmp_path, "J", ["lid", "rid", "a", "b"], "J-D2/J-D1")
 
 
+@pytest.mark.feature("JOIN.cdsjoin.index0")
 def test_control_j_d2_without_a_reference_to_row_0(node_session, tmp_path):
     """Control: no index points at row 0, so J-D2 cannot show; the right rows are exactly the valid ones."""
     left = {**IL, "idx": [3, 2, -1, 4, 1, 7]}
@@ -516,6 +611,7 @@ RR = {"rid": [0, 1, 2, 3, 4, 5], "idx": [0, 2, -1, 4, 1, 7], "b": [20.0, 21.0, 2
 REV = {"J": dict(left="L", right="R", on_left=[], on_right=["idx"], how="inner")}
 
 
+@pytest.mark.feature("JOIN.cdsjoin.reverse_index")
 def test_signature_j_d3_reverse_index_join(node_session, tmp_path):
     """J-D3, exact: both index arrays unset and every column read throws the 'map' error the port predicts."""
     out = _read(node_session, {"L": RL, "R": RR}, REV, tmp_path, "J", ["lid", "rid"])
@@ -525,6 +621,7 @@ def test_signature_j_d3_reverse_index_join(node_session, tmp_path):
         Port({"L": RL, "R": RR}, REV).column("J", "lid")
 
 
+@pytest.mark.feature("JOIN.cdsjoin.reverse_index")
 def test_control_j_d3_the_same_relation_in_the_supported_direction(node_session, tmp_path):
     """Control: the same relation with the row numbers in the LEFT table (forward index join, a left join so J-D2
     cannot show) gives the reverse oracle's left values — the oracle and data are sound."""
@@ -560,6 +657,7 @@ def test_the_j_d3_classifier_fails_closed():
     assert not _is_j_d3({**full, "throws": {k: full["throws"][k] + " (extra)" for k in keys}}, keys)   # not exact
 
 
+@pytest.mark.feature("JOIN.cdsjoin.reverse_index")
 @pytest.mark.xfail(**STRICT, reason="J-D3")
 def test_strict_reverse_index_join_is_correct(node_session, tmp_path):
     keys = ["lid", "rid", "a", "b"]
@@ -598,6 +696,7 @@ V0_KEYS = ["vid", "mass", "tid", "pt", "eid", "vz"]
 C_KEYS = ["cid", "cmass", "vid", "mass", "tid", "pt", "eid", "vz"]
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("how", ["inner", "left"])
 def test_c6_signature_v0_track_event(node_session, tmp_path, how):
     """C-6, J2, exact signature: V0 -> track -> event gives exactly the port's result (J-D1 at both levels, J-D2 for
@@ -605,18 +704,21 @@ def test_c6_signature_v0_track_event(node_session, tmp_path, how):
     _signature(node_session, AO2D, _chain_v0(how), tmp_path, "VTE", V0_KEYS)
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.xfail(**STRICT, reason="J-D1 / J-D2 through the chain")
 @pytest.mark.parametrize("how", ["inner", "left"])
 def test_c6_strict_v0_track_event_is_correct(node_session, tmp_path, how):
     _check(node_session, AO2D, _chain_v0(how), tmp_path, "VTE", V0_KEYS, "J-D1/J-D2 chain")
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("how", ["inner", "left"])
 def test_c6_signature_cascade_v0_track_event(node_session, tmp_path, how):
     """C-6, J2, exact signature: cascade -> V0 -> track -> event (three levels)."""
     _signature(node_session, AO2D, _chain_cascade(how), tmp_path, "CVTE", C_KEYS)
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.xfail(**STRICT, reason="J-D1 / J-D2 through the chain")
 @pytest.mark.parametrize("how", ["inner", "left"])
 def test_c6_strict_cascade_v0_track_event_is_correct(node_session, tmp_path, how):
@@ -628,6 +730,7 @@ def _right_nested(how):
             "VTE2": dict(left="V0", right="TE", on_left=["pos"], on_right=[], how=how)}
 
 
+@pytest.mark.feature("JOIN.recursive")
 def test_c6_control_right_nested_identity_references(node_session, tmp_path):
     """Control: V0 x (track x event) — the outer key lies in a plain table, so J-D5 cannot show; references equal to
     the row numbers (left joins) make J-D1/J-D2 impossible: the two-level chain equals the oracle exactly."""
@@ -636,6 +739,7 @@ def test_c6_control_right_nested_identity_references(node_session, tmp_path):
     _check(node_session, t, _right_nested("left"), tmp_path, "VTE2", V0_KEYS, "control")
 
 
+@pytest.mark.feature("JOIN.recursive")
 def test_signature_j_d5_left_nested_chain_is_empty_and_stays_empty(node_session, tmp_path):
     """J-D5, exact: V0 -> track -> event is empty at load (length 0), and stays empty after the inner join's key
     column has been computed; only an explicit recomputation gives the rows."""
@@ -651,6 +755,7 @@ def test_signature_j_d5_left_nested_chain_is_empty_and_stays_empty(node_session,
     assert out == {"at_load": 0, "inner_ev": [0, 0, 3, 9, None], "after_inner_computed": 0, "after_recompute": 5}, out
 
 
+@pytest.mark.feature("JOIN.recursive")
 def test_c6_two_daughters_join_of_two_joins_signature(node_session, tmp_path):
     """C-6, a join whose two inputs are joins: (V0 x positive track) joined with (V0 x negative track) on the V0 id —
     exactly the port's result."""
@@ -663,6 +768,7 @@ def test_c6_two_daughters_join_of_two_joins_signature(node_session, tmp_path):
     assert not out["throws"] and {k: [_norm(v) for v in out["columns"][k]] for k in keys} == {k: [_norm(v) for v in port[k]] for k in keys}
 
 
+@pytest.mark.feature("JOIN.recursive")
 def test_signature_j_d5_key_join_of_joins_pairs_rows_by_position(node_session, tmp_path):
     """J-D5, exact: when the two joined joins list the V0s at different positions (the negative-daughter join is an
     inner join that lost a row), the key join pairs rows by position, not by V0 id — exactly the port's result."""
@@ -681,6 +787,7 @@ def _vpn_joins():
             "VPN": dict(left="VP", right="VN", on_left=["vid"], on_right=["vid"], how="inner")}
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.xfail(**STRICT, reason="J-D5: a key join of joins pairs rows by position")
 def test_strict_key_join_of_joins_pairs_by_v0_id(node_session, tmp_path):
     """J-D5 strict guard (GPT22 item 4, tightened): (V0 x positive track) x (V0 x negative track) joined on the V0 id
@@ -692,6 +799,7 @@ def test_strict_key_join_of_joins_pairs_by_v0_id(node_session, tmp_path):
     _check(node_session, tables, _vpn_joins(), tmp_path, "VPN", ["p_tid", "n_tid"], "J-D5")
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.xfail(**STRICT, reason="J-D5 / J-D1: the association order changes the result")
 def test_c7_strict_production_is_associative(node_session, tmp_path):
     """C-7 directly on production (GPT22 item 2): (V0 x T) x E and V0 x (T x E) must give the same records. Left joins:
@@ -708,6 +816,7 @@ def test_c7_strict_production_is_associative(node_session, tmp_path):
     raise AssertionError("C-7: production differs from the port")
 
 
+@pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("how", ["left"])
 def test_c7_associativity_v0_track_event(node_session, tmp_path, how):
     """C-7 (invariant): (V0 x T) x E and V0 x (T x E) — the oracle gives the same rows both ways; production gives
@@ -720,6 +829,72 @@ def test_c7_associativity_v0_track_event(node_session, tmp_path, how):
             {k: [_norm(v) for v in c] for k, c in _port_columns(AO2D, joins, m, V0_KEYS).items()}
 
 
+# C-7 as the contract states it (W0 review, GPT24-GPT27): INNER key joins on DISTINCT keys, (A x B) x C = A x (B x C).
+# Keys sorted and unique per table. Two fixtures:
+#   CLEAN  every unmatched key at the END of its table, so each single join is correct; then production must be
+#          associative and equal pandas both ways (healthy control). With distinct sorted keys and no inner gap, pairing
+#          by position (J-D5) happens to coincide with pairing by key - so CLEAN cannot show J-D5, only its absence.
+#   GAP    key 11 of B has no partner INSIDE C (J-D4) - the two association orders then differ, each exactly as the port
+#          predicts: J-D4 in the single join, carried and changed by J-D5 in the join of a join.
+CA = {"aid": [0, 1, 2, 3], "k1": [0, 1, 2, 3], "a": [1.0, 1.1, 1.2, 1.3]}
+CB = {"bid": [0, 1, 2, 3], "k1": [0, 1, 2, 4], "k2": [10, 11, 12, 13], "b": [2.0, 2.1, 2.2, 2.3]}
+C7_CLEAN = {"A": CA, "B": CB, "C": {"cid": [0, 1, 2], "k2": [10, 11, 12], "c": [3.0, 3.1, 3.2]}}
+C7_GAP = {"A": CA, "B": CB, "C": {"cid": [0, 1, 2], "k2": [10, 12, 13], "c": [3.0, 3.2, 3.3]}}
+ABC_KEYS = ["aid", "bid", "cid", "a", "b", "c"]
+ABC_LEFT = {"AB": dict(left="A", right="B", on_left=["k1"], on_right=["k1"], how="inner"),
+            "ABC": dict(left="AB", right="C", on_left=["k2"], on_right=["k2"], how="inner")}
+ABC_RIGHT = {"BC": dict(left="B", right="C", on_left=["k2"], on_right=["k2"], how="inner"),
+             "ABC": dict(left="A", right="BC", on_left=["k1"], on_right=["k1"], how="inner")}
+
+
+@pytest.mark.feature("JOIN.recursive")
+@pytest.mark.parametrize("joins", [ABC_LEFT, ABC_RIGHT], ids=["A_x_B_then_C", "A_then_B_x_C"])
+def test_c7_control_clean_inner_key_joins_are_associative_and_correct(node_session, tmp_path, joins):
+    """Control: on CLEAN keys, each single join and both association orders equal pandas (records and row count)."""
+    single = next(m for m in joins if m != "ABC")                         # AB or BC: a join of two plain tables
+    for m in (single, "ABC"):                                             # the single join first, then the nested one
+        keys = ABC_KEYS if m == "ABC" else [k for k in ABC_KEYS if k[0] in m.lower()]
+        sub = {single: joins[single]} if m == single else joins
+        out = _read(node_session, C7_CLEAN, sub, tmp_path, m, keys)
+        _complete(out, keys, sum(_oracle_records(C7_CLEAN, joins, m, keys).values()))
+        assert _records(out["columns"], keys) == _oracle_records(C7_CLEAN, joins, m, keys), (m, out["columns"])
+    assert _oracle_records(C7_CLEAN, ABC_LEFT, "ABC", ABC_KEYS) == _oracle_records(C7_CLEAN, ABC_RIGHT, "ABC", ABC_KEYS)
+
+
+@pytest.mark.feature("JOIN.recursive")
+def test_c7_signature_inner_key_joins_with_an_inner_gap_are_not_associative(node_session, tmp_path):
+    """J-D4 / J-D5 through C-7, exact: on GAP keys both association orders give exactly the port's result (left-nested
+    3 rows, right-nested 1 row); pandas gives the same 2 rows both ways."""
+    want = _oracle_records(C7_GAP, ABC_LEFT, "ABC", ABC_KEYS)
+    assert want == _oracle_records(C7_GAP, ABC_RIGHT, "ABC", ABC_KEYS) and sum(want.values()) == 2
+    got = []
+    for joins in (ABC_LEFT, ABC_RIGHT):
+        out = _read(node_session, C7_GAP, joins, tmp_path, "ABC", ABC_KEYS)
+        port = _port_columns(C7_GAP, joins, "ABC", ABC_KEYS)
+        assert not out["throws"] and {k: [_norm(v) for v in out["columns"][k]] for k in ABC_KEYS} == \
+            {k: [_norm(v) for v in port[k]] for k in ABC_KEYS}, (out, port)
+        assert _records(port, ABC_KEYS) != want
+        got.append(_records(out["columns"], ABC_KEYS))
+    assert got[0] != got[1] and (sum(got[0].values()), sum(got[1].values())) == (3, 1)
+
+
+@pytest.mark.feature("JOIN.recursive")
+@pytest.mark.xfail(**STRICT, reason="J-D4 / J-D5: inner key joins with an inner gap are not associative")
+def test_c7_strict_inner_key_joins_with_an_inner_gap_are_associative(node_session, tmp_path):
+    want = _oracle_records(C7_GAP, ABC_LEFT, "ABC", ABC_KEYS)
+    outs = [_read(node_session, C7_GAP, j, tmp_path, "ABC", ABC_KEYS) for j in (ABC_LEFT, ABC_RIGHT)]
+    for o in outs:
+        assert not o["throws"] and set(o["columns"]) == set(ABC_KEYS), o["throws"]
+    if all(_records(o["columns"], ABC_KEYS) == want for o in outs):
+        return
+    same = all({k: [_norm(v) for v in o["columns"][k]] for k in ABC_KEYS} ==
+               {k: [_norm(v) for v in p[k]] for k in ABC_KEYS}
+               for o, p in zip(outs, (_port_columns(C7_GAP, j, "ABC", ABC_KEYS) for j in (ABC_LEFT, ABC_RIGHT))))
+    known_defect(same, "C-7 violated for inner key joins with an inner gap (J-D4 / J-D5)")
+    raise AssertionError("C-7 (inner key joins): production differs from the port")
+
+
+@pytest.mark.feature("JOIN.change_propagation")
 @pytest.mark.parametrize("change", ["event_values", "track_to_event_mapping"])
 def test_c8_a_change_of_the_innermost_table_reaches_the_outermost_join(node_session, tmp_path, change):
     """C-8: after changing the innermost table in Node, the outermost join's event values equal a fresh computation
@@ -745,6 +920,38 @@ USED = """(a) => {
 }"""
 
 
+# C-8 with rows ADDED or REMOVED (W0 review): the same two-level chain V0 x (track x event); a table changes its length
+# in Node. The event columns (gathered with the right row numbers, untouched by J-D1) must equal the oracle on the new
+# tables in order, with the new length; every column must equal a fresh computation (the port on the new tables).
+C8_ROWS = {
+    "event_added": {"E": {"eid": [0, 1, 2, 3, 4], "vz": [0.5, 1.5, 2.5, 3.5, 4.5]},
+                    "T": {"ev": [0, 0, 1, 4, -1, 9]}},                                  # track 3 now points to event 4
+    "track_removed": {"T": {k: v[:5] for k, v in T.items()}},                            # V0 3 (pos 5) loses its track
+    "v0_added": {"V0": {"vid": [0, 1, 2, 3, 4, 5], "pos": [0, 1, 3, 5, -1, 2], "neg": [2, 2, 4, 0, 8, 1],
+                        "mass": [0.49, 0.50, 0.51, 0.52, 0.53, 0.54]}},
+    "v0_removed": {"V0": {k: v[:3] for k, v in V0.items()}},
+}
+
+
+@pytest.mark.feature("JOIN.change_propagation")
+@pytest.mark.parametrize("change", sorted(C8_ROWS))
+def test_c8_rows_added_or_removed_reach_the_outermost_join(node_session, tmp_path, change):
+    mutate = [{"table": t, "data": d} for t, d in C8_ROWS[change].items()]
+    new = {**AO2D, **{t: {**AO2D[t], **d} for t, d in C8_ROWS[change].items()}}
+    out = _read(node_session, AO2D, _right_nested("left"), tmp_path, "VTE2", V0_KEYS, mutate)
+    rows = lambda tables, t: len(next(iter(tables[t].values())))
+    assert any(rows(new, t) != rows(AO2D, t) for t in C8_ROWS[change])     # a table really changed its length
+    assert not out["throws"], out["throws"]
+    assert out["length"] == rows(new, "V0")                                 # a left join keeps every V0 row
+    oracle = _oracle(new, _right_nested("left"), "VTE2")
+    for k in ("eid", "vz"):
+        assert [_norm(v) for v in out["columns"][k]] == [_norm(v) for v in oracle[k]], k
+    port = _port_columns(new, _right_nested("left"), "VTE2", V0_KEYS)
+    assert {k: [_norm(v) for v in out["columns"][k]] for k in V0_KEYS} == {k: [_norm(v) for v in port[k]] for k in V0_KEYS}
+    assert out["length"] == len(oracle)
+
+
+@pytest.mark.feature("JOIN.change_propagation")
 @pytest.mark.parametrize("change", ["event_values", "track_to_event_mapping"])
 def test_c8_cache_invalidation_on_an_already_used_model(node_session, tmp_path, change):
     """C-8 (GPT22 item 3): read the outermost join (its columns are now cached), change the innermost table, re-read
@@ -847,6 +1054,7 @@ def _ao2d_tables():
             "CL": {"cl_layer": cl["layer"][:N_CLUSTERS], "cl_track_fk": fk["clusters_track_idx"][:N_CLUSTERS]}}, d
 
 
+@pytest.mark.feature("JOIN.prototype_parity")
 def test_j3_tracks_to_events_three_references_agree(node_session, tmp_path):
     """J3: for every track, the production left index join's event row = the fixture's dense foreign key = the parent
     the prototype's inverse index gives back; and the joined event id is the event table's id at that row."""
@@ -860,6 +1068,7 @@ def test_j3_tracks_to_events_three_references_agree(node_session, tmp_path):
     assert _ints(out["columns"]["ev_id"]) == [t["EV"]["ev_id"][p] for p in fk]
 
 
+@pytest.mark.feature("JOIN.prototype_parity")
 def test_j3_inner_join_loses_exactly_the_tracks_of_event_0(node_session, tmp_path):
     """J-D2 on the generated AO2D-shaped fixture, exact: the inner join keeps every track except the tracks of event 0 — exactly as many as the
     prototype lists as event 0's children."""
@@ -872,6 +1081,7 @@ def test_j3_inner_join_loses_exactly_the_tracks_of_event_0(node_session, tmp_pat
     assert lost == _prototype_parent_of(fk, len(t["EV"]["ev_id"])).count(0) == fk.count(0) > 0
 
 
+@pytest.mark.feature("JOIN.prototype_parity")
 def test_j3_clusters_right_nested_event_per_cluster(node_session, tmp_path):
     """J3, two levels: clusters x (tracks x events) gives each cluster's event exactly as the fixture's dense
     clusters_event_idx and as the prototype's two inverse indices composed."""
@@ -889,6 +1099,7 @@ def test_j3_clusters_right_nested_event_per_cluster(node_session, tmp_path):
     assert _ints(out["columns"]["ev_id"]) == [t["EV"]["ev_id"][p] for p in want]
 
 
+@pytest.mark.feature("JOIN.prototype_parity")
 def test_j3_clusters_left_nested_is_empty(node_session, tmp_path):
     """J-D5 on the generated AO2D-shaped fixture, exact: (clusters x tracks) x events is empty at load, as the port predicts."""
     t, _ = _ao2d_tables()
