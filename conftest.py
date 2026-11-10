@@ -160,6 +160,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_aliases: target: production aliases in Node - expressions, functions, parameters, gathers, change propagation (PHASE_4_5 A1)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(
