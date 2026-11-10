@@ -395,6 +395,9 @@ def matched_outcomes(nodeid: str, test_outcomes: Dict[str, str]) -> List[Tuple[s
     return []
 
 
+PARTLY_NOT_RUN = "❓ Partly verified (not every test ran)"      # PHASE_4_5 A2 v0.2 (review F1)
+
+
 def compute_status(
     feature_id: str,
     feature_test_nodeids: List[str],
@@ -413,9 +416,11 @@ def compute_status(
     2. xpassed -> 🧨 Broken (unexpected pass)
     3. xfailed -> ⚠️ Known Issue
     4. unknown/skipped only -> ❓ Unknown
-    5. all passed -> ✅ Working
-    6. no tests + planned -> 📋 Planned
-    7. no tests -> ❌ No Tests
+    5. passed, but a registered test has no result or a test/case was skipped -> ❓ Partly verified (fail closed,
+       PHASE_4_5 A2 review F1: "Working" only when every registered test ran and every case passed)
+    6. all passed -> ✅ Working
+    7. no tests + planned -> 📋 Planned
+    8. no tests -> ❌ No Tests
     """
     if not feature_test_nodeids:
         # Check if feature is planned
@@ -459,8 +464,13 @@ def compute_status(
     known = [o for o in outcomes if o not in ("unknown", "skipped")]
     if not known:
         return "❓ Unknown", test_count, []
-    
-    # Priority 5: All passed
+
+    # Priority 5 (PHASE_4_5 A2 v0.2, review F1): some tests or cases did not run - no result in the reports, or skipped.
+    # The ones that ran cannot vouch for them: never "Working" (fail closed).
+    if len(known) < len(outcomes):
+        return PARTLY_NOT_RUN, test_count, []
+
+    # Priority 6: All passed
     if all(o == "passed" for o in known):
         return "✅ Working", test_count, []
     
@@ -744,6 +754,8 @@ def generate_matrix(
         "| 📋 Planned | Feature planned, not yet tested |",
         "| ❌ No Tests | No tests cover this feature |",
         "| ❓ Unknown | Test status unclear |",
+        "| ❓ Partly verified | The tests that ran pass, but not every registered test or case ran (no result, or "
+        "skipped), or a scenario checked only the response; counted with Unknown in the summary |",
         "",
         "## Priority Levels",
         "",

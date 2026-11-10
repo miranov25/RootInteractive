@@ -185,15 +185,16 @@ def test_after_classes():
 '''
 
 
-def _source_to_matrix(tmp_path, fail: str) -> dict:
+def _source_to_matrix(tmp_path, fail: str, pytest_args=()) -> dict:
     """The REAL path (J4 review M-1): a test file with a helper class -> pytest's own JSON report -> the generator's
-    command line -> its JSON output. Returns the feature's entry."""
+    command line -> its JSON output. Returns the feature's entry. `pytest_args`: extra selection (-k ...)."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     src = tmp_path / "test_fake_matrix.py"
     src.write_text(FAKE_TESTS.replace("{fail}", fail))
     report = tmp_path / "report.json"
     subprocess.run([sys.executable, "-m", "pytest", str(src), "-q", "-p", "no:cacheprovider", "-p", "no:randomly",
-                    "--rootdir", str(tmp_path), "-c", os.devnull, "--json-report", f"--json-report-file={report}"],
+                    "--rootdir", str(tmp_path), "-c", os.devnull, *pytest_args,
+                    "--json-report", f"--json-report-file={report}"],
                    cwd=tmp_path, capture_output=True, text=True, timeout=300)
     assert report.is_file()
     out = tmp_path / "matrix.md"
@@ -216,6 +217,34 @@ def test_a_failed_later_variant_after_a_helper_class_makes_the_feature_broken(tm
     assert broken["test_count"] == 3 and broken["cases"] == 4 and broken["without_result"] == []
     working = _source_to_matrix(tmp_path / "b", "never")
     assert working["status"] == "✅ Working" and working["cases"] == 4
+
+
+def test_a_feature_with_a_test_or_case_that_did_not_run_is_never_working():
+    """PHASE_4_5 A2 review F1 (GPT28, reproduced by GPT24): one passing test must not vouch for a registered test
+    without a result, or for a skipped test or case. The reviewers' counterexamples, then the controls."""
+    two = ["t.py::test_good", "t.py::test_missing"]
+    partly = gen.PARTLY_NOT_RUN
+    assert gen.compute_status("F", two, {"t.py::test_good": "passed"}, {})[0] == partly            # no result
+    assert gen.compute_status("F", two, {"t.py::test_good": "passed", "t.py::test_missing": "skipped"}, {})[0] == partly
+    assert gen.compute_status("F", ["t.py::test_x"], {"t.py::test_x[a]": "passed", "t.py::test_x[b]": "skipped"},
+                              {})[0] == partly                                                     # a skipped case
+    assert gen.compute_status("F", two, {"t.py::test_good": "passed", "t.py::test_missing": "passed"}, {})[0] \
+        == "✅ Working"                                                                            # control: all ran
+    assert gen.compute_status("F", two, {"t.py::test_good": "passed", "t.py::test_missing": "failed"}, {})[0] \
+        == "🧨 Broken"
+    assert gen.compute_status("F", two, {"t.py::test_good": "passed", "t.py::test_missing": "xfailed"}, {})[0] \
+        == "⚠️ Known Issue"
+    assert gen.compute_status("F", two, {}, {})[0] == "❓ Unknown"
+    assert "Working" not in partly and gen._matrix_rank(partly) > gen._matrix_rank("✅ Working")   # never hidden by headless
+
+
+def test_a_deselected_test_makes_the_feature_partly_verified_through_the_real_path(tmp_path):
+    """The same through pytest's own report and the generator's command line: the fake file's last test is deselected
+    (-k), so it has no result; the other tests all pass. Control: the full selection gives Working."""
+    partly = _source_to_matrix(tmp_path / "a", "never", ["-k", "not after_classes"])
+    assert partly["status"] == gen.PARTLY_NOT_RUN and partly["cases"] == 3
+    assert [t.split("::")[-1] for t in partly["without_result"]] == ["test_after_classes"]
+    assert _source_to_matrix(tmp_path / "b", "never")["status"] == "✅ Working"
 
 
 def test_a_test_without_result_is_unknown_and_listed_never_a_pass():

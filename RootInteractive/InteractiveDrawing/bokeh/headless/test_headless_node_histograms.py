@@ -427,7 +427,8 @@ def test_signature_b4_zero_weight_first_gives_nan_moments(node_session, tmp_path
 def test_strict_zero_weight_rows_do_not_spoil_the_weighted_moments(node_session, tmp_path):
     got = _profile(node_session, tmp_path, _one_slice(Y5, B4_W), ("entries", "mean", "std"), weights="w", **UNBINNED)
     m, s = _weighted_moments(Y5, B4_W)
-    if np.allclose([got["mean"][0], got["std"][0]], [m, s], rtol=1e-13):
+    # A2 v0.2 (review F5): the correct result needs the right entries (the summed weights) as well as mean and std
+    if got["entries"] == [float(sum(B4_W))] and np.allclose([got["mean"][0], got["std"][0]], [m, s], rtol=1e-13):
         return
     known_defect(got["entries"] == [4.0] and np.isnan(got["mean"][0]) and np.isnan(got["std"][0]), "B4")
     raise AssertionError(f"B4: neither numpy nor the B4 signature: {got}")
