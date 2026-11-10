@@ -164,6 +164,14 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_widgets: target: interactive widgets in Node - every widget type changes its filter or parameter, histograms and profiles follow (PHASE_4_5 A3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_widgets: target: interactive widgets in Chromium - real keyboard, click and select input on every widget type (PHASE_4_5 A3)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(
