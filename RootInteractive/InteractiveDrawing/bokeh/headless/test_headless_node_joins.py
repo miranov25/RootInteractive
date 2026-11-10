@@ -63,9 +63,12 @@ READ = """(a) => {
   const m = doc.get_model_by_name(a.name);
   if (!m) return {error: "no model named " + a.name};
   const arr = x => (x == null) ? null : Array.from(x, v => (v === undefined || Number.isNaN(v)) ? null : v);
-  const out = {il: arr(m._indices_left), ir: arr(m._indices_right), columns: {}, throws: {}};
-  try { out.length = m.get_length(); } catch (e) { out.throws.length = String(e.message); }
-  for (const k of a.keys) { try { out.columns[k] = arr(m.get_column(k)); } catch (e) { out.throws[k] = String(e.message); } }
+  const out = {il: arr(m._indices_left), ir: arr(m._indices_right), columns: {}, throws: {}, throw_kinds: {}};
+  const isObj = e => e !== null && typeof e === "object";
+  const note = (k, e) => { out.throws[k] = (isObj(e) && "message" in e) ? String(e.message) : String(e);
+                           out.throw_kinds[k] = (isObj(e) && "name" in e) ? String(e.name) : typeof e; };
+  try { out.length = m.get_length(); } catch (e) { note("length", e); }
+  for (const k of a.keys) { try { out.columns[k] = arr(m.get_column(k)); } catch (e) { note(k, e); } }
   return out;
 }"""
 
@@ -446,12 +449,20 @@ def test_j_h1_exact_result_on_unsorted_keys_and_its_sorted_control(node_session,
     assert as_ids == _oracle_pairs(KL, sorted_r, "inner")
 
 
+REFUSAL_WORDING = re.compile(r"\bunsorted\b|\b(?:must be|are not|is not|not)\s+sorted\b", re.I)
+DELIBERATE_KINDS = {"Error", "string"}          # a plain Error or a thrown string - never TypeError, ReferenceError, ...
+
+
 def _is_loud_refusal(out) -> bool:
-    """J-H1 (Q-1 (b)): a refusal counts only if every reported error names the precondition it refuses - sorted keys.
-    Any other error (e.g. "Cannot read properties of undefined") is NOT a refusal: it stays red (GPT27, W0 review).
-    If the developer words the refusal differently, this test fails visibly and the wording is added here."""
-    msgs = list(out["throws"].values())
-    return bool(msgs) and all(re.search(r"sort", str(m), re.I) for m in msgs)
+    """J-H1 (Q-1 (b)): an error counts as a deliberate refusal of unsorted keys only if, for EVERY reported error,
+    (1) it is deliberately thrown - a plain Error or a thrown string, never a JavaScript runtime error such as
+    TypeError ("sort is not a function", "Cannot read properties of undefined (reading 'sort')"), and (2) its message
+    names the precondition: the word "key" and "unsorted" / "must be sorted" / "not sorted" (J4 review H-1, GPT25 and
+    GPT27). Anything else stays red. If the developer words the refusal differently, this test fails visibly and
+    the wording is added here."""
+    msgs, kinds = out["throws"], out.get("throw_kinds", {})
+    return bool(msgs) and all(kinds.get(k) in DELIBERATE_KINDS and REFUSAL_WORDING.search(str(m))
+                              and re.search(r"\bkeys?\b", str(m), re.I) for k, m in msgs.items())
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
@@ -466,12 +477,18 @@ def test_strict_unsorted_keys_join_correctly_or_refuse_loudly(node_session, tmp_
 
 
 def test_the_j_h1_refusal_classifier_is_exact():
-    """Control (GPT27): only errors that name the sorting precondition count as a refusal."""
-    assert _is_loud_refusal({"throws": {"lid": "CDSJoin: keys must be sorted"}})
-    assert _is_loud_refusal({"throws": {"lid": "unsorted key column kr", "length": "Keys not sorted"}})
-    assert not _is_loud_refusal({"throws": {}})                                                   # no error at all
-    assert not _is_loud_refusal({"throws": {"lid": "Cannot read properties of undefined (reading 'map')"}})
-    assert not _is_loud_refusal({"throws": {"lid": "keys must be sorted", "length": "x is not a function"}})
+    """Control (GPT27; J4 review H-1): only deliberate errors that name the sorted-key precondition are a refusal."""
+    def o(**errors):                                     # errors: key -> (kind, message)
+        return {"throws": {k: m for k, (_, m) in errors.items()}, "throw_kinds": {k: t for k, (t, _) in errors.items()}}
+    assert _is_loud_refusal(o(lid=("Error", "CDSJoin: keys must be sorted")))
+    assert _is_loud_refusal(o(lid=("string", "unsorted key column kr"), length=("Error", "Keys not sorted")))
+    assert not _is_loud_refusal(o())                                                              # no error at all
+    assert not _is_loud_refusal(o(lid=("TypeError", "sort is not a function")))                 # the reviewers'
+    assert not _is_loud_refusal(o(lid=("TypeError", "Cannot read properties of undefined (reading 'sort')")))  # cases
+    assert not _is_loud_refusal(o(lid=("TypeError", "keys must be sorted")))                     # a runtime error class
+    assert not _is_loud_refusal(o(lid=("Error", "keys must be sorted"), length=("TypeError", "x is not a function")))
+    assert not _is_loud_refusal(o(lid=("Error", "the result is sorted")))                        # no precondition
+    assert not _is_loud_refusal({"throws": {"lid": "keys must be sorted"}})                      # kind not recorded
 
 
 # ----- multi-key joins (R-8): which key column is most significant
@@ -1107,6 +1124,36 @@ def test_j3_clusters_left_nested_is_empty(node_session, tmp_path):
              "CTE": dict(left="CT", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
     out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
     assert out["length"] == 0 == Port(t, joins).length("CTE") and out["columns"]["ev_id"] == []
+
+
+# The strict partners of the two J3 defect tests above (J4 review M-3): every defect signature has a strict check that
+# asserts the correct result, so the capability row shows the defect (Known Issue), never "Working".
+@pytest.mark.feature("JOIN.prototype_parity")
+@pytest.mark.xfail(**STRICT, reason="J-D2 on the AO2D-shaped fixture")
+def test_j3_strict_inner_join_keeps_the_tracks_of_event_0(node_session, tmp_path):
+    t, d = _ao2d_tables()
+    fk = d["dense_fk"]["tracks_event_idx"]
+    joins = {"TE": dict(left="TR", right="EV", on_left=["trk_event_fk"], on_right=[], how="inner")}
+    out = _read(node_session, t, joins, tmp_path, "TE", [])
+    if _ints(out["ir"]) == [p for p in fk if 0 <= p < len(t["EV"]["ev_id"])]:
+        return                                                             # every track with an event is kept
+    known_defect(_ints(out["ir"]) == [p for p in fk if p > 0] and fk.count(0) > 0, "J-D2 on the AO2D-shaped fixture")
+    raise AssertionError("J3 inner join: neither the oracle nor the J-D2 signature")
+
+
+@pytest.mark.feature("JOIN.prototype_parity")
+@pytest.mark.xfail(**STRICT, reason="J-D5 on the AO2D-shaped fixture")
+def test_j3_strict_clusters_left_nested_gives_each_cluster_its_event(node_session, tmp_path):
+    t, d = _ao2d_tables()
+    joins = {"CT": dict(left="CL", right="TR", on_left=["cl_track_fk"], on_right=[], how="left"),
+             "CTE": dict(left="CT", right="EV", on_left=["trk_event_fk"], on_right=[], how="left")}
+    out = _read(node_session, t, joins, tmp_path, "CTE", ["ev_id"])
+    want = [t["EV"]["ev_id"][p] for p in d["dense_fk"]["clusters_event_idx"][:N_CLUSTERS]]
+    if not out["throws"] and out["length"] == N_CLUSTERS and _ints(out["columns"]["ev_id"]) == want:
+        return                                                             # left-nested = right-nested = the fixture
+    known_defect(not out["throws"] and out["length"] == 0 == Port(t, joins).length("CTE")
+                 and out["columns"].get("ev_id") == [], "J-D5 on the AO2D-shaped fixture")
+    raise AssertionError("J3 left-nested chain: neither the oracle nor the J-D5 signature")
 
 
 # ===================================================================================== the AO2D fixture safeguards

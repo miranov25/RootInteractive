@@ -63,6 +63,7 @@ Date: 2026-02-02
 Version: 1.1
 """
 
+import ast
 import subprocess
 import json
 import tempfile
@@ -93,107 +94,73 @@ sys.path.insert(0, str(PROJECT_ROOT / "RootInteractive" / "InteractiveDrawing" /
 # FEATURE MARKER PARSING (P1-1: Canonical form only)
 # =============================================================================
 
+FEATURE_ID = re.compile(r"[A-Z]+(?:\.\w+)+")
+
+
+def _feature_ids(decorators) -> List[str]:
+    """The ids of the canonical markers @pytest.mark.feature("ID") among a node's decorators."""
+    out = []
+    for d in decorators:
+        if (isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr == "feature"
+                and isinstance(d.func.value, ast.Attribute) and d.func.value.attr == "mark"
+                and isinstance(d.func.value.value, ast.Name) and d.func.value.value.id == "pytest"
+                and d.args and isinstance(d.args[0], ast.Constant) and isinstance(d.args[0].value, str)
+                and FEATURE_ID.fullmatch(d.args[0].value)):
+            out.append(d.args[0].value)
+    return out
+
+
+def _test_file_id(filepath: Path) -> str:
+    """The file part of a pytest node id: the path relative to the project root (pytest's rootdir), else as given."""
+    try:
+        return filepath.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return filepath.as_posix()
+
+
 def parse_feature_markers_from_files(test_pattern: str, verbose: bool = False) -> Dict[str, List[str]]:
     """
     Parse @pytest.mark.feature("feature_id") markers from test files.
-    
-    P1-1 Fix: Only supports canonical form:
-        @pytest.mark.feature("DSL.arithmetic_expr")
-    
-    P2-1 Fix: Regex supports multi-dot IDs like "ENC.base64.float64"
-    
+
+    Only the canonical form is supported: @pytest.mark.feature("DSL.arithmetic_expr"), ids with several dots allowed.
+
+    PHASE_4_3 J4 v0.6 (review M-1): the file is read as Python syntax (ast), not line by line. A test function gets a
+    class segment only if it is defined INSIDE that class - before, the class of the last `class` line was attached
+    to every later module-level test (e.g. after a helper class `Port`), so its results were never found. The file
+    part is the path relative to the project root, as in pytest's node ids; markers in strings or comments are
+    ignored by construction. Marked classes are ignored, as before (no test file has one).
+
     Returns dict mapping feature_id -> [list of test nodeids]
     """
     feature_tests = {}
-    test_files = glob.glob(str(PROJECT_ROOT / test_pattern))
-    
+    test_files = sorted(glob.glob(str(PROJECT_ROOT / test_pattern)))
+
     if verbose:
         print(f"Scanning {len(test_files)} test files...")
-    
+
     for filepath in test_files:
         filepath = Path(filepath)
-        
         try:
-            with open(filepath) as f:
-                content = f.read()
-        except (FileNotFoundError, PermissionError) as e:
+            tree = ast.parse(filepath.read_text(), filename=str(filepath))
+        except (FileNotFoundError, PermissionError, SyntaxError, UnicodeDecodeError) as e:
             if verbose:
                 print(f"  Warning: Cannot read {filepath}: {e}")
             continue
-        
-        lines = content.split('\n')
-        current_class = None
-        pending_features = []
-        in_triple_quote = False
-        triple_quote_char = None
-        
-        for i, line in enumerate(lines):
-            # Track triple-quoted strings (skip markers inside docstrings)
-            for quote in ['"""', "'''"]:
-                count = line.count(quote)
-                if count > 0:
-                    if not in_triple_quote:
-                        in_triple_quote = True
-                        triple_quote_char = quote
-                        if count % 2 == 0:
-                            in_triple_quote = False
-                            triple_quote_char = None
-                    elif quote == triple_quote_char:
-                        if count % 2 == 1:
-                            in_triple_quote = False
-                            triple_quote_char = None
-                    break
-            
-            if in_triple_quote:
+        file_id = _test_file_id(filepath)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+                found = [(f"{file_id}::{node.name}", _feature_ids(node.decorator_list))]
+            elif isinstance(node, ast.ClassDef):
+                found = [(f"{file_id}::{node.name}::{m.name}", _feature_ids(m.decorator_list)) for m in node.body
+                         if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name.startswith("test")]
+            else:
                 continue
-            
-            # Skip comments
-            stripped = line.strip()
-            if stripped.startswith('#'):
-                continue
-            
-            # Track class context
-            class_match = re.match(r'^class (\w+)', line)
-            if class_match:
-                current_class = class_match.group(1)
-                pending_features = []
-                continue
-            
-            # P1-1 + P2-1: Match canonical form with multi-dot support
-            # Examples: "DSL.arithmetic_expr", "ENC.base64.float64"
-            feature_match = re.match(
-                r'\s*@pytest\.mark\.feature\(["\']([A-Z]+(?:\.\w+)+)["\']\)',
-                line
-            )
-            if feature_match:
-                pending_features.append(feature_match.group(1))
-                continue
-            
-            # Match test definition
-            test_match = re.match(r'\s*def (test_\w+)\(', line)
-            if test_match:
-                test_name = test_match.group(1)
-                basename = filepath.name
-                
-                if current_class:
-                    nodeid = f"{basename}::{current_class}::{test_name}"
-                else:
-                    nodeid = f"{basename}::{test_name}"
-                
-                for feature_id in pending_features:
-                    if feature_id not in feature_tests:
-                        feature_tests[feature_id] = []
-                    feature_tests[feature_id].append(nodeid)
+            for nodeid, features in found:
+                for feature_id in features:
+                    feature_tests.setdefault(feature_id, []).append(nodeid)
                     if verbose:
                         print(f"  Found: {feature_id} -> {nodeid}")
-                
-                pending_features = []
-            
-            # Reset on non-decorator lines (but keep for stacked decorators)
-            if stripped and not stripped.startswith('@') and not stripped.startswith('def '):
-                if not stripped.startswith('#'):
-                    pending_features = []
-    
+
     return feature_tests
 
 
@@ -415,8 +382,18 @@ def combine_status(status: str, test_count: int, tests: List[str], e: dict) -> T
     return best, (test_count if tests else 0) + len(e["scenarios"])
 
 # =============================================================================
-# STATUS COMPUTATION (P1-2: Multiple matching strategies)
+# STATUS COMPUTATION (PHASE_4_3 J4 v0.6: exact matching, every variant)
 # =============================================================================
+
+def matched_outcomes(nodeid: str, test_outcomes: Dict[str, str]) -> List[Tuple[str, str]]:
+    """The report entries of one test: its exact node id or its parametrized variants "<nodeid>[...]"; the
+    project-relative form first, then the file-name form. Empty if the test has no result."""
+    for form in (nodeid, nodeid.split("/")[-1]):
+        hits = sorted((k, v) for k, v in test_outcomes.items() if k == form or k.startswith(form + "["))
+        if hits:
+            return hits
+    return []
+
 
 def compute_status(
     feature_id: str,
@@ -427,7 +404,7 @@ def compute_status(
     """
     Compute feature status from test outcomes.
     
-    P1-2 Fix: Multiple nodeid matching strategies.
+    PHASE_4_3 J4 v0.6: exact node-id matching, every parametrized variant counts (matched_outcomes).
     
     Returns (status_string, test_count, failed_tests)
     
@@ -448,60 +425,22 @@ def compute_status(
     
     outcomes = []
     failed_tests = []
-    
+
     for nodeid in feature_test_nodeids:
-        # Strategy 0 (PHASE_4_3 J4): a parametrized test - EVERY variant counts. Before, strategy 4 below took the first
-        # variant found, so a failing later variant (e.g. test_x[outer]) was hidden behind a passing test_x[inner].
-        variants = [k for k in test_outcomes if k.startswith(nodeid + "[")]
-        if variants:
-            for k in variants:
-                outcomes.append(test_outcomes[k])
-                if test_outcomes[k] in ("failed", "error", "xpassed"):
-                    failed_tests.append(k)
+        # PHASE_4_3 J4 v0.6 (review M-1): EXACT matching only. A test's results are the report entries with exactly its
+        # node id, or its node id followed by a parameter list "[...]" - EVERY variant counts. The project-relative
+        # form is tried first, then the file-name form (reports from a run started elsewhere). The former suffix,
+        # test-name and substring strategies are gone: they could attribute another test's result (test_x to
+        # test_x_other) or only the first variant of a parametrized test. No match -> "unknown", never a pass.
+        hits = matched_outcomes(nodeid, test_outcomes)
+        if not hits:
+            outcomes.append("unknown")
             continue
+        for key, outcome in hits:
+            outcomes.append(outcome)
+            if outcome in ("failed", "error", "xpassed"):
+                failed_tests.append(key)
 
-        outcome = None
-        matched_nodeid = nodeid
-
-        # Strategy 1: Exact match
-        outcome = test_outcomes.get(nodeid)
-        if outcome:
-            matched_nodeid = nodeid
-        
-        # Strategy 2: Without directory prefix (match suffix)
-        if outcome is None:
-            for key, val in test_outcomes.items():
-                if key.endswith(nodeid) or nodeid.endswith(key.split("/")[-1]):
-                    outcome = val
-                    matched_nodeid = key
-                    break
-        
-        # Strategy 3: Just test name (last :: segment)
-        if outcome is None:
-            test_name = nodeid.split("::")[-1]
-            for key, val in test_outcomes.items():
-                if key.endswith("::" + test_name) or key.endswith(test_name):
-                    outcome = val
-                    matched_nodeid = key
-                    break
-        
-        # Strategy 4: Fuzzy match on file::test
-        if outcome is None:
-            # Extract file.py::test_name pattern
-            parts = nodeid.split("::")
-            if len(parts) >= 2:
-                file_test = f"{parts[0]}::{parts[-1]}"
-                for key, val in test_outcomes.items():
-                    if file_test in key:
-                        outcome = val
-                        matched_nodeid = key
-                        break
-        
-        outcomes.append(outcome or "unknown")
-        
-        if outcome in ("failed", "error", "xpassed"):
-            failed_tests.append(matched_nodeid)
-    
     test_count = len(feature_test_nodeids)
     
     # Priority 1: Any failed = broken
@@ -637,9 +576,17 @@ def generate_matrix(
             else:
                 counts["unknown"] += 1
             
-            # Format tests column
+            # Format tests column. PHASE_4_3 J4 v0.6 (review M-2): test functions, executed cases (every parameter
+            # variant is a case) and functions without any result in the reports are shown separately.
+            hits = {n: matched_outcomes(n, test_outcomes) for n in tests}
+            cases = sum(len(h) for h in hits.values())
+            without_result = sorted(n for n, h in hits.items() if not h)
             if tests or (headless and feature_id in headless):
-                tests_display = f"{test_count} test{'s' if test_count > 1 else ''}"
+                tests_display = f"{test_count} test{'s' if test_count != 1 else ''}"
+                if tests:
+                    tests_display += f", {cases} case{'s' if cases != 1 else ''}"
+                    if without_result:
+                        tests_display += f", {len(without_result)} without result"
             else:
                 tests_display = "-"
             
@@ -654,6 +601,8 @@ def generate_matrix(
                 "backends": info.get("backends", []),
                 "layer": layer,
                 "test_count": test_count,
+                "cases": cases,
+                "without_result": without_result,
                 "tests": tests,
                 "failed_tests": failed,
                 "planned": info.get("planned", False),

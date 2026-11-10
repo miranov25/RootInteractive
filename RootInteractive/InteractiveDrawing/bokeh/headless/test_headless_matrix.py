@@ -6,6 +6,9 @@ reports) and checks one rule; the report-kind rule of the engine is checked at t
 """
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -153,6 +156,74 @@ def test_every_variant_of_a_parametrized_test_counts():
         == "✅ Working"                                                       # control: all variants pass
     assert gen.compute_status("F", ["t.py::test_y"], {"t.py::test_y": "passed", "t.py::test_y_other[a]": "failed"}, {})[0] \
         == "✅ Working"                                                       # control: a similar name is not a variant
+
+
+FAKE_TESTS = '''import pytest
+
+
+class Port:                                   # a helper class before the tests, as in test_headless_node_joins.py
+    def run(self):
+        return 1
+
+
+@pytest.mark.feature("JOIN.change_propagation")
+@pytest.mark.parametrize("how", ["inner", "outer"])
+def test_x(how):
+    assert how != "{fail}"
+
+
+class TestGroup:
+    @pytest.mark.feature("JOIN.change_propagation")
+    def test_in_class(self):
+        assert True
+
+
+@pytest.mark.feature("JOIN.change_propagation")
+def test_after_classes():
+    """@pytest.mark.feature("JOIN.recursive") inside a docstring is not a marker"""
+    assert True
+'''
+
+
+def _source_to_matrix(tmp_path, fail: str) -> dict:
+    """The REAL path (J4 review M-1): a test file with a helper class -> pytest's own JSON report -> the generator's
+    command line -> its JSON output. Returns the feature's entry."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    src = tmp_path / "test_fake_matrix.py"
+    src.write_text(FAKE_TESTS.replace("{fail}", fail))
+    report = tmp_path / "report.json"
+    subprocess.run([sys.executable, "-m", "pytest", str(src), "-q", "-p", "no:cacheprovider", "-p", "no:randomly",
+                    "--rootdir", str(tmp_path), "-c", os.devnull, "--json-report", f"--json-report-file={report}"],
+                   cwd=tmp_path, capture_output=True, text=True, timeout=300)
+    assert report.is_file()
+    out = tmp_path / "matrix.md"
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "generate_capability_matrix.py"), "--test-dir", str(src), "--from-reports", str(report),
+                        "--output", str(out)], cwd=ROOT, capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return json.loads(out.with_suffix(".json").read_text())["features"]["JOIN.change_propagation"]
+
+
+def test_a_failed_later_variant_after_a_helper_class_makes_the_feature_broken(tmp_path):
+    """J4 review M-1 (GPT25, reproduced by GPT24): after a helper class, a module-level parametrized test whose SECOND
+    variant fails must give Broken - before, the misnamed test id fell through to fuzzy matching and gave Working.
+    Control: with no failing variant the same file gives Working. Also: no class segment on module-level tests, a
+    class segment inside a test class, docstring markers ignored, and cases counted per variant."""
+    broken = _source_to_matrix(tmp_path / "a", "outer")
+    assert broken["status"] == "🧨 Broken" and [t.split("::")[-1] for t in broken["failed_tests"]] == ["test_x[outer]"]
+    assert [t.split("/")[-1] for t in broken["tests"]] == ["test_fake_matrix.py::test_x",
+                                                          "test_fake_matrix.py::TestGroup::test_in_class",
+                                                          "test_fake_matrix.py::test_after_classes"]
+    assert broken["test_count"] == 3 and broken["cases"] == 4 and broken["without_result"] == []
+    working = _source_to_matrix(tmp_path / "b", "never")
+    assert working["status"] == "✅ Working" and working["cases"] == 4
+
+
+def test_a_test_without_result_is_unknown_and_listed_never_a_pass():
+    """Exact matching (J4 review M-1): a similar name is not a result, and a missing result is shown."""
+    hits = gen.matched_outcomes("d/t.py::test_x", {"d/t.py::test_x_other": "failed", "t.py::test_x_other": "failed"})
+    assert hits == []
+    assert gen.compute_status("F", ["d/t.py::test_x"], {"d/t.py::test_x_other": "passed"}, {})[0] == "❓ Unknown"
+    assert gen.matched_outcomes("d/t.py::test_x", {"t.py::test_x[a]": "passed"}) == [("t.py::test_x[a]", "passed")]
 
 
 def test_a_not_executed_selection_check_is_attributed_like_an_executed_one():
