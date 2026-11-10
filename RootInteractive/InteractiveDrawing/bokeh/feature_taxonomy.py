@@ -272,6 +272,14 @@ FEATURE_TAXONOMY = {
         "layer": "build",
         "proof": "wasm/Makefile",
     },
+    "WASM.integration": {                       # PHASE_4_4 W2
+        "name": "WASM in RootInteractive",
+        "description": "CustomWasmModule loads a WASM binary; CustomWasmFunc applies its functions to table columns",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "test_wasm_integration.py",
+    },
     "WASM.scalar.arithmetic": {
         "name": "WASM scalar arithmetic",
         "description": "Scalar evaluation of basic arithmetic (fun1, fun2)",
