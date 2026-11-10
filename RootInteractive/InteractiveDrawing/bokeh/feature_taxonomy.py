@@ -209,29 +209,35 @@ FEATURE_TAXONOMY = {
         "name": "1D histogram",
         "description": "1D histogram binning (HistogramCDS)",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_histograms.py",
     },
     "HIST.histogram_nd": {
         "name": "N-D histogram",
         "description": "N-dimensional histogram (HistoNdCDS)",
         "priority": "P2",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_histograms.py",
     },
 
     "HIST.profile": {
         "name": "Histogram profile",
         "description": "Profile of an N-D histogram along one axis: mean, sigma, quantiles per bin (HistoNdProfile)",
         "priority": "P2",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_histograms.py",
+    },
+    # PHASE_4_5 A2: unbinned profile statistics (headless/test_headless_node_histograms.py; B4, B5, B5b)
+    "HIST.profile_unbinned": {
+        "name": "Unbinned profile statistics",
+        "description": "Profile statistics from the rows' raw values (unbinned_projections): mean, sigma, quantiles",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_histograms.py",
     },
 
     # =========================================================================
@@ -241,10 +247,9 @@ FEATURE_TAXONOMY = {
         "name": "Range filter",
         "description": "Row selection by a range widget (RangeFilter), inclusive limits, missing values excluded",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_histograms.py",
     },
 
     "FILTER.intersection": {
