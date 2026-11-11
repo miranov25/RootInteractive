@@ -204,6 +204,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "browser_legacy_dashboards: target: RootInteractive's own example dashboards (test_bokehClientHistogram.py) end to end in Chromium on a reproducible table - real widget input, every affected histogram against numpy, drawn plots, restore (PHASE_4_7)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(

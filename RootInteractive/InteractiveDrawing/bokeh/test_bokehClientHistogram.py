@@ -5,8 +5,17 @@ from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveParameters import 
 from RootInteractive.Tools.compressArray import arrayCompressionRelative16
 from pandas import CategoricalDtype
 from bokeh.transform import factor_mark, factor_cmap, linear_cmap
+import os
 
-df = pd.DataFrame(np.random.random_sample(size=(500000, 4)), columns=list('ABCD'))
+# PHASE_4_7 dashboard tests: opt-in reproducible table. Both RI_DASHBOARD_ROWS and RI_DASHBOARD_SEED must be set;
+# without them the original 500,000 unseeded rows are used, exactly as before.
+_riRows, _riSeed = os.environ.get("RI_DASHBOARD_ROWS"), os.environ.get("RI_DASHBOARD_SEED")
+if _riRows is None and _riSeed is None:
+    df = pd.DataFrame(np.random.random_sample(size=(500000, 4)), columns=list('ABCD'))
+elif _riRows is not None and _riSeed is not None:
+    df = pd.DataFrame(np.random.default_rng(int(_riSeed)).random(size=(int(_riRows), 4)), columns=list('ABCD'))
+else:
+    raise ValueError("set both RI_DASHBOARD_ROWS and RI_DASHBOARD_SEED, or neither")
 initMetadata(df)
 MARKERS = ['hex', 'circle_x', 'triangle','square']
 markerFactor=factor_mark('DDC', MARKERS, ["A0","A1","A2","A3","A4"] )

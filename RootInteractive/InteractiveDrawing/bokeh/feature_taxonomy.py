@@ -360,6 +360,17 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_display.py",
     },
+    "DASHBOARD.histogram_only": {
+        "name": "Example dashboard: histograms only (testBokehClientHistogramOnlyHisto)",
+        "description": "RootInteractive's own example dashboard, built by its original function on a reproducible "
+                       "table, in Chromium: the A range slider moved with the keyboard, the Cumulative tab opened and "
+                       "closed, everything restored; selected rows, all histoA bins, cumulative and CDF, and the drawn "
+                       "plots equal numpy at every step",
+        "priority": "P0",
+        "backends": ["browser"],
+        "layer": "e2e",
+        "proof": "headless/test_headless_legacy_dashboards.py",
+    },
     "DISPLAY.graph3d": {
         "name": "3D graph (BokehVisJSGraph3D, vis.js)",
         "description": "The 3D graph takes x, y, z and style from the right columns and rows of a public-builder page "
