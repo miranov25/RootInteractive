@@ -250,6 +250,43 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_node_histograms.py",
     },
+    # PHASE_4_6 C1 (GPT28.RI candidate, integrated by Claude20.RI): headless/test_headless_node_stats.py
+    "HIST.stack": {
+        "name": "Stacked histograms (CDSStack)",
+        "description": "Histograms whose weights (or variable) are chosen by a multi-select parameter, one part per "
+                       "selected option, labelled by _source_index; a single-select weight parameter recomputes",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.histogram_table": {
+        "name": "Histogram statistics table (HistoStatsCDS)",
+        "description": "tableHisto: entries, mean, std, isOK, quantiles and sum_range integrals per histogram, "
+                       "columnwise and rowwise, following filters and weight parameters",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.linear_fit": {
+        "name": "Client-side linear fit (ClientLinearFitter)",
+        "description": "linearFit in jsFunctionArray: least squares (weighted, ridge) and the fitted alias, refit on "
+                       "data and predictor changes",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.sum_range": {
+        "name": "Integral and efficiency columns (sum_range)",
+        "description": "Integral of a histogram over an interval (uniform density in each bin) and its fraction of "
+                       "the entries, in profiles and in the statistics table",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
 
     # =========================================================================
     # Selection filters (PHASE_4 stage 4.2c-2b: identifiers used by the headless tests; evidence enters in 4.7)

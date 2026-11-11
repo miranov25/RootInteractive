@@ -180,6 +180,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_stats: target: statistics computed in the page in Node - statistics table, linear fit, integrals, weighted unbinned quantiles, stacked histograms (PHASE_4_6 C1)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(
