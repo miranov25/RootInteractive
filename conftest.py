@@ -172,6 +172,14 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_a4: target: three linked tables V0 -> track -> event on one real page in Node, every state against GPT24's shared reference (PHASE_4_5 A4)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_a4: target: the same A4 page in Chromium - real multi-select, keyboard and select input, painted V0 rows, browser = Node (PHASE_4_5 A4)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(

@@ -167,6 +167,17 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "test_dsl_customjs.py::test_compileVarName",
     },
+    # PHASE_4_5 A4: three tables linked by row numbers on one real page (headless/test_headless_a4_multitable.py)
+    "JOIN.multi_table_chain": {
+        "name": "Three linked tables on one page (V0 -> track -> event)",
+        "description": "Filters on own and looked-up columns, weighted histograms, a weight parameter, an alias "
+                       "histogram, a 2-D histogram and its profile; every state equals an independent reference "
+                       "(GPT24 shared oracle v0.2), in Node and with real input in Chromium",
+        "priority": "P1",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_a4_multitable.py",
+    },
     # PHASE_4_3 J4: production CDSJoin in Node against pandas (headless/test_headless_node_joins.py); the join test
     # contract C-1..C-9 and its crosswalk: PHASE_4_3_Joins_Contract_Crosswalk (docs).
     "JOIN.cdsjoin.reverse_index": {

@@ -109,7 +109,9 @@ def test_backend_markers_select_their_tests():
     node, browser = _collect("node_backend"), _collect("browser_backend")
     assert len(node) >= 80 and len(browser) >= 50, (len(node), len(browser))     # measured at v0.2: 84 and 56
     both = set(node) & set(browser)
-    assert both and all("test_headless_parity.py::" in t for t in both), sorted(both)[:5]   # only parity needs both
+    a4 = "test_headless_a4_multitable.py::test_browser_real_input_equals_the_reference_and_node"   # A4's parity test
+    assert both and all("test_headless_parity.py::" in t or t.endswith(a4) for t in both), sorted(both)[:5]
+    # only browser = Node parity needs both fixtures
 
 
 def test_an_inherited_session_id_is_not_reused(tmp_path):

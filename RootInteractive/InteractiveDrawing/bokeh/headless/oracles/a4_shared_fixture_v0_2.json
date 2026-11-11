@@ -1,0 +1,740 @@
+{
+  "bins": {
+    "alias": [
+      0.0,
+      1.0,
+      2.0,
+      3.0,
+      4.0
+    ],
+    "mass": [
+      0.0,
+      1.0,
+      2.0,
+      3.0
+    ],
+    "pospt": [
+      0.0,
+      1.0,
+      2.0,
+      3.0
+    ]
+  },
+  "cases": {
+    "all_pt_ge_2": {
+      "expected": {
+        "alias_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "mass_counts": [
+          0,
+          0,
+          0
+        ],
+        "mass_pospt_2d": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "mass_wA": [
+          0,
+          0,
+          0
+        ],
+        "mass_wB": [
+          0,
+          0,
+          0
+        ],
+        "profile_entries": [
+          0,
+          0,
+          0
+        ],
+        "profile_isOK": [
+          false,
+          false,
+          false
+        ],
+        "profile_mean": [
+          null,
+          null,
+          null
+        ],
+        "profile_std": [
+          null,
+          null,
+          null
+        ],
+        "selected_mask": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": []
+      },
+      "selection": {
+        "event_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "min_pt": 2.0
+      }
+    },
+    "all_valid": {
+      "expected": {
+        "alias_counts": [
+          1,
+          4,
+          3,
+          1
+        ],
+        "mass_counts": [
+          2,
+          3,
+          4
+        ],
+        "mass_pospt_2d": [
+          1,
+          1,
+          0,
+          0,
+          2,
+          2,
+          1,
+          0,
+          2
+        ],
+        "mass_wA": [
+          7,
+          12,
+          26
+        ],
+        "mass_wB": [
+          19,
+          27,
+          26
+        ],
+        "profile_entries": [
+          2,
+          3,
+          4
+        ],
+        "profile_isOK": [
+          true,
+          true,
+          true
+        ],
+        "profile_mean": [
+          1.5,
+          1.1666666666666667,
+          2.0
+        ],
+        "profile_std": [
+          1.0,
+          0.4714045207910317,
+          0.5
+        ],
+        "selected_mask": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      "selection": {
+        "event_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "min_pt": 0.0
+      }
+    },
+    "empty_events": {
+      "expected": {
+        "alias_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "mass_counts": [
+          0,
+          0,
+          0
+        ],
+        "mass_pospt_2d": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "mass_wA": [
+          0,
+          0,
+          0
+        ],
+        "mass_wB": [
+          0,
+          0,
+          0
+        ],
+        "profile_entries": [
+          0,
+          0,
+          0
+        ],
+        "profile_isOK": [
+          false,
+          false,
+          false
+        ],
+        "profile_mean": [
+          null,
+          null,
+          null
+        ],
+        "profile_std": [
+          null,
+          null,
+          null
+        ],
+        "selected_mask": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": []
+      },
+      "selection": {
+        "event_indices": [],
+        "min_pt": 0.0
+      }
+    },
+    "events_0_2_4": {
+      "expected": {
+        "alias_counts": [
+          1,
+          2,
+          2,
+          1
+        ],
+        "mass_counts": [
+          2,
+          1,
+          3
+        ],
+        "mass_pospt_2d": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          0,
+          2
+        ],
+        "mass_wA": [
+          7,
+          2,
+          22
+        ],
+        "mass_wB": [
+          19,
+          11,
+          17
+        ],
+        "profile_entries": [
+          2,
+          1,
+          3
+        ],
+        "profile_isOK": [
+          true,
+          true,
+          true
+        ],
+        "profile_mean": [
+          1.5,
+          1.5,
+          2.1666666666666665
+        ],
+        "profile_std": [
+          1.0,
+          0.0,
+          0.4714045207910317
+        ],
+        "selected_mask": [
+          1,
+          1,
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": [
+          0,
+          1,
+          4,
+          5,
+          7,
+          8
+        ]
+      },
+      "selection": {
+        "event_indices": [
+          0,
+          2,
+          4
+        ],
+        "min_pt": 0.0
+      }
+    },
+    "events_0_2_4_pt_ge_1": {
+      "expected": {
+        "alias_counts": [
+          0,
+          1,
+          2,
+          1
+        ],
+        "mass_counts": [
+          1,
+          0,
+          3
+        ],
+        "mass_pospt_2d": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          2
+        ],
+        "mass_wA": [
+          6,
+          0,
+          22
+        ],
+        "mass_wB": [
+          7,
+          0,
+          17
+        ],
+        "profile_entries": [
+          1,
+          0,
+          3
+        ],
+        "profile_isOK": [
+          true,
+          false,
+          true
+        ],
+        "profile_mean": [
+          2.5,
+          null,
+          2.1666666666666665
+        ],
+        "profile_std": [
+          0.0,
+          null,
+          0.4714045207910317
+        ],
+        "selected_mask": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": [
+          4,
+          5,
+          7,
+          8
+        ]
+      },
+      "selection": {
+        "event_indices": [
+          0,
+          2,
+          4
+        ],
+        "min_pt": 1.0
+      }
+    },
+    "events_2_pt_ge_1_5": {
+      "expected": {
+        "alias_counts": [
+          0,
+          1,
+          1,
+          0
+        ],
+        "mass_counts": [
+          1,
+          0,
+          1
+        ],
+        "mass_pospt_2d": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        "mass_wA": [
+          6,
+          0,
+          5
+        ],
+        "mass_wB": [
+          7,
+          0,
+          8
+        ],
+        "profile_entries": [
+          1,
+          0,
+          1
+        ],
+        "profile_isOK": [
+          true,
+          false,
+          true
+        ],
+        "profile_mean": [
+          2.5,
+          null,
+          2.5
+        ],
+        "profile_std": [
+          0.0,
+          null,
+          0.0
+        ],
+        "selected_mask": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "selected_row_ids": [
+          4,
+          5
+        ]
+      },
+      "selection": {
+        "event_indices": [
+          2
+        ],
+        "min_pt": 1.5
+      }
+    }
+  },
+  "format": "RootInteractive PHASE_4_5 A4 oracle v0.2",
+  "policy_probes": {
+    "cross_event_daughter": {
+      "expected": {
+        "accepted_by_fixture_filter": false,
+        "negpt_gather": 2.2,
+        "parent_valid": true,
+        "pospt_gather": 2.5
+      },
+      "row": {
+        "event_idx": 2,
+        "mass": 1.7,
+        "neg_idx": 3,
+        "pos_idx": 4,
+        "v0_id": 12,
+        "wA": 13,
+        "wB": 0
+      }
+    },
+    "orphan_negative_daughter": {
+      "expected": {
+        "accepted_by_fixture_filter": false,
+        "negpt_gather": null,
+        "parent_valid": true,
+        "pospt_gather": 2.5
+      },
+      "row": {
+        "event_idx": 2,
+        "mass": 1.8,
+        "neg_idx": -1,
+        "pos_idx": 4,
+        "v0_id": 9,
+        "wA": 10,
+        "wB": 3
+      }
+    }
+  },
+  "tables": {
+    "events": [
+      {
+        "centrality": 12.0,
+        "event_id": 0
+      },
+      {
+        "centrality": 38.0,
+        "event_id": 1
+      },
+      {
+        "centrality": 55.0,
+        "event_id": 2
+      },
+      {
+        "centrality": 71.0,
+        "event_id": 3
+      },
+      {
+        "centrality": 85.0,
+        "event_id": 4
+      }
+    ],
+    "tracks": [
+      {
+        "event_id": 0,
+        "pt": 0.8,
+        "track_id": 0
+      },
+      {
+        "event_id": 0,
+        "pt": 1.8,
+        "track_id": 1
+      },
+      {
+        "event_id": 1,
+        "pt": 1.3,
+        "track_id": 2
+      },
+      {
+        "event_id": 1,
+        "pt": 2.2,
+        "track_id": 3
+      },
+      {
+        "event_id": 2,
+        "pt": 2.5,
+        "track_id": 4
+      },
+      {
+        "event_id": 2,
+        "pt": 1.6,
+        "track_id": 5
+      },
+      {
+        "event_id": 3,
+        "pt": 0.9,
+        "track_id": 6
+      },
+      {
+        "event_id": 4,
+        "pt": 1.1,
+        "track_id": 7
+      },
+      {
+        "event_id": 4,
+        "pt": 2.3,
+        "track_id": 8
+      }
+    ],
+    "v0": [
+      {
+        "event_idx": 0,
+        "mass": 0.5,
+        "neg_idx": 1,
+        "pos_idx": 0,
+        "v0_id": 0,
+        "wA": 1,
+        "wB": 12
+      },
+      {
+        "event_idx": 0,
+        "mass": 1.4,
+        "neg_idx": 0,
+        "pos_idx": 1,
+        "v0_id": 1,
+        "wA": 2,
+        "wB": 11
+      },
+      {
+        "event_idx": 1,
+        "mass": 1.6,
+        "neg_idx": 3,
+        "pos_idx": 2,
+        "v0_id": 2,
+        "wA": 3,
+        "wB": 10
+      },
+      {
+        "event_idx": 1,
+        "mass": 2.4,
+        "neg_idx": 3,
+        "pos_idx": 2,
+        "v0_id": 3,
+        "wA": 4,
+        "wB": 9
+      },
+      {
+        "event_idx": 2,
+        "mass": 2.6,
+        "neg_idx": 5,
+        "pos_idx": 4,
+        "v0_id": 4,
+        "wA": 5,
+        "wB": 8
+      },
+      {
+        "event_idx": 2,
+        "mass": 0.8,
+        "neg_idx": 5,
+        "pos_idx": 4,
+        "v0_id": 5,
+        "wA": 6,
+        "wB": 7
+      },
+      {
+        "event_idx": 3,
+        "mass": 1.2,
+        "neg_idx": 6,
+        "pos_idx": 6,
+        "v0_id": 6,
+        "wA": 7,
+        "wB": 6
+      },
+      {
+        "event_idx": 4,
+        "mass": 2.9,
+        "neg_idx": 8,
+        "pos_idx": 7,
+        "v0_id": 7,
+        "wA": 8,
+        "wB": 5
+      },
+      {
+        "event_idx": 4,
+        "mass": 2.1,
+        "neg_idx": 7,
+        "pos_idx": 8,
+        "v0_id": 8,
+        "wA": 9,
+        "wB": 4
+      },
+      {
+        "event_idx": 2,
+        "mass": 1.8,
+        "neg_idx": -1,
+        "pos_idx": 4,
+        "v0_id": 9,
+        "wA": 10,
+        "wB": 3
+      },
+      {
+        "event_idx": -1,
+        "mass": 0.2,
+        "neg_idx": 1,
+        "pos_idx": 0,
+        "v0_id": 10,
+        "wA": 11,
+        "wB": 2
+      },
+      {
+        "event_idx": 4,
+        "mass": 1.3,
+        "neg_idx": 99,
+        "pos_idx": 7,
+        "v0_id": 11,
+        "wA": 12,
+        "wB": 1
+      }
+    ]
+  }
+}
