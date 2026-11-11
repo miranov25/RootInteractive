@@ -192,6 +192,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_transport: target: the compressed table CDSCompress in a real page in Node - lossless decoding, lazy cache, histogram under a filter, data replacement, wrong-length guard (PHASE_4_6 D1p2)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(

@@ -129,6 +129,34 @@ FEATURE_TAXONOMY = {
         "proof": None,
         "planned": True,
     },
+    "ENC.cds_compress.page_decode": {
+        "name": "Compressed table in a page (CDSCompress): lossless decoding",
+        "description": "A page built with lossless compression (zip, base64) decodes every column exactly (NaN, +-inf, "
+                       "-0 kept), only when the column is read, and reuses the decoded array; a weighted histogram on "
+                       "the compressed table follows a range filter, an empty range and the full range again",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
+    "ENC.cds_compress.data_replace": {
+        "name": "Compressed table: replacing its data in a live page",
+        "description": "After inputData is replaced, every column and the histogram show the new data (known defect "
+                       "TR-D1: columns decoded before the replacement keep their old values)",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
+    "ENC.cds_compress.length_guard": {
+        "name": "Compressed table: a column of the wrong length is refused",
+        "description": "Reading a column whose decoded length differs from the table's raises 'Corrupted length of "
+                       "column ...' (known defect TR-D2: refused only on the first read, returned on the second)",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
 
     # =========================================================================
     # Join Operations
