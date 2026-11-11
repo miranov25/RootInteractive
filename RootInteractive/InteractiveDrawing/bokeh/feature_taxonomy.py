@@ -360,6 +360,16 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_display.py",
     },
+    "DISPLAY.graph3d": {
+        "name": "3D graph (BokehVisJSGraph3D, vis.js)",
+        "description": "The 3D graph takes x, y, z and style from the right columns and rows of a public-builder page "
+                       "(also reordered and under a widget filter); in Chromium the view hands exactly those points to "
+                       "vis.js, a real mouse drag turns the view, and a data change reaches vis.js and redraws",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_visualization_d3.py",
+    },
     "DISPLAY.lazy_tabs": {
         "name": "Lazy tabs (LazyTabs)",
         "description": "Plots in a hidden tab are not recomputed until the tab opens, then show the current selection; "

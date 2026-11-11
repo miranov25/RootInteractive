@@ -196,6 +196,14 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_d3: target: the 3D graph BokehVisJSGraph3D in Node - which columns and rows the graph takes from a public-builder page, after reordering and after a widget filter (PHASE_4_6 D3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_d3: target: the 3D graph in Chromium with vis.js - the points handed to vis.js, a real mouse drag, a data change that reaches vis.js and redraws (PHASE_4_6 D3)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(
