@@ -300,6 +300,16 @@ FEATURE_TAXONOMY = {
         "proof": "headless/test_headless_node_histograms.py",
     },
 
+    # PHASE_4_6 C2 (GPT27.RI candidate, revised by GPT26.RI, integrated by Claude20.RI): headless/test_headless_display.py
+    "FILTER.text_query": {
+        "name": "Text query (textQuery widget, ColumnFilter)",
+        "description": "Rows selected by a typed JavaScript condition over the table's columns, toggleable, with "
+                       "real typing in Chromium",
+        "priority": "P1",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
     "FILTER.intersection": {
         "name": "Filter intersection",
         "description": "Intersection of several filters on one table (LazyIntersectionFilter)",
@@ -308,6 +318,37 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": None,
         "planned": True,
+    },
+
+    # =========================================================================
+    # Display (PHASE_4_6 C2): what is drawn, tabs, labels - headless/test_headless_display.py
+    # =========================================================================
+    "DISPLAY.downsampler": {
+        "name": "Downsampled scatter (DownsamplerCDS)",
+        "description": "At most nPointRender of the selected rows, in source order, deterministic per table, following "
+                       "filter and nPointRender changes; selections map back to the source rows",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
+    "DISPLAY.lazy_tabs": {
+        "name": "Lazy tabs (LazyTabs)",
+        "description": "Plots in a hidden tab are not recomputed until the tab opens, then show the current selection; "
+                       "real tab click in Chromium",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
+    "DISPLAY.axis_label": {
+        "name": "Parametric axis label (ConcatenatedString)",
+        "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
+                       "the widget, in Node and in Chromium",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
     },
 
     # =========================================================================

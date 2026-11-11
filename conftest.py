@@ -184,6 +184,14 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "node_display: target: widgets and display in Node - text query, downsampler, lazy tabs, parametric axis labels (PHASE_4_6 C2)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_display: target: widgets and display in Chromium - typed text query, tab click, axis label after a real widget change (PHASE_4_6 C2)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
     )
     config.addinivalue_line(
