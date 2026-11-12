@@ -1,6 +1,6 @@
 # CAPABILITY_MATRIX
 
-**Generated:** 2026-11-12 22:56:41
+**Generated:** 2026-11-12 23:16:06
 
 **Generator:** `scripts/generate_capability_matrix.py`
 
@@ -29,7 +29,7 @@
 | Feature | Priority | Status | Backend | Layer | Tests |
 |---------|----------|--------|---------|-------|-------|
 | `DASHBOARD.histogram_only` | P0 | ⚠️ Known Issue | browser | e2e | 5 tests, 5 cases |
-| `DASHBOARD.weights_reference` | P0 | ❌ No Tests | browser | e2e | - |
+| `DASHBOARD.weights_reference` | P0 | ⚠️ Known Issue | browser | e2e | 4 tests, 4 cases |
 
 
 ## DISPLAY
@@ -226,9 +226,12 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 </details>
 
 <details>
-<summary><strong>DASHBOARD.weights_reference</strong> — Example dashboard: analysis weights against reference weights (test_interactiveTemplateWeightsRef) (0 tests)</summary>
+<summary><strong>DASHBOARD.weights_reference</strong> — Example dashboard: analysis weights against reference weights (test_interactiveTemplateWeightsRef) (4 tests)</summary>
 
-*No tests with @pytest.mark.feature marker*
+- ✅ `RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_control_weighted_counts_and_analysis_side_equal_numpy`
+- ✅ `RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_live_faults_in_the_browser_are_caught`
+- ✅ `RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_page_is_the_original_dashboard_on_the_reproducible_table`
+- ⚠️ `RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_range_and_restores`
 
 </details>
 
@@ -2378,9 +2381,9 @@ Tests per feature (for traceability). Approval logic: Feature = ✅ Working iff 
 |--------|-------|------------|
 | ✅ Working | 33 | 47.8% |
 | 🧨 Broken | 0 | 0.0% |
-| ⚠️ Known Issue | 29 | 42.0% |
+| ⚠️ Known Issue | 30 | 43.5% |
 | 📋 Planned | 0 | 0.0% |
-| ❌ No Tests | 6 | 8.7% |
+| ❌ No Tests | 5 | 7.2% |
 | ❓ Unknown | 1 | 1.4% |
 | **Total** | **69** | **100%** |
 

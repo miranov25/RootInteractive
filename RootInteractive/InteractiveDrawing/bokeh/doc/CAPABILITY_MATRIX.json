@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-12T22:56:41.215685",
+  "generated": "2026-11-12T23:16:06.141843",
   "generator": "scripts/generate_capability_matrix.py",
   "version": "1.0",
   "phase": "0.1.A",
@@ -143,16 +143,21 @@
     "DASHBOARD.weights_reference": {
       "name": "Example dashboard: analysis weights against reference weights (test_interactiveTemplateWeightsRef)",
       "description": "An oracle test dashboard: RootInteractive's WeightsRef template dashboard, built by its original function on a reproducible table, in Chromium with real input (tab click, weight and transform selects, bin spinner, A slider keys, restore): the selected rows, both sides' weighted 2-D counts, the analysis and reference profiles (entries, mean, std, quantiles), all drawn series, the comparison curves and the error bars of the means equal numpy at every step, by the Architect's decisions; known defects WT-D6, WR-D1, WT-D14; live faults are caught",
-      "status": "\u274c No Tests",
+      "status": "\u26a0\ufe0f Known Issue",
       "priority": "P0",
       "backends": [
         "browser"
       ],
       "layer": "e2e",
-      "test_count": 0,
-      "cases": 0,
+      "test_count": 4,
+      "cases": 4,
       "without_result": [],
-      "tests": [],
+      "tests": [
+        "RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_page_is_the_original_dashboard_on_the_reproducible_table",
+        "RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_range_and_restores",
+        "RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_control_weighted_counts_and_analysis_side_equal_numpy",
+        "RootInteractive/InteractiveDrawing/bokeh/headless/test_headless_oracle_weightsref.py::test_wr1_live_faults_in_the_browser_are_caught"
+      ],
       "failed_tests": [],
       "planned": false,
       "regression": null
@@ -14555,9 +14560,9 @@
   "summary": {
     "working": 33,
     "broken": 0,
-    "known_issue": 29,
+    "known_issue": 30,
     "planned": 0,
-    "no_tests": 6,
+    "no_tests": 5,
     "unknown": 1,
     "total": 69
   }
