@@ -55,7 +55,8 @@ from .test_headless_oracle_dashboards import ROWS, SEED, DEFAULT_TABLE, KnownDef
 
 UNIT = pytest.mark.headless_unit
 BROWSER = pytest.mark.browser_oracle_dashboards
-FEATURE = pytest.mark.feature("DASHBOARD.weights_reference")
+# The feature mark is written out on each test: scripts/generate_capability_matrix.py reads only the literal form
+# @pytest.mark.feature("ID"), so a mark held in a variable left WR1 out of the capability matrix (closing check).
 SCENARIO = "WR1"
 K_LOW = 8
 NBINS = (100, 120)
@@ -527,7 +528,7 @@ def test_wr_known_defects_change_the_answer_on_the_default_table():
 
 # ------------------------------------------------------------------ the page in Chromium (browser_oracle_dashboards)
 @BROWSER
-@FEATURE
+@pytest.mark.feature("DASHBOARD.weights_reference")
 def test_wr1_page_is_the_original_dashboard_on_the_reproducible_table(wr_page):
     m = wr_page["manifest"]
     assert m["function"] == W.WR_FUNCTION and m["rows"] == ROWS and m["seed"] == SEED and m["opt_in"] is True
@@ -538,7 +539,7 @@ def test_wr1_page_is_the_original_dashboard_on_the_reproducible_table(wr_page):
 
 
 @BROWSER
-@FEATURE
+@pytest.mark.feature("DASHBOARD.weights_reference")
 @pytest.mark.xfail(**WR_XFAIL, reason=WR_DEFECTS)
 def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_range_and_restores(wr_page,
                                                                                              headless_session):
@@ -622,7 +623,7 @@ def _reported_errors(exp: dict, act: dict) -> dict:
 
 
 @BROWSER
-@FEATURE
+@pytest.mark.feature("DASHBOARD.weights_reference")
 def test_wr1_control_weighted_counts_and_analysis_side_equal_numpy(wr_page, headless_session):
     """Healthy control: the parts no known defect touches - both sides' weighted counts, the analysis profile (entries,
     mean, std, quantiles) and their drawn series - equal numpy exactly, on the rows the page selects."""
@@ -664,7 +665,7 @@ LIVE_FAULTS = {   # name: (inject, undo, the words the comparator must report)
 
 
 @BROWSER
-@FEATURE
+@pytest.mark.feature("DASHBOARD.weights_reference")
 def test_wr1_live_faults_in_the_browser_are_caught(wr_page, headless_session):
     """Faults injected into the live page are reported by the same snapshot and comparator; after each is undone the
     page equals the AS-SHOWN oracle again. Control first: the untouched page equals AS SHOWN."""
