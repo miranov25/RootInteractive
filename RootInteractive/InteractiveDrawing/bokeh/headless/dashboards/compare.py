@@ -8,9 +8,11 @@ What a drawn plot must satisfy (revision of 2026-11-12, after GPT24's consolidat
 - every expected plot, visible or hidden, is present exactly once, and no other plot of the checked sources is there;
 - a visible plot: data from the right histogram, shown (its canvas visible and the renderer itself visible), the drawn
   x field and x values (bin centres), the drawn y values, the axis labels and the title;
-- painted geometry: the screen coordinates Bokeh computed when it painted are finite, one per point, and an increasing
-  straight-line image of the current x and y values (x to the right, y upwards). A plot whose values changed but
-  whose painting did not follow fails here;
+- screen coordinates, anchored (revision of 2026-11-12, GPT25's summary item H-03): the coordinates Bokeh computed for
+  each point (the glyph view's sx, sy) must equal the position the plot's own frame and axis ranges give for the
+  EXPECTED x and y values, within 0.01 px, on linear axes; and every point must lie inside the frame. A plot whose
+  values changed but whose drawing did not follow, a plot shifted or scaled, or an axis range that cuts points off,
+  fails here. What this is NOT: a check of the pixels on the canvas (no raster claim);
 - a hidden plot: present and not shown (its tab is not active). Its values are checked when its tab is opened.
 """
 from __future__ import annotations
@@ -22,7 +24,7 @@ import numpy as np
 CDF_RTOL = 1e-12             # cdf is cumulative / total in float64 on both sides
 EDGE_RTOL = 1e-12             # bin edges and bin centres
 WIDGET_ATOL_FRACTION = 1e-12  # of the slider's full range
-PAINT_ATOL_PX = 0.01          # screen coordinates are float32; a straight line through them must fit within 0.01 px
+ANCHOR_ATOL_PX = 0.01         # screen coordinates (float32; 3e-5 px seen) against the frame-and-range position
 
 RESPONSE_KEYS = ("widgets", "tab", "selected_count", "selected_sha256", "edges", "bin_count", "cumulative", "cdf",
                  "renderers")
@@ -43,20 +45,37 @@ def _renderers(actual: dict, source: str, yfield: str) -> list:
     return [r for r in actual.get("renderers", []) if r.get("source") == source and r.get("yfield") == yfield]
 
 
-def _straight_image(values, screen, increasing: bool):
-    """None if `screen` is a straight-line image of `values` (increasing or decreasing as asked), else why not."""
-    v, s = np.asarray(values, dtype=float), np.asarray(screen, dtype=float)
-    if v.shape != s.shape or v.size == 0:
-        return f"{s.size} screen coordinates for {v.size} values"
-    if not np.isfinite(s).all():
-        return "screen coordinates not finite"
-    if np.ptp(v) == 0:
-        return None if np.ptp(s) <= PAINT_ATOL_PX else "equal values painted at different places"
-    slope, offset = np.polyfit(v, s, 1)
-    if (slope > 0) != increasing:
-        return f"painted in the wrong direction (slope {slope:.3g})"
-    worst = float(np.max(np.abs(s - (slope * v + offset))))
-    return None if worst <= PAINT_ATOL_PX else f"painted positions do not follow the values (off by up to {worst:.3g} px)"
+def _anchored(r: dict, axis: str, values) -> list:
+    """Differences between the screen coordinates Bokeh computed and the position the plot's frame and range give for
+    the expected values: x runs from the frame's left to its right edge, y from its bottom to its top edge."""
+    frame, rng, scale = r.get("frame"), r.get(f"{axis}_range"), r.get(f"{axis}_scale")
+    if not isinstance(frame, dict) or not rng or len(rng) != 2:
+        return ["the plot's frame or axis range is missing from the actual response"]
+    if scale != "LinearScale":
+        return [f"{axis} axis scale {scale!r}; only LinearScale is supported by this check"]
+    start, end = float(rng[0]), float(rng[1])
+    if not np.isfinite([start, end]).all() or end == start:
+        return [f"{axis} range {rng} is not usable"]
+    v = np.asarray(values, dtype=float)
+    s = np.asarray(r.get("s" + axis) or [], dtype=float)
+    if s.shape != v.shape or v.size == 0:
+        return [f"{s.size} screen coordinates for {v.size} values"]
+    if axis == "x":
+        lo, hi = frame["left"], frame["right"]
+        want = lo + (v - start) / (end - start) * (hi - lo)
+    else:
+        lo, hi = frame["top"], frame["bottom"]
+        want = hi - (v - start) / (end - start) * (hi - lo)
+    out = []
+    bad = ~(np.abs(s - want) <= ANCHOR_ATOL_PX)
+    if bad.any():
+        i = int(np.flatnonzero(bad)[0])
+        out.append(f"point {i} at {s[i]:.2f} px, the frame and range put it at {want[i]:.2f} px "
+                   f"({int(bad.sum())} points differ)")
+    outside = (want < lo - ANCHOR_ATOL_PX) | (want > hi + ANCHOR_ATOL_PX)
+    if outside.any():
+        out.append(f"{int(outside.sum())} points lie outside the plot frame (axis range {rng})")
+    return out
 
 
 def compare(expected: dict, actual: dict, widget_span: float = 1.0) -> List[str]:
@@ -115,10 +134,9 @@ def compare(expected: dict, actual: dict, widget_span: float = 1.0) -> List[str]
             got = r.get(key)
             if not isinstance(got, str) or got.strip() != spec[key]:
                 out.append(f"{name}: {key} {got!r}, expected {spec[key]!r}")
-        for axis, values, increasing in (("x", spec["x"], True), ("y", column[yfield], False)):
-            why = _straight_image(values, r.get("s" + axis) or [], increasing)
-            if why:
-                out.append(f"{name} (painted {axis}): {why}")
+        for axis, values in (("x", spec["x"]), ("y", column[yfield])):
+            for why in _anchored(r, axis, values):
+                out.append(f"{name} (screen {axis}): {why}")
     for source, yfield in expected["hidden_renderers"]:
         found = _renderers(actual, source, yfield)
         if len(found) != 1:

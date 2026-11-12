@@ -9,16 +9,17 @@ computed beforehand from the raw table only (dashboards/oracle.py):
 - the slider value read back from the page, the active tab, the selected rows (count and exact set);
 - all 20 bins of the histogram `histoA`, its cumulative counts and its CDF;
 - what is drawn: every checked plot present exactly once, visible or hidden as its tab requires; for a visible plot
-  its data source, x field and x values (bin centres), y values, axis labels and title, and the screen positions
-  Bokeh painted (a straight-line image of the current values).
+  its data source, x field and x values (bin centres), y values, axis labels and title, and the screen coordinates
+  Bokeh computed for each point, anchored to the plot's frame and axis ranges (not a pixel check).
 The comparator (dashboards/compare.py) is the same one the falsifiers below must see fail: on a snapshot, and on the
 live page in the browser.
 
 Known defect H01-D1: after the A slider's upper handle is moved back to its end with the arrow keys it stops a few
 float steps short of the end, so the row with the largest A stays excluded. Reported in two lanes (decision DEC-05):
 the workflow test is its strict expected failure, and dashboard_health.json marks C4 KNOWN_ISSUE_RED and the dashboard
-RED. The release check (dashboards/release.py, target release_oracle_dashboards) fails on a RED dashboard unless the
-Architect has accepted the bug for release in dashboards/waivers.json.
+RED. The release check (dashboards/release.py, target release_oracle_dashboards) checks that the health file comes from
+this run, this test code, this dashboard, table and page, and fails on a RED dashboard unless the Architect has
+accepted the bug for release at its exact checkpoint, with its signature (dashboards/waivers.json).
 
 Evidence in headless_out/dashboards/h01/: the page and its manifest, expected_*.json, actual_*.json, comparison.json
 (results, cold and warm times, console messages), dashboard_health.json, inventory.json (every widget and plot of the
@@ -35,6 +36,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -138,10 +140,20 @@ def _synthetic():
     return base, changed
 
 
-def _painted(x, y):
-    """Screen positions a correct painting would give: x to the right, y upwards, both straight lines."""
-    top = max(max(y), 1e-300)
-    return [80.0 + 600.0 * v for v in x], [180.0 - 150.0 * v / top for v in y]
+FRAME = {"left": 75.0, "right": 635.0, "top": 27.0, "bottom": 162.0}
+
+
+def _ranges(x, y):
+    pad = lambda lo, hi: 0.05 * ((hi - lo) or 1.0)
+    return ([min(x) - pad(min(x), max(x)), max(x) + pad(min(x), max(x))],
+            [min(y) - pad(min(y), max(y)), max(y) + pad(min(y), max(y))])
+
+
+def _screen(x, y, xr, yr, frame=FRAME):
+    """The coordinates the plot's frame and ranges give: x from the left edge to the right, y from the bottom up."""
+    w, h = frame["right"] - frame["left"], frame["bottom"] - frame["top"]
+    return ([frame["left"] + (v - xr[0]) / (xr[1] - xr[0]) * w for v in x],
+            [frame["bottom"] - (v - yr[0]) / (yr[1] - yr[0]) * h for v in y])
 
 
 def _actual_from(expected: dict, chain=("HistogramCDS", "histoA")) -> dict:
@@ -150,9 +162,12 @@ def _actual_from(expected: dict, chain=("HistogramCDS", "histoA")) -> dict:
     for source, yfield in expected["visible_renderers"]:
         spec = expected["plots"][f"{source}.{yfield}"]
         x, y = list(spec["x"]), list(expected[yfield])
-        sx, sy = _painted(x, y)
+        xr, yr = _ranges(x, y)
+        sx, sy = _screen(x, y, xr, yr)
         rend.append({"source": source, "yfield": yfield, "xfield": spec["xfield"],
                      "chain": [["DownsamplerCDS", source], list(chain)], "x": x, "y": y, "sx": sx, "sy": sy,
+                     "frame": dict(FRAME), "x_range": xr, "y_range": yr, "x_scale": "LinearScale",
+                     "y_scale": "LinearScale",
                      "n": len(y), "canvas_visible": True, "model_visible": True, "visible": True,
                      "xlabel": spec["xlabel"], "ylabel": " " + spec["ylabel"], "title": " " + spec["title"]})
     for source, yfield in expected["hidden_renderers"]:
@@ -216,12 +231,25 @@ def _mutations(base, changed):
         r = _visible(a)[0]
         r["model_visible"] = False
         r["visible"] = False
-    def m_paint_stale(a):
+    def m_paint_stale(a):                       # the coordinates of the old values, in the same frame and ranges
         r = _visible(a)[0]
-        r["sy"] = _painted(r["x"], base[r["yfield"]])[1]
+        r["sy"] = _screen(r["x"], base[r["yfield"]], r["x_range"], r["y_range"])[1]
     def m_paint_upside_down(a):
         r = _visible(a)[0]
-        r["sy"] = [360.0 - v for v in r["sy"]]
+        r["sy"] = [FRAME["top"] + FRAME["bottom"] - v for v in r["sy"]]
+    # revision 2026-11-12 (GPT25's summary, H-03): moves that keep a straight-line image but leave the frame anchor
+    def m_shifted_20px(a):
+        r = _visible(a)[0]
+        r["sx"] = [v + 20.0 for v in r["sx"]]
+    def m_scaled(a):
+        r = _visible(a)[0]
+        r["sy"] = [FRAME["top"] + 0.9 * (v - FRAME["top"]) for v in r["sy"]]
+    def m_range_cuts_points(a):                 # consistent coordinates, but the x range hides half the points
+        r = _visible(a)[0]
+        r["x_range"] = [0.5, r["x_range"][1]]
+        r["sx"] = _screen(r["x"], r["y"], r["x_range"], r["y_range"])[0]
+    def m_log_axis(a):
+        _visible(a)[0]["y_scale"] = "LogScale"
     return {"one bin +1": (m_bin, "histoA.bin_count"), "two bins redistributed": (m_redistribute, "histoA.bin_count"),
             "one selected row swapped, same count": (m_swapped_row, "selected rows differ"),
             "stale after the slider change": (m_stale, "selection:"),
@@ -236,8 +264,12 @@ def _mutations(base, changed):
             "x drawn from another field": (m_x_field, "draws x from 'bin_bottom'"),
             "wrong x axis label": (m_x_label, "xlabel"), "wrong title": (m_title, "title"),
             "renderer switched off": (m_switched_off, "renderer visible: False"),
-            "painting not updated": (m_paint_stale, "(painted y)"),
-            "painted upside down": (m_paint_upside_down, "wrong direction")}
+            "drawing not updated": (m_paint_stale, "(screen y)"),
+            "drawn upside down": (m_paint_upside_down, "(screen y)"),
+            "every point shifted by 20 px": (m_shifted_20px, "(screen x)"),
+            "drawing scaled by 0.9": (m_scaled, "(screen y)"),
+            "axis range cuts points off": (m_range_cuts_points, "outside the plot frame"),
+            "logarithmic axis": (m_log_axis, "only LinearScale")}
 
 
 @UNIT
@@ -260,78 +292,141 @@ def test_h01_comparator_rejects_a_wrong_answer(name):
 
 
 # ------------------------------------------------------------------ the release check (headless_unit)
-def _health(statuses: dict, bugs: dict = None, dashboard: str = None, scenario: str = "H01") -> dict:
+H01 = release.REQUIRED["H01"]
+GREEN = {c: "PASS" for c in H01["actions"]}
+RED_C4 = dict(GREEN, C4="KNOWN_ISSUE_RED")
+LOST = {"C4": {"lost_rows": [44894], "row_with_largest_A": 44894}}
+TODAY = __import__("datetime").date(2026, 11, 12)
+WAIVER_C4 = {"scenario": "H01", "checkpoint": "C4", "bug": "H01-D1", "signature": {"lost_rows": [44894]},
+             "decision": "DEC-99", "date": "2026-11-12", "by": "Architect", "expires": "2026-12-31"}
+
+
+def _table_hash():
+    return oracle.table_sha256(oracle.regenerate_table(H01["rows"], H01["seed"]))
+
+
+def _health(statuses: dict, bugs: dict = None, dashboard: str = None, scenario: str = "H01", **identity) -> dict:
     bugs = bugs or {}
     dash = dashboard or ("PASS" if all(s == "PASS" for s in statuses.values()) and statuses else "RED")
-    return {"scenario": scenario, "actions": statuses, "known_defects": bugs, "dashboard": dash}
+    h = {"scenario": scenario, "function": H01["function"], "rows": H01["rows"], "seed": H01["seed"],
+         "table_sha256": _TABLE_HASH, "page_sha256": None, "code_sha256": release.code_sha256(), "run_id": "run-1",
+         "actions": statuses, "known_defects": bugs,
+         "known_defect_detail": {c: LOST[c] for c in bugs if c in LOST}, "dashboard": dash}
+    h.update(identity)
+    return h
 
 
-def _write(tmp_path, *healths):
+def _write(tmp_path, *healths, manifest=None):
+    """Each health file in its own folder, with the manifest.json and page.html a real run leaves next to it."""
     files = []
     for i, h in enumerate(healths):
         d = tmp_path / f"run{i}"
         d.mkdir()
+        page = d / "page.html"
+        page.write_text("<html>a page</html>")
+        h = dict(h)
+        if h.get("page_sha256") is None:
+            h["page_sha256"] = __import__("hashlib").sha256(page.read_bytes()).hexdigest()
+        m = {k: h.get(k) for k in ("function", "rows", "seed", "table_sha256", "page_sha256")}
+        m.update(manifest or {})
+        (d / "manifest.json").write_text(json.dumps(m))
         (d / "dashboard_health.json").write_text(json.dumps(h))
         files.append(d / "dashboard_health.json")
     return files
 
 
-GREEN = {c: "PASS" for c in release.REQUIRED["H01"]}
-RED_C4 = dict(GREEN, C4="KNOWN_ISSUE_RED")
-WAIVER = {"H01-D1": {"decision": "DEC-99", "date": "2026-11-12", "by": "Architect"}}
+_TABLE_HASH = _table_hash()
+
+
+def _check(files, waivers=(), **kw):
+    return release.check(files, list(waivers), run_id=kw.pop("run_id", "run-1"), today=TODAY, **kw)
 
 
 @UNIT
 def test_release_check_passes_a_green_dashboard(tmp_path):
-    assert release.check(_write(tmp_path, _health(GREEN)), {}) == []
+    assert _check(_write(tmp_path, _health(GREEN))) == []
 
 
 @UNIT
-def test_release_check_passes_a_known_bug_only_when_accepted(tmp_path):
+def test_release_check_passes_a_known_bug_only_when_accepted_at_its_checkpoint(tmp_path):
+    """Without a waiver H01-D1 fails the release; with the waiver for exactly H01, C4, H01-D1 and its lost row it
+    passes, is listed as accepted, and the health file stays RED."""
     files = _write(tmp_path, _health(RED_C4, {"C4": "H01-D1"}))
-    found = release.check(files, {})
-    assert found == ["H01 C4: known bug H01-D1 - not accepted for release (no waiver in waivers.json)"], found
-    assert release.check(files, WAIVER) == []
+    assert _check(files) == ["H01 C4: known bug H01-D1 - not accepted for release (no waiver for H01 C4 H01-D1 "
+                             "in waivers.json)"]
+    accepted = []
+    assert _check(files, [WAIVER_C4], accepted=accepted) == []
+    assert accepted and "H01 C4: H01-D1 accepted by DEC-99" in accepted[0]
+    assert json.loads(files[0].read_text())["dashboard"] == "RED"
+
+
+CASES = {   # case: (health, waivers, words the problem must contain, extra manifest fields)
+    "no file": (None, [], "0 health files", None),
+    "two files": ("two", [], "2 health files", None),
+    "an action failed": (_health(dict(GREEN, C2="FAIL")), [], "H01 C2: FAIL", None),
+    "an action not run": (_health({c: s for c, s in GREEN.items() if c != "C6"}), [], "H01 C6: NOT_RUN", None),
+    "unknown status": (_health(dict(GREEN, C3="MAYBE")), [], "unknown statuses", None),
+    "dashboard status wrong": (_health(RED_C4, {"C4": "H01-D1"}, dashboard="PASS"), [WAIVER_C4], "dashboard status",
+                               None),
+    "stale waiver": (_health(GREEN), [WAIVER_C4], "remove or correct the waiver", None),
+    "unknown dashboard": ("unknown", [], "does not know", None),
+    "unreadable file": ("unreadable", [], "unreadable", None),
+    # GPT25's summary H-01: the run must be the one asked for
+    "wrong dashboard function": (_health(GREEN, function="testBokehClientHistogram"), [], "function", None),
+    "wrong row count": (_health(GREEN, rows=40000), [], "rows 40000", None),
+    "wrong seed": (_health(GREEN, seed=7), [], "seed 7", None),
+    "wrong table hash": (_health(GREEN, table_sha256="0" * 64), [], "table hash", None),
+    "other test code": (_health(GREEN, code_sha256="f" * 64), [], "other test code", None),
+    "another run": (_health(GREEN, run_id="run-0"), [], "not by this release run", None),
+    "manifest differs": (_health(GREEN), [], "manifest rows", {"rows": 1}),
+    "page differs": (_health(GREEN, page_sha256="e" * 64), [], "page.html", None),
+    # GPT25's summary H-02: a waiver is bound to its place, signature and date
+    "waiver at another checkpoint": (_health(dict(GREEN, C2="KNOWN_ISSUE_RED"), {"C2": "H01-D1"}), [WAIVER_C4],
+                                     "H01 C2: known bug H01-D1 - not accepted", None),
+    "expired waiver": (_health(RED_C4, {"C4": "H01-D1"}), [dict(WAIVER_C4, expires="2026-11-11")], "expired",
+                       None),
+    "other signature": (_health(RED_C4, {"C4": "H01-D1"}), [dict(WAIVER_C4, signature={"lost_rows": [7]})],
+                        "not the accepted signature", None),
+}
 
 
 @UNIT
-@pytest.mark.parametrize("case", ["no file", "two files", "an action failed", "an action not run", "unknown status",
-                                  "dashboard status wrong", "stale waiver", "unknown dashboard", "unreadable file"])
+@pytest.mark.parametrize("case", list(CASES))
 def test_release_check_fails_closed(tmp_path, case):
-    h = _health(GREEN)
-    files, waivers, words = None, {}, None
-    if case == "no file":
-        files, words = [], "0 health files"
-    elif case == "two files":
-        files, words = _write(tmp_path, h, h), "2 health files"
-    elif case == "an action failed":
-        files, words = _write(tmp_path, _health(dict(GREEN, C2="FAIL"))), "H01 C2: FAIL"
-    elif case == "an action not run":
-        files, words = _write(tmp_path, _health({c: s for c, s in GREEN.items() if c != "C6"})), "H01 C6: NOT_RUN"
-    elif case == "unknown status":
-        files, words = _write(tmp_path, _health(dict(GREEN, C3="MAYBE"))), "unknown statuses"
-    elif case == "dashboard status wrong":
-        files, words = _write(tmp_path, _health(RED_C4, {"C4": "H01-D1"}, dashboard="PASS")), "dashboard status"
-        waivers = WAIVER
-    elif case == "stale waiver":
-        files, waivers, words = _write(tmp_path, h), WAIVER, "remove the waiver"
-    elif case == "unknown dashboard":
-        files, words = _write(tmp_path, h, _health(GREEN, scenario="H99")), "does not know"
-    elif case == "unreadable file":
-        files = _write(tmp_path, h)
+    health, waivers, words, manifest = CASES[case]
+    if health is None:
+        files = []
+    elif health == "two":
+        files = _write(tmp_path, _health(GREEN), _health(GREEN))
+    elif health == "unknown":
+        files = _write(tmp_path, _health(GREEN), _health(GREEN, scenario="H99"))
+    elif health == "unreadable":
+        files = _write(tmp_path, _health(GREEN))
         files[0].write_text("{not json")
-        words = "unreadable"
-    found = release.check(files, waivers)
+    else:
+        files = _write(tmp_path, health, manifest=manifest)
+    found = _check(files, waivers)
     assert found and any(words in f for f in found), (case, found)
 
 
 @UNIT
 def test_release_waivers_file_is_valid_and_names_decisions():
-    """The shipped waivers.json loads; every waiver names its decision, date and author (none yet: DEC-05, E-1)."""
-    waivers = release.load_waivers()
-    assert isinstance(waivers, dict)
-    for bug, w in waivers.items():
-        assert re.match(r"^DEC-\d\d+$", w["decision"]) and re.match(r"^\d{4}-\d\d-\d\d$", w["date"]), (bug, w)
+    """The shipped waivers.json loads; every waiver names its exact place, signature, decision, date, author and expiry
+    (none yet: open decision E-1)."""
+    for w in release.load_waivers():
+        assert set(release.WAIVER_KEYS) <= set(w), w
+
+
+@UNIT
+def test_release_waivers_are_validated(tmp_path):
+    """A waiver without its checkpoint or expiry, or with a decision that is not a DEC number, does not load."""
+    for bad in ({k: v for k, v in WAIVER_C4.items() if k != "checkpoint"}, {k: v for k, v in WAIVER_C4.items()
+                                                                              if k != "expires"},
+                dict(WAIVER_C4, decision="the Architect said so")):
+        f = tmp_path / "w.json"
+        f.write_text(json.dumps({"waivers": [bad]}))
+        with pytest.raises(ValueError):
+            release.load_waivers(f)
 
 
 # ------------------------------------------------------------------ the page itself (browser_oracle_dashboards)
@@ -376,9 +471,13 @@ SNAPSHOT_JS = r"""() => {
       const canvas = view.parent?.canvas_view?.el, plot = view.parent?.model, g = view.glyph;
       const shown = canvas ? canvas.checkVisibility({visibilityProperty: true, opacityProperty: true}) : null;
       const label = side => { const a = plot?.[side]; return a && a.length === 1 ? String(a[0].axis_label) : null; };
+      const bb = view.parent?.frame?.bbox, xr = plot?.x_range, yr = plot?.y_range;
       renderers.push({source: view.model.data_source.name, yfield: view.model.glyph.y?.field ?? null,
                       xfield: view.model.glyph.x?.field ?? null, chain, x: arr(g._x), y: arr(g._y),
                       sx: arr(g.sx), sy: arr(g.sy), n: g.data_size, canvas_visible: shown,
+                      frame: bb ? {left: bb.left, right: bb.right, top: bb.top, bottom: bb.bottom} : null,
+                      x_range: xr ? [xr.start, xr.end] : null, y_range: yr ? [yr.start, yr.end] : null,
+                      x_scale: plot?.x_scale?.type ?? null, y_scale: plot?.y_scale?.type ?? null,
                       model_visible: view.model.visible, visible: shown === true && view.model.visible === true,
                       xlabel: label('below'), ylabel: label('left'), title: plot?.title ? String(plot.title.text) : null});
     }
@@ -578,6 +677,20 @@ def _h01_d1_lost_rows(t, widgets, expected: dict, actual: dict, span: float):
     return lost.tolist()
 
 
+def _git_identity() -> dict:
+    """The commit the test code came from, and whether the dashboard test files differ from it (evidence only)."""
+    root = Path(__file__).resolve().parents[4]
+    files = [str(Path(__file__).resolve().parent / f) for f in release.CODE_FILES]
+    def git(*a):
+        r = subprocess.run(["git", *a], cwd=root, capture_output=True, text=True, timeout=30)
+        return r.stdout.strip() if r.returncode == 0 else None
+    try:
+        return {"head": git("rev-parse", "--short", "HEAD"), "test_files_modified": bool(git("status", "--porcelain",
+                                                                                            "--", *files))}
+    except (OSError, subprocess.SubprocessError):
+        return {"head": None, "test_files_modified": None}
+
+
 def _is_h01_d1(t, widgets, expected: dict, actual: dict, span: float) -> bool:
     return _h01_d1_lost_rows(t, widgets, expected, actual, span) is not None
 
@@ -678,7 +791,12 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
                   "console_allowed_seen": page.console_allowed(), "timing": timing, "page_bytes": m["page_bytes"],
                   "h01_d1_lost_rows": lost_rows, "row_with_largest_A": a_max_row}
     (out / "comparison.json").write_text(json.dumps(comparison, indent=1))
-    health = {"scenario": "H01", "function": oracle.H01_FUNCTION, "rows": ROWS, "seed": SEED, "actions": status,
+    health = {"scenario": "H01", "function": oracle.H01_FUNCTION, "rows": ROWS, "seed": SEED,
+              # identity, checked by the release check (GPT25's summary H-01)
+              "table_sha256": m["table_sha256"], "page_sha256": m["page_sha256"],
+              "code_sha256": release.code_sha256(), "git": _git_identity(),
+              "run_id": os.environ.get("RI_RELEASE_RUN_ID") or f"local-{uuid.uuid4().hex[:12]}",
+              "actions": status,
               "known_defects": {c: "H01-D1" for c, s in status.items() if s == "KNOWN_ISSUE_RED"},
               "known_defect_detail": {c: {"lost_rows": r, "row_with_largest_A": a_max_row} for c, r in lost_rows.items()}}
     health["dashboard"] = "PASS" if all(s == "PASS" for s in status.values()) else "RED"
@@ -766,6 +884,10 @@ const P = H.models().filter(m => (m.type === 'Figure' || m.type === 'Plot') && m
 window.__riFault = window.__riFault || {};
 """
 LIVE_FAULTS = {
+    "x axis range narrowed: half the points cut off": (
+        "window.__riFault.xr = [P.x_range.start, P.x_range.end]; P.x_range.start = 0.5;",
+        "P.x_range.start = window.__riFault.xr[0]; P.x_range.end = window.__riFault.xr[1];",
+        "outside the plot frame"),
     # name: (inject, undo, the words the comparator must report)
     "x drawn from the bins' lower edges": (
         "R.glyph.x = {field: 'bin_bottom'};", "R.glyph.x = {field: 'bin_center'};", "draws x from 'bin_bottom'"),
@@ -825,9 +947,11 @@ def test_release_check_of_the_oracle_dashboards(request, tmp_path):
     if request.config.getoption("markexpr") != "release_oracle_dashboards":
         pytest.skip("the release check runs only as its own target: pytest -m release_oracle_dashboards")
     out = tmp_path / "release_run"
+    run_id = f"release-{uuid.uuid4().hex[:12]}"
     env = {k: v for k, v in os.environ.items() if k not in ("PYTEST_XDIST_WORKER", "PYTEST_ADDOPTS", "RI_HEADLESS_SESSION",
                                                             "RI_HEADLESS_TEST_SESSION_ID", "RI_HEADLESS_CHECK_REQUIRED")}
-    env.update(RI_HEADLESS_OUT=str(out), RI_HEADLESS_REQUIRED="1", RI_HEADLESS_TARGET="browser_oracle_dashboards")
+    env.update(RI_HEADLESS_OUT=str(out), RI_HEADLESS_REQUIRED="1", RI_HEADLESS_TARGET="browser_oracle_dashboards",
+               RI_RELEASE_RUN_ID=run_id)
     root = Path(__file__).resolve().parents[4]
     done = subprocess.run([sys.executable, "-m", "pytest", str(Path(__file__).resolve().parent), "-m",
                            "browser_oracle_dashboards", "-p", "no:xdist", "-p", "no:cacheprovider", "-q",
@@ -835,5 +959,9 @@ def test_release_check_of_the_oracle_dashboards(request, tmp_path):
     (tmp_path / "release_run.log").write_text(done.stdout + done.stderr)
     assert done.returncode == 0, "the oracle dashboards did not pass:\n" + (done.stdout + done.stderr)[-3000:]
     files = sorted(out.rglob("dashboard_health.json"))
-    problems = release.check(files, release.load_waivers())
+    accepted = []
+    problems = release.check(files, release.load_waivers(), run_id=run_id, accepted=accepted)
+    print(f"release run {run_id}: {len(files)} health file(s); code {release.code_sha256()[:12]}")
+    for a in accepted:
+        print("ACCEPTED (dashboard stays RED):", a)
     assert not problems, "release check failed:\n" + "\n".join(problems)

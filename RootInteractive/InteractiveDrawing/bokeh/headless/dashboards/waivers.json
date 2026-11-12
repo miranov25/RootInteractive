@@ -1,4 +1,4 @@
 {
- "about": "Known RootInteractive bugs the Architect has accepted for a release (release.py). One entry per bug: {\"<bug>\": {\"decision\": \"DEC-nn\", \"date\": \"YYYY-MM-DD\", \"by\": \"Architect\", \"note\": \"...\"}}. Empty: no known bug is accepted, so a dashboard showing a known bug fails the release check.",
- "waivers": {}
+ "about": "Known RootInteractive bugs the Architect has accepted for a release (release.py). A list of entries, each naming its exact place and signature: {\"scenario\": \"H01\", \"checkpoint\": \"C4\", \"bug\": \"H01-D1\", \"signature\": {\"lost_rows\": [44894]}, \"decision\": \"DEC-nn\", \"date\": \"YYYY-MM-DD\", \"by\": \"Architect\", \"expires\": \"YYYY-MM-DD\", \"note\": \"...\"}. Empty: no known bug is accepted, so a dashboard showing a known bug fails the release check. An accepted bug never makes the dashboard healthy: its health stays RED.",
+ "waivers": []
 }
