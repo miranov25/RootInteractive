@@ -63,6 +63,7 @@ Date: 2026-02-02
 Version: 1.1
 """
 
+import ast
 import subprocess
 import json
 import tempfile
@@ -93,107 +94,73 @@ sys.path.insert(0, str(PROJECT_ROOT / "RootInteractive" / "InteractiveDrawing" /
 # FEATURE MARKER PARSING (P1-1: Canonical form only)
 # =============================================================================
 
+FEATURE_ID = re.compile(r"[A-Z]+(?:\.\w+)+")
+
+
+def _feature_ids(decorators) -> List[str]:
+    """The ids of the canonical markers @pytest.mark.feature("ID") among a node's decorators."""
+    out = []
+    for d in decorators:
+        if (isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr == "feature"
+                and isinstance(d.func.value, ast.Attribute) and d.func.value.attr == "mark"
+                and isinstance(d.func.value.value, ast.Name) and d.func.value.value.id == "pytest"
+                and d.args and isinstance(d.args[0], ast.Constant) and isinstance(d.args[0].value, str)
+                and FEATURE_ID.fullmatch(d.args[0].value)):
+            out.append(d.args[0].value)
+    return out
+
+
+def _test_file_id(filepath: Path) -> str:
+    """The file part of a pytest node id: the path relative to the project root (pytest's rootdir), else as given."""
+    try:
+        return filepath.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return filepath.as_posix()
+
+
 def parse_feature_markers_from_files(test_pattern: str, verbose: bool = False) -> Dict[str, List[str]]:
     """
     Parse @pytest.mark.feature("feature_id") markers from test files.
-    
-    P1-1 Fix: Only supports canonical form:
-        @pytest.mark.feature("DSL.arithmetic_expr")
-    
-    P2-1 Fix: Regex supports multi-dot IDs like "ENC.base64.float64"
-    
+
+    Only the canonical form is supported: @pytest.mark.feature("DSL.arithmetic_expr"), ids with several dots allowed.
+
+    PHASE_4_3 J4 v0.6 (review M-1): the file is read as Python syntax (ast), not line by line. A test function gets a
+    class segment only if it is defined INSIDE that class - before, the class of the last `class` line was attached
+    to every later module-level test (e.g. after a helper class `Port`), so its results were never found. The file
+    part is the path relative to the project root, as in pytest's node ids; markers in strings or comments are
+    ignored by construction. Marked classes are ignored, as before (no test file has one).
+
     Returns dict mapping feature_id -> [list of test nodeids]
     """
     feature_tests = {}
-    test_files = glob.glob(str(PROJECT_ROOT / test_pattern))
-    
+    test_files = sorted(glob.glob(str(PROJECT_ROOT / test_pattern)))
+
     if verbose:
         print(f"Scanning {len(test_files)} test files...")
-    
+
     for filepath in test_files:
         filepath = Path(filepath)
-        
         try:
-            with open(filepath) as f:
-                content = f.read()
-        except (FileNotFoundError, PermissionError) as e:
+            tree = ast.parse(filepath.read_text(), filename=str(filepath))
+        except (FileNotFoundError, PermissionError, SyntaxError, UnicodeDecodeError) as e:
             if verbose:
                 print(f"  Warning: Cannot read {filepath}: {e}")
             continue
-        
-        lines = content.split('\n')
-        current_class = None
-        pending_features = []
-        in_triple_quote = False
-        triple_quote_char = None
-        
-        for i, line in enumerate(lines):
-            # Track triple-quoted strings (skip markers inside docstrings)
-            for quote in ['"""', "'''"]:
-                count = line.count(quote)
-                if count > 0:
-                    if not in_triple_quote:
-                        in_triple_quote = True
-                        triple_quote_char = quote
-                        if count % 2 == 0:
-                            in_triple_quote = False
-                            triple_quote_char = None
-                    elif quote == triple_quote_char:
-                        if count % 2 == 1:
-                            in_triple_quote = False
-                            triple_quote_char = None
-                    break
-            
-            if in_triple_quote:
+        file_id = _test_file_id(filepath)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+                found = [(f"{file_id}::{node.name}", _feature_ids(node.decorator_list))]
+            elif isinstance(node, ast.ClassDef):
+                found = [(f"{file_id}::{node.name}::{m.name}", _feature_ids(m.decorator_list)) for m in node.body
+                         if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name.startswith("test")]
+            else:
                 continue
-            
-            # Skip comments
-            stripped = line.strip()
-            if stripped.startswith('#'):
-                continue
-            
-            # Track class context
-            class_match = re.match(r'^class (\w+)', line)
-            if class_match:
-                current_class = class_match.group(1)
-                pending_features = []
-                continue
-            
-            # P1-1 + P2-1: Match canonical form with multi-dot support
-            # Examples: "DSL.arithmetic_expr", "ENC.base64.float64"
-            feature_match = re.match(
-                r'\s*@pytest\.mark\.feature\(["\']([A-Z]+(?:\.\w+)+)["\']\)',
-                line
-            )
-            if feature_match:
-                pending_features.append(feature_match.group(1))
-                continue
-            
-            # Match test definition
-            test_match = re.match(r'\s*def (test_\w+)\(', line)
-            if test_match:
-                test_name = test_match.group(1)
-                basename = filepath.name
-                
-                if current_class:
-                    nodeid = f"{basename}::{current_class}::{test_name}"
-                else:
-                    nodeid = f"{basename}::{test_name}"
-                
-                for feature_id in pending_features:
-                    if feature_id not in feature_tests:
-                        feature_tests[feature_id] = []
-                    feature_tests[feature_id].append(nodeid)
+            for nodeid, features in found:
+                for feature_id in features:
+                    feature_tests.setdefault(feature_id, []).append(nodeid)
                     if verbose:
                         print(f"  Found: {feature_id} -> {nodeid}")
-                
-                pending_features = []
-            
-            # Reset on non-decorator lines (but keep for stacked decorators)
-            if stripped and not stripped.startswith('@') and not stripped.startswith('def '):
-                if not stripped.startswith('#'):
-                    pending_features = []
-    
+
     return feature_tests
 
 
@@ -315,9 +282,121 @@ def load_outcomes_from_reports(report_paths: List[Path], verbose: bool = False) 
     return outcomes
 
 
+
 # =============================================================================
-# STATUS COMPUTATION (P1-2: Multiple matching strategies)
+# HEADLESS EVIDENCE (PHASE_4 stage 4.2c-2d): the headless engine's own per-capability verdicts
 # =============================================================================
+# The headless tests express a known defect as an expected failure INSIDE a passing pytest test, so pytest's outcome
+# cannot carry it. The engine writes a verdict per capability into every scenario report (expect.py::feature_status).
+# With --from-headless, those verdicts enter the matrix: only reports of the folder's session (session.json), only
+# healthy runs (no deliberate faults, no harness controls), only taxonomy capabilities (engine labels skipped, any
+# other unknown id is an error). Order: Broken > Known Issue > Unverified > Working — a confirmed known defect is never
+# hidden by an unverified result elsewhere. Evidence of only "response" checks (a value changes and returns) verifies
+# a capability only in part. Without --from-headless nothing in this script's output changes.
+HEADLESS_RANK = {"Working": 0, "Unverified": 1, "Known Issue": 2, "Broken": 3}
+
+
+def load_headless_evidence(folders: List[str], taxonomy: Dict) -> Dict[str, dict]:
+    evidence: Dict[str, dict] = {}
+    for folder in folders:
+        folder = Path(folder)
+        meta_path = folder / "session.json"
+        if not meta_path.is_file():
+            raise SystemExit(f"--from-headless {folder}: no session.json (not the output folder of a finished headless session)")
+        meta = json.loads(meta_path.read_text())
+        sid = meta.get("session")
+        if not sid:
+            raise SystemExit(f"--from-headless {folder}: session.json names no session")
+        found = 0
+        for f in sorted(folder.rglob("report*.json")):
+            try:
+                r = json.loads(f.read_text())
+            except Exception as exc:
+                raise SystemExit(f"--from-headless: unreadable report {f}: {exc}")
+            if r.get("session") != sid:
+                continue                                 # another session's report in a re-used folder
+            found += 1
+            if r.get("kind") not in ("healthy", "fault", "harness"):
+                raise SystemExit(f"--from-headless: report without a valid kind: {f}")
+            if r["kind"] != "healthy":
+                continue
+            base = re.sub(r" \[node\]$", "", r["id"])
+            scopes: Dict[str, set] = {}
+            defects: Dict[str, set] = {}
+            outs: Dict[str, set] = {}
+            for o in r.get("outcomes", []):
+                feat = o.get("feature") or ""
+                if feat and o.get("assertion", True):
+                    scopes.setdefault(feat, set()).add(o.get("scope", "value"))
+                    outs.setdefault(feat, set()).add(o.get("outcome", ""))
+                    m = re.search(r"known defect (\S+?):", o.get("detail", "")) if o.get("outcome") == "XFAIL" else None
+                    if m:
+                        defects.setdefault(feat, set()).add(m.group(1))
+            for feat, status in (r.get("features") or {}).items():
+                if feat.startswith("ENGINE."):
+                    continue
+                o = outs.get(feat)
+                if o:            # this report's status from its checks: a known defect is never hidden by a skip
+                    status = ("Broken" if o & {"FAIL", "ERROR", "XPASS"} else "Known Issue" if "XFAIL" in o
+                              else "Unverified" if "SKIP" in o or "PASS" not in o else "Working")
+                if feat not in taxonomy:
+                    raise SystemExit(f"--from-headless: capability {feat!r} of {r['id']} is not in the taxonomy")
+                e = evidence.setdefault(feat, {"status": "Working", "value_evidence": False, "scenarios": {}})
+                if HEADLESS_RANK[status] > HEADLESS_RANK[e["status"]]:
+                    e["status"] = status
+                e["value_evidence"] |= "value" in scopes.get(feat, set())
+                sc = e["scenarios"].setdefault(base, {"backends": set(), "defects": set(), "status": "Working",
+                                                      "skipped": False})
+                sc["backends"].add(r.get("backend", "browser"))
+                sc["defects"] |= defects.get(feat, set())
+                sc["skipped"] |= bool(o and "SKIP" in o and status != "Unverified")
+                if HEADLESS_RANK[status] > HEADLESS_RANK[sc["status"]]:
+                    sc["status"] = status
+        if found == 0:
+            raise SystemExit(f"--from-headless {folder}: no report of session {sid}")
+    return evidence
+
+
+MATRIX_RANK = [("Broken", 4), ("Known Issue", 3), ("Unknown", 2), ("Partly", 2), ("Working", 1)]
+
+
+def _matrix_rank(status: str) -> int:
+    return next((r for key, r in MATRIX_RANK if key in status), 0)      # Planned / No Tests: no evidence
+
+
+def headless_matrix_status(e: dict) -> str:
+    s = e["status"]
+    if s == "Broken":
+        return "🧨 Broken"
+    if s == "Known Issue":
+        return "⚠️ Known Issue"
+    if s == "Unverified":
+        return "❓ Unknown"
+    return "✅ Working" if e["value_evidence"] else "❓ Partly verified (response only)"
+
+
+def combine_status(status: str, test_count: int, tests: List[str], e: dict) -> Tuple[str, int]:
+    """The worse of the decorator status (if it has tests) and the headless status; counts add up."""
+    h = headless_matrix_status(e)
+    best = h if not tests or _matrix_rank(h) >= _matrix_rank(status) else status
+    return best, (test_count if tests else 0) + len(e["scenarios"])
+
+# =============================================================================
+# STATUS COMPUTATION (PHASE_4_3 J4 v0.6: exact matching, every variant)
+# =============================================================================
+
+def matched_outcomes(nodeid: str, test_outcomes: Dict[str, str]) -> List[Tuple[str, str]]:
+    """The report entries of one test: its exact node id or its parametrized variants "<nodeid>[...]"; the
+    project-relative form first, then the file-name form. Empty if the test has no result."""
+    for form in (nodeid, nodeid.split("/")[-1]):
+        hits = sorted((k, v) for k, v in test_outcomes.items() if k == form or k.startswith(form + "["))
+        if hits:
+            return hits
+    return []
+
+
+PARTLY_NOT_RUN = "❓ Partly verified (not every test ran)"      # PHASE_4_5 A2 v0.2 (review F1)
+
 
 def compute_status(
     feature_id: str,
@@ -328,7 +407,7 @@ def compute_status(
     """
     Compute feature status from test outcomes.
     
-    P1-2 Fix: Multiple nodeid matching strategies.
+    PHASE_4_3 J4 v0.6: exact node-id matching, every parametrized variant counts (matched_outcomes).
     
     Returns (status_string, test_count, failed_tests)
     
@@ -337,9 +416,11 @@ def compute_status(
     2. xpassed -> 🧨 Broken (unexpected pass)
     3. xfailed -> ⚠️ Known Issue
     4. unknown/skipped only -> ❓ Unknown
-    5. all passed -> ✅ Working
-    6. no tests + planned -> 📋 Planned
-    7. no tests -> ❌ No Tests
+    5. passed, but a registered test has no result or a test/case was skipped -> ❓ Partly verified (fail closed,
+       PHASE_4_5 A2 review F1: "Working" only when every registered test ran and every case passed)
+    6. all passed -> ✅ Working
+    7. no tests + planned -> 📋 Planned
+    8. no tests -> ❌ No Tests
     """
     if not feature_test_nodeids:
         # Check if feature is planned
@@ -349,50 +430,22 @@ def compute_status(
     
     outcomes = []
     failed_tests = []
-    
+
     for nodeid in feature_test_nodeids:
-        outcome = None
-        matched_nodeid = nodeid
-        
-        # Strategy 1: Exact match
-        outcome = test_outcomes.get(nodeid)
-        if outcome:
-            matched_nodeid = nodeid
-        
-        # Strategy 2: Without directory prefix (match suffix)
-        if outcome is None:
-            for key, val in test_outcomes.items():
-                if key.endswith(nodeid) or nodeid.endswith(key.split("/")[-1]):
-                    outcome = val
-                    matched_nodeid = key
-                    break
-        
-        # Strategy 3: Just test name (last :: segment)
-        if outcome is None:
-            test_name = nodeid.split("::")[-1]
-            for key, val in test_outcomes.items():
-                if key.endswith("::" + test_name) or key.endswith(test_name):
-                    outcome = val
-                    matched_nodeid = key
-                    break
-        
-        # Strategy 4: Fuzzy match on file::test
-        if outcome is None:
-            # Extract file.py::test_name pattern
-            parts = nodeid.split("::")
-            if len(parts) >= 2:
-                file_test = f"{parts[0]}::{parts[-1]}"
-                for key, val in test_outcomes.items():
-                    if file_test in key:
-                        outcome = val
-                        matched_nodeid = key
-                        break
-        
-        outcomes.append(outcome or "unknown")
-        
-        if outcome in ("failed", "error", "xpassed"):
-            failed_tests.append(matched_nodeid)
-    
+        # PHASE_4_3 J4 v0.6 (review M-1): EXACT matching only. A test's results are the report entries with exactly its
+        # node id, or its node id followed by a parameter list "[...]" - EVERY variant counts. The project-relative
+        # form is tried first, then the file-name form (reports from a run started elsewhere). The former suffix,
+        # test-name and substring strategies are gone: they could attribute another test's result (test_x to
+        # test_x_other) or only the first variant of a parametrized test. No match -> "unknown", never a pass.
+        hits = matched_outcomes(nodeid, test_outcomes)
+        if not hits:
+            outcomes.append("unknown")
+            continue
+        for key, outcome in hits:
+            outcomes.append(outcome)
+            if outcome in ("failed", "error", "xpassed"):
+                failed_tests.append(key)
+
     test_count = len(feature_test_nodeids)
     
     # Priority 1: Any failed = broken
@@ -411,8 +464,13 @@ def compute_status(
     known = [o for o in outcomes if o not in ("unknown", "skipped")]
     if not known:
         return "❓ Unknown", test_count, []
-    
-    # Priority 5: All passed
+
+    # Priority 5 (PHASE_4_5 A2 v0.2, review F1): some tests or cases did not run - no result in the reports, or skipped.
+    # The ones that ran cannot vouch for them: never "Working" (fail closed).
+    if len(known) < len(outcomes):
+        return PARTLY_NOT_RUN, test_count, []
+
+    # Priority 6: All passed
     if all(o == "passed" for o in known):
         return "✅ Working", test_count, []
     
@@ -428,6 +486,7 @@ def generate_matrix(
     test_outcomes: Dict[str, str],
     feature_tests: Dict[str, List[str]],
     verbose: bool = False,
+    headless: Optional[Dict[str, dict]] = None,
 ) -> Tuple[str, dict]:
     """
     Generate CAPABILITY_MATRIX content (Markdown + JSON).
@@ -508,6 +567,8 @@ def generate_matrix(
             tests = feature_tests.get(feature_id, [])
             
             status, test_count, failed = compute_status(feature_id, tests, test_outcomes, taxonomy)
+            if headless and feature_id in headless:                         # PHASE_4 4.2c-2d
+                status, test_count = combine_status(status, test_count, tests, headless[feature_id])
             
             # Update counts
             if "Working" in status:
@@ -525,9 +586,17 @@ def generate_matrix(
             else:
                 counts["unknown"] += 1
             
-            # Format tests column
-            if tests:
-                tests_display = f"{test_count} test{'s' if test_count > 1 else ''}"
+            # Format tests column. PHASE_4_3 J4 v0.6 (review M-2): test functions, executed cases (every parameter
+            # variant is a case) and functions without any result in the reports are shown separately.
+            hits = {n: matched_outcomes(n, test_outcomes) for n in tests}
+            cases = sum(len(h) for h in hits.values())
+            without_result = sorted(n for n, h in hits.items() if not h)
+            if tests or (headless and feature_id in headless):
+                tests_display = f"{test_count} test{'s' if test_count != 1 else ''}"
+                if tests:
+                    tests_display += f", {cases} case{'s' if cases != 1 else ''}"
+                    if without_result:
+                        tests_display += f", {len(without_result)} without result"
             else:
                 tests_display = "-"
             
@@ -542,11 +611,17 @@ def generate_matrix(
                 "backends": info.get("backends", []),
                 "layer": layer,
                 "test_count": test_count,
+                "cases": cases,
+                "without_result": without_result,
                 "tests": tests,
                 "failed_tests": failed,
                 "planned": info.get("planned", False),
                 "regression": info.get("regression"),
             }
+            if headless and feature_id in headless:                         # PHASE_4 4.2c-2d
+                json_data["features"][feature_id]["headless_scenarios"] = {
+                    sid: {"backends": sorted(v["backends"]), "status": v["status"], "defects": sorted(v["defects"])}
+                    for sid, v in sorted(headless[feature_id]["scenarios"].items())}
         
         lines.extend(["", ""])
     
@@ -582,6 +657,9 @@ def generate_matrix(
         name = info.get("name", feature_id)
         feature_test_list = feature_tests.get(feature_id, [])
         test_count = len(feature_test_list)
+        hl = (headless or {}).get(feature_id)
+        if hl:
+            test_count += len(hl["scenarios"])
         
         lines.append("<details>")
         lines.append(f"<summary><strong>{feature_id}</strong> — {name} ({test_count} tests)</summary>")
@@ -627,11 +705,17 @@ def generate_matrix(
                     status_emoji = "❓"
                 
                 lines.append(f"- {status_emoji} `{nodeid}`")
-        else:
+        elif not hl:
             if info.get("planned"):
                 lines.append("*Feature planned, not yet implemented*")
             else:
                 lines.append("*No tests with @pytest.mark.feature marker*")
+        if hl:                                                              # PHASE_4 4.2c-2d: headless evidence
+            mark = {"Working": "✅", "Known Issue": "⚠️", "Unverified": "❓", "Broken": "🧨"}
+            for sid, v in sorted(hl["scenarios"].items()):
+                extra = f" — known defect {', '.join(sorted(v['defects']))}" if v["defects"] else ""
+                extra += " — also skipped checks" if v.get("skipped") else ""
+                lines.append(f"- {mark[v['status']]} headless scenario `{sid}` ({', '.join(sorted(v['backends']))}){extra}")
         
         lines.append("")
         lines.append("</details>")
@@ -670,6 +754,8 @@ def generate_matrix(
         "| 📋 Planned | Feature planned, not yet tested |",
         "| ❌ No Tests | No tests cover this feature |",
         "| ❓ Unknown | Test status unclear |",
+        "| ❓ Partly verified | The tests that ran pass, but not every registered test or case ran (no result, or "
+        "skipped), or a scenario checked only the response; counted with Unknown in the summary |",
         "",
         "## Priority Levels",
         "",
@@ -721,6 +807,7 @@ Examples:
         nargs="*",
         default=[
             "RootInteractive/InteractiveDrawing/bokeh/test_*.py",
+            "RootInteractive/InteractiveDrawing/bokeh/headless/test_*.py",   # PHASE_4_3 J4: the Node join tests
             "RootInteractive/Tools/test_*.py",
             "RootInteractive/onnx/test_*.py"
         ],
@@ -735,6 +822,13 @@ Examples:
         "--from-reports",
         nargs="*",
         help="Read outcomes from existing JSON report files (pytest-json-report format)"
+    )
+    parser.add_argument(
+        "--from-headless",
+        nargs="*",
+        default=[],
+        help="Headless output folders of finished sessions (session.json + scenario reports): the engine's own "
+             "per-capability verdicts of healthy runs enter the matrix (PHASE_4 stage 4.2c-2d)"
     )
     parser.add_argument(
         "--skip-tests",
@@ -843,11 +937,13 @@ Examples:
     # Generate matrix
     # -------------------------------------------------------------------------
     print("\nGenerating capability matrix...")
+    headless = load_headless_evidence(args.from_headless, FEATURE_TAXONOMY) if args.from_headless else None
     markdown, json_data = generate_matrix(
         FEATURE_TAXONOMY,
         test_outcomes,
         feature_tests,
-        args.verbose
+        args.verbose,
+        headless=headless,
     )
     
     # -------------------------------------------------------------------------

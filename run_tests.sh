@@ -42,6 +42,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 # Test directories (without glob - pytest discovers test_*.py)
 TEST_DIRS=(
     "RootInteractive/InteractiveDrawing/bokeh"
+    "RootInteractive/InteractiveDrawing/bokeh/headless"
     "RootInteractive/Tools"
     "RootInteractive/onnx"
     "RootInteractive/MLpipeline/tests"
@@ -122,9 +123,17 @@ Options:
   --quick          Run tests only (skip CAPABILITY_MATRIX generation)
   --matrix         Generate CAPABILITY_MATRIX only (skip running tests)
   --dry-run        Show what would be done without doing it
+  --full           Headless tests: the full suite (all generated cases, every browser test);
+                   default: the fast suite (tests marked slow are left out)
+  --target NAME    Run only this target (repeatable; each target runs separately, with its own log folder,
+                   timing and summary line). A target is a pytest marker of the headless tests (hyphens may be
+                   used for underscores), or "joins" (node --test). "all": everything, as --full.
+  --list-targets   List the targets, their test counts and descriptions (with --ids: also every test id)
 
 Test Directories:
-  - RootInteractive/InteractiveDrawing/bokeh/
+  - RootInteractive/InteractiveDrawing/bokeh/ (without headless/, which has its own entry)
+  - RootInteractive/InteractiveDrawing/bokeh/headless/ (Node and browser tests; fast suite unless --full)
+  - RootInteractive/joins/ (Node tests, node --test)
   - RootInteractive/Tools/
 
 Output Structure:
@@ -170,6 +179,10 @@ VERBOSE=""
 QUICK_MODE=0
 MATRIX_ONLY=0
 DRY_RUN=0
+FULL_MODE=0
+TARGETS=()
+LIST_TARGETS=0
+LIST_IDS=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -183,6 +196,14 @@ while [[ $# -gt 0 ]]; do
         --quick) QUICK_MODE=1 ;;
         --matrix) MATRIX_ONLY=1 ;;
         --dry-run) DRY_RUN=1 ;;
+        --full) FULL_MODE=1 ;;
+        --target)
+            shift
+            if [[ -z "${1:-}" ]]; then echo "--target needs a name (see --list-targets)"; return 2; fi
+            TARGETS+=("$1")
+            ;;
+        --list-targets) LIST_TARGETS=1 ;;
+        --ids) LIST_IDS=1 ;;
         *) echo "Unknown option: $1"; show_help; return 2 ;;
     esac
     shift
@@ -241,6 +262,184 @@ BEFOREPY
 fi
 
 # =============================================================================
+# Targets (PHASE_4 stage 4.2c-2c): pytest markers of the headless tests, plus "joins" (node --test)
+# =============================================================================
+HEADLESS_DIR="RootInteractive/InteractiveDrawing/bokeh/headless"
+NODE_TAP=()                                  # TAP output gives a readable count on every Node version (C-3)
+if command -v node > /dev/null 2>&1 && node --help 2>/dev/null | grep -q -- "--test-reporter"; then NODE_TAP=(--test-reporter=tap); fi
+
+target_markers() {                           # the registered target markers ("<name>: target: <description>")
+    python3 -m pytest --markers -p no:cacheprovider "$HEADLESS_DIR" 2>/dev/null \
+        | sed -n 's/^@pytest\.mark\.\([a-z_0-9]*\): target: \(.*\)/\1|\2/p' | sort -u -t'|' -k1,1
+}
+
+publish_matrix() {                           # $1: destination .md; the rest: generator arguments
+    # The Architect's decision (4.2c-2d, option C, approved by three reviewers): both files are generated in a temporary
+    # folder and published TOGETHER only on success (both present, the JSON readable); if generation fails or crashes,
+    # the previous pair stays unchanged and the caller fails the run. Measured failures are published.
+    local dest="$1"; shift
+    local tmp; tmp=$(mktemp -d)
+    if python3 scripts/generate_capability_matrix.py "$@" --output "$tmp/matrix.md" \
+            && [[ -s "$tmp/matrix.md" && -s "$tmp/matrix.json" ]] \
+            && python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$tmp/matrix.json"; then
+        mkdir -p "$(dirname "$dest")"
+        mv "$tmp/matrix.md" "$dest" && mv "$tmp/matrix.json" "${dest%.md}.json"
+        local ok=$?
+        rm -rf "$tmp"
+        return $ok
+    fi
+    rm -rf "$tmp"
+    return 1
+}
+
+is_target() {                                # a registered target marker: exact name, never a pattern (4.2c-2c F-1)
+    cut -d'|' -f1 <<< "$KNOWN_TARGETS" | grep -qxF -- "${1//-/_}"
+}
+
+tap_counts() {                               # "selected passed failed skipped test-errors collection-errors"
+    local p f s
+    p=$(grep -E "^# pass [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    f=$(grep -E "^# fail [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    s=$(grep -E "^# skipped [0-9]+" "$1" | tail -1 | awk '{print $3}')
+    if [[ -z "$p" || -z "$f" ]]; then return 1; fi
+    if [[ $((p + f + ${s:-0})) -le 0 ]]; then return 1; fi           # a run with no tests is not a pass (4.2c-2c v0.2)
+    echo "$((p + f + ${s:-0})) $p $f ${s:-0} 0 0"
+}
+
+json_counts() {                              # the same six numbers from pytest-json-report; ids to selected_tests.txt
+    python3 - "$1" "$2" <<'COUNTPY'
+import json, sys
+try:                                         # an unreadable or missing report is a failure, never counted as zero tests
+    r = json.load(open(sys.argv[1]))
+    s = r["summary"]
+    coll = sum(1 for c in r.get("collectors", []) if c.get("outcome") == "failed")
+    tests = [t["nodeid"] for t in r["tests"]]
+    open(sys.argv[2], "w").write("".join(t + "\n" for t in tests))
+except Exception as exc:
+    print(f"report unreadable: {exc!r}", file=sys.stderr); sys.exit(3)
+print(len(tests), s.get("passed", 0), s.get("failed", 0), s.get("skipped", 0), s.get("error", 0), coll)
+COUNTPY
+}
+
+run_target() {
+    local name="$1" marker="${1//-/_}" out="$LOG_BASE_DIR/target_${1}_${TIMESTAMP}" rc=0 counts note="" t0 t1
+    local cmd=()
+    mkdir -p "$out"
+    if [[ "$name" == "joins" ]]; then
+        local files=(RootInteractive/joins/test_*.mjs)
+        cmd=(node --test "${NODE_TAP[@]}" "${files[@]}")
+    elif is_target "$name"; then
+        cmd=(env -u DISPLAY RI_HEADLESS_OUT="$PROJECT_ROOT/$out/headless_out"
+             RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/$HEADLESS_DIR/_out}"
+             RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1 RI_HEADLESS_TARGET="$marker"
+             python3 -m pytest "$HEADLESS_DIR" -m "$marker" -n "$PARALLEL_WORKERS" --timeout=900 -q -p no:cacheprovider
+             --json-report --json-report-file="$PROJECT_ROOT/$out/report.json")
+    else
+        echo "unknown target: $name (see ./run_tests.sh --list-targets)" | tee "$out/test.log"
+        printf "%-22s %8s %6s %6s %7s %8s %11s %7s %4s  %s\n" "$name" 0 0 0 0 0 0 0.0 2 "$out  UNKNOWN TARGET" >> "$TARGET_SUMMARY"
+        TARGET_FAILED=1; return
+    fi
+    printf '%q ' "${cmd[@]}" > "$out/command.txt"; echo >> "$out/command.txt"
+    if [[ $DRY_RUN -eq 1 ]]; then echo "  [DRY RUN] $(cat "$out/command.txt")"; return; fi
+    echo "${BOLD}Target: $name${RESET}"
+    t0=$(date +%s.%N)
+    if [[ "$name" == "joins" && ! -e "${files[0]}" ]]; then
+        echo "no joins test files (RootInteractive/joins/test_*.mjs)" > "$out/test.log"; rc=1
+    elif [[ ( "$name" == "joins" || "$marker" == "node_joins" ) && ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+        # both read the generated AO2D fixture; node_joins too since PHASE_4_4 W0 (AO2D fixture addendum, GPT24/GPT25)
+        { echo "RootInteractive/joins/ao2d_fixture.json is missing (generated, not in git); create it with:"
+          echo "    (cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"; } | tee "$out/test.log"
+        rc=1; note="  FIXTURE MISSING"
+    else
+        "${cmd[@]}" > "$out/test.log" 2>&1; rc=$?
+    fi
+    t1=$(date +%s.%N)
+    if [[ "$name" == "joins" ]]; then
+        counts=$(tap_counts "$out/test.log") || { counts="0 0 0 0 0 0"; note="${note:-  COUNT UNREADABLE OR NO TESTS}"; rc=1; }
+    else
+        if ! counts=$(json_counts "$out/report.json" "$out/selected_tests.txt" 2>> "$out/test.log"); then
+            counts="0 0 0 0 0 0"; note="${note:-  REPORT UNREADABLE}"; [[ $rc -eq 0 ]] && rc=1   # keeps FIXTURE MISSING
+        fi
+        [[ $rc -eq 5 ]] && note="  EMPTY SELECTION"
+        # the capability matrix of this target, in its own folder (4.2c-2d; never the canonical matrix)
+        if [[ -f "$out/headless_out/session.json" ]] && find "$out/headless_out" -name 'report*.json' -print -quit | grep -q .; then
+            if ! publish_matrix "$out/CAP_MATRIX_${marker}.md" --from-reports "$out/report.json" \
+                    --from-headless "$out/headless_out" >> "$out/test.log" 2>&1; then
+                note="${note}  MATRIX GENERATION FAILED"; [[ $rc -eq 0 ]] && rc=1
+            fi
+        fi
+    fi
+    read -r sel pas fai ski ter cer <<< "$counts"
+    printf "%-22s %8s %6s %6s %7s %8s %11s %7.1f %4s  %s\n" "$name" "$sel" "$pas" "$fai" "$ski" "$ter" "$cer" \
+        "$(python3 -c "print($t1 - $t0)")" "$rc" "$out$note" | tee -a "$TARGET_SUMMARY"
+    [[ $rc -eq 0 ]] || TARGET_FAILED=1
+}
+
+if [[ $LIST_TARGETS -eq 1 ]]; then
+    print_header "Targets"
+    printf "%-22s %6s  %s\n" target tests description
+    while IFS='|' read -r m about; do
+        n=$(python3 -m pytest --collect-only -qq -p no:cacheprovider -m "$m" "$HEADLESS_DIR" 2>/dev/null | grep -c "::")
+        printf "%-22s %6s  %s\n" "$m" "$n" "$about"
+        if [[ $LIST_IDS -eq 1 ]]; then
+            python3 -m pytest --collect-only -qq -p no:cacheprovider -m "$m" "$HEADLESS_DIR" 2>/dev/null | grep "::" | sed 's/^/    /'
+        fi
+    done < <(target_markers)
+    printf "%-22s %6s  %s\n" joins "$(ls RootInteractive/joins/test_*.mjs 2>/dev/null | wc -l) files" "JavaScript tests of the joins prototypes (node --test, TAP)"
+    if [[ $LIST_IDS -eq 1 ]]; then ls RootInteractive/joins/test_*.mjs 2>/dev/null | sed 's/^/    /'; fi
+    echo "Run one:   ./run_tests.sh --target node_histograms      (the same tests: pytest $HEADLESS_DIR -m node_histograms)"
+    echo "Test ids:  pytest --collect-only -qq -m <target> $HEADLESS_DIR"
+    return 0
+fi
+
+if [[ ${#TARGETS[@]} -gt 0 ]]; then
+    KNOWN_TARGETS=$(target_markers)
+    bad=()                                   # every name is checked before anything runs, also with "all" (4.2c-2c v0.2)
+    for t in "${TARGETS[@]}"; do
+        if [[ "$t" != all && "$t" != joins ]] && ! is_target "$t"; then bad+=("$t"); fi
+    done
+    if [[ ${#bad[@]} -gt 0 ]]; then
+        echo "unknown target(s): ${bad[*]} (see ./run_tests.sh --list-targets)"
+        return 1
+    fi
+    if [[ " ${TARGETS[*]} " == *" all "* ]]; then
+        FULL_MODE=1                          # --target all: the existing full acceptance path below
+    else
+        print_header "Targets: ${TARGETS[*]}"
+        TARGET_SUMMARY="$LOG_BASE_DIR/targets_${TIMESTAMP}.txt"
+        TARGET_FAILED=0
+        {
+            echo "commit $(git rev-parse --short HEAD 2>/dev/null) | workers $PARALLEL_WORKERS | $(python3 --version 2>&1) | pytest $(python3 -c 'import pytest; print(pytest.__version__)' 2>/dev/null) | node $(node --version 2>/dev/null) | bokeh $(python3 -c 'import bokeh; print(bokeh.__version__)' 2>/dev/null)"
+            printf "%-22s %8s %6s %6s %7s %8s %11s %7s %4s  %s\n" target selected passed failed skipped test-err collect-err wall_s exit log
+        } | tee "$TARGET_SUMMARY"
+        all0=$(date +%s.%N)
+        for t in "${TARGETS[@]}"; do run_target "$t"; done
+        echo "total wall time: $(python3 -c "print(f'{$(date +%s.%N) - $all0:.1f}')") s" | tee -a "$TARGET_SUMMARY"
+        if [[ ${#TARGETS[@]} -gt 1 && $DRY_RUN -eq 0 ]]; then                  # tests selected by several targets
+            python3 - "$LOG_BASE_DIR" "$TIMESTAMP" <<'OVERPY' | tee -a "$TARGET_SUMMARY"
+import collections, pathlib, sys
+seen = collections.defaultdict(list)
+for f in sorted(pathlib.Path(sys.argv[1]).glob(f"target_*_{sys.argv[2]}/selected_tests.txt")):
+    for t in f.read_text().splitlines():
+        seen[t].append(f.parent.name.split("_" + sys.argv[2])[0][len("target_"):])
+over = {t: ts for t, ts in seen.items() if len(ts) > 1}
+print(f"overlap between targets: {len(over)} test(s)" + "".join(f"\n  {t}: {', '.join(ts)}" for t, ts in sorted(over.items())))
+OVERPY
+        fi
+        if [[ $DRY_RUN -eq 0 ]]; then                                        # the evidence of this invocation
+            if (cd "$LOG_BASE_DIR" && zip -qr "targets_${TIMESTAMP}.zip" "targets_${TIMESTAMP}.txt" target_*_"${TIMESTAMP}" \
+                    -x '*.npz' -x '*.html' -x '*_document.json') && [[ -s "$LOG_BASE_DIR/targets_${TIMESTAMP}.zip" ]]; then
+                echo "Evidence: $LOG_BASE_DIR/targets_${TIMESTAMP}.zip"
+            else
+                print_warning "the evidence zip could not be written; the target folders remain in $LOG_BASE_DIR"
+                TARGET_FAILED=1
+            fi
+        fi
+        return $TARGET_FAILED
+    fi
+fi
+
+# =============================================================================
 # Phase 1: Run Tests
 # =============================================================================
 
@@ -275,13 +474,32 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
         echo "${BOLD}Testing: $test_dir ($test_count test files)${RESET}"
         echo "Output: $output_dir/"
         
+        # Per-folder arguments (PHASE_4 stage 4.2c-2b): the bokeh entry leaves out headless/, which has its own entry;
+        # the headless entry runs the fast suite unless --full, writes its reports into this run's log folder and keeps
+        # the Node model bundle in a persistent store (built once, about a minute).
+        EXTRA_ARGS=()
+        case "$test_dir" in
+            RootInteractive/InteractiveDrawing/bokeh)
+                EXTRA_ARGS=(--ignore=RootInteractive/InteractiveDrawing/bokeh/headless) ;;
+            RootInteractive/InteractiveDrawing/bokeh/headless)
+                # required browser and Node (a wrong jsdom version fails), the required-scenario check, an outer time
+                # limit per test, and no X display for this entry (4.2c-2b v0.2)
+                [[ $FULL_MODE -eq 1 ]] || EXTRA_ARGS=(-m "not slow")
+                EXTRA_ARGS+=(--timeout=900)
+                export RI_HEADLESS_OUT="$PROJECT_ROOT/$output_dir/headless_out"
+                export RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/RootInteractive/InteractiveDrawing/bokeh/headless/_out}"
+                export RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1
+                HEADLESS_SAVED_DISPLAY="${DISPLAY-}"; unset DISPLAY ;;
+        esac
+
         if [[ $DRY_RUN -eq 1 ]]; then
-            echo "  [DRY RUN] Would run: pytest $test_dir/ -n $PARALLEL_WORKERS"
+            echo "  [DRY RUN] Would run: pytest $test_dir/ -n $PARALLEL_WORKERS ${EXTRA_ARGS[*]}"
         else
             # Run pytest with parallel workers
             if [[ "$PARALLEL_WORKERS" -gt 1 ]]; then
                 python3 -m pytest "$test_dir/" \
                     -n "$PARALLEL_WORKERS" \
+                    "${EXTRA_ARGS[@]}" \
                     $VERBOSE \
                     --json-report \
                     --json-report-file="$report_file" \
@@ -289,6 +507,7 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             else
                 # Sequential run
                 python3 -m pytest "$test_dir/" \
+                    "${EXTRA_ARGS[@]}" \
                     $VERBOSE \
                     --json-report \
                     --json-report-file="$report_file" \
@@ -296,6 +515,16 @@ if [[ $MATRIX_ONLY -eq 0 ]]; then
             fi
             exit_code=${PIPESTATUS[0]}
             if [[ $exit_code -ne 0 ]]; then RUN_FAILED=1; fi
+            if [[ "$test_dir" == "RootInteractive/InteractiveDrawing/bokeh/headless" ]]; then
+                # The outcome list, the timings and the required-scenario check are written and checked by the headless
+                # session itself (its conftest.py): a failure there is pytest's own exit status, never ignored here.
+                for f in outcomes.txt timings.txt; do
+                    if [[ -f "$RI_HEADLESS_OUT/$f" ]]; then cp "$RI_HEADLESS_OUT/$f" "$output_dir/$f"; fi
+                done
+                HEADLESS_OUT_DIR="$RI_HEADLESS_OUT"           # for the capability matrix (4.2c-2d)
+                unset RI_HEADLESS_OUT RI_HEADLESS_REQUIRED RI_HEADLESS_CHECK_REQUIRED
+                if [[ -n "$HEADLESS_SAVED_DISPLAY" ]]; then export DISPLAY="$HEADLESS_SAVED_DISPLAY"; fi
+            fi
 
             if [[ -f "$report_file" ]]; then
                 REPORT_FILES+=("$report_file")
@@ -348,6 +577,42 @@ for t in r.get('tests', []):
             fi
         fi
     done
+
+    # Node tests of the joins prototypes (PHASE_4 stage 4.2c-2b). The files are listed explicitly: their names
+    # (test_*.mjs) do not match node --test's default patterns, so a folder argument would find nothing. An empty list
+    # fails the run; three of the files read ao2d_fixture.json, which is generated (joins/README.md), so it is checked
+    # first and its generation command printed.
+    if [[ -d RootInteractive/joins ]]; then
+        joins_dir="$LOG_BASE_DIR/joins_${TIMESTAMP}"
+        joins_files=(RootInteractive/joins/test_*.mjs)
+        echo ""
+        echo "${BOLD}Testing: RootInteractive/joins (node --test, ${#joins_files[@]} files)${RESET}"
+        if [[ ! -e "${joins_files[0]}" ]]; then
+            print_warning "no joins test files found (RootInteractive/joins/test_*.mjs)"
+            RUN_FAILED=1
+        elif [[ $DRY_RUN -eq 1 ]]; then
+            echo "  [DRY RUN] Would run: node --test ${joins_files[*]}"
+        elif ! command -v node > /dev/null 2>&1; then
+            print_warning "node not found: joins tests not run"
+            RUN_FAILED=1
+        elif [[ ! -f RootInteractive/joins/ao2d_fixture.json ]]; then
+            print_warning "RootInteractive/joins/ao2d_fixture.json is missing (generated, not in git); create it with:"
+            echo "    (cd RootInteractive/Tools/generators && python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json)"
+            RUN_FAILED=1
+        else
+            mkdir -p "$joins_dir"
+            node --test "${NODE_TAP[@]}" "${joins_files[@]}" 2>&1 | tee "$joins_dir/test.log"
+            [[ ${PIPESTATUS[0]} -eq 0 ]] || RUN_FAILED=1
+            joins_passed=$(grep -E "^# pass [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
+            joins_failed=$(grep -E "^# fail [0-9]+" "$joins_dir/test.log" | tail -1 | awk '{print $3}')
+            if [[ -z "$joins_passed" || -z "$joins_failed" ]] || (( joins_passed + joins_failed <= 0 )); then
+                print_warning "joins: no test counted, or the count could not be read from the log"; RUN_FAILED=1
+            fi
+            TOTAL_PASSED=$((TOTAL_PASSED + ${joins_passed:-0}))
+            TOTAL_FAILED=$((TOTAL_FAILED + ${joins_failed:-0}))
+            echo "  Results: ${joins_passed:-0} passed, ${joins_failed:-0} failed"
+        fi
+    fi
     
     # Summary
     print_header "Test Summary"
@@ -392,34 +657,48 @@ if [[ $QUICK_MODE -eq 0 ]]; then
         done
     fi
     
+    # PHASE_4 4.2c-2d (the Architect's decision, option C, approved by three reviewers): only a COMPLETE full-suite headless
+    # session (session.json "complete") publishes the canonical matrix; any other run publishes CAP_MATRIX_fast (the
+    # fast suite) or CAP_MATRIX_partial (--matrix without a complete session) in test_logs/, each with the evidence it
+    # has. publish_matrix keeps the previous pair if generation fails, and the run then fails.
+    HL_DIR="${HEADLESS_OUT_DIR:-}"
+    if [[ -z "$HL_DIR" && -L "$LOG_BASE_DIR/headless_latest" ]]; then
+        HL_DIR="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/headless_latest")/headless_out"
+    fi
+    HL_ARGS=()
+    if [[ -n "$HL_DIR" && -f "$HL_DIR/session.json" ]] && find "$HL_DIR" -name 'report*.json' -print -quit | grep -q .; then
+        HL_ARGS=(--from-headless "$HL_DIR")
+    fi
+    if [[ ${#HL_ARGS[@]} -gt 0 ]] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("complete") else 1)' "$HL_DIR/session.json"; then
+        MATRIX_DEST="$MATRIX_OUTPUT"
+    elif [[ $MATRIX_ONLY -eq 1 ]]; then
+        MATRIX_DEST="$LOG_BASE_DIR/CAP_MATRIX_partial.md"
+        echo "Note: no complete headless session; the canonical matrix is not updated. Matrix: $MATRIX_DEST"
+    else
+        MATRIX_DEST="$LOG_BASE_DIR/CAP_MATRIX_fast.md"
+        echo "Note: not a complete full-suite run; the canonical matrix is not updated. Matrix of this run: $MATRIX_DEST"
+    fi
+
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo "[DRY RUN] Would run: python3 scripts/generate_capability_matrix.py"
+        echo "[DRY RUN] Would publish: $MATRIX_DEST (generator ${HL_ARGS[*]})"
         echo "  Reports: ${REPORT_FILES[*]}"
     else
-        # Remove previous outputs so a failed/no-op generator cannot look successful.
-        rm -f "$MATRIX_OUTPUT" "${MATRIX_OUTPUT%.md}.json"
         if [[ ${#REPORT_FILES[@]} -gt 0 ]]; then
             echo "Using reports:"
             for rf in "${REPORT_FILES[@]}"; do
                 echo "  - $rf"
             done
-            python3 scripts/generate_capability_matrix.py \
-                --from-reports "${REPORT_FILES[@]}" \
-                --output "$MATRIX_OUTPUT"
-            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+            publish_matrix "$MATRIX_DEST" --from-reports "${REPORT_FILES[@]}" "${HL_ARGS[@]}"
         else
             echo "No reports found, running pytest internally..."
-            python3 scripts/generate_capability_matrix.py \
-                --output "$MATRIX_OUTPUT"
-            if [[ $? -ne 0 ]]; then RUN_FAILED=1; fi
+            publish_matrix "$MATRIX_DEST" "${HL_ARGS[@]}"
         fi
-        
-        if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-            print_success "Generated: $MATRIX_OUTPUT"
-            print_success "Generated: ${MATRIX_OUTPUT%.md}.json"
+        if [[ $? -eq 0 ]]; then
+            print_success "Generated: $MATRIX_DEST"
+            print_success "Generated: ${MATRIX_DEST%.md}.json"
         else
             RUN_FAILED=1
-            print_error "Failed to generate fresh CAPABILITY_MATRIX outputs"
+            print_error "Capability matrix generation failed; the previous $MATRIX_DEST (if any) is unchanged"
         fi
     fi
 fi
@@ -439,8 +718,8 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-    echo "Matrix: $MATRIX_OUTPUT"
+if [[ -s "${MATRIX_DEST:-$MATRIX_OUTPUT}" && -s "$(echo "${MATRIX_DEST:-$MATRIX_OUTPUT}" | sed 's/\.md$/.json/')" ]]; then
+    echo "Matrix: ${MATRIX_DEST:-$MATRIX_OUTPUT}"
 fi
 
 echo ""
@@ -508,7 +787,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
     fi
 done
 
-[[ -f "$MATRIX_OUTPUT" ]] && echo "  Matrix:    $PROJECT_ROOT/$MATRIX_OUTPUT"
+[[ -f "${MATRIX_DEST:-$MATRIX_OUTPUT}" ]] && echo "  Matrix:    $PROJECT_ROOT/${MATRIX_DEST:-$MATRIX_OUTPUT}"
 [[ -f "$DIFF_PHASE" ]] && echo "  Diff tag:  $PROJECT_ROOT/$DIFF_PHASE"
 [[ -f "$DIFF_LAST" ]] && echo "  Diff HEAD: $PROJECT_ROOT/$DIFF_LAST"
 
@@ -532,7 +811,7 @@ for test_dir in "${TEST_DIRS[@]}"; do
     if [[ $MATRIX_ONLY -eq 1 && -L "$LOG_BASE_DIR/${dir_name}_latest" ]]; then
         latest_dir="$LOG_BASE_DIR/$(readlink "$LOG_BASE_DIR/${dir_name}_latest")"
     fi
-    for f in test.log summary.txt report.json; do
+    for f in test.log summary.txt report.json outcomes.txt timings.txt; do     # outcomes/timings: headless entry
         if [[ -f "$latest_dir/$f" ]]; then
             cp "$latest_dir/$f" "$REVIEWER_STAGE/${dir_name}_${f}"
             REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
@@ -540,9 +819,15 @@ for test_dir in "${TEST_DIRS[@]}"; do
     done
 done
 
+# Collect the joins Node tests' log (PHASE_4 stage 4.2c-2b)
+if [[ -f "$LOG_BASE_DIR/joins_${TIMESTAMP}/test.log" ]]; then
+    cp "$LOG_BASE_DIR/joins_${TIMESTAMP}/test.log" "$REVIEWER_STAGE/joins_test.log"
+    REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
+fi
+
 # Collect matrix (unique name, no prefix needed)
-if [[ -s "$MATRIX_OUTPUT" && -s "${MATRIX_OUTPUT%.md}.json" ]]; then
-    cp "$MATRIX_OUTPUT" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
+if [[ -s "${MATRIX_DEST:-$MATRIX_OUTPUT}" ]]; then                                  # the matrix of THIS run (4.2c-2d)
+    cp "${MATRIX_DEST:-$MATRIX_OUTPUT}" "$REVIEWER_STAGE/CAPABILITY_MATRIX.md"
     REVIEWER_COUNT=$((REVIEWER_COUNT + 1))
 fi
 

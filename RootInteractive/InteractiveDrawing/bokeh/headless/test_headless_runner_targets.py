@@ -1,0 +1,216 @@
+"""Runner controls for `run_tests.sh --target` (stage 4.2c-2c v0.2; review findings GPT22, GPT23, GPT24).
+
+Each test runs the real run_tests.sh in a miniature checkout — like RootInteractive/MLpipeline/tests/
+test_phase_2_1_runner.py does for the run without targets — with two demo targets registered in a small pytest.ini.
+A failing test, a forced failure of the evidence zip, an unreadable pytest report, a misspelled name next to "all",
+and a joins run with zero tests must each make the run fail; a passing target must succeed with its evidence written.
+"""
+import os
+import shutil
+import subprocess
+import textwrap
+from pathlib import Path
+
+import pytest
+
+pytestmark = [pytest.mark.headless_unit]   # target (4.2c-2c)
+RUNNER = Path(__file__).resolve().parents[4] / "run_tests.sh"
+HEADLESS = "RootInteractive/InteractiveDrawing/bokeh/headless"
+
+
+@pytest.fixture
+def checkout(tmp_path):
+    shutil.copy2(RUNNER, tmp_path / "run_tests.sh")
+    (tmp_path / "pytest.ini").write_text(textwrap.dedent("""\
+        [pytest]
+        addopts = --strict-markers
+        markers =
+            demo_pass: target: a passing demo target
+            demo_fail: target: a demo target with one failing test
+        """))
+    h = tmp_path / HEADLESS
+    h.mkdir(parents=True)
+    (h / "test_demo.py").write_text(textwrap.dedent("""\
+        import pytest
+
+        @pytest.mark.demo_pass
+        def test_passes():
+            assert True
+
+        @pytest.mark.demo_fail
+        def test_fails():
+            assert False, "deliberate failure"
+        """))
+    (h / "conftest.py").write_text(textwrap.dedent("""\
+        import json, os
+        from pathlib import Path
+
+        def pytest_sessionfinish(session):       # a session artifact, complete only when FAKE_COMPLETE is set
+            out = os.environ.get("RI_HEADLESS_OUT")
+            if out and not hasattr(session.config, "workerinput"):
+                Path(out).mkdir(parents=True, exist_ok=True)
+                (Path(out) / "session.json").write_text(json.dumps(
+                    {"session": "mini", "complete": bool(os.environ.get("FAKE_COMPLETE"))}))
+                (Path(out) / "main" / "x").mkdir(parents=True, exist_ok=True)
+                (Path(out) / "main" / "x" / "report.json").write_text(json.dumps({"id": "x", "session": "mini"}))
+
+        def pytest_unconfigure(config):          # makes the pytest report unreadable after pytest wrote it
+            path = getattr(config.option, "json_report_file", None)
+            if os.environ.get("CORRUPT_REPORT") and path and not hasattr(config, "workerinput"):
+                open(path, "w").write("{not json")
+        """))
+    for directory in ("RootInteractive/InteractiveDrawing/bokeh", "RootInteractive/Tools", "RootInteractive/onnx",
+                      "RootInteractive/MLpipeline/tests"):
+        (tmp_path / directory).mkdir(parents=True, exist_ok=True)
+    (tmp_path / "RootInteractive/Tools/test_sentinel.py").write_text(textwrap.dedent("""\
+        import os
+
+        def test_writes_sentinel():              # proves that the normal run started (GPT23's sentinel)
+            if os.environ.get("SENTINEL"):
+                open(os.environ["SENTINEL"], "w").write("started")
+        """))
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "generate_capability_matrix.py").write_text(textwrap.dedent("""\
+        import os, sys
+        from pathlib import Path
+        if os.environ.get("STUB_LOG"):
+            open(os.environ["STUB_LOG"], "a").write(" ".join(sys.argv[1:]) + "\\n")    # what run_tests.sh asked for
+        if os.environ.get("STUB_CRASH"):
+            raise RuntimeError("injected generator crash")
+        out = Path(sys.argv[sys.argv.index("--output") + 1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("matrix"); out.with_suffix(".json").write_text("{}")
+        """))
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    return tmp_path
+
+
+def _run(root, *args, **env):
+    e = {**os.environ, "RootInteractive_DOCS": str(root / "docs"), **env}
+    for k in ("RI_HEADLESS_OUT", "RI_HEADLESS_SESSION", "RI_HEADLESS_TARGET", "RI_HEADLESS_CHECK_REQUIRED",
+              "PYTEST_XDIST_WORKER", "PYTEST_ADDOPTS"):
+        e.pop(k, None)
+    return subprocess.run(["bash", "./run_tests.sh", *args, "-n", "1"], cwd=root, env=e, capture_output=True,
+                          text=True, timeout=240)
+
+
+def test_a_passing_target_succeeds_with_its_evidence(checkout):
+    r = _run(checkout, "--target", "demo_pass")
+    assert r.returncode == 0 and "Evidence:" in r.stdout, r.stdout + r.stderr
+    assert list((checkout / "test_logs").glob("targets_*.zip"))
+    # its own capability matrix, in its own folder, never the canonical one (4.2c-2d, option C)
+    assert list((checkout / "test_logs").glob("target_demo_pass_*/CAP_MATRIX_demo_pass.md"))
+    assert list((checkout / "test_logs").glob("target_demo_pass_*/CAP_MATRIX_demo_pass.json"))
+    assert not (checkout / "RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md").exists()
+
+
+def test_a_failing_test_fails_the_target_and_keeps_the_evidence(checkout):
+    r = _run(checkout, "--target", "demo-fail")
+    line = [l for l in r.stdout.splitlines() if l.startswith("demo-fail ")]
+    assert r.returncode != 0 and line and line[0].split()[3] == "1", r.stdout + r.stderr   # 1 failed
+    assert list((checkout / "test_logs").glob("targets_*.zip"))
+
+
+def test_a_failed_evidence_zip_fails_the_run(checkout, tmp_path_factory):
+    fake = tmp_path_factory.mktemp("fakebin")
+    (fake / "zip").write_text("#!/bin/sh\nexit 17\n")
+    (fake / "zip").chmod(0o755)
+    r = _run(checkout, "--target", "demo_pass", PATH=f"{fake}:{os.environ['PATH']}")
+    assert r.returncode != 0 and "Evidence:" not in r.stdout and "evidence zip could not be written" in r.stdout, \
+        r.stdout + r.stderr
+
+
+def test_an_unreadable_report_fails_the_run(checkout):
+    r = _run(checkout, "--target", "demo_pass", CORRUPT_REPORT="1")
+    assert r.returncode != 0 and "REPORT UNREADABLE" in r.stdout, r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("name", ["demo_passs", "demo.pass"])   # a dot must not match as a pattern (4.2c-2c F-1)
+def test_a_misspelled_name_next_to_all_runs_nothing(checkout, name):
+    sentinel = checkout / "sentinel"
+    r = _run(checkout, "--quick", "--target", "all", "--target", name, SENTINEL=str(sentinel))
+    assert r.returncode != 0 and f"unknown target(s): {name}" in r.stdout, r.stdout + r.stderr
+    assert not sentinel.exists(), "a test started although a target name was unknown"
+    assert "Testing:" not in r.stdout and "Target:" not in r.stdout, r.stdout                  # nothing was run
+
+
+def test_a_joins_run_with_zero_tests_fails(checkout, tmp_path_factory):
+    """GPT24: a readable TAP summary with zero tests must not pass. A stand-in `node` first in PATH reports exactly that
+    (a real `node --test` counts even an empty test file as one passing test)."""
+    joins = checkout / "RootInteractive/joins"
+    joins.mkdir(parents=True)
+    (joins / "test_empty.mjs").write_text("// no tests\n")
+    (joins / "ao2d_fixture.json").write_text("{}")
+    fake = tmp_path_factory.mktemp("fakenode")
+    (fake / "node").write_text('#!/bin/sh\ncase "$*" in *--help*) echo "--test-reporter";; '
+                               '*) printf "TAP version 13\\n# tests 0\\n# pass 0\\n# fail 0\\n";; esac\nexit 0\n')
+    (fake / "node").chmod(0o755)
+    r = _run(checkout, "--target", "joins", PATH=f"{fake}:{os.environ['PATH']}")
+    assert r.returncode != 0 and "NO TESTS" in r.stdout, r.stdout + r.stderr
+
+
+def test_a_node_joins_run_without_the_ao2d_fixture_fails_before_any_test(checkout):
+    """PHASE_4_4 W0 (AO2D fixture addendum, GPT24/GPT25): --target node_joins checks for the generated fixture first,
+    like the joins target - non-zero exit, FIXTURE MISSING, the regeneration command in the log, no test started.
+    Control: with the fixture present, the same target runs its test and passes."""
+    ini = checkout / "pytest.ini"
+    ini.write_text(ini.read_text() + "    node_joins: target: a demo of the join tests\n")
+    (checkout / HEADLESS / "test_demo_joins.py").write_text(textwrap.dedent("""\
+        import os, pytest
+
+        @pytest.mark.node_joins
+        def test_writes_sentinel():
+            open(os.environ["SENTINEL"], "w").write("ran")
+        """))
+    sentinel = checkout / "sentinel"
+    r = _run(checkout, "--target", "node_joins", SENTINEL=str(sentinel))
+    line = [l for l in r.stdout.splitlines() if l.startswith("node_joins ")]
+    assert r.returncode != 0 and line and line[0].endswith("FIXTURE MISSING"), r.stdout + r.stderr
+    log = next((checkout / "test_logs").glob("target_node_joins_*/test.log")).read_text()
+    assert "ao2d_fixture.json is missing" in log and "python3 generate_ao2d_fixture.py ../../joins/ao2d_fixture.json" in log
+    assert not sentinel.exists(), "a test started although the fixture was missing"
+
+    (checkout / "RootInteractive/joins").mkdir(parents=True, exist_ok=True)
+    (checkout / "RootInteractive/joins/ao2d_fixture.json").write_text("{}")
+    r = _run(checkout, "--target", "node_joins", SENTINEL=str(sentinel))
+    assert r.returncode == 0 and sentinel.read_text() == "ran", r.stdout + r.stderr
+
+
+def test_the_normal_run_rejects_a_joins_result_with_zero_tests(checkout, tmp_path_factory):
+    """GPT23 (4.2c-2c F-2): the normal run (no --target) must not accept a joins TAP summary with zero tests."""
+    joins = checkout / "RootInteractive/joins"
+    joins.mkdir(parents=True)
+    (joins / "test_empty.mjs").write_text("// no tests\n")
+    (joins / "ao2d_fixture.json").write_text("{}")
+    fake = tmp_path_factory.mktemp("fakenode_normal")
+    (fake / "node").write_text('#!/bin/sh\ncase "$*" in *--help*) echo "--test-reporter";; '
+                               '*) printf "TAP version 13\\n# tests 0\\n# pass 0\\n# fail 0\\n";; esac\nexit 0\n')
+    (fake / "node").chmod(0o755)
+    r = _run(checkout, "--quick", PATH=f"{fake}:{os.environ['PATH']}")
+    assert r.returncode != 0 and "joins: no test counted" in r.stdout, r.stdout[-3000:] + r.stderr
+
+
+@pytest.mark.parametrize("case", ["fast_run", "complete_session", "crash"])
+def test_only_a_complete_session_publishes_the_canonical_matrix(checkout, tmp_path_factory, case):
+    """4.2c-2d, the Architect's decision (option C): a complete session publishes CAPABILITY_MATRIX.md/.json; the fast
+    run publishes CAP_MATRIX_fast.md/.json in test_logs/; a crashing generator keeps the previous canonical pair
+    unchanged and fails the run."""
+    log = tmp_path_factory.mktemp("stub") / "generator_calls.txt"
+    tracked = checkout / "RootInteractive/InteractiveDrawing/bokeh/doc/CAPABILITY_MATRIX.md"
+    tracked.parent.mkdir(parents=True, exist_ok=True)
+    tracked.write_text("PREVIOUS"); tracked.with_suffix(".json").write_text('{"previous": true}')
+    env = {"STUB_LOG": str(log)}
+    if case in ("complete_session", "crash"):
+        env["FAKE_COMPLETE"] = "1"
+    if case == "crash":
+        env["STUB_CRASH"] = "1"
+    r = _run(checkout, **env)
+    calls = log.read_text()
+    fast = checkout / "test_logs" / "CAP_MATRIX_fast.md"
+    if case == "fast_run":
+        assert fast.exists() and fast.with_suffix(".json").exists() and tracked.read_text() == "PREVIOUS", calls
+    elif case == "complete_session":
+        assert "--from-headless" in calls and tracked.read_text() == "matrix" and not fast.exists(), calls
+    else:
+        assert tracked.read_text() == "PREVIOUS" and tracked.with_suffix(".json").read_text() == '{"previous": true}'
+        assert r.returncode != 0 and "generation failed" in r.stdout, r.stdout[-2000:]

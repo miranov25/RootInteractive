@@ -46,8 +46,7 @@ FEATURE_TAXONOMY = {
         "priority": "P1",
         "backends": ["python", "node"],
         "layer": "unit",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_aliases.py",
     },
     "DSL.gather_operation": {
         "name": "Cross-table gather",
@@ -130,6 +129,34 @@ FEATURE_TAXONOMY = {
         "proof": None,
         "planned": True,
     },
+    "ENC.cds_compress.page_decode": {
+        "name": "Compressed table in a page (CDSCompress): lossless decoding",
+        "description": "A page built with lossless compression (zip, base64) decodes every column exactly (NaN, +-inf, "
+                       "-0 kept), only when the column is read, and reuses the decoded array; a weighted histogram on "
+                       "the compressed table follows a range filter, an empty range and the full range again",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
+    "ENC.cds_compress.data_replace": {
+        "name": "Compressed table: replacing its data in a live page",
+        "description": "After inputData is replaced, every column and the histogram show the new data (known defect "
+                       "TR-D1: columns decoded before the replacement keep their old values)",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
+    "ENC.cds_compress.length_guard": {
+        "name": "Compressed table: a column of the wrong length is refused",
+        "description": "Reading a column whose decoded length differs from the table's raises 'Corrupted length of "
+                       "column ...' (known defect TR-D2: refused only on the first read, returned on the second)",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_d1p2_transport.py",
+    },
 
     # =========================================================================
     # Join Operations
@@ -138,7 +165,7 @@ FEATURE_TAXONOMY = {
         "name": "Basic CDSJoin",
         "description": "Basic CDSJoin index join",
         "priority": "P0",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
         "proof": "test_ClientSideJoin.py::test_join",
     },
@@ -146,7 +173,7 @@ FEATURE_TAXONOMY = {
         "name": "CDSJoin index-0 regression",
         "description": "CDSJoin with index 0 (regression test for x>=0 fix)",
         "priority": "P0",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
         "proof": "test_ClientSideJoin.py::test_join",
         "regression": "PR-371",
@@ -155,7 +182,7 @@ FEATURE_TAXONOMY = {
         "name": "CDSJoin outer join",
         "description": "CDSJoin outer join with null handling",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
         "proof": None,
         "planned": True,
@@ -168,6 +195,51 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "test_dsl_customjs.py::test_compileVarName",
     },
+    # PHASE_4_5 A4: three tables linked by row numbers on one real page (headless/test_headless_a4_multitable.py)
+    "JOIN.multi_table_chain": {
+        "name": "Three linked tables on one page (V0 -> track -> event)",
+        "description": "Filters on own and looked-up columns, weighted histograms, a weight parameter, an alias "
+                       "histogram, a 2-D histogram and its profile; every state equals an independent reference "
+                       "(GPT24 shared oracle v0.2), in Node and with real input in Chromium",
+        "priority": "P1",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_a4_multitable.py",
+    },
+    # PHASE_4_3 J4: production CDSJoin in Node against pandas (headless/test_headless_node_joins.py); the join test
+    # contract C-1..C-9 and its crosswalk: PHASE_4_3_Joins_Contract_Crosswalk (docs).
+    "JOIN.cdsjoin.reverse_index": {
+        "name": "CDSJoin reverse index join",
+        "description": "Index join where the right table holds the left row numbers (contract C-3)",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_joins.py",
+    },
+    "JOIN.recursive": {
+        "name": "Recursive joins",
+        "description": "Joins of joins: V0 -> track -> event, cascade -> (V0, track) -> event; association order (C-6, C-7)",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_joins.py",
+    },
+    "JOIN.change_propagation": {
+        "name": "Join change propagation",
+        "description": "A change of an inner table (values, mapping, rows added or removed) reaches the outer join (C-8)",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_joins.py",
+    },
+    "JOIN.prototype_parity": {
+        "name": "Join prototype parity",
+        "description": "Production joins agree with the joins/ prototype on the AO2D-shaped fixture's forward index path (C-9)",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_joins.py",
+    },
 
     # =========================================================================
     # Histogram Operations
@@ -176,19 +248,170 @@ FEATURE_TAXONOMY = {
         "name": "1D histogram",
         "description": "1D histogram binning (HistogramCDS)",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": None,
-        "planned": True,
+        "proof": "headless/test_headless_node_histograms.py",
     },
     "HIST.histogram_nd": {
         "name": "N-D histogram",
         "description": "N-dimensional histogram (HistoNdCDS)",
         "priority": "P2",
+        "backends": ["browser", "node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_histograms.py",
+    },
+
+    "HIST.profile": {
+        "name": "Histogram profile",
+        "description": "Profile of an N-D histogram along one axis: mean, sigma, quantiles per bin (HistoNdProfile)",
+        "priority": "P2",
+        "backends": ["browser", "node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_histograms.py",
+    },
+    # PHASE_4_5 A2: unbinned profile statistics (headless/test_headless_node_histograms.py; B4, B5, B5b)
+    "HIST.profile_unbinned": {
+        "name": "Unbinned profile statistics",
+        "description": "Profile statistics from the rows' raw values (unbinned_projections): mean, sigma, quantiles",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_histograms.py",
+    },
+    # PHASE_4_6 C1 (GPT28.RI candidate, integrated by Claude20.RI): headless/test_headless_node_stats.py
+    "HIST.stack": {
+        "name": "Stacked histograms (CDSStack)",
+        "description": "Histograms whose weights (or variable) are chosen by a multi-select parameter, one part per "
+                       "selected option, labelled by _source_index; a single-select weight parameter recomputes",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.histogram_table": {
+        "name": "Histogram statistics table (HistoStatsCDS)",
+        "description": "tableHisto: entries, mean, std, isOK, quantiles and sum_range integrals per histogram, "
+                       "columnwise and rowwise, following filters and weight parameters",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.linear_fit": {
+        "name": "Client-side linear fit (ClientLinearFitter)",
+        "description": "linearFit in jsFunctionArray: least squares (weighted, ridge) and the fitted alias, refit on "
+                       "data and predictor changes",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+    "STAT.sum_range": {
+        "name": "Integral and efficiency columns (sum_range)",
+        "description": "Integral of a histogram over an interval (uniform density in each bin) and its fraction of "
+                       "the entries, in profiles and in the statistics table",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_stats.py",
+    },
+
+    # =========================================================================
+    # Selection filters (PHASE_4 stage 4.2c-2b: identifiers used by the headless tests; evidence enters in 4.7)
+    # =========================================================================
+    "FILTER.range": {
+        "name": "Range filter",
+        "description": "Row selection by a range widget (RangeFilter), inclusive limits, missing values excluded",
+        "priority": "P1",
+        "backends": ["browser", "node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_histograms.py",
+    },
+
+    # PHASE_4_6 C2 (GPT27.RI candidate, revised by GPT26.RI, integrated by Claude20.RI): headless/test_headless_display.py
+    "FILTER.text_query": {
+        "name": "Text query (textQuery widget, ColumnFilter)",
+        "description": "Rows selected by a typed JavaScript condition over the table's columns, toggleable, with "
+                       "real typing in Chromium",
+        "priority": "P1",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
+    "FILTER.intersection": {
+        "name": "Filter intersection",
+        "description": "Intersection of several filters on one table (LazyIntersectionFilter)",
+        "priority": "P1",
         "backends": ["browser"],
         "layer": "integration",
         "proof": None,
         "planned": True,
+    },
+
+    # =========================================================================
+    # Display (PHASE_4_6 C2): what is drawn, tabs, labels - headless/test_headless_display.py
+    # =========================================================================
+    "DISPLAY.downsampler": {
+        "name": "Downsampled scatter (DownsamplerCDS)",
+        "description": "At most nPointRender of the selected rows, in source order, deterministic per table, following "
+                       "filter and nPointRender changes; selections map back to the source rows",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
+    "DASHBOARD.histogram_only": {
+        "name": "Example dashboard: histograms only (testBokehClientHistogramOnlyHisto)",
+        "description": "An oracle test dashboard: RootInteractive's own example dashboard, built by its original "
+                       "function on a reproducible table, in Chromium: the A range slider moved with the keyboard, the "
+                       "Cumulative tab opened and closed, everything restored; selected rows, all histoA bins, "
+                       "cumulative and CDF, and the drawn plots (x and y values, labels, painted positions, visible "
+                       "or hidden) equal numpy at every step; live faults in the page are caught",
+        "priority": "P0",
+        "backends": ["browser"],
+        "layer": "e2e",
+        "proof": "headless/test_headless_oracle_dashboards.py",
+    },
+    "DASHBOARD.weights_reference": {
+        "name": "Example dashboard: analysis weights against reference weights (test_interactiveTemplateWeightsRef)",
+        "description": "An oracle test dashboard: RootInteractive's WeightsRef template dashboard, built by its original "
+                       "function on a reproducible table, in Chromium with real input (tab click, weight and transform "
+                       "selects, bin spinner, A slider keys, restore): the selected rows, both sides' weighted 2-D "
+                       "counts, the analysis and reference profiles (entries, mean, std, quantiles), all drawn series, "
+                       "the comparison curves and the error bars of the means equal numpy at every step, by the "
+                       "Architect's decisions; known defects WT-D6, WR-D1, WT-D14; live faults are caught",
+        "priority": "P0",
+        "backends": ["browser"],
+        "layer": "e2e",
+        "proof": "headless/test_headless_oracle_weightsref.py",
+    },
+    "DISPLAY.graph3d": {
+        "name": "3D graph (BokehVisJSGraph3D, vis.js)",
+        "description": "The 3D graph takes x, y, z and style from the right columns and rows of a public-builder page "
+                       "(also reordered and under a widget filter); in Chromium the view hands exactly those points to "
+                       "vis.js, a real mouse drag turns the view, and a data change reaches vis.js and redraws",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_visualization_d3.py",
+    },
+    "DISPLAY.lazy_tabs": {
+        "name": "Lazy tabs (LazyTabs)",
+        "description": "Plots in a hidden tab are not recomputed until the tab opens, then show the current selection; "
+                       "real tab click in Chromium",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
+    },
+    "DISPLAY.axis_label": {
+        "name": "Parametric axis label (ConcatenatedString)",
+        "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
+                       "the widget, in Node and in Chromium",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_display.py",
     },
 
     # =========================================================================
@@ -198,10 +421,51 @@ FEATURE_TAXONOMY = {
         "name": "CDSAlias",
         "description": "CDSAlias column aliasing",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["browser", "node"],
         "layer": "integration",
-        "proof": "test_Alias.py",
-        "planned": True,
+        "proof": "headless/test_headless_node_aliases.py",
+    },
+    # PHASE_4_5 A1: production aliases in Node against numpy, built through bokehDrawSA.fromArray
+    # (headless/test_headless_node_aliases.py)
+    "ALIAS.chain": {
+        "name": "Alias of an alias",
+        "description": "An alias computed from another alias: expression form, function form, gathers of aliases",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_aliases.py",
+    },
+    "ALIAS.context": {
+        "name": "Alias of a secondary table",
+        "description": "An alias declared on a table of sourceArray (the third element of the alias tuple)",
+        "priority": "P1",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_aliases.py",
+    },
+    "ALIAS.parameter": {
+        "name": "Aliases with parameters",
+        "description": "Parameters in alias expressions and functions; a widget change recomputes; column-selector parameters",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_aliases.py",
+    },
+    "ALIAS.change_propagation": {
+        "name": "Alias change propagation",
+        "description": "A change (parameter, table values, gathered table) recomputes exactly the dependent aliases",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_aliases.py",
+    },
+    "DSL.server_client_parity": {
+        "name": "One expression, one result",
+        "description": "An expression computed in the browser (alias) and on the server (shown directly) gives the same column",
+        "priority": "P0",
+        "backends": ["python", "node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_node_aliases.py",
     },
 
     # =========================================================================
@@ -238,6 +502,14 @@ FEATURE_TAXONOMY = {
         "backends": ["native"],
         "layer": "build",
         "proof": "wasm/Makefile",
+    },
+    "WASM.integration": {                       # PHASE_4_4 W2
+        "name": "WASM in RootInteractive",
+        "description": "CustomWasmModule loads a WASM binary; CustomWasmFunc applies its functions to table columns",
+        "priority": "P0",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "test_wasm_integration.py",
     },
     "WASM.scalar.arithmetic": {
         "name": "WASM scalar arithmetic",

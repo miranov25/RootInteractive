@@ -121,3 +121,108 @@ def pytest_configure(config):
         "markers",
         "unittest: Unit test marker (legacy)"
     )
+
+    # -------------------------------------------------------------------------
+    # Target markers (PHASE_4 stage 4.2c-2c): ./run_tests.sh --target <name> == pytest <headless folder> -m <name>
+    # -------------------------------------------------------------------------
+    config.addinivalue_line(
+        "markers",
+        "headless_unit: target: Python-only headless tests: oracles, comparison, expectations, packaging, session end, targets"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_harness: target: the Node model harness and its fault controls"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_scenarios: target: every computing scenario of 4.2a/4.2b in Node alone (B1, B2, B8 by their exact descriptions)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_histograms: target: histogram families at sample size, rule and B10 controls, template, batch and reduced-document checks"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_histograms_full: target: histogram families at full size (3 x 3 400 generated tables)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_filters: target: B1 row-count sweep at sample row counts, 2 and 3 filters in every move order, 20 000 / 20 001 rows"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_filters_full: target: B1 row-count sweep 1-200 rows, 4 and 5 filters in every move order"
+    )
+    # node_joins has its own call (R-6: it was glued to the string above)
+    config.addinivalue_line(
+        "markers",
+        "node_joins: target: production CDSJoin in Node - joins and recursive joins, oracle and invariant tests (PHASE_4_3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_aliases: target: production aliases in Node - expressions, functions, parameters, gathers, change propagation (PHASE_4_5 A1)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_widgets: target: interactive widgets in Node - every widget type changes its filter or parameter, histograms and profiles follow (PHASE_4_5 A3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_widgets: target: interactive widgets in Chromium - real keyboard, click and select input on every widget type (PHASE_4_5 A3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_a4: target: three linked tables V0 -> track -> event on one real page in Node, every state against GPT24's shared reference (PHASE_4_5 A4)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_a4: target: the same A4 page in Chromium - real multi-select, keyboard and select input, painted V0 rows, browser = Node (PHASE_4_5 A4)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_stats: target: statistics computed in the page in Node - statistics table, linear fit, integrals, weighted unbinned quantiles, stacked histograms (PHASE_4_6 C1)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_display: target: widgets and display in Node - text query, downsampler, lazy tabs, parametric axis labels (PHASE_4_6 C2)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_display: target: widgets and display in Chromium - typed text query, tab click, axis label after a real widget change (PHASE_4_6 C2)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_transport: target: the compressed table CDSCompress in a real page in Node - lossless decoding, lazy cache, histogram under a filter, data replacement, wrong-length guard (PHASE_4_6 D1p2)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "node_d3: target: the 3D graph BokehVisJSGraph3D in Node - which columns and rows the graph takes from a public-builder page, after reordering and after a widget filter (PHASE_4_6 D3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_d3: target: the 3D graph in Chromium with vis.js - the points handed to vis.js, a real mouse drag, a data change that reaches vis.js and redraws (PHASE_4_6 D3)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_oracle_dashboards: target: the oracle test dashboards - RootInteractive's own example dashboards (test_bokehClientHistogram.py) end to end in Chromium on a reproducible table - real widget input, every affected histogram against numpy, drawn plots and painted positions, live faults, restore (PHASE_4_7)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "release_oracle_dashboards: target: the release check of the oracle test dashboards - runs them in Chromium and fails on a failed run or on a dashboard that is RED with a bug not accepted for release (dashboards/waivers.json) (PHASE_4_7)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_smoke: target: the plain page in Chromium and its browser = Node parity pair"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_scenarios: target: every scenario in Chromium"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_parity: target: browser = Node parity for every scenario, and the parity controls"
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser_harness: target: the browser engine's harness and fault controls"
+    )

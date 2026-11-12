@@ -11,7 +11,7 @@ setup(
     name='RootInteractive',
     version='v0.01.11',
     #packages=setuptools.find_packages(),
-    packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts"]),
+    packages=setuptools.find_packages(exclude=["scripts*", "tests*","*d.ts", "*headless*"]),  # headless test engine: never installed (PHASE_4 D-14)
     license='Not defined yet. Most probably similar to ALICE (CERN)  license',
     long_description=long_description,
     long_description_content_type="text/markdown",

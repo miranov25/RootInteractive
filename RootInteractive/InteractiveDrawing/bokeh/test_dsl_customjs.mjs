@@ -4,14 +4,22 @@ import zlib from "zlib"
 const inputPath = process.argv[2];
 const data = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 
+// Fail-closed comparison (post-audit order 0; GPT22's audit): NaN matches only NaN, an infinity only the same
+// infinity; finite values within delta. Before, NaN made "d > m" false, so NaN against 42 counted as a match.
 function shallow_compare_absolute(A,B,delta){
     if(A === B) return true
     if(!A || !B || A.length !== B.length) return false
-    let m = 0;
     for (let i = 0; i < A.length; i++) {
-        const d = Math.abs(A[i] - B[i]);
-        if (d > m) m = d;
-        if (m > delta) return false;
+        const a = A[i], b = B[i];
+        if (Number.isNaN(a) || Number.isNaN(b)) {
+            if (Number.isNaN(a) && Number.isNaN(b)) continue;
+            return false;
+        }
+        if (!Number.isFinite(a) || !Number.isFinite(b)) {
+            if (a === b) continue;
+            return false;
+        }
+        if (!(Math.abs(a - b) <= delta)) return false;
     }
     return true;
 }
@@ -73,11 +81,21 @@ for(const table_name in data.data){
     data.data[table_name] = new DataFrame(data.data[table_name], data.data);
 }
 
+let comparisons = 0;
 for(const test_case of data.test_cases){
     if(test_case.type === "EQ"){
+        comparisons++;
         const table = data.data[test_case.table];
         const lhs_data = table.get_column(test_case.lhs);
         const rhs_data = table.get_column(test_case.rhs);
+        // fail closed (GPT23, order-0 condition O-1): an operand that cannot be resolved is a failure, never
+        // "undefined === undefined"
+        for (const [side, name, col] of [["lhs", test_case.lhs, lhs_data], ["rhs", test_case.rhs, rhs_data]]) {
+            if (col === undefined || col === null || typeof col.length !== "number") {
+                console.error(`Test case failed: missing column ${side} "${name}" in table "${test_case.table}"`);
+                process.exit(1);
+            }
+        }
         const delta = test_case.epsilon || 1e-10;
         if(!shallow_compare_absolute(lhs_data, rhs_data, delta)){
             console.error(`Test case failed:
@@ -103,6 +121,7 @@ for(const test_case of data.test_cases){
     }
 }
 
-if(!data.test_cases.length){
-    console.log("No test cases provided.")
+if(comparisons === 0){                       // fail closed: a run that compared nothing must not pass
+    console.error("No comparison was made (no EQ test case).");
+    process.exit(1);
 }
