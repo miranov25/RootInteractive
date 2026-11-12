@@ -1,8 +1,8 @@
 """Narrated review video of a dashboard test run (PHASE_4_7, Claude20.RI). Optional: routine runs never need it.
 
-    python -m RootInteractive.InteractiveDrawing.bokeh.headless.legacy.video RUNDIR [OUT.mp4]
+    python -m RootInteractive.InteractiveDrawing.bokeh.headless.dashboards.video RUNDIR [OUT.mp4]
 
-RUNDIR is the test's evidence folder (headless_out/legacy/h01) after a run with RI_DEMO_VIDEO=1. It holds the real
+RUNDIR is the test's evidence folder (headless_out/dashboards/h01) after a run with RI_DEMO_VIDEO=1. It holds the real
 Chromium recording (video/*.webm), timeline.json (when each action started and each checkpoint was read, with its
 status), and expected_C*.json / actual_C*.json (the numpy oracle and the page's own values). The video is built from
 those only: every number shown or spoken comes from the expected and actual files, every status from the comparator.
@@ -264,7 +264,11 @@ def build(rundir: Path, out: Path = None) -> dict:
               "speech": engine, "ffmpeg": subprocess.run([ff, "-version"], capture_output=True,
                                                          text=True).stdout.splitlines()[0],
               "font": font, "streams": [l.strip() for l in probe.splitlines() if "Stream" in l or "Duration" in l],
-              "script": script}
+              "script": script,
+              # the origin of every number shown or spoken: the evidence files this video was built from
+              "evidence_sha256": {f.name: sha256(f) for f in sorted(rundir.iterdir())
+                                  if f.is_file() and (f.suffix in (".json", ".npz") or f.name == "page.html")
+                                  and not f.name.endswith("_script.json")}}
     (out.parent / (out.stem + "_script.json")).write_text(json.dumps(record, indent=1))
     return record
 

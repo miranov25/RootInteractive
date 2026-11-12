@@ -362,14 +362,15 @@ FEATURE_TAXONOMY = {
     },
     "DASHBOARD.histogram_only": {
         "name": "Example dashboard: histograms only (testBokehClientHistogramOnlyHisto)",
-        "description": "RootInteractive's own example dashboard, built by its original function on a reproducible "
-                       "table, in Chromium: the A range slider moved with the keyboard, the Cumulative tab opened and "
-                       "closed, everything restored; selected rows, all histoA bins, cumulative and CDF, and the drawn "
-                       "plots equal numpy at every step",
+        "description": "An oracle test dashboard: RootInteractive's own example dashboard, built by its original "
+                       "function on a reproducible table, in Chromium: the A range slider moved with the keyboard, the "
+                       "Cumulative tab opened and closed, everything restored; selected rows, all histoA bins, "
+                       "cumulative and CDF, and the drawn plots (x and y values, labels, painted positions, visible "
+                       "or hidden) equal numpy at every step; live faults in the page are caught",
         "priority": "P0",
         "backends": ["browser"],
         "layer": "e2e",
-        "proof": "headless/test_headless_legacy_dashboards.py",
+        "proof": "headless/test_headless_oracle_dashboards.py",
     },
     "DISPLAY.graph3d": {
         "name": "3D graph (BokehVisJSGraph3D, vis.js)",

@@ -204,7 +204,11 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "browser_legacy_dashboards: target: RootInteractive's own example dashboards (test_bokehClientHistogram.py) end to end in Chromium on a reproducible table - real widget input, every affected histogram against numpy, drawn plots, restore (PHASE_4_7)"
+        "browser_oracle_dashboards: target: the oracle test dashboards - RootInteractive's own example dashboards (test_bokehClientHistogram.py) end to end in Chromium on a reproducible table - real widget input, every affected histogram against numpy, drawn plots and painted positions, live faults, restore (PHASE_4_7)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "release_oracle_dashboards: target: the release check of the oracle test dashboards - runs them in Chromium and fails on a failed run or on a dashboard that is RED with a bug not accepted for release (dashboards/waivers.json) (PHASE_4_7)"
     )
     config.addinivalue_line(
         "markers",

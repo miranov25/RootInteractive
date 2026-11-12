@@ -1,20 +1,30 @@
-"""PHASE_4_7 Cycle A — RootInteractive's own example dashboard, end to end in Chromium (H01), Claude20.RI.
+"""PHASE_4_7 — the oracle test dashboards: RootInteractive's own example dashboard H01, end to end in Chromium
+(Claude20.RI; Cycle A, revised 2026-11-12 after GPT24's consolidated review).
 
 In plain words: the original function `testBokehClientHistogramOnlyHisto` of test_bokehClientHistogram.py builds its
-dashboard on a reproducible table (the opt-in RI_DASHBOARD_ROWS / RI_DASHBOARD_SEED, default 50,000 rows). The test
-opens that real page in Chromium, moves the A range slider with the keyboard, opens and closes the "Cumulative" tab,
-and restores everything. At each of the five checkpoints it compares, against numpy computed beforehand from the raw
-table only (legacy/oracle.py):
+dashboard on a reproducible table (the opt-in RI_DASHBOARD_ROWS / RI_DASHBOARD_SEED; here 50,000 rows, seed 4711).
+The test opens that real page in Chromium, moves the A range slider with the keyboard, opens and closes the
+"Cumulative" tab, and restores everything. At each of the six checkpoints it compares the page with numpy values
+computed beforehand from the raw table only (dashboards/oracle.py):
 - the slider value read back from the page, the active tab, the selected rows (count and exact set);
 - all 20 bins of the histogram `histoA`, its cumulative counts and its CDF;
-- what is drawn: the visible plot's glyph values, that its data comes from `histoA`, and that the other tab's plots
-  are hidden.
-The comparator (legacy/compare.py) is the same one the falsifiers below must see fail.
+- what is drawn: every checked plot present exactly once, visible or hidden as its tab requires; for a visible plot
+  its data source, x field and x values (bin centres), y values, axis labels and title, and the screen positions
+  Bokeh painted (a straight-line image of the current values).
+The comparator (dashboards/compare.py) is the same one the falsifiers below must see fail: on a snapshot, and on the
+live page in the browser.
 
-Evidence in headless_out/legacy/h01/: the page and its manifest, expected_*.json, actual_*.json, comparison.json,
-dashboard_health.json (per action: PASS or FAIL) and, with RI_DEMO_VIDEO=1, the browser recording and timeline.json
-for the narrated video (legacy/video.py). Targets: browser_legacy_dashboards (page fidelity and the browser run) and
-headless_unit (oracle, comparator and seam checks, no browser).
+Known defect H01-D1: after the A slider's upper handle is moved back to its end with the arrow keys it stops a few
+float steps short of the end, so the row with the largest A stays excluded. Reported in two lanes (decision DEC-05):
+the workflow test is its strict expected failure, and dashboard_health.json marks C4 KNOWN_ISSUE_RED and the dashboard
+RED. The release check (dashboards/release.py, target release_oracle_dashboards) fails on a RED dashboard unless the
+Architect has accepted the bug for release in dashboards/waivers.json.
+
+Evidence in headless_out/dashboards/h01/: the page and its manifest, expected_*.json, actual_*.json, comparison.json
+(results, cold and warm times, console messages), dashboard_health.json, inventory.json (every widget and plot of the
+page, and which ones H01 checks) and, with RI_DEMO_VIDEO=1, the recording and timeline.json for the narrated video
+(dashboards/video.py). Targets: browser_oracle_dashboards (the page in Chromium), headless_unit (oracle, comparator,
+release check and seam, no browser), release_oracle_dashboards (the release check, run only as its own target).
 """
 from __future__ import annotations
 
@@ -30,19 +40,22 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from .legacy import oracle
-from .legacy.compare import compare, differs
+from .dashboards import oracle, release
+from .dashboards.compare import compare, differs
 
-ROWS = int(os.environ.get("RI_LEGACY_ROWS", "50000"))
+ROWS = int(os.environ.get("RI_DASHBOARD_TEST_ROWS", "50000"))
 SEED = 4711
 # H01-D1 depends on the slider's end value, i.e. on the data: it is reproduced with the default table (50,000 rows,
-# seed 4711). With another row count (RI_LEGACY_ROWS, for timing runs) its tests do not claim it.
+# seed 4711). With another row count (RI_DASHBOARD_TEST_ROWS, for timing runs) its tests do not claim it.
 DEFAULT_TABLE = (ROWS, SEED) == (50000, 4711)
 K_LOW, K_HIGH = 8, 8                      # keyboard steps: lower handle right, upper handle left
 EXAMPLE = Path(__file__).resolve().parents[1] / "test_bokehClientHistogram.py"
 ORIGINAL_LINE = "df = pd.DataFrame(np.random.random_sample(size=(500000, 4)), columns=list('ABCD'))"
 UNIT = pytest.mark.headless_unit
-BROWSER = pytest.mark.browser_legacy_dashboards
+BROWSER = pytest.mark.browser_oracle_dashboards
+RELEASE = pytest.mark.release_oracle_dashboards
+CHECKED_PLOTS = {("histo1Ds", "bin_count"), ("histoA", "cumulative"), ("histoA", "cdf")}
+CHECKED_WIDGETS = {"A"}
 
 
 class KnownDefect(AssertionError):
@@ -59,9 +72,9 @@ H01_D1 = ("H01-D1: moving the A slider's upper handle back to its end with the a
           "end; the end is exactly the largest A, so that row stays excluded (49,999 of 50,000 rows)")
 
 
-# ------------------------------------------------------------------ capture (child process, legacy/capture.py)
+# ------------------------------------------------------------------ capture (child process, dashboards/capture.py)
 def _capture(outdir: Path, rows: int, seed: int, graph_only: bool = False) -> dict:
-    cmd = [sys.executable, "-m", "RootInteractive.InteractiveDrawing.bokeh.headless.legacy.capture",
+    cmd = [sys.executable, "-m", "RootInteractive.InteractiveDrawing.bokeh.headless.dashboards.capture",
            oracle.H01_FUNCTION, str(rows), str(seed), str(outdir)] + (["--graph-only"] if graph_only else [])
     env = {k: v for k, v in os.environ.items() if k not in ("RI_DASHBOARD_ROWS", "RI_DASHBOARD_SEED")}
     root = str(Path(__file__).resolve().parents[4])
@@ -78,7 +91,7 @@ def _capture(outdir: Path, rows: int, seed: int, graph_only: bool = False) -> di
 
 @pytest.fixture(scope="session")
 def h01_page(headless_out):
-    out = headless_out / "legacy" / "h01"
+    out = headless_out / "dashboards" / "h01"
     out.mkdir(parents=True, exist_ok=True)
     manifest = _capture(out, ROWS, SEED)
     return {"dir": out, "html": out / "page.html", "manifest": manifest}
@@ -86,7 +99,7 @@ def h01_page(headless_out):
 
 # ------------------------------------------------------------------ Python-only checks (headless_unit)
 @UNIT
-def test_legacy_seam_keeps_the_original_default_line():
+def test_dashboard_seam_keeps_the_original_default_line():
     """The opt-in never touches the default path: the original line is still there, under 'neither variable set'."""
     src = EXAMPLE.read_text()
     assert src.count(ORIGINAL_LINE) == 1, "the original 500,000-row line must appear exactly once"
@@ -105,11 +118,14 @@ def test_h01_oracle_on_a_hand_checked_table():
     assert full["selected_count"] == 8
     assert np.flatnonzero(full["bin_count"]).tolist() == [0, 1, 2, 3, 10, 11, 18, 19]
     assert full["cumulative"][-1] == 8 and full["cdf"][-1] == 1.0
+    assert np.allclose(full["plots"]["histo1Ds.bin_count"]["x"][:3], [0.025, 0.075, 0.125], rtol=1e-12, atol=0)
+    assert full["plots"]["histo1Ds.bin_count"]["xlabel"] == "bin_center"
     cut = oracle.h01_expected(t, oracle.with_a_range(w, 0.1, 0.6), "Cumulative", "hand")
     assert cut["selected_count"] == 4
     assert np.flatnonzero(cut["bin_count"]).tolist() == [2, 3, 10, 11]
     assert cut["cumulative"][:4] == [0, 0, 1, 2] and cut["cdf"][3] == 0.5 and cut["cdf"][11] == 1.0
     assert cut["visible_renderers"] == [["histoA", "cumulative"], ["histoA", "cdf"]]
+    assert cut["plots"]["histoA.cdf"]["xlabel"] == "A (cm)" and cut["plots"]["histoA.cdf"]["title"] == "cdf vs A (cm)"
 
 
 def _synthetic():
@@ -122,19 +138,36 @@ def _synthetic():
     return base, changed
 
 
+def _painted(x, y):
+    """Screen positions a correct painting would give: x to the right, y upwards, both straight lines."""
+    top = max(max(y), 1e-300)
+    return [80.0 + 600.0 * v for v in x], [180.0 - 150.0 * v / top for v in y]
+
+
 def _actual_from(expected: dict, chain=("HistogramCDS", "histoA")) -> dict:
     """A correct actual response, built from an expected one (only for the falsifiers)."""
     rend = []
     for source, yfield in expected["visible_renderers"]:
-        rend.append({"source": source, "yfield": yfield, "chain": [["DownsamplerCDS", source], list(chain)],
-                     "y": list(expected[yfield]), "n": len(expected[yfield]), "visible": True})
+        spec = expected["plots"][f"{source}.{yfield}"]
+        x, y = list(spec["x"]), list(expected[yfield])
+        sx, sy = _painted(x, y)
+        rend.append({"source": source, "yfield": yfield, "xfield": spec["xfield"],
+                     "chain": [["DownsamplerCDS", source], list(chain)], "x": x, "y": y, "sx": sx, "sy": sy,
+                     "n": len(y), "canvas_visible": True, "model_visible": True, "visible": True,
+                     "xlabel": spec["xlabel"], "ylabel": " " + spec["ylabel"], "title": " " + spec["title"]})
     for source, yfield in expected["hidden_renderers"]:
-        rend.append({"source": source, "yfield": yfield, "chain": [["DownsamplerCDS", source], list(chain)],
-                     "y": [], "n": 20, "visible": False})
+        rend.append({"source": source, "yfield": yfield, "xfield": "bin_center",
+                     "chain": [["DownsamplerCDS", source], list(chain)], "x": [], "y": [], "sx": [], "sy": [],
+                     "n": 20, "canvas_visible": False, "model_visible": True, "visible": False,
+                     "xlabel": None, "ylabel": None, "title": None})
     return {"widgets": copy.deepcopy(expected["widgets"]), "tab": expected["tab"],
             "selected_count": expected["selected_count"], "selected_sha256": expected["selected_sha256"],
             "edges": list(expected["edges"]), "bin_count": list(expected["bin_count"]),
             "cumulative": list(expected["cumulative"]), "cdf": list(expected["cdf"]), "renderers": rend}
+
+
+def _visible(a):
+    return [r for r in a["renderers"] if r["visible"]]
 
 
 def _mutations(base, changed):
@@ -153,9 +186,8 @@ def _mutations(base, changed):
         for r in a["renderers"]:
             r["chain"] = [["DownsamplerCDS", r["source"]], ["HistogramCDS", "histoB"]]
     def m_view_not_updated(a):
-        for r in a["renderers"]:
-            if r["visible"]:
-                r["y"] = list(base[r["yfield"]]) if r["yfield"] in base else r["y"]
+        for r in _visible(a):
+            r["y"] = list(base[r["yfield"]]) if r["yfield"] in base else r["y"]
     def m_hidden_plot(a):
         a["renderers"][0]["visible"] = False
     def m_wrong_restore(a):
@@ -164,13 +196,48 @@ def _mutations(base, changed):
         a["cdf"][-1] *= 1 + 1e-9
     def m_missing(a):
         del a["cumulative"]
+    # revision 2026-11-12 (GPT24 review G1, G2): hidden plots, x, labels, painting
+    def m_hidden_missing(a):
+        a["renderers"] = [r for r in a["renderers"] if r["visible"]]
+    def m_hidden_twice(a):
+        a["renderers"].append(copy.deepcopy([r for r in a["renderers"] if not r["visible"]][0]))
+    def m_unexpected_plot(a):
+        a["renderers"].append(dict(copy.deepcopy(a["renderers"][0]), yfield="bin_count", source="histoA"))
+    def m_x_shifted(a):
+        r = _visible(a)[0]
+        r["x"] = [v + 0.025 for v in r["x"]]
+    def m_x_field(a):
+        _visible(a)[0]["xfield"] = "bin_bottom"
+    def m_x_label(a):
+        _visible(a)[0]["xlabel"] = "B (cm/s)"
+    def m_title(a):
+        _visible(a)[0]["title"] = "cdf vs B (cm/s)"
+    def m_switched_off(a):
+        r = _visible(a)[0]
+        r["model_visible"] = False
+        r["visible"] = False
+    def m_paint_stale(a):
+        r = _visible(a)[0]
+        r["sy"] = _painted(r["x"], base[r["yfield"]])[1]
+    def m_paint_upside_down(a):
+        r = _visible(a)[0]
+        r["sy"] = [360.0 - v for v in r["sy"]]
     return {"one bin +1": (m_bin, "histoA.bin_count"), "two bins redistributed": (m_redistribute, "histoA.bin_count"),
             "one selected row swapped, same count": (m_swapped_row, "selected rows differ"),
             "stale after the slider change": (m_stale, "selection:"),
             "plot bound to another source": (m_wrong_source, "does not come from HistogramCDS histoA"),
             "plot not redrawn": (m_view_not_updated, "(drawn values)"), "plot hidden": (m_hidden_plot, "not visible"),
             "wrong slider value": (m_wrong_restore, "widget A"), "cdf off by 1e-9": (m_cdf, "histoA.cdf"),
-            "field missing": (m_missing, "missing from the actual response")}
+            "field missing": (m_missing, "missing from the actual response"),
+            "hidden plots missing": (m_hidden_missing, "found 0 glyph renderers on the hidden tab"),
+            "hidden plot twice": (m_hidden_twice, "found 2 glyph renderers on the hidden tab"),
+            "unexpected plot of a checked source": (m_unexpected_plot, "not expected"),
+            "x shifted by half a bin": (m_x_shifted, "(drawn x)"),
+            "x drawn from another field": (m_x_field, "draws x from 'bin_bottom'"),
+            "wrong x axis label": (m_x_label, "xlabel"), "wrong title": (m_title, "title"),
+            "renderer switched off": (m_switched_off, "renderer visible: False"),
+            "painting not updated": (m_paint_stale, "(painted y)"),
+            "painted upside down": (m_paint_upside_down, "wrong direction")}
 
 
 @UNIT
@@ -192,7 +259,82 @@ def test_h01_comparator_rejects_a_wrong_answer(name):
     assert found and any(words in f for f in found), (name, found)
 
 
-# ------------------------------------------------------------------ the page itself (browser_legacy_dashboards)
+# ------------------------------------------------------------------ the release check (headless_unit)
+def _health(statuses: dict, bugs: dict = None, dashboard: str = None, scenario: str = "H01") -> dict:
+    bugs = bugs or {}
+    dash = dashboard or ("PASS" if all(s == "PASS" for s in statuses.values()) and statuses else "RED")
+    return {"scenario": scenario, "actions": statuses, "known_defects": bugs, "dashboard": dash}
+
+
+def _write(tmp_path, *healths):
+    files = []
+    for i, h in enumerate(healths):
+        d = tmp_path / f"run{i}"
+        d.mkdir()
+        (d / "dashboard_health.json").write_text(json.dumps(h))
+        files.append(d / "dashboard_health.json")
+    return files
+
+
+GREEN = {c: "PASS" for c in release.REQUIRED["H01"]}
+RED_C4 = dict(GREEN, C4="KNOWN_ISSUE_RED")
+WAIVER = {"H01-D1": {"decision": "DEC-99", "date": "2026-11-12", "by": "Architect"}}
+
+
+@UNIT
+def test_release_check_passes_a_green_dashboard(tmp_path):
+    assert release.check(_write(tmp_path, _health(GREEN)), {}) == []
+
+
+@UNIT
+def test_release_check_passes_a_known_bug_only_when_accepted(tmp_path):
+    files = _write(tmp_path, _health(RED_C4, {"C4": "H01-D1"}))
+    found = release.check(files, {})
+    assert found == ["H01 C4: known bug H01-D1 - not accepted for release (no waiver in waivers.json)"], found
+    assert release.check(files, WAIVER) == []
+
+
+@UNIT
+@pytest.mark.parametrize("case", ["no file", "two files", "an action failed", "an action not run", "unknown status",
+                                  "dashboard status wrong", "stale waiver", "unknown dashboard", "unreadable file"])
+def test_release_check_fails_closed(tmp_path, case):
+    h = _health(GREEN)
+    files, waivers, words = None, {}, None
+    if case == "no file":
+        files, words = [], "0 health files"
+    elif case == "two files":
+        files, words = _write(tmp_path, h, h), "2 health files"
+    elif case == "an action failed":
+        files, words = _write(tmp_path, _health(dict(GREEN, C2="FAIL"))), "H01 C2: FAIL"
+    elif case == "an action not run":
+        files, words = _write(tmp_path, _health({c: s for c, s in GREEN.items() if c != "C6"})), "H01 C6: NOT_RUN"
+    elif case == "unknown status":
+        files, words = _write(tmp_path, _health(dict(GREEN, C3="MAYBE"))), "unknown statuses"
+    elif case == "dashboard status wrong":
+        files, words = _write(tmp_path, _health(RED_C4, {"C4": "H01-D1"}, dashboard="PASS")), "dashboard status"
+        waivers = WAIVER
+    elif case == "stale waiver":
+        files, waivers, words = _write(tmp_path, h), WAIVER, "remove the waiver"
+    elif case == "unknown dashboard":
+        files, words = _write(tmp_path, h, _health(GREEN, scenario="H99")), "does not know"
+    elif case == "unreadable file":
+        files = _write(tmp_path, h)
+        files[0].write_text("{not json")
+        words = "unreadable"
+    found = release.check(files, waivers)
+    assert found and any(words in f for f in found), (case, found)
+
+
+@UNIT
+def test_release_waivers_file_is_valid_and_names_decisions():
+    """The shipped waivers.json loads; every waiver names its decision, date and author (none yet: DEC-05, E-1)."""
+    waivers = release.load_waivers()
+    assert isinstance(waivers, dict)
+    for bug, w in waivers.items():
+        assert re.match(r"^DEC-\d\d+$", w["decision"]) and re.match(r"^\d{4}-\d\d-\d\d$", w["date"]), (bug, w)
+
+
+# ------------------------------------------------------------------ the page itself (browser_oracle_dashboards)
 @BROWSER
 @pytest.mark.feature("DASHBOARD.histogram_only")
 def test_h01_page_is_the_original_dashboard_on_the_reproducible_table(h01_page, headless_out):
@@ -202,7 +344,7 @@ def test_h01_page_is_the_original_dashboard_on_the_reproducible_table(h01_page, 
     assert m["opt_in"] and m["rows"] == ROWS and m["seed"] == SEED
     t = oracle.regenerate_table(ROWS, SEED)
     assert oracle.table_sha256(t) == m["table_sha256"], "the page was not built from the oracle's table"
-    original = _capture(headless_out / "legacy" / "h01_original_500k", 0, 0, graph_only=True)
+    original = _capture(headless_out / "dashboards" / "h01_original_500k", 0, 0, graph_only=True)
     assert not original["opt_in"] and original["rows"] == 500_000
     assert original["graph"] == m["graph"], "the 50,000-row page differs in structure from the original page"
     assert m["graph"]["tabs"] == [["Histograms", "Cumulative"]]
@@ -225,15 +367,20 @@ SNAPSHOT_JS = r"""() => {
   for (let i = 0; i < n; i++) mask += v[i] ? '1' : '0';
   const renderers = [], seen = new Set();
   const kids = x => !x ? [] : (x instanceof Map ? Array.from(x.values()) : Array.from(x));
+  const arr = a => a ? Array.from(a) : null;
   const walk = view => {
     if (!view || seen.has(view)) return; seen.add(view);
     if (view.model && view.model.type === 'GlyphRenderer' && view.model.glyph.type === 'Scatter') {
       const chain = []; let m = view.model.data_source, guard = 0;
       while (m && guard++ < 10) { chain.push([m.type, m.name]); m = m.source ?? (m.sources ? m.sources[0] : null); }
-      const canvas = view.parent?.canvas_view?.el;
-      renderers.push({source: view.model.data_source.name, yfield: view.model.glyph.y?.field ?? null, chain,
-                      y: view.glyph._y ? Array.from(view.glyph._y) : null, n: view.glyph.data_size,
-                      visible: canvas ? canvas.checkVisibility({visibilityProperty: true, opacityProperty: true}) : null});
+      const canvas = view.parent?.canvas_view?.el, plot = view.parent?.model, g = view.glyph;
+      const shown = canvas ? canvas.checkVisibility({visibilityProperty: true, opacityProperty: true}) : null;
+      const label = side => { const a = plot?.[side]; return a && a.length === 1 ? String(a[0].axis_label) : null; };
+      renderers.push({source: view.model.data_source.name, yfield: view.model.glyph.y?.field ?? null,
+                      xfield: view.model.glyph.x?.field ?? null, chain, x: arr(g._x), y: arr(g._y),
+                      sx: arr(g.sx), sy: arr(g.sy), n: g.data_size, canvas_visible: shown,
+                      model_visible: view.model.visible, visible: shown === true && view.model.visible === true,
+                      xlabel: label('below'), ylabel: label('left'), title: plot?.title ? String(plot.title.text) : null});
     }
     for (const c of kids(view.child_views)) walk(c);
     for (const c of kids(view.renderer_views)) walk(c);
@@ -243,6 +390,30 @@ SNAPSHOT_JS = r"""() => {
   return {widgets: {A: Array.from(slider[0].value)}, tab: tabs[0].tabs[tabs[0].active].title, mask,
           edges: bottom.concat([top[top.length - 1]]), bin_count: Array.from(hist.get_column('bin_count')),
           cumulative: Array.from(hist.get_column('cumulative')), cdf: Array.from(hist.get_column('cdf')), renderers};
+}"""
+
+INVENTORY_JS = r"""() => {
+  const out = [], seen = new Set();
+  const kids = x => !x ? [] : (x instanceof Map ? Array.from(x.values()) : Array.from(x));
+  const f = s => s == null ? null : (s.field ?? (s.value !== undefined ? 'value ' + String(s.value) : null));
+  const walk = view => {
+    if (!view || seen.has(view)) return; seen.add(view);
+    if (view.model && view.model.type === 'GlyphRenderer') {
+      const g = view.model.glyph, canvas = view.parent?.canvas_view?.el, plot = view.parent?.model;
+      out.push({glyph: g.type, source: view.model.data_source.name,
+                x: f(g.x) ?? f(g.left), y: f(g.y) ?? f(g.top),
+                xlabel: plot?.below?.length ? String(plot.below[0].axis_label) : null,
+                ylabel: plot?.left?.length ? String(plot.left[0].axis_label) : null,
+                shown: canvas ? canvas.checkVisibility({visibilityProperty: true, opacityProperty: true}) : null});
+    }
+    for (const c of kids(view.child_views)) walk(c);
+    for (const c of kids(view.renderer_views)) walk(c);
+  };
+  for (const v of (Bokeh.index instanceof Map ? Bokeh.index.values() : Object.values(Bokeh.index))) walk(v);
+  const tables = window.__riH.models().filter(m => m.type === 'DataTable')
+    .map(m => ({glyph: 'DataTable', source: m.source?.name ?? null, x: null, y: null, xlabel: null, ylabel: null,
+                columns: m.columns.map(c => String(c.field)), shown: null}));
+  return out.concat(tables);
 }"""
 
 
@@ -268,6 +439,23 @@ def _settle(pg, timeout_s: float = 20.0) -> dict:
             return now
         last = now
     raise AssertionError("H01: the page did not settle")
+
+
+def _inventory(manifest: dict, at_c1: list, at_c3: list) -> dict:
+    """Every widget and plot of the page, and which ones H01 checks (the rest: the next H01 delivery)."""
+    plots, left = [], list(at_c3)
+    for r1 in at_c1:
+        key = (r1["source"], r1["y"])
+        same = [r for r in left if (r["glyph"], r["source"], r["x"], r["y"]) == (r1["glyph"], r1["source"], r1["x"], r1["y"])]
+        r3 = left.pop(left.index(same[0])) if same else {"shown": None}
+        tab = "Histograms" if r1["shown"] else "Cumulative" if r3["shown"] else "?"
+        checked = r1["glyph"] == "Scatter" and key in CHECKED_PLOTS
+        plots.append(dict({k: v for k, v in r1.items() if k != "shown"}, tab=tab, checked_by_h01=checked))
+    widgets = [{"type": w[0], "title": w[1], "name": w[2], "checked_by_h01": w[0] == "RangeSlider" and
+                w[1] in CHECKED_WIDGETS} for w in manifest["graph"]["widgets"]]
+    return {"plots": plots, "widgets": widgets,
+            "summary": {"plots": len(plots), "plots_checked": sum(p["checked_by_h01"] for p in plots),
+                        "widgets": len(widgets), "widgets_checked": sum(w["checked_by_h01"] for w in widgets)}}
 
 
 class _Timeline:
@@ -354,6 +542,11 @@ class _Page:
         self.pg.mouse.move(x + 900, y, steps=10)
         self.pg.mouse.up()
 
+    def console_allowed(self) -> dict:
+        """The console errors the existing policy allows, with how often each was seen (recorded, never hidden)."""
+        from .engine.runner import CONSOLE_ALLOWED
+        return {p: sum(1 for e in self.errors["console"] if re.search(p, e)) for p, _ in CONSOLE_ALLOWED}
+
     def unexpected_errors(self) -> dict:
         from .engine.runner import CONSOLE_ALLOWED
         console = [e for e in self.errors["console"] if not any(re.search(p, e) for p, _ in CONSOLE_ALLOWED)]
@@ -364,20 +557,29 @@ class _Page:
         self.ctx.close()
 
 
-def _is_h01_d1(t, widgets, expected: dict, actual: dict, span: float) -> bool:
-    """H01-D1, exact: the lower end is exactly the slider's start, the upper end sits 1 to 4 float steps below the
-    slider's end; the page is exactly right for the value it shows (selection, all bins, cumulative, cdf, drawn plots);
-    the rows it lost are exactly those with A above the shown value, at least one (the largest A)."""
+def _h01_d1_lost_rows(t, widgets, expected: dict, actual: dict, span: float):
+    """H01-D1, exact. Returns the indices of the rows the page lost, or None when the page does not show H01-D1.
+
+    The signature: the lower end is exactly the slider's start; the upper end sits 1 to 4 float steps below the
+    slider's end; the page is exactly right for the value it shows (selected rows, every bin, cumulative, cdf, drawn
+    plots); the rows it lost are exactly the selected rows with A above the shown value, at least one."""
     a = widgets["A"]
     lo, hi = actual["widgets"]["A"]
     if lo != a["start"] or not 0 < a["end"] - hi <= 4 * np.spacing(a["end"]):
-        return False
+        return None
     shown = oracle.h01_expected(t, oracle.with_a_range(widgets, lo, hi), expected["tab"], expected["checkpoint"],
                                 check_margin=False)
     if compare(shown, actual, widget_span=span):
-        return False
-    lost = expected["selected_count"] - actual["selected_count"]
-    return lost >= 1 and lost == int(((t["A"] > hi) & (t["A"] <= a["end"])).sum())
+        return None
+    full = oracle.selection(t, oracle.with_a_range(widgets, *expected["widgets"]["A"]))
+    lost = np.flatnonzero(full & ~oracle.selection(t, oracle.with_a_range(widgets, lo, hi)))
+    if len(lost) < 1 or len(lost) != expected["selected_count"] - actual["selected_count"]:
+        return None
+    return lost.tolist()
+
+
+def _is_h01_d1(t, widgets, expected: dict, actual: dict, span: float) -> bool:
+    return _h01_d1_lost_rows(t, widgets, expected, actual, span) is not None
 
 
 def _run_plan(page: _Page, plan, expected, span: float, out: Path = None):
@@ -435,7 +637,7 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
             "C5": lambda: page.keys(1, "End"),
             "C6": lambda: page.tab("Histograms")}
     plan = [(cid, name, text, acts[cid]) for cid, name, text, _, _ in steps]
-    video = None
+    video, lost_rows, inventory_reads = None, {}, {}
     try:
         actual, results, seconds = {}, {}, {"first_load": page.load_seconds}
         for one in plan:
@@ -443,8 +645,12 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
             actual.update(act_one); results.update(res_one); seconds.update({k: v for k, v in sec_one.items()
                                                                               if k != "first_load"})
             cid = one[0]
-            status = ("PASS" if not results[cid] else
-                      "KNOWN_ISSUE_RED" if _is_h01_d1(t, widgets, expected[cid], actual[cid], span) else "FAIL")
+            if cid in ("C1", "C3"):
+                inventory_reads[cid] = page.pg.evaluate(INVENTORY_JS)
+            lost = _h01_d1_lost_rows(t, widgets, expected[cid], actual[cid], span) if results[cid] else None
+            status = "PASS" if not results[cid] else "KNOWN_ISSUE_RED" if lost is not None else "FAIL"
+            if lost is not None:
+                lost_rows[cid] = lost
             page.timeline.add(kind="checkpoint", id=cid, scene=one[1], action=one[2], status=status,
                               overlay=_overlay(expected[cid], actual[cid], results[cid], status),
                               expected={k: expected[cid][k] for k in ("selected_count", "tab")},
@@ -459,17 +665,27 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
             video = vids[-1].name if vids else None
     errors = page.unexpected_errors()
 
-    # 3. classification and evidence (comparison, per-action health, timeline)
+    # 3. classification and evidence (comparison, per-action health, inventory, timeline)
     status = {c["id"]: c["status"] for c in page.timeline.events if c["kind"] == "checkpoint"}
     nonvacuous = differs(actual["C1"], actual["C2"])
+    a_max_row = int(np.argmax(t["A"]))
+    timing = {"cold": {"capture_child_process_s": m["seconds"].get("capture_process"),
+                       "of_which_build_s": m["seconds"].get("build"), "of_which_html_s": m["seconds"].get("html")},
+              "page_first_load_s": page.load_seconds,
+              "warm": {k.replace("settle_", "action_") + "_s": v for k, v in seconds.items() if k != "first_load"}}
     comparison = {"rows": ROWS, "seed": SEED, "a_slider": a, "a_changed": [lo, hi], "results": results,
-                  "status": status, "non_vacuity": nonvacuous, "errors": page.errors, "seconds": seconds,
-                  "page_bytes": m["page_bytes"], "capture_seconds": m["seconds"]}
+                  "status": status, "non_vacuity": nonvacuous, "errors": page.errors,
+                  "console_allowed_seen": page.console_allowed(), "timing": timing, "page_bytes": m["page_bytes"],
+                  "h01_d1_lost_rows": lost_rows, "row_with_largest_A": a_max_row}
     (out / "comparison.json").write_text(json.dumps(comparison, indent=1))
-    health = {"scenario": "H01", "function": oracle.H01_FUNCTION, "actions": status,
-              "known_defects": {c: "H01-D1" for c, s in status.items() if s == "KNOWN_ISSUE_RED"}}
+    health = {"scenario": "H01", "function": oracle.H01_FUNCTION, "rows": ROWS, "seed": SEED, "actions": status,
+              "known_defects": {c: "H01-D1" for c, s in status.items() if s == "KNOWN_ISSUE_RED"},
+              "known_defect_detail": {c: {"lost_rows": r, "row_with_largest_A": a_max_row} for c, r in lost_rows.items()}}
     health["dashboard"] = "PASS" if all(s == "PASS" for s in status.values()) else "RED"
     (out / "dashboard_health.json").write_text(json.dumps(health, indent=1))
+    if set(inventory_reads) == {"C1", "C3"}:
+        (out / "inventory.json").write_text(json.dumps(_inventory(m, inventory_reads["C1"], inventory_reads["C3"]),
+                                                       indent=1))
     if record:
         (out / "timeline.json").write_text(json.dumps({"scenario": "H01", "video": video, "rows": ROWS, "seed": SEED,
                                                        "events": page.timeline.events, "health": health}, indent=1))
@@ -481,13 +697,15 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
     assert all(s == "PASS" for c, s in status.items() if c != "C4"), status
     assert nonvacuous, "the A range change did not change the page"
     assert not errors, errors
-    known_defect(status["C4"] == "KNOWN_ISSUE_RED", H01_D1)
+    assert set(inventory_reads) == {"C1", "C3"}
+    known_defect(status["C4"] == "KNOWN_ISSUE_RED" and lost_rows.get("C4") == [a_max_row], H01_D1)
 
 
 @BROWSER
 @pytest.mark.feature("DASHBOARD.histogram_only")
 def test_signature_h01_d1_arrow_keys_back_to_the_end_lose_the_largest_A(h01_page, headless_session):
-    """H01-D1, exact, in its smallest form: one arrow step left and one right on the upper handle."""
+    """H01-D1, exact, in its smallest form: one arrow step left and one right on the upper handle. The one row lost
+    is the row with the largest A."""
     if not DEFAULT_TABLE:
         pytest.skip("H01-D1 is reproduced with the default table (50,000 rows, seed 4711) only")
     m = h01_page["manifest"]
@@ -502,8 +720,9 @@ def test_signature_h01_d1_arrow_keys_back_to_the_end_lose_the_largest_A(h01_page
         got = _settle(page.pg)
     finally:
         page.close()
-    assert _is_h01_d1(t, widgets, full, got, a["end"] - a["start"]), (got["widgets"], got["selected_count"])
-    assert full["selected_count"] - got["selected_count"] == 1 and got["widgets"]["A"][1] < a["end"]
+    lost = _h01_d1_lost_rows(t, widgets, full, got, a["end"] - a["start"])
+    assert lost == [int(np.argmax(t["A"]))], (got["widgets"], got["selected_count"], lost)
+    assert t["A"][lost[0]] == a["end"] and got["widgets"]["A"][1] < a["end"]
     assert not page.unexpected_errors(), page.unexpected_errors()
 
 
@@ -534,3 +753,87 @@ def test_control_h01_d1_end_key_and_mouse_drag_restore_the_full_range(h01_page, 
     assert compare(full, by_mouse, widget_span=span) == [], compare(full, by_mouse, widget_span=span)
     assert by_key["widgets"]["A"][1] == a["end"] and by_mouse["widgets"]["A"][1] == a["end"]
     assert not page.unexpected_errors(), page.unexpected_errors()
+
+
+# ------------------------------------------------------------------ live faults in the browser (G2, G6)
+_FIND_JS = r"""
+const H = window.__riH;
+const r = H.models().filter(m => m.type === 'GlyphRenderer' && m.data_source.name === 'histo1Ds'
+                              && m.glyph.type === 'Scatter' && m.glyph.y?.field === 'bin_count');
+if (r.length !== 1) throw Error('live fault: expected one histo1Ds bin_count scatter, found ' + r.length);
+const R = r[0];
+const P = H.models().filter(m => (m.type === 'Figure' || m.type === 'Plot') && m.renderers.includes(R))[0];
+window.__riFault = window.__riFault || {};
+"""
+LIVE_FAULTS = {
+    # name: (inject, undo, the words the comparator must report)
+    "x drawn from the bins' lower edges": (
+        "R.glyph.x = {field: 'bin_bottom'};", "R.glyph.x = {field: 'bin_center'};", "draws x from 'bin_bottom'"),
+    "plot switched off": ("R.visible = false;", "R.visible = true;", "renderer visible: False"),
+    "x axis relabelled": ("window.__riFault.xl = P.below[0].axis_label; P.below[0].axis_label = 'B (cm/s)';",
+                          "P.below[0].axis_label = window.__riFault.xl;", "xlabel 'B (cm/s)'"),
+    "one drawn value changed in the plot's own source": (   # the DownsamplerCDS serves its columns by get_column
+        "const d = R.data_source, get = Object.getPrototypeOf(d).get_column; "
+        "d.get_column = function (k) { const c = get.call(this, k); if (k !== 'bin_count' || !c) return c; "
+        "const m = Array.from(c); m[5] += 1; return m; }; d.change.emit();",
+        "const d = R.data_source; delete d.get_column; d.change.emit();",
+        "(drawn values)"),
+}
+
+
+@BROWSER
+@pytest.mark.feature("DASHBOARD.histogram_only")
+def test_h01_live_faults_in_the_browser_are_caught(h01_page, headless_session):
+    """Faults injected into the live page in Chromium (not into a saved snapshot) are reported by the same snapshot
+    and comparator the workflow uses; after each fault is undone the page passes again. Control first: the
+    untouched page passes."""
+    m = h01_page["manifest"]
+    widgets, t = m["widget_state"], oracle.regenerate_table(ROWS, SEED)
+    a = widgets["A"]
+    span = a["end"] - a["start"]
+    full = oracle.h01_expected(t, widgets, "Histograms", "full")
+    found, snapshots, control = {}, {}, None
+    page = _Page(headless_session, h01_page["html"])
+    try:
+        control = compare(full, _settle(page.pg), widget_span=span)
+        for name, (inject, undo, _) in LIVE_FAULTS.items():
+            page.pg.evaluate("() => {" + _FIND_JS + inject + "}")
+            snapshots[name] = _settle(page.pg)
+            faulty = compare(full, snapshots[name], widget_span=span)
+            page.pg.evaluate("() => {" + _FIND_JS + undo + "}")
+            found[name] = (faulty, compare(full, _settle(page.pg), widget_span=span))
+    finally:
+        page.close()
+    (h01_page["dir"] / "live_faults.json").write_text(json.dumps(
+        {"expected": full, "control": control,
+         "faults": {n: {"inject": LIVE_FAULTS[n][0], "found": f, "after_undo": u, "snapshot": snapshots.get(n)}
+                    for n, (f, u) in found.items()}}, indent=1))
+    assert control == [], control
+    for name, (faulty, after) in found.items():
+        words = LIVE_FAULTS[name][2]
+        assert any(words in d for d in faulty), (name, faulty)
+        assert after == [], (name, "the page did not pass again after the fault was undone", after)
+    assert not page.unexpected_errors(), page.unexpected_errors()
+
+
+# ------------------------------------------------------------------ the release check (release_oracle_dashboards)
+@RELEASE
+def test_release_check_of_the_oracle_dashboards(request, tmp_path):
+    """Runs the oracle dashboards in Chromium (a child pytest of the target browser_oracle_dashboards) and passes only
+    when that run is green AND every dashboard is healthy or shows only bugs the Architect accepted for release
+    (dashboards/waivers.json). Runs only as its own target: in an ordinary run it is skipped."""
+    if request.config.getoption("markexpr") != "release_oracle_dashboards":
+        pytest.skip("the release check runs only as its own target: pytest -m release_oracle_dashboards")
+    out = tmp_path / "release_run"
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTEST_XDIST_WORKER", "PYTEST_ADDOPTS", "RI_HEADLESS_SESSION",
+                                                            "RI_HEADLESS_TEST_SESSION_ID", "RI_HEADLESS_CHECK_REQUIRED")}
+    env.update(RI_HEADLESS_OUT=str(out), RI_HEADLESS_REQUIRED="1", RI_HEADLESS_TARGET="browser_oracle_dashboards")
+    root = Path(__file__).resolve().parents[4]
+    done = subprocess.run([sys.executable, "-m", "pytest", str(Path(__file__).resolve().parent), "-m",
+                           "browser_oracle_dashboards", "-p", "no:xdist", "-p", "no:cacheprovider", "-q",
+                           "--timeout=900"], cwd=root, env=env, capture_output=True, text=True, timeout=1800)
+    (tmp_path / "release_run.log").write_text(done.stdout + done.stderr)
+    assert done.returncode == 0, "the oracle dashboards did not pass:\n" + (done.stdout + done.stderr)[-3000:]
+    files = sorted(out.rglob("dashboard_health.json"))
+    problems = release.check(files, release.load_waivers())
+    assert not problems, "release check failed:\n" + "\n".join(problems)

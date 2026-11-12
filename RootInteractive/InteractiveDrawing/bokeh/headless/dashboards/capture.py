@@ -6,7 +6,7 @@ import), the working directory is the output folder (the example calls `output_f
 replaced only during the call, to keep the real root `pAll` that `fromArray` passes to it. The dashboard function and
 `fromArray` are not touched.
 
-    python -m RootInteractive.InteractiveDrawing.bokeh.headless.legacy.capture FUNCTION ROWS SEED OUTDIR [--graph-only]
+    python -m RootInteractive.InteractiveDrawing.bokeh.headless.dashboards.capture FUNCTION ROWS SEED OUTDIR [--graph-only]
 
 ROWS = 0 builds the original 500,000 unseeded rows (no opt-in); --graph-only skips the HTML (fidelity check).
 
@@ -127,7 +127,7 @@ def main(function: str, rows: int, seed: int, outdir: str, html: bool = True) ->
         from bokeh.embed import file_html
         from bokeh.resources import INLINE
         t2 = time.perf_counter()
-        (out / "page.html").write_text(file_html(root, INLINE, f"RI legacy dashboard {function}"), encoding="utf-8")
+        (out / "page.html").write_text(file_html(root, INLINE, f"RI oracle test dashboard {function}"), encoding="utf-8")
         t_html = round(time.perf_counter() - t2, 3)
     df = example.df
     np.savez(out / "table.npz", **{c: df[c].to_numpy(dtype="<f8") for c in "ABCD"})

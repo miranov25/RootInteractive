@@ -11,8 +11,14 @@ H01 contract (testBokehClientHistogramOnlyHisto; histogram `histoA`: variable A,
 - bin i counts the selected rows with edge[i] <= A < edge[i+1], edges = linspace(0, 1, 21); the oracle checks that no
   selected value lies within 1e-9 of an edge, so this agrees with numpy.histogram;
 - cumulative = running sum of the counts, left to right;
-- cdf = cumulative / (sum of the counts in the histogram range), last bin 1 (ratified for non-empty histograms;
-  an empty histogram is a separate, open policy and is never produced by these tests).
+- cdf = cumulative / (sum of the counts in the histogram range), last bin 1 (decision DEC-06, for non-empty
+  histograms; an empty histogram is a separate, open policy and is never produced by these tests);
+- the drawn plots (H01_PLOTS): x is the bin centre (edge[i] + edge[i+1]) / 2; the axis labels and titles follow the
+  declaration in testBokehClientHistogramOnlyHisto and the table's metadata (test_bokehClientHistogram.py line 32,
+  'A.AxisTitle': "A (cm)"): a plot of histoA is labelled with A's title, a plot of the stacked source histo1Ds (a
+  multi-select of histograms, so no single variable) with the plain field name "bin_center"; the declared y title of
+  histo1Ds, "{transformY}(N)", reads "(N)" while transformY is None (no transform). Labels are compared without
+  leading or trailing spaces.
 """
 from __future__ import annotations
 
@@ -26,6 +32,13 @@ H01_NBINS = 20
 H01_RANGE = (0.0, 1.0)
 EDGE_MARGIN = 1e-9
 DDC_NAMES = {0: "A0", 1: "A1", 2: "A2", 3: "A3", 4: "A4"}
+H01_PLOTS = {   # (source, drawn y field) -> drawn x field and labels; x values are the bin centres
+    ("histo1Ds", "bin_count"): {"xfield": "bin_center", "xlabel": "bin_center", "ylabel": "(N)",
+                                "title": "(N) vs bin_center"},
+    ("histoA", "cumulative"): {"xfield": "bin_center", "xlabel": "A (cm)", "ylabel": "cumulative",
+                               "title": "cumulative vs A (cm)"},
+    ("histoA", "cdf"): {"xfield": "bin_center", "xlabel": "A (cm)", "ylabel": "cdf", "title": "cdf vs A (cm)"},
+}
 
 
 def regenerate_table(rows: int, seed: int) -> Dict[str, np.ndarray]:
@@ -94,13 +107,15 @@ def h01_expected(t: Dict[str, np.ndarray], widgets: Dict[str, dict], tab: str, c
     visible = ([["histo1Ds", "bin_count"]] if tab == "Histograms"
                else [["histoA", "cumulative"], ["histoA", "cdf"]])
     hidden = ([["histoA", "cumulative"], ["histoA", "cdf"]] if tab == "Histograms" else [["histo1Ds", "bin_count"]])
+    centres = ((edges[:-1] + edges[1:]) / 2).tolist()
+    plots = {f"{s}.{y}": dict(H01_PLOTS[(s, y)], x=centres) for s, y in visible}
     return {
         "scenario": "H01", "function": H01_FUNCTION, "checkpoint": checkpoint,
         "widgets": {"A": list(widgets["A"]["value"])}, "tab": tab,
         "selected_count": int(mask.sum()), "selected_sha256": mask_sha256(mask),
         "edges": edges.tolist(), "bin_count": counts.tolist(), "cumulative": cumulative.tolist(),
         "cdf": (cumulative / total).tolist(),
-        "visible_renderers": visible, "hidden_renderers": hidden,
+        "visible_renderers": visible, "hidden_renderers": hidden, "plots": plots,
         "boundary_margin": margin,
     }
 

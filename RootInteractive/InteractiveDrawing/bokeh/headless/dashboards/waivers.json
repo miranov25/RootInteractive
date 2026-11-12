@@ -1,0 +1,4 @@
+{
+ "about": "Known RootInteractive bugs the Architect has accepted for a release (release.py). One entry per bug: {\"<bug>\": {\"decision\": \"DEC-nn\", \"date\": \"YYYY-MM-DD\", \"by\": \"Architect\", \"note\": \"...\"}}. Empty: no known bug is accepted, so a dashboard showing a known bug fails the release check.",
+ "waivers": {}
+}
