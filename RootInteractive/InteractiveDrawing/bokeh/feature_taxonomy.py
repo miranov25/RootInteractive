@@ -372,6 +372,19 @@ FEATURE_TAXONOMY = {
         "layer": "e2e",
         "proof": "headless/test_headless_oracle_dashboards.py",
     },
+    "DASHBOARD.weights_reference": {
+        "name": "Example dashboard: analysis weights against reference weights (test_interactiveTemplateWeightsRef)",
+        "description": "An oracle test dashboard: RootInteractive's WeightsRef template dashboard, built by its original "
+                       "function on a reproducible table, in Chromium with real input (tab click, weight and transform "
+                       "selects, bin spinner, A slider keys, restore): the selected rows, both sides' weighted 2-D "
+                       "counts, the analysis and reference profiles (entries, mean, std, quantiles), all drawn series, "
+                       "the comparison curves and the error bars of the means equal numpy at every step, by the "
+                       "Architect's decisions; known defects WT-D6, WR-D1, WT-D14; live faults are caught",
+        "priority": "P0",
+        "backends": ["browser"],
+        "layer": "e2e",
+        "proof": "headless/test_headless_oracle_weightsref.py",
+    },
     "DISPLAY.graph3d": {
         "name": "3D graph (BokehVisJSGraph3D, vis.js)",
         "description": "The 3D graph takes x, y, z and style from the right columns and rows of a public-builder page "

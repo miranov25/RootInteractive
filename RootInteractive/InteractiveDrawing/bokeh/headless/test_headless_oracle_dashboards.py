@@ -339,6 +339,7 @@ _TABLE_HASH = _table_hash()
 
 
 def _check(files, waivers=(), **kw):
+    kw.setdefault("required", {"H01": H01})            # the release's other dashboards are tested by their own files
     return release.check(files, list(waivers), run_id=kw.pop("run_id", "run-1"), today=TODAY, **kw)
 
 
@@ -410,9 +411,10 @@ def test_release_check_fails_closed(tmp_path, case):
 
 
 @UNIT
-def test_release_check_requires_the_run_identity(tmp_path):
+def test_release_check_requires_the_run_identity(tmp_path, monkeypatch):
     """GPT25's fix-check summary, A1: every entry point certifies a named run. check() without a run identity fails;
     the command line refuses to start without --run-id, and fails with a wrong one."""
+    monkeypatch.setattr(release, "REQUIRED", {"H01": H01})    # the command line checks the release's dashboards
     files = _write(tmp_path, _health(GREEN))
     assert _check(files) == []
     found = release.check(files, [], run_id=None, today=TODAY)

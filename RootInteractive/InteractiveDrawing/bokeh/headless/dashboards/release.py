@@ -39,10 +39,15 @@ HERE = Path(__file__).resolve().parent
 WAIVERS = HERE / "waivers.json"
 # the code whose result a health file reports: a health file written by other code is not this release's evidence
 CODE_FILES = ("dashboards/capture.py", "dashboards/oracle.py", "dashboards/compare.py",
-              "test_headless_oracle_dashboards.py")
+              "test_headless_oracle_dashboards.py", "dashboards/oracle_weightsref.py",
+              "test_headless_oracle_weightsref.py")
 REQUIRED: Dict[str, dict] = {
     "H01": {"function": "testBokehClientHistogramOnlyHisto", "rows": 50000, "seed": 4711,
             "actions": ["C1", "C2", "C3", "C4", "C5", "C6"]},
+    # WR1: the WeightsRef dashboard (test_headless_oracle_weightsref.py); a checkpoint can show several known defects,
+    # named together in one entry ("WR-D1,WT-D14,WT-D6"), so a waiver names that exact combination
+    "WR1": {"function": "test_interactiveTemplateWeightsRef", "rows": 50000, "seed": 4711,
+            "actions": ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]},
 }
 STATUSES = ("PASS", "KNOWN_ISSUE_RED", "FAIL")
 WAIVER_KEYS = ("scenario", "checkpoint", "bug", "signature", "decision", "date", "by", "expires")
@@ -82,12 +87,13 @@ def load_waivers(path: Path = WAIVERS) -> list:
     return waivers
 
 
-def check(health_files: Iterable[Path], waivers: list, required: Dict[str, dict] = REQUIRED,
+def check(health_files: Iterable[Path], waivers: list, required: Optional[Dict[str, dict]] = None,
           run_id: Optional[str] = None, code: Optional[str] = None, today: Optional[_dt.date] = None,
           accepted: Optional[list] = None) -> List[str]:
     """The problems of one run (empty = pass). `accepted`, when given, receives the known bugs accepted by a waiver."""
     today = today or _dt.date.today()
     code = code or code_sha256()
+    required = REQUIRED if required is None else required
     problems: List[str] = []
     if not run_id:
         problems.append("no run identity given: a release check must name the run it certifies (--run-id)")
