@@ -410,6 +410,21 @@ def test_release_check_fails_closed(tmp_path, case):
 
 
 @UNIT
+def test_release_check_requires_the_run_identity(tmp_path):
+    """GPT25's fix-check summary, A1: every entry point certifies a named run. check() without a run identity fails;
+    the command line refuses to start without --run-id, and fails with a wrong one."""
+    files = _write(tmp_path, _health(GREEN))
+    assert _check(files) == []
+    found = release.check(files, [], run_id=None, today=TODAY)
+    assert any("no run identity given" in f for f in found), found
+    with pytest.raises(SystemExit) as stop:
+        release.main([str(tmp_path)])
+    assert stop.value.code == 2
+    assert release.main([str(tmp_path), "--run-id", "run-0"]) == 1
+    assert release.main([str(tmp_path), "--run-id", "run-1"]) == 0
+
+
+@UNIT
 def test_release_waivers_file_is_valid_and_names_decisions():
     """The shipped waivers.json loads; every waiver names its exact place, signature, decision, date, author and expiry
     (none yet: open decision E-1)."""

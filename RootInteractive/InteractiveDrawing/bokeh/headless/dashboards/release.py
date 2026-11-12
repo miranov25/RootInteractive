@@ -20,7 +20,9 @@ release that a user workflow is broken. This check can. It reads the health file
 Anything missing, FAIL, NOT_RUN or unknown fails. The check fails closed: no file, no pass. An accepted bug does not
 make the dashboard healthy: its health file stays RED, and the report lists the accepted bugs.
 
-    python -m RootInteractive.InteractiveDrawing.bokeh.headless.dashboards.release RUN_DIR [--waivers FILE] [--run-id ID]
+    python -m RootInteractive.InteractiveDrawing.bokeh.headless.dashboards.release RUN_DIR --run-id ID [--waivers FILE]
+
+A release check always names the run it certifies (GPT25's fix-check summary, A1): without a run identity it fails.
 """
 from __future__ import annotations
 
@@ -87,6 +89,8 @@ def check(health_files: Iterable[Path], waivers: list, required: Dict[str, dict]
     today = today or _dt.date.today()
     code = code or code_sha256()
     problems: List[str] = []
+    if not run_id:
+        problems.append("no run identity given: a release check must name the run it certifies (--run-id)")
     by_scenario: Dict[str, list] = {}
     for f in health_files:
         try:
@@ -112,7 +116,7 @@ def check(health_files: Iterable[Path], waivers: list, required: Dict[str, dict]
         if h.get("code_sha256") != code:
             problems.append(f"{scenario}: written by other test code (code hash {str(h.get('code_sha256'))[:12]}, "
                             f"current {code[:12]})")
-        if run_id is not None and h.get("run_id") != run_id:
+        if run_id and h.get("run_id") != run_id:
             problems.append(f"{scenario}: written by run {h.get('run_id')!r}, not by this release run {run_id!r}")
         man = f.parent / "manifest.json"
         if not man.is_file():
@@ -176,7 +180,7 @@ def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="release check of the oracle test dashboards")
     ap.add_argument("run_dir", type=Path)
     ap.add_argument("--waivers", type=Path, default=WAIVERS)
-    ap.add_argument("--run-id", default=None)
+    ap.add_argument("--run-id", required=True, help="the run identity recorded in the health files of the run")
     a = ap.parse_args(argv)
     waivers = load_waivers(a.waivers)
     files = sorted(a.run_dir.rglob("dashboard_health.json"))
