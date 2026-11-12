@@ -53,7 +53,13 @@ def known_defect(condition: bool, message: str) -> None:
 
 STRICT = dict(strict=True, raises=KnownDefect)
 TQ_D1_ERROR = "ReferenceError: cut is not defined"
-TQ_D2_ERROR = "TypeError: Function.prototype.apply was called on null, which is null and not a function"
+# The end of V8's message depends on the Node version ("which is null and not a function" in Node 22, other wording
+# in Node 18 on alma2), so the signature uses the part every version shares, plus the function that raises it.
+TQ_D2_ERROR = "TypeError: Function.prototype.apply was called on null"
+
+
+def _one_tq_d2_message(messages) -> bool:
+    return len(messages) == 1 and messages[0].startswith(TQ_D2_ERROR)
 
 N = 12
 X = np.array([0.25, .75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75, .5, 1.5, 2.5, 3.5])
@@ -472,7 +478,7 @@ def test_node_textquery_toggle_with_second_filter(node_session, tmp_path):
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2") & gate_oracle())
     _node_set(page, "Toggle", "active", True, label="disable")
     assert_histogram(df, _hist_state(page), gate_oracle())
-    known_defect(report.console_errors == [TQ_D2_ERROR] and not report.page_errors, "TQ-D2: the logged TypeError")
+    known_defect(_one_tq_d2_message(report.console_errors) and not report.page_errors, "TQ-D2: the logged TypeError")
     _assert_no_errors(report)
 
 
@@ -769,7 +775,7 @@ def _clear_and_retype(page):
 def _is_tq_d2(after_clear, recorded, report) -> bool:
     return (after_clear == query_oracle("return A > 1").tolist() and len(recorded) == 1
             and recorded[0].startswith(TQ_D2_ERROR) and "at CustomJSNAryFunction.compute" in recorded[0]
-            and report.console_errors == [TQ_D2_ERROR] and not report.page_errors)
+            and _one_tq_d2_message(report.console_errors) and not report.page_errors)
 
 
 @pytest.mark.node_display
