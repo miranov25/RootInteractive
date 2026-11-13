@@ -395,6 +395,22 @@ def matched_outcomes(nodeid: str, test_outcomes: Dict[str, str]) -> List[Tuple[s
     return []
 
 
+DETAIL_ORDER = ("failed", "error", "xpassed", "xfailed", "skipped", "passed")      # worst first
+DETAIL_EMOJI = {"passed": "✅", "failed": "❌", "error": "💥", "skipped": "⏭️", "xfailed": "⚠️", "xpassed": "🔄"}
+
+
+def detail_outcome(nodeid: str, test_outcomes: Dict[str, str]) -> Tuple[Optional[str], int]:
+    """The outcome shown for one test in the detail list, and its number of cases: the worst outcome over every
+    parametrized variant (matched_outcomes, as for the status); (None, 0) without a result (PHASE_5 Batch 1, A4 F5)."""
+    hits = [o for _, o in matched_outcomes(nodeid, test_outcomes)]
+    if not hits:
+        return None, 0
+    for o in DETAIL_ORDER:
+        if o in hits:
+            return o, len(hits)
+    return "unknown", len(hits)
+
+
 PARTLY_NOT_RUN = "❓ Partly verified (not every test ran)"      # PHASE_4_5 A2 v0.2 (review F1)
 
 
@@ -667,43 +683,14 @@ def generate_matrix(
         
         if feature_test_list:
             for nodeid in sorted(feature_test_list):
-                # Try to get outcome for this test
-                outcome = None
-                
-                # Strategy 1: Exact match
-                outcome = test_outcomes.get(nodeid)
-                
-                # Strategy 2: Match with full path prefix
-                if outcome is None:
-                    for key, val in test_outcomes.items():
-                        if key.endswith(nodeid):
-                            outcome = val
-                            break
-                
-                # Strategy 3: Match just the test name part
-                if outcome is None:
-                    test_name = nodeid.split("::")[-1]
-                    for key, val in test_outcomes.items():
-                        if key.endswith("::" + test_name):
-                            outcome = val
-                            break
-                
-                # Status emoji based on outcome
-                if outcome == "passed":
-                    status_emoji = "✅"
-                elif outcome == "failed":
-                    status_emoji = "❌"
-                elif outcome == "error":
-                    status_emoji = "💥"
-                elif outcome == "skipped":
-                    status_emoji = "⏭️"
-                elif outcome == "xfailed":
-                    status_emoji = "⚠️"
-                elif outcome == "xpassed":
-                    status_emoji = "🔄"
-                else:
-                    status_emoji = "❓"
-                
+                # PHASE_5 Batch 1 (A4 review F5): the same exact matching as the status (matched_outcomes): every
+                # parametrized variant counts, and the line shows the worst of them with the number of cases. The
+                # former suffix and test-name strategies missed parametrized tests and showed them as unknown.
+                outcome, cases = detail_outcome(nodeid, test_outcomes)
+                status_emoji = DETAIL_EMOJI.get(outcome, "❓")
+                if cases > 1:
+                    lines.append(f"- {status_emoji} `{nodeid}` ({cases} cases)")
+                    continue
                 lines.append(f"- {status_emoji} `{nodeid}`")
         elif not hl:
             if info.get("planned"):

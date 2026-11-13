@@ -342,7 +342,7 @@ FEATURE_TAXONOMY = {
         "name": "Filter intersection",
         "description": "Intersection of several filters on one table (LazyIntersectionFilter)",
         "priority": "P1",
-        "backends": ["browser"],
+        "backends": ["node"],                # PHASE_5 Batch 1 (A4 review F2): every test of it runs in Node
         "layer": "integration",
         "proof": None,
         "planned": True,

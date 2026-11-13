@@ -389,7 +389,8 @@ PERMUTATION = [8, 5, 2, 11, 0, 4, 9, 7, 10, 1, 3, 6]      # GPT24's row permutat
 @pytest.mark.layer("integration")
 @pytest.mark.feature("JOIN.multi_table_chain")
 @pytest.mark.feature("DSL.gather_operation")
-@pytest.mark.feature("FILTER.intersection")
+# no FILTER.intersection (PHASE_5 Batch 1, A4 review F2): the page puts the validity filter first so that B1 cannot act;
+# it is no evidence for filter intersection in general (test_headless_batch1_selection.py is)
 @pytest.mark.parametrize("order", ["fixture", "permuted"])
 def test_node_every_state_after_load_equals_the_reference(node_session, tmp_path, order):
     """Full -> event cut -> event and daughter cut -> nonempty high-pt state with an empty profile slice -> both
