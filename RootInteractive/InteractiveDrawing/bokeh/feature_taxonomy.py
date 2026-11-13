@@ -379,7 +379,8 @@ FEATURE_TAXONOMY = {
                        "selects, bin spinner, A slider keys, restore): the selected rows, both sides' weighted 2-D "
                        "counts, the analysis and reference profiles (entries, mean, std, quantiles), all drawn series, "
                        "the comparison curves and the error bars of the means equal numpy at every step, by the "
-                       "Architect's decisions; known defects WT-D6, WR-D1, WT-D14; live faults are caught",
+                       "Architect's decisions; known defects WR-D1, WT-D14 (WT-D6 fixed in PHASE_5 Batch 1); "
+                       "live faults are caught",
         "priority": "P0",
         "backends": ["browser"],
         "layer": "e2e",

@@ -26,8 +26,8 @@ Page design (test-side choices, stated so a reviewer can check them):
     excluded at load) cannot change a selection here; checked below with B1's own selection rule, and the filter
     order is read from the page.
 Known defect found again (no new id): B2 — at load every 1-D histogram counts all rows, the selection is ignored
-(HistogramCDS.ts `initialize`); the 2-D histogram and the profile follow the selection from load on. Exact signature,
-strict partner and control below.
+(HistogramCDS.ts `initialize`); the 2-D histogram and the profile follow the selection from load on. Fixed in PHASE_5
+Batch 1: the strict mark is off and the signature test removed; B2's signature at load is now a regression.
 
 Source: GPT24.RI's A4 v0.2 packages (Team N: oracle, fixture; Team B: real-event helper, here corrected for Bokeh
 3.3.2: the figure is `.bk-Figure`, a RootInteractive plot draws from a DownsamplerCDS whose `.data` is empty, and the
@@ -54,16 +54,10 @@ CASES = FIXTURE["cases"]
 T = FIXTURE["tables"]
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 1 fixed B2: its exact signature is a regression - an ordinary failure."""
     if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 # ===================================================================================== the page
@@ -458,20 +452,9 @@ def _is_b2(snapshot) -> bool:
 @pytest.mark.layer("integration")
 @pytest.mark.feature("JOIN.multi_table_chain")
 @pytest.mark.feature("HIST.histogram_1d")
-def test_signature_b2_at_load_the_1d_histograms_count_every_row(node_session, tmp_path):
-    snapshot = _load_state(node_session, tmp_path)
-    assert _is_b2(snapshot), {k: snapshot[k] for k in ("selected_mask", "mass_counts", "mass_wA", "alias_counts")}
-
-
-@pytest.mark.node_a4
-@pytest.mark.backend("node")
-@pytest.mark.layer("integration")
-@pytest.mark.feature("JOIN.multi_table_chain")
-@pytest.mark.feature("HIST.histogram_1d")
-@pytest.mark.xfail(**STRICT, reason="B2: a 1-D histogram ignores the selection at page load (HistogramCDS.ts initialize)")
 def test_strict_the_load_state_equals_the_reference(node_session, tmp_path):
     snapshot = _load_state(node_session, tmp_path)
-    known_defect(_is_b2(snapshot), "B2: at load the 1-D histograms count every row")
+    regression(_is_b2(snapshot), "B2: at load the 1-D histograms count every row")
     assert_case(snapshot, "all_valid")
 
 

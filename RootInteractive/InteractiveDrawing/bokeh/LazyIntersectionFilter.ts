@@ -181,16 +181,18 @@ export class LazyIntersectionFilter extends RIFilter {
           if(this.old_values.length <= x){
             this.old_values.length = x+1
           }
-          let values_bits = filters[x].as_bits(this._old_old_values)
+          // PHASE_5 Batch 1 (WG-D2): no shared output buffer - a filter caches the array it returns, and this
+          // filter keeps it as old_values[x]; a reused buffer made a later move compare an array with itself
+          let values_bits = filters[x].as_bits(null)
           if(values_bits == null){
-            values_bits = pack_booleans(filters[x].v_compute(), this._old_old_values)
+            values_bits = pack_booleans(filters[x].v_compute(), null)
           }
           const counts = this.resize_counts(values_bits.length)
           if(this._vectorize){
               if(filters[x].invert){
-                this._changed_values ||= from_bits_8(values_bits, this.old_values[x], counts)
+                this._changed_values = from_bits_8(values_bits, this.old_values[x], counts) || this._changed_values
               } else {
-                this._changed_values ||= from_bits_8(this.old_values[x], values_bits, counts)
+                this._changed_values = from_bits_8(this.old_values[x], values_bits, counts) || this._changed_values
               }
               [this._old_old_values, this.old_values[x]] = [this.old_values[x], values_bits]
           } else {
@@ -205,11 +207,11 @@ export class LazyIntersectionFilter extends RIFilter {
           const counts = this.counts
           if(this._vectorize){
               if(filters[x].invert){
-                this._changed_values ||= from_bits_8(null, this.old_values[x], counts)
+                this._changed_values = from_bits_8(null, this.old_values[x], counts) || this._changed_values
               } else {
-                this._changed_values ||= from_bits_8(this.old_values[x], null, counts)
+                this._changed_values = from_bits_8(this.old_values[x], null, counts) || this._changed_values
               }
-              this.old_values[x]?.fill(-1)
+              this.old_values[x] = null       // PHASE_5 Batch 1 (WG-D2): the array belongs to the filter's cache
           } else {
             const l = this.counts.length
             for(let i=0; i < l; i++){
@@ -233,6 +235,11 @@ export class LazyIntersectionFilter extends RIFilter {
         return cached_vector
     }
     this.update_counts()
+    if(this.counts == null){
+      // PHASE_5 Batch 1 (WG-D1): no filter is active yet (a toggleable range alone, disabled): every row is selected
+      const lengths = this.filters.map((f: any) => f.source != null ? f.source.get_length() : null).filter((n: any) => n != null)
+      this.resize_counts(Math.ceil((lengths.length ? lengths[0] : 0) / 32))
+    }
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
         new_vector = this._vectorize ? Array(this.counts.length * 4).fill(false) : Array(this.counts.length).fill(false)

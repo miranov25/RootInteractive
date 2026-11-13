@@ -33,6 +33,10 @@ confirms their formulas ("R2-errors").
 Two lanes (DEC-05): the workflow test is the strict expected failure of the three defects; dashboard_health.json (in
 headless_out/dashboards/wr1/) marks each checkpoint and the dashboard RED. Healthy controls: the weighted counts and
 the analysis side equal numpy exactly (they have no defect), and live faults injected into the page are caught.
+
+PHASE_5 Batch 1 fixed WT-D6 (bokehTools.py: a range widget at its automatic full range keeps every exported row). The
+page now shows WR-D1 and WT-D14 only (PRESENT); the model keeps all three (MODEL_DEFECTS) as the record of master
+f1cbe0f. A checkpoint equal to the master model (WT-D6 back) is reported as a regression.
 """
 from __future__ import annotations
 
@@ -61,10 +65,11 @@ SCENARIO = "WR1"
 K_LOW = 8
 NBINS = (100, 120)
 RTOL_SUM, RTOL_MOMENT, RTOL_ERR = 1e-12, 1e-10, 1e-9
-ALL_DEFECTS = tuple(W.DEFECTS)
+MODEL_DEFECTS = tuple(W.DEFECTS)                         # the model: master f1cbe0f
+PRESENT = ("WR-D1", "WT-D14")                             # on the page after PHASE_5 Batch 1 (WT-D6 fixed)
 WR_XFAIL = dict(strict=DEFAULT_TABLE, raises=KnownDefect)
-WR_DEFECTS = ("WT-D6, WR-D1, WT-D14 at every checkpoint: the A slider at its end still cuts row 44894; the reference "
-              "side is binned; the error bar of a weighted mean is std/sqrt(sum w), not s/sqrt(N_eff)")
+WR_DEFECTS = ("WR-D1, WT-D14 at every checkpoint: the reference side is binned; the error bar of a weighted mean is "
+              "std/sqrt(sum w), not s/sqrt(N_eff)")
 JOIN = "histoXYData_1_join"
 # (data source, drawn y field) -> what it must equal; x is the X bin centre (profiles) or the 2-D bin's X centre
 SERIES = {
@@ -215,10 +220,10 @@ def wr_compare(exp: dict, act: dict, sections=("state", "selection", "histograms
     return out
 
 
-def _attribute(t, state) -> list:
+def _attribute(t, state, defects=PRESENT) -> list:
     """The known defects that change the expected response in this state (each one switched off in turn)."""
-    full = W.expected(t, state, ALL_DEFECTS)
-    return [d for d in ALL_DEFECTS if _expected_differs(full, W.expected(t, state, [x for x in ALL_DEFECTS if x != d]))]
+    full = W.expected(t, state, defects)
+    return [d for d in defects if _expected_differs(full, W.expected(t, state, [x for x in defects if x != d]))]
 
 
 def _expected_differs(a: dict, b: dict) -> bool:
@@ -233,16 +238,18 @@ def _expected_differs(a: dict, b: dict) -> bool:
     return False
 
 
-def _detail(t, state) -> dict:
+def _detail(t, state, defects=PRESENT) -> dict:
     """Each defect's exact signature in this state (recorded in the health file)."""
-    shown, desired = W.expected(t, state, ALL_DEFECTS), W.expected(t, state, ())
-    lost = np.flatnonzero(desired["selected_rows"] & ~shown["selected_rows"]).tolist()
-    d_ref = np.nanmax(np.abs(shown["reference"]["mean"] - W.expected(t, state, ("WT-D6", "WT-D14"))["reference"]["mean"]))
-    no14 = W.expected(t, state, ("WT-D6", "WR-D1"))
-    ratio = shown["errors"]["analysis"]["mean"] / no14["errors"]["analysis"]["mean"]
-    return {"WT-D6": {"lost_rows": lost},
-            "WR-D1": {"reference_mean_binned_minus_unbinned_max": round(float(d_ref), 9)},
-            "WT-D14": {"analysis_mean_error_drawn_over_proper_max": round(float(np.nanmax(ratio)), 6)}}
+    shown, desired = W.expected(t, state, defects), W.expected(t, state, ())
+    without = lambda d: W.expected(t, state, tuple(x for x in defects if x != d))
+    out = {}
+    if "WT-D6" in defects:
+        out["WT-D6"] = {"lost_rows": np.flatnonzero(desired["selected_rows"] & ~shown["selected_rows"]).tolist()}
+    d_ref = np.nanmax(np.abs(shown["reference"]["mean"] - without("WR-D1")["reference"]["mean"]))
+    ratio = shown["errors"]["analysis"]["mean"] / without("WT-D14")["errors"]["analysis"]["mean"]
+    out["WR-D1"] = {"reference_mean_binned_minus_unbinned_max": round(float(d_ref), 9)}
+    out["WT-D14"] = {"analysis_mean_error_drawn_over_proper_max": round(float(np.nanmax(ratio)), 6)}
+    return out
 
 
 # ------------------------------------------------------------------ the page: capture, snapshot, real input
@@ -414,7 +421,7 @@ def test_wr_oracle_on_a_hand_checked_table():
     assert np.isclose(e["analysis"]["mean"][1], np.sum(w1 * y1) / w1.sum(), rtol=1e-12)
     assert np.isclose(e["analysis"]["n_eff"][1], w1.sum() ** 2 / np.sum(w1 ** 2), rtol=1e-12)
     assert np.isclose(e["errors"]["analysis"]["mean"][1], e["analysis"]["std"][1] / np.sqrt(e["analysis"]["n_eff"][1]))
-    shown = W.expected(t, state, ALL_DEFECTS)
+    shown = W.expected(t, state, MODEL_DEFECTS)
     assert np.isclose(shown["errors"]["analysis"]["mean"][1], shown["analysis"]["std"][1] / np.sqrt(w1.sum()))
     # equal weights on both sides: desired comparison exactly 0; binned reference (WR-D1) is not
     same = dict(state, weightsRef="A")
@@ -480,10 +487,10 @@ def _actual_from(exp: dict) -> dict:
 @UNIT
 def test_wr_comparator_accepts_the_right_answer_and_rejects_wrong_ones():
     t, state = _tiny()
-    for defects in ((), ALL_DEFECTS):
+    for defects in ((), PRESENT, MODEL_DEFECTS):
         exp = W.expected(t, state, defects)
         assert wr_compare(exp, _actual_from(exp)) == [], wr_compare(exp, _actual_from(exp))
-    exp = W.expected(t, state, ALL_DEFECTS)
+    exp = W.expected(t, state, MODEL_DEFECTS)
     mutations = {
         "a weighted count": ("bin_count", lambda a: a.__setitem__("bin_count", [v + 1e-6 for v in a["bin_count"]])),
         "a lost row": ("selected rows", lambda a: a["selected"].__setitem__(0, False)),
@@ -509,7 +516,8 @@ def test_wr_comparator_accepts_the_right_answer_and_rejects_wrong_ones():
 
 @UNIT
 def test_wr_known_defects_change_the_answer_on_the_default_table():
-    """Non-vacuity: each known defect changes the expected page at C1 on the reproducible table (python only)."""
+    """Non-vacuity: each known defect changes the expected page at C1 on the reproducible table (python only). The
+    model's three on master f1cbe0f (WT-D6 included, as a record), and the two still on the page."""
     if not DEFAULT_TABLE:
         pytest.skip("the signatures are stated for the default table (50,000 rows, seed 4711)")
     t = oracle.regenerate_table(ROWS, SEED)
@@ -518,8 +526,10 @@ def test_wr_known_defects_change_the_answer_on_the_default_table():
                    "value": [float(t[c].min()), float(t[c].max())]} for c in "ABCD"}
     state = {"widgets": widgets, "weights": "A", "weightsRef": "B/(1+C)", "transform": "diff", "nbinsX": 100,
              "nbinsY": 120}
-    assert set(_attribute(t, state)) == set(ALL_DEFECTS)
-    det = _detail(t, state)
+    assert set(_attribute(t, state, MODEL_DEFECTS)) == set(MODEL_DEFECTS)
+    assert set(_attribute(t, state)) == set(PRESENT)
+    assert "WT-D6" not in _detail(t, state)
+    det = _detail(t, state, MODEL_DEFECTS)
     assert det["WT-D6"]["lost_rows"] == [44894] and int(np.argmax(t["A"])) == 44894
     assert W.round16(t["A"])[44894] > a_hi > a_lo
     assert det["WR-D1"]["reference_mean_binned_minus_unbinned_max"] > 1e-6
@@ -543,15 +553,17 @@ def test_wr1_page_is_the_original_dashboard_on_the_reproducible_table(wr_page):
 @pytest.mark.xfail(**WR_XFAIL, reason=WR_DEFECTS)
 def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_range_and_restores(wr_page,
                                                                                              headless_session):
-    """The whole WR1 workflow, seven checkpoints. It is the strict partner of WT-D6, WR-D1 and WT-D14: KnownDefect is
-    raised only after every checkpoint was compared, and only when each one equals the AS-SHOWN oracle exactly and
-    differs from DESIRED by exactly these three defects."""
+    """The whole WR1 workflow, seven checkpoints. It is the strict partner of WR-D1 and WT-D14 (and was of WT-D6 until
+    PHASE_5 Batch 1): KnownDefect is raised only after every checkpoint was compared, and only when each one equals
+    the AS-SHOWN oracle exactly and differs from DESIRED by exactly these two defects. A checkpoint equal to the master
+    model (WT-D6 back) is a regression."""
     out, m = wr_page["dir"], wr_page["manifest"]
     t = oracle.regenerate_table(ROWS, SEED)
     assert oracle.table_sha256(t) == m["table_sha256"]
     steps = _states(m)
     desired = {cid: W.expected(t, s) for cid, _, _, s in steps}
-    shown = {cid: W.expected(t, s, ALL_DEFECTS) for cid, _, _, s in steps}
+    shown = {cid: W.expected(t, s, PRESENT) for cid, _, _, s in steps}
+    master = {cid: W.expected(t, s, MODEL_DEFECTS) for cid, _, _, s in steps}
     blame = {cid: _attribute(t, s) for cid, _, _, s in steps}
     detail = {cid: _detail(t, s) for cid, _, _, s in steps}
     page = _Page(headless_session, wr_page["html"])
@@ -590,11 +602,14 @@ def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_rang
 
     assert len(status) == len(steps)
     failed = {cid: results[cid] for cid, s in status.items() if s == "FAIL"}
+    back = [cid for cid in failed if not wr_compare(master[cid], actual[cid])]
+    if back:
+        raise AssertionError(f"REGRESSION, a fixed defect is back: WT-D6 - checkpoints {back} equal the master model")
     assert not failed, json.dumps(failed, indent=1)[:6000]
     assert wr_compare(desired["C1"], actual["C2"], sections=("comparison",)), "the weight change did not change the page"
     assert not errors, errors
-    known_defect(all(s == "KNOWN_ISSUE_RED" and sorted(blame[c]) == sorted(ALL_DEFECTS) for c, s in status.items())
-                 and all(detail[c]["WT-D6"]["lost_rows"] == [44894] for c in status), WR_DEFECTS)
+    known_defect(all(s == "KNOWN_ISSUE_RED" and sorted(blame[c]) == sorted(PRESENT) for c, s in status.items()),
+                 WR_DEFECTS)
 
 
 def _reported_errors(exp: dict, act: dict) -> dict:
@@ -626,7 +641,8 @@ def _reported_errors(exp: dict, act: dict) -> dict:
 @pytest.mark.feature("DASHBOARD.weights_reference")
 def test_wr1_control_weighted_counts_and_analysis_side_equal_numpy(wr_page, headless_session):
     """Healthy control: the parts no known defect touches - both sides' weighted counts, the analysis profile (entries,
-    mean, std, quantiles) and their drawn series - equal numpy exactly, on the rows the page selects."""
+    mean, std, quantiles) and their drawn series - equal numpy exactly, on every row (WT-D6 fixed in PHASE_5 Batch 1;
+    before, on the rows the page selected)."""
     m = wr_page["manifest"]
     t = oracle.regenerate_table(ROWS, SEED)
     base = _states(m)[0][3]
@@ -636,7 +652,7 @@ def test_wr1_control_weighted_counts_and_analysis_side_equal_numpy(wr_page, head
         got = _settle(page.pg)
     finally:
         page.close()
-    exp = W.expected(t, base, ("WT-D6",))                   # the page's selection; nothing else switched on
+    exp = W.expected(t, base)                               # DESIRED: every row (WT-D6 fixed)
     diffs = wr_compare(exp, got, sections=("state", "selection", "histograms", "analysis", "drawn"))
     assert diffs == [], diffs[:10]
     assert not page.unexpected_errors(), page.unexpected_errors()
@@ -671,7 +687,7 @@ def test_wr1_live_faults_in_the_browser_are_caught(wr_page, headless_session):
     page equals the AS-SHOWN oracle again. Control first: the untouched page equals AS SHOWN."""
     m = wr_page["manifest"]
     t = oracle.regenerate_table(ROWS, SEED)
-    shown = W.expected(t, _states(m)[0][3], ALL_DEFECTS)
+    shown = W.expected(t, _states(m)[0][3], PRESENT)
     found = {}
     page = _Page(headless_session, wr_page["html"])
     try:

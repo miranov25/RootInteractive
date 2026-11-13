@@ -14,6 +14,9 @@ into a page with a 1-D, a 2-D and a weighted 1-D histogram; Node builds the page
   - the gate of V-1 (substituted documents equal fresh builds as model graphs, references kept); isolation; timings.
 Filters (document cases): B1 with the refined rule (b1_first_changed) swept over 1-200 rows; 2 to 5 filters in every
   move order; the 20 000 / 20 001-row pair. Every expected B1 step is computed from the rule, every other must PASS.
+  PHASE_5 Batch 1 fixed B1: each filter family runs twice - on the fixed code, where every step must PASS (the
+  intersection of all filters), and with B1 put back by the fault B1_REINTRODUCED, where the refined rule must still
+  predict every step exactly (the rule stays proven, so the fault keeps being a faithful copy of B1).
 """
 import json
 import os
@@ -27,6 +30,7 @@ import pandas as pd
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import data as data_mod
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import sweep
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.expect import EqualsSelection, expected_failure
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.report import ScenarioResult
@@ -44,6 +48,25 @@ MODELS = ("h1", "h2", "hw")                      # documents hold only these mod
 READ = """() => [window.__riH.col('h1', 'bin_count', ['HistogramCDS']), window.__riH.col('h2', 'bin_count', ['HistoNdCDS']),
                  window.__riH.col('hw', 'bin_count', ['HistogramCDS'])]"""
 B1_RULE = "b1_later_filters_keep_rows_excluded_at_load"
+CODES = [pytest.param(False, id="fixed"), pytest.param(True, id="b1_put_back")]   # PHASE_5 Batch 1
+
+
+@pytest.fixture(scope="module")
+def b1_back_session(node_session, node_bundle_root):
+    """A Node session whose bundle copy has B1 put back (engine/faults.py B1_REINTRODUCED). One window for all its
+    documents, isolated per document as the healthy session is (timers, channels, every added global - the fault
+    counter too): a fresh window per document, the default of fault sessions, exhausts Node's memory over these
+    families' hundreds of documents (measured: the process ended after about 170)."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    s = NodeSession(node_bundle_root, fault=faults.B1_REINTRODUCED, fresh_window=False)
+    yield s
+    s.close()
+
+
+def _filter_run(b1_live, node_session, b1_back_session, sc, out):
+    if b1_live:
+        return run(b1_back_session, sc, out / "b1_put_back", test_ref=__file__, fault=faults.B1_REINTRODUCED)
+    return run(node_session, sc, out, test_ref=__file__)
 
 
 def _page(name, nb, lo, hi):
@@ -293,7 +316,7 @@ def test_batch_refuses_a_session_with_startup_errors(node_bundle_root, tmp_path)
 
 
 # ------------------------------------------------------------------------------------------- filters: B1 sweep
-def _b1_scenario(n, first_has_nan):
+def _b1_scenario(n, first_has_nan, b1_live=True):
     a_spec = "normal(0,1) + 10% NaN" if first_has_nan else "normal(0,1)"
     base = Scenario(
         id=f"families/b1_sweep_n{n}_{'first_nan' if first_has_nan else 'first_finite'}",
@@ -313,7 +336,7 @@ def _b1_scenario(n, first_has_nan):
                  [filt.range_mask(a, -1, 1), load_masks[1]],
                  [filt.range_mask(a, -1, 1), filt.range_mask(b, -1, 1)]]
     b1_steps = tuple(k for k, now in enumerate(steps_now)
-                     if not np.array_equal(filt.b1_selection(now, load_masks), now[0] & now[1]))
+                     if b1_live and not np.array_equal(filt.b1_selection(now, load_masks), now[0] & now[1]))
     expect = []
     if b1_steps:
         expect.append(expected_failure("B1", "h2.bin_count", b1_steps, EqualsSelection(B1_RULE)))
@@ -328,25 +351,29 @@ ROWS = {"fast": (1, 2, 3, 31, 32, 33, 63, 64, 65, 200), "full": tuple(range(1, 2
 
 @pytest.mark.parametrize("size", B1_SIZES)
 @pytest.mark.parametrize("first_has_nan", [False, True], ids=["first_filter_finite", "first_filter_with_nan"])
-def test_b1_row_count_sweep(first_has_nan, size, node_session, headless_out):
+@pytest.mark.parametrize("b1_live", CODES)
+def test_b1_row_count_sweep(b1_live, first_has_nan, size, node_session, b1_back_session, headless_out):
     out = headless_out / "b1_sweep"
     bad, with_b1, without, skipped, trigger = [], [], [], [], []
     t0 = time.perf_counter()
     for n in ROWS[size]:
-        sc, df = _b1_scenario(n, first_has_nan)
+        sc, df = _b1_scenario(n, first_has_nan, b1_live)
         if sc is None:
             skipped.append(n)
             continue
-        r = run(node_session, sc, out, test_ref=__file__)
+        r = _filter_run(b1_live, node_session, b1_back_session, sc, out)
         (with_b1 if sc.expect else without).append(n)
         trigger.append((n, bool(sc.expect), bool(np.isnan(df.b.to_numpy()).any())))
         if not r.ok:
             bad.append((n, [f"{o.step}:{o.check}={o.outcome}" for o in r.outcomes if o.outcome not in ("PASS", "XFAIL")][:3]))
     dt = time.perf_counter() - t0
-    (out / f"summary_{'first_nan' if first_has_nan else 'first_finite'}_{size}.json").write_text(json.dumps(
+    (out / f"summary_{'b1_put_back' if b1_live else 'fixed'}_{'first_nan' if first_has_nan else 'first_finite'}_"
+           f"{size}.json").write_text(json.dumps(
         {"with_b1": with_b1, "without_b1": without, "skipped_no_finite_value": skipped, "seconds": round(dt, 1)}))
     assert not bad, f"{len(bad)} row counts not as the refined rule predicts: {bad[:5]}"
-    if not first_has_nan:
+    if not b1_live:
+        assert not with_b1                                           # fixed code: no step expects B1
+    elif not first_has_nan:
         # the trigger of the refined rule: with a finite first filter, B1 shows exactly when the row count is not a
         # multiple of 32 AND the second filter excludes a row at load (its missing values)
         wrong = [(n, shows) for n, shows, b_nan in trigger if shows != (n % 32 != 0 and b_nan)]
@@ -357,7 +384,7 @@ def test_b1_row_count_sweep(first_has_nan, size, node_session, headless_out):
 COLS = "abcde"
 
 
-def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
+def _filters_scenario(n, k, order, first_has_nan=False, seed=None, b1_live=True):
     """k range filters on columns a.. ; the first without missing values unless first_has_nan, the others with 10 %;
     each filter moved once to [-1, 1] in the given order. Expected B1 steps from the refined rule."""
     cols = {"x": "uniform(0,1)", "y": "normal(0,1)"}
@@ -382,7 +409,8 @@ def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
         now[i] = filt.range_mask(vals[i], -1, 1)
         steps_now.append(list(now))
     correct = lambda masks: np.logical_and.reduce(masks)
-    b1_steps = tuple(s for s, m in enumerate(steps_now) if not np.array_equal(filt.b1_selection(m, load_masks), correct(m)))
+    b1_steps = tuple(s for s, m in enumerate(steps_now)
+                     if b1_live and not np.array_equal(filt.b1_selection(m, load_masks), correct(m)))
     expect = []
     if b1_steps:
         expect.append(expected_failure("B1", "h2.bin_count", b1_steps, EqualsSelection(B1_RULE)))
@@ -396,32 +424,37 @@ def _filters_scenario(n, k, order, first_has_nan=False, seed=None):
                                pytest.param(3, id="3_filters", marks=pytest.mark.node_filters),
                                pytest.param(4, id="4_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full]),
                                pytest.param(5, id="5_filters", marks=[pytest.mark.slow, pytest.mark.node_filters_full])])
-def test_filters_every_move_order(k, node_session, headless_out):
+@pytest.mark.parametrize("b1_live", CODES)
+def test_filters_every_move_order(b1_live, k, node_session, b1_back_session, headless_out):
     import itertools
     out, bad, counts = headless_out / "filter_orders", [], {"with_b1": 0, "without_b1": 0}
     for n in (32, 33):                                   # both triggers of the refined rule
         for order in itertools.permutations(range(k)):
-            sc = _filters_scenario(n, k, order)
+            sc = _filters_scenario(n, k, order, b1_live=b1_live)
             if sc is None:
                 continue
-            r = run(node_session, sc, out, test_ref=__file__)
+            r = _filter_run(b1_live, node_session, b1_back_session, sc, out)
             counts["with_b1" if sc.expect else "without_b1"] += 1
             if not r.ok:
                 bad.append((n, order, [f"{o.step}:{o.check}={o.outcome}" for o in r.outcomes if o.outcome not in ("PASS", "XFAIL")][:3]))
-    (out / f"summary_k{k}.json").write_text(json.dumps(counts))
+    (out / f"summary_k{k}_{'b1_put_back' if b1_live else 'fixed'}.json").write_text(json.dumps(counts))
     assert not bad, f"{len(bad)} move orders not as the refined rule predicts: {bad[:3]}"
+    assert counts["with_b1"] > 0 if b1_live else counts["with_b1"] == 0, counts
 
 
 @pytest.mark.node_filters
-def test_b1_twenty_thousand_rows_boundary(node_session, headless_out):
-    """Claude3's pair: first filter without missing values — 20 000 rows (a multiple of 32): no B1; 20 001: B1."""
+@pytest.mark.parametrize("b1_live", CODES)
+def test_b1_twenty_thousand_rows_boundary(b1_live, node_session, b1_back_session, headless_out):
+    """Claude3's pair: first filter without missing values — 20 000 rows (a multiple of 32): no B1; 20 001: B1.
+    PHASE_5 Batch 1: on the fixed code both select the intersection; with B1 put back, the pair behaves as before."""
     out = headless_out / "filter_orders"
     results = {}
     for n in (20_000, 20_001):
-        sc = _filters_scenario(n, 2, (0, 1), seed=47)
-        r = run(node_session, sc, out, test_ref=__file__)
+        sc = _filters_scenario(n, 2, (0, 1), seed=47, b1_live=b1_live)
+        r = _filter_run(b1_live, node_session, b1_back_session, sc, out)
         results[n] = (bool(sc.expect), r.ok)
-    assert results == {20_000: (False, True), 20_001: (True, True)}, results
+    want = {20_000: (False, True), 20_001: (True, True)} if b1_live else {20_000: (False, True), 20_001: (False, True)}
+    assert results == want, results
 
 
 @pytest.mark.node_histograms

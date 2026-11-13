@@ -20,6 +20,10 @@ the workflow test is its strict expected failure, and dashboard_health.json mark
 RED. The release check (dashboards/release.py, target release_oracle_dashboards) checks that the health file comes from
 this run, this test code, this dashboard, table and page, and fails on a RED dashboard unless the Architect has
 accepted the bug for release at its exact checkpoint, with its signature (dashboards/waivers.json).
+PHASE_5 Batch 1 fixed H01-D1 (with WT-D6, bokehTools.py: a slider value within 1e-9 of its range of an end is that
+end): the strict mark is off, the signature test is now the positive test of the same smallest move, and H01-D1's
+exact state at C4 is a regression. The health lane keeps its classification, so a regression is still reported as
+KNOWN_ISSUE_RED in dashboard_health.json.
 
 Evidence in headless_out/dashboards/h01/: the page and its manifest, expected_*.json, actual_*.json, comparison.json
 (results, cold and warm times, console messages), dashboard_health.json, inventory.json (every widget and plot of the
@@ -69,7 +73,12 @@ def known_defect(condition: bool, message: str) -> None:
         raise KnownDefect(message)
 
 
-H01_D1_XFAIL = dict(strict=DEFAULT_TABLE, raises=KnownDefect)
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 1: the exact signature of a fixed defect is a regression - an ordinary failure."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
+
+
 H01_D1 = ("H01-D1: moving the A slider's upper handle back to its end with the arrow keys stops 2e-16 short of the "
           "end; the end is exactly the largest A, so that row stays excluded (49,999 of 50,000 rows)")
 
@@ -729,11 +738,10 @@ def _run_plan(page: _Page, plan, expected, span: float, out: Path = None):
 
 @BROWSER
 @pytest.mark.feature("DASHBOARD.histogram_only")
-@pytest.mark.xfail(**H01_D1_XFAIL, reason=H01_D1)
 def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_restores(h01_page, headless_session):
-    """The whole H01 workflow, six checkpoints. It is H01-D1's strict partner: checkpoint C4 expects the full range
-    back after the arrow keys; KnownDefect is raised only after every checkpoint was compared and only when C4's (and
-    nothing else's) difference is exactly H01-D1."""
+    """The whole H01 workflow, six checkpoints. It was H01-D1's strict partner: checkpoint C4 expects the full range
+    back after the arrow keys. Fixed in PHASE_5 Batch 1: every checkpoint must PASS; C4 in H01-D1's exact state is a
+    regression (reported after every checkpoint was compared and the evidence written)."""
     out, m = h01_page["dir"], h01_page["manifest"]
     widgets = m["widget_state"]
     a = widgets["A"]
@@ -833,16 +841,18 @@ def test_h01_histogram_dashboard_follows_the_A_range_and_the_cumulative_tab_and_
     assert nonvacuous, "the A range change did not change the page"
     assert not errors, errors
     assert set(inventory_reads) == {"C1", "C3"}
-    known_defect(status["C4"] == "KNOWN_ISSUE_RED" and lost_rows.get("C4") == [a_max_row], H01_D1)
+    regression(status["C4"] == "KNOWN_ISSUE_RED" and lost_rows.get("C4") == [a_max_row], H01_D1)
+    assert status["C4"] == "PASS" and health["dashboard"] == "PASS", (status, health["dashboard"])
 
 
 @BROWSER
 @pytest.mark.feature("DASHBOARD.histogram_only")
-def test_signature_h01_d1_arrow_keys_back_to_the_end_lose_the_largest_A(h01_page, headless_session):
-    """H01-D1, exact, in its smallest form: one arrow step left and one right on the upper handle. The one row lost
-    is the row with the largest A."""
+def test_h01_d1_arrow_keys_back_to_the_end_keep_the_largest_A(h01_page, headless_session):
+    """H01-D1's smallest form (fixed in PHASE_5 Batch 1): one arrow step left and one right on the upper handle. On
+    master the row with the largest A was lost. The slider still stops 2e-16 short of its end (Bokeh's slider), but
+    the filter now treats a value that close to the end as the end: every row and every bin is back."""
     if not DEFAULT_TABLE:
-        pytest.skip("H01-D1 is reproduced with the default table (50,000 rows, seed 4711) only")
+        pytest.skip("H01-D1 was reproduced with the default table (50,000 rows, seed 4711) only")
     m = h01_page["manifest"]
     widgets, t = m["widget_state"], oracle.regenerate_table(ROWS, SEED)
     a = widgets["A"]
@@ -855,9 +865,10 @@ def test_signature_h01_d1_arrow_keys_back_to_the_end_lose_the_largest_A(h01_page
         got = _settle(page.pg)
     finally:
         page.close()
-    lost = _h01_d1_lost_rows(t, widgets, full, got, a["end"] - a["start"])
-    assert lost == [int(np.argmax(t["A"]))], (got["widgets"], got["selected_count"], lost)
-    assert t["A"][lost[0]] == a["end"] and got["widgets"]["A"][1] < a["end"]
+    span = a["end"] - a["start"]
+    regression(_h01_d1_lost_rows(t, widgets, full, got, span) == [int(np.argmax(t["A"]))], H01_D1)
+    assert compare(full, got, widget_span=span) == [], compare(full, got, widget_span=span)
+    assert got["selected_count"] == ROWS and a["end"] - got["widgets"]["A"][1] <= 1e-9 * span, got["widgets"]
     assert not page.unexpected_errors(), page.unexpected_errors()
 
 

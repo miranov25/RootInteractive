@@ -234,7 +234,7 @@ export class DownsamplerCDS extends ColumnDataSource {
     if(new_column == null){
       new_column = Array(_downsampled_indices.length)
     }
-    if(new_column.length < _downsampled_indices.length) new_column.length = _downsampled_indices.length
+    new_column.length = _downsampled_indices.length      // PHASE_5 Batch 1 (DS-D1): also shorten after the selection shrinks
     for(let i=0; i <_downsampled_indices.length; i++){
       new_column[i] = column_orig[_downsampled_indices[i]]
     }

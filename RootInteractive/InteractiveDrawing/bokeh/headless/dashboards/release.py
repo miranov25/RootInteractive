@@ -45,7 +45,7 @@ REQUIRED: Dict[str, dict] = {
     "H01": {"function": "testBokehClientHistogramOnlyHisto", "rows": 50000, "seed": 4711,
             "actions": ["C1", "C2", "C3", "C4", "C5", "C6"]},
     # WR1: the WeightsRef dashboard (test_headless_oracle_weightsref.py); a checkpoint can show several known defects,
-    # named together in one entry ("WR-D1,WT-D14,WT-D6"), so a waiver names that exact combination
+    # named together in one entry ("WR-D1,WT-D14"; WT-D6 fixed in PHASE_5 Batch 1), so a waiver names that exact combination
     "WR1": {"function": "test_interactiveTemplateWeightsRef", "rows": 50000, "seed": 4711,
             "actions": ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]},
 }

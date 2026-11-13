@@ -47,6 +47,7 @@ export class HistogramCDS extends ColumnarDataSource {
     this.data = {}
     this.view = null
     this._stale_range = true
+    this.change_selection()        // PHASE_5 Batch 1 (B2): apply the selection at load, as HistoNdCDS.initialize does
   }
 
   connect_signals(): void {

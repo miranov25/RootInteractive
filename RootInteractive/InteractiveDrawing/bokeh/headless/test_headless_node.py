@@ -69,8 +69,10 @@ def test_settle_rule_waits_for_a_timer_round(node_session, node_bundle_root):
     node_session.request("new_doc", path=str(doc))                 # fresh document for the settled read
     settled = node_session.request("eval", code=SET_JS, arg=["a", [-1, 1], _probes(B1_TWO_FILTERS), SETTLE_ROUNDS])
     after = node_session.request("eval", code=sel)["result"]
-    assert one_microtask["result"] == before == 18039                # stale after one microtask
-    assert settled["ok"] and settled["result"]["settled"] and after == 12361 and after != before
+    # PHASE_5 Batch 1 (B1 fixed): the counts are the intersection of both filters, from pandas: 16273 rows with a and b
+    # finite; 11157 of them with a in [-1, 1] (under B1 they were 18039 and 12361)
+    assert one_microtask["result"] == before == 16273                # stale after one microtask
+    assert settled["ok"] and settled["result"]["settled"] and after == 11157 and after != before
 
 
 def test_delayed_update_completes_by_its_condition(node_session, headless_out):

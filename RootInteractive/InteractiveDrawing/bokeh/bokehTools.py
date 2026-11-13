@@ -666,8 +666,18 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             if variables[0] == 'range':
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
                 if optionWidget["callback"] == "selection":
-                    widgetFilter = RangeFilter(range=localWidget.value, field=variables[1][0], name=variables[1][0])
-                    localWidget.js_link("value", widgetFilter, "range")
+                    # PHASE_5 Batch 1 (WT-D6, H01-D1): a range widget whose limits come from the data keeps every exported
+                    # row while it is at its limits - also when the page receives rounded (compressed) values; a value
+                    # within rounding of a limit is that limit (arrow keys can stop 2e-16 short of it).
+                    openEnds = len(variables[1]) == 1 and optionWidget.get("type", "auto") in ("auto", "minmax", "unique")
+                    initialRange = [float("-inf"), float("inf")] if openEnds else list(localWidget.value)
+                    widgetFilter = RangeFilter(range=initialRange, field=variables[1][0], name=variables[1][0])
+                    localWidget.js_on_change("value", CustomJS(args={"target": widgetFilter, "open_ends": openEnds}, code="""
+                        const w = cb_obj, tol = 1e-9 * Math.abs(w.end - w.start)
+                        const lo = w.value[0] <= w.start + tol ? (open_ends ? -Infinity : w.start) : w.value[0]
+                        const hi = w.value[1] >= w.end - tol ? (open_ends ? Infinity : w.end) : w.value[1]
+                        target.range = [lo, hi]
+                    """))
                 widgetFull = localWidget
             if variables[0] == 'select':
                 localWidget, widgetFilter, newColumn = makeBokehSelectWidget(fakeDf, variables[1], paramDict, **optionWidget)
@@ -1317,7 +1327,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 widgetNames.append(iCds if iCds is not None else "")
                 widgetFields.append(iWidget["filter"].field)
                 iFilter = iWidget["filter"]
-                if isinstance(iFilter, RangeFilter):
+                if isinstance(iFilter, RangeFilter) and iWidget.get("type") == "range" and isinstance(iWidget.get("widget"), RangeSlider):
+                    # PHASE_5 Batch 1: a range slider's filter is open (+-Infinity) at automatic limits, so the table shows
+                    # the slider's value - what it showed before, when the filter range was linked to that value
+                    widgetTypes.append("range")
+                    widgetValues.append(f"[{iWidget['widget'].value[0]}, {iWidget['widget'].value[1]}]")
+                    if selectionCDS is not None:
+                        iWidget["widget"].js_on_change("value", CustomJS(args={"target":selectionCDS, "i":i}, code="""
+                            target.patch({"value": [[i, "["+cb_obj.value.join(', ')+ "]" ]]},{});
+                        """))
+                elif isinstance(iFilter, RangeFilter):
                     widgetTypes.append("range")
                     widgetValues.append(f"[{iFilter.range[0]}, {iFilter.range[1]}]")
                     if selectionCDS is not None:

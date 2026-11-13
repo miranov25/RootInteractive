@@ -11,8 +11,14 @@ Rules:
 
 The targets are compiled TypeScript of RootInteractive 4e8d783 as Bokeh 3.3.x emits it; a new Bokeh version that
 changes the text makes the fault ERROR ("not applied") rather than pass.
+
+Defect faults (PHASE_5 Batch 1). A fixed defect is put back into the disposable copy by a fault, so that the engine's
+classification can still be proven on it: a known defect explained exactly is XFAIL, and an unrelated fault on top of
+it is FAIL ("a different problem"), never XFAIL. A composite fault (`compose`) applies several faults, each exactly
+once; the outcomes of the run show that each part acted (the defect's exact signature, and the unrelated failure).
 """
 from dataclasses import dataclass
+from typing import Tuple
 
 COUNTER = "window.__riFault = (window.__riFault || 0) + 1"
 
@@ -26,8 +32,9 @@ class Fault:
     id: str
     description: str
     source: str            # the TypeScript line the compiled text comes from
-    search: str
-    replace: str
+    search: str = ""
+    replace: str = ""
+    parts: Tuple["Fault", ...] = ()   # a composite fault: every part applied, each exactly once
 
 
 UPDATE_NEVER_TRIGGERED = Fault(
@@ -48,10 +55,39 @@ ND_BIN_SHIFTED = Fault(
 
 FAULTS = {f.id: f for f in (UPDATE_NEVER_TRIGGERED, ND_BIN_SHIFTED)}
 
+# ---- defect faults: a fixed defect put back (PHASE_5 Batch 1); the text searched is the fixed line ----
+B1_REINTRODUCED = Fault(
+    id="b1_reintroduced",
+    description="B1 put back: once one filter has changed, a later filter's counts are not updated (the old `||=`)",
+    source="LazyIntersectionFilter.ts 197 (fixed in PHASE_5 Batch 1)",
+    search="this._changed_values = from_bits_8(this.old_values[x], values_bits, counts) || this._changed_values;",
+    replace=f"this._changed_values = ({COUNTER}, this._changed_values || "
+            f"from_bits_8(this.old_values[x], values_bits, counts));",
+)
+
+B2_REINTRODUCED = Fault(
+    id="b2_reintroduced",
+    description="B2 put back: the 1-D histogram does not apply the selection when the page loads",
+    source="HistogramCDS.ts 50 (fixed in PHASE_5 Batch 1)",
+    search="this.change_selection(); // PHASE_5 Batch 1 (B2)",
+    replace=f"{COUNTER}; // PHASE_5 Batch 1 (B2)",
+)
+
+DEFECT_FAULTS = {f.id: f for f in (B1_REINTRODUCED, B2_REINTRODUCED)}
+
+
+def compose(*faults: Fault) -> Fault:
+    """One fault made of several; each part must match exactly once. The id joins the parts' ids with '+'."""
+    flat = tuple(p for f in faults for p in (f.parts or (f,)))
+    return Fault(id="+".join(p.id for p in flat), description="; ".join(p.description for p in flat),
+                 source="; ".join(p.source for p in flat), parts=flat)
+
 
 def apply(text: str, fault: Fault) -> str:
-    n = text.count(fault.search)
-    if n != 1:
-        raise FaultNotApplied(f"fault {fault.id!r}: target text found {n} times (must be exactly once); "
-                              f"source {fault.source}")
-    return text.replace(fault.search, fault.replace)
+    for part in (fault.parts or (fault,)):
+        n = text.count(part.search) if part.search else 0
+        if n != 1:
+            raise FaultNotApplied(f"fault {part.id!r}: target text found {n} times (must be exactly once); "
+                                  f"source {part.source}")
+        text = text.replace(part.search, part.replace)
+    return text

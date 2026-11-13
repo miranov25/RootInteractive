@@ -121,8 +121,9 @@ def test_page_build_failure_writes_a_report(headless_session, headless_out):
 
 
 def test_load_check_reads_the_page_b1(headless_session, headless_out):
-    """Claude3's two-filter page (known defect B1). Expected to FAIL while B1 exists; stage 4.2b turns it into a strict
-    expected failure with a signature."""
+    """Claude3's two-filter page (known defect B1). It FAILED while B1 existed; PHASE_5 Batch 1 fixed B1, so the load
+    check now reads the intersection of both filters, equal to the rows with finite widget columns (16273, pandas).
+    The check still failing on B1 is proven by the B1 vehicle (test_headless_faults.py)."""
     sc = Scenario(id="harness/load_check_reads_the_page_b1",
                   data=Tables(TableSpec(20_000, 23, {"x": "uniform(0,1)", "y": "normal(0,1)",
                                                      "a": "normal(0,1) + 10% NaN", "b": "normal(0,1) + 10% NaN"})),
@@ -131,10 +132,10 @@ def test_load_check_reads_the_page_b1(headless_session, headless_out):
                   steps=(load(),), checks=(auto(),), labels=Labels(family="harness", technique="negative control"))
     res = run(headless_session, sc, headless_out, test_ref=__file__)
     chk = [o for o in res.outcomes if o.check == LOAD_CHECK]
-    assert [o.outcome for o in chk] == ["FAIL"], res.text()
+    assert [o.outcome for o in chk] == ["PASS"], res.text()
     page_n = int(chk[0].detail.split("page selects ")[1].split()[0])
     finite_n = int(chk[0].detail.split("finite widget columns ")[1].split()[0])
-    assert page_n > finite_n                                             # the second filter is not applied
+    assert page_n == finite_n == 16273                                   # both filters applied (B1 fixed)
 
 
 def _page_with_widget(id_, steps, checks, expect=()):

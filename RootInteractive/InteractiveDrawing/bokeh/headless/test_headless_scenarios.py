@@ -1,6 +1,6 @@
 """Runs every scenario in headless Chromium: the stage-4.2a scenarios (all must PASS) and the known RootInteractive
-defects (stage 4.2b: each must FAIL exactly as declared). One pytest test per scenario; the full per-check report is
-written to the output folder and printed on failure.
+defects (stage 4.2b: each must FAIL exactly as declared; B1 and B2, fixed in PHASE_5 Batch 1, run as regressions). One
+pytest test per scenario; the full per-check report is written to the output folder and printed on failure.
 
 A known-defect scenario passes this test only if (a) every outcome is PASS or XFAIL and (b) every declared expected
 failure really occurred, as XFAIL, at each of its steps — an expectation that never shows is a failure of the test,

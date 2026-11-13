@@ -10,6 +10,8 @@ headless/test_headless_widgets.py. Two changes only: the file name, and the 9 ca
 two defects found (WG-D1, WG-D2: signatures, strict partners, controls) - 35 exact cases. The acceptance rule is
 unchanged (every case passed), so it says NOT ACCEPTED while a strict expected failure (a known defect) remains;
 the expected failures are listed per case in the output.
+PHASE_5 Batch 1 (Claude20.RI) fixed WG-D1 and WG-D2: the three Node signature cases are removed and the Chromium
+signature case is now the check that the page loads and shows the widget - 32 exact cases, all expected to pass.
 
 Usage after approved integration + required alma2 run:
   python verify_widget_stage3_report_GPT27_RI_v0_2a.py \
@@ -53,15 +55,12 @@ EXPECTED_SUFFIXES = (
     "test_browser_distinct_widget_input_updates_dependent_state[toggle-click]",
     "test_node_scratch_muted_widget_callback_is_caught",
     # integration (Claude20.RI): WG-D1 and WG-D2
-    "test_signature_wg_d1_a_toggleable_range_disabled_at_load_breaks_the_page",
     "test_control_wg_d1_with_a_second_active_filter_the_page_loads",
-    "test_signature_wg_d2_an_enabled_toggleable_range_selects_every_row[gate-first]",
-    "test_signature_wg_d2_an_enabled_toggleable_range_selects_every_row[gate-second]",
     "test_strict_wg_d2_an_enabled_toggleable_range_selects_its_rows[gate-first]",
     "test_strict_wg_d2_an_enabled_toggleable_range_selects_its_rows[gate-second]",
     "test_control_wg_d2_the_same_range_without_toggle_selects_its_rows[gate-first]",
     "test_control_wg_d2_the_same_range_without_toggle_selects_its_rows[gate-second]",
-    "test_chromium_wg_d1_signature_the_page_raises_and_shows_no_widget",
+    "test_chromium_wg_d1_the_page_loads_and_shows_the_widget",
 )
 N_CASES = len(EXPECTED_SUFFIXES)
 CONTROLS = {"test_oracle_and_assertions_have_controls_that_fail",

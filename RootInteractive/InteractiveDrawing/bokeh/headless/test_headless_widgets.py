@@ -19,6 +19,8 @@ names, data and oracles. Changes on integration (each needed to run on the pinne
     WG-D1  a toggleable range widget alone on its table (disabled at load, its default) breaks the page;
     WG-D2  with a second filter the page loads, but the enabled and moved toggleable range still selects every row.
   The original candidate test of the toggleable range is WG-D1's strict partner.
+  PHASE_5 Batch 1 fixed both: the strict marks are off, the signature tests removed (the Chromium one now checks
+  that the page loads and shows the widget), and each exact signature is a regression (an ordinary failure).
 
 Original candidate notes (GPT27.RI):
 - A missing Node bundle, jsdom or Chromium is a skipped/environmental case under the existing fixtures, NOT an
@@ -53,6 +55,12 @@ def known_defect(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 1: the exact signature of a fixed defect is a regression - an ordinary failure."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 # Numerically unambiguous synthetic data; no boundary positions or NaN needed
@@ -675,11 +683,10 @@ def test_node_spinner_range_each_endpoint_callback_and_histogram(node_session, t
 @pytest.mark.layer("integration")
 @pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="WG-D1")
 def test_node_toggleable_range_activation_and_restore(node_session, tmp_path):
     df = frame()
     failure = _load_failure(node_session, build_document(tmp_path, df, "toggleable_range"))      # integration: WG-D1
-    known_defect(failure == WG_D1, "WG-D1")
+    regression(failure == WG_D1, "WG-D1: the page raises at load")
     assert failure is None, f"neither a page nor the WG-D1 signature: {failure}"
     page, report = _node_page(node_session, tmp_path, df, "toggleable_range")
     # Bokeh's extra 'disable' Toggle initially active: the filter is disabled.
@@ -970,15 +977,6 @@ def _load_failure(node_session, path):
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("FILTER.range")
-def test_signature_wg_d1_a_toggleable_range_disabled_at_load_breaks_the_page(node_session, tmp_path):
-    """WG-D1, exact signature: the error kind, the message and the three innermost functions."""
-    assert _load_failure(node_session, build_document(tmp_path, frame(), "toggleable_range")) == WG_D1
-
-
-@pytest.mark.node_widgets
-@pytest.mark.backend("node")
-@pytest.mark.layer("integration")
-@pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_nd")
 def test_control_wg_d1_with_a_second_active_filter_the_page_loads(node_session, tmp_path):
     """Control: the same toggleable range plus an active range on x: the page loads, and at load every row is
@@ -1013,29 +1011,17 @@ def _enable_and_move(node_session, tmp_path, kind):
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("FILTER.range")
-@pytest.mark.parametrize("kinds", ORDERS)
-def test_signature_wg_d2_an_enabled_toggleable_range_selects_every_row(node_session, tmp_path, kinds):
-    """WG-D2, exact signature: the gate filter is active and holds (-1, 0.5), but every row stays selected and the
-    bins are those of all rows; the oracle selects 4 of 12 rows."""
-    df, state, gate = _enable_and_move(node_session, tmp_path, kinds[0])
-    assert gate == {"active": True, "range": [-1.0, 0.5]}, gate
-    assert_state(df, state, np.ones(len(df), dtype=bool))
-    assert oracle_range(df, -1.0, 0.5).sum() == 4
-
-
-@pytest.mark.node_widgets
-@pytest.mark.backend("node")
-@pytest.mark.layer("integration")
-@pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="WG-D2")
 @pytest.mark.parametrize("kinds", ORDERS)
 def test_strict_wg_d2_an_enabled_toggleable_range_selects_its_rows(node_session, tmp_path, kinds):
+    """WG-D2 (fixed in PHASE_5 Batch 1): enabled and moved to (-1, 0.5), the gate selects its 4 of 12 rows. On master
+    the filter was active and held the range, but every row stayed selected."""
     df, state, gate = _enable_and_move(node_session, tmp_path, kinds[0])
+    assert oracle_range(df, -1.0, 0.5).sum() == 4
     if np.array_equal(np.asarray(state["mask"], dtype=bool), oracle_range(df, -1.0, 0.5)):
         assert_state(df, state, oracle_range(df, -1.0, 0.5))                 # the bins must follow as well
         return
-    known_defect(gate == {"active": True, "range": [-1.0, 0.5]} and all(state["mask"]), "WG-D2")
+    regression(gate == {"active": True, "range": [-1.0, 0.5]} and all(state["mask"]), "WG-D2: every row selected")
     raise AssertionError(f"WG-D2: neither the oracle nor the WG-D2 signature: {state}, {gate}")
 
 
@@ -1059,8 +1045,9 @@ def test_control_wg_d2_the_same_range_without_toggle_selects_its_rows(node_sessi
 @pytest.mark.backend("browser")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("FILTER.range")
-def test_chromium_wg_d1_signature_the_page_raises_and_shows_no_widget(headless_session, tmp_path):
-    """WG-D1 in Chromium: exactly one page error with the WG-D1 message, and no slider is rendered."""
+def test_chromium_wg_d1_the_page_loads_and_shows_the_widget(headless_session, tmp_path):
+    """WG-D1 in Chromium (fixed in PHASE_5 Batch 1). On master: exactly one page error with the WG-D1 message, and no
+    slider rendered. Now: no page error, and the range slider is rendered with its two handles."""
     from bokeh.plotting import output_file
     html = tmp_path / "widget_toggleable_range.html"
     output_file(str(html), mode="inline")
@@ -1073,7 +1060,8 @@ def test_chromium_wg_d1_signature_the_page_raises_and_shows_no_widget(headless_s
                 break
             page.wait_for_timeout(100)
         page.wait_for_timeout(500)                                      # and nothing else follows
-        assert errors == ["pageerror: " + WG_D1[1]], errors
-        assert page.locator(".noUi-handle").count() == 0
+        regression(errors == ["pageerror: " + WG_D1[1]], "WG-D1: the page raises at load")
+        assert errors == [], errors
+        assert page.locator(".noUi-handle").count() == 2
     finally:
         ctx.close()

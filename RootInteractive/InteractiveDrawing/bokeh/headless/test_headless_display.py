@@ -27,6 +27,8 @@ tests. Defects, each with an exact signature, a strict expected-failure partner 
          get_length() entries are right and Bokeh paints get_length() rows (A4 observation O-A4-2, now a test);
   WG-D1  (A3, same signature) also for a toggleable TEXT QUERY alone on its table - the form the standard dashboard
          template (bokehInteractiveTemplate.py) uses three times.
+  DS-D1 and WG-D1 are fixed in PHASE_5 Batch 1: their strict marks are off and their signature tests removed; their
+  exact signatures are now regressions (ordinary failures).
 Changes: the defect tests and helpers below; GPT's tests that hit a defect are its strict partners; the Chromium
 axis-label tests check the axis text at load and the full state after the real input (the model value at load is
 CS-D1, tested in Node). Targets node_display (Node) and browser_display (Chromium).
@@ -52,6 +54,14 @@ def known_defect(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 1: the exact signature of a fixed defect is a regression - an ordinary failure."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
+
+
 TQ_D1_ERROR = "ReferenceError: cut is not defined"
 # The end of V8's message depends on the Node version ("which is null and not a function" in Node 22, other wording
 # in Node 18 on alma2), so the signature uses the part every version shares, plus the function that raises it.
@@ -825,18 +835,12 @@ def _alone_doc(tmp_path):
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-def test_signature_wg_d1_a_toggleable_text_query_alone_breaks_the_page(node_session, tmp_path):
-    """WG-D1 (A3), the same exact signature, for the dashboard template's toggleable text query alone on its table."""
-    assert _load_failure(node_session, _alone_doc(tmp_path)) == WG_D1
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="WG-D1: a toggleable filter alone on its table breaks the page")
 def test_strict_a_toggleable_text_query_alone_loads_and_selects_every_row(node_session, tmp_path):
-    """WG-D1's control is A3's (a second active filter) and test_control_tq_d2_a_toggle_with_the_query_shown_logs_nothing."""
+    """WG-D1 (fixed in PHASE_5 Batch 1): the dashboard template's toggleable text query alone on its table, disabled
+    at load, broke the page. Its control is A3's (a second active filter) and
+    test_control_tq_d2_a_toggle_with_the_query_shown_logs_nothing."""
     failure = _load_failure(node_session, _alone_doc(tmp_path))
-    known_defect(failure == WG_D1, "WG-D1")
+    regression(failure == WG_D1, "WG-D1: the page raises at load")
     assert failure is None, failure
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query_alone", df)
@@ -899,17 +903,6 @@ def _is_ds_d1(before, after, low, high) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("DISPLAY.downsampler")
-def test_signature_ds_d1_after_the_selection_shrinks_the_columns_keep_old_entries(node_session, tmp_path):
-    """DS-D1: 12 rows drawn, then 6: get_length() is 6, the columns still have 12 entries; the first 6 are the new rows,
-    the last 6 are the old entries 6..11."""
-    page, report = _node_page(node_session, tmp_path, "sample", frame())
-    before, after = _shrink(page, -1., 1.)
-    assert _is_ds_d1(before, after, -1., 1.), (before, after)
-    _assert_no_errors(report)
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("DISPLAY.downsampler")
 def test_control_ds_d1_when_the_selection_grows_the_columns_match_the_length(node_session, tmp_path):
     """DS-D1's control: 6 rows, then 12: every column has exactly get_length() entries, the selected rows."""
     page, report = _node_page(node_session, tmp_path, "sample", frame())
@@ -924,9 +917,12 @@ def test_control_ds_d1_when_the_selection_grows_the_columns_match_the_length(nod
 
 @pytest.mark.node_display
 @pytest.mark.feature("DISPLAY.downsampler")
-@pytest.mark.xfail(**STRICT, reason="DS-D1: the downsampler's columns keep old entries after the selection shrinks")
 def test_strict_after_the_selection_shrinks_every_column_has_get_length_entries(node_session, tmp_path):
+    """DS-D1 (fixed in PHASE_5 Batch 1): 12 rows drawn, then 6. On master get_length() was 6 while the columns kept 12
+    entries, the last 6 the old entries 6..11. Now every column has exactly the 6 selected rows."""
     page, report = _node_page(node_session, tmp_path, "sample", frame())
     before, after = _shrink(page, -1., 1.)
-    known_defect(_is_ds_d1(before, after, -1., 1.), "DS-D1: old entries kept")
+    regression(_is_ds_d1(before, after, -1., 1.), "DS-D1: old entries kept")
     assert after["length"] == len(after["index"]) == len(after["x"]), after
+    assert after["index"] == np.flatnonzero(gate_oracle(-1., 1.)).tolist(), after
+    _assert_no_errors(report)

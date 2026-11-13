@@ -8,13 +8,17 @@ matrix must never end as an expected failure with the scenario OK (no known defe
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults, node_bundle
+from RootInteractive.InteractiveDrawing.bokeh.headless.engine.assertions import assert_as_declared
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import run
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import (
     Labels, Page, Scenario, TableSpec, Tables, auto, hist, load, range_, set_)
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios import known_defects
 from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.histograms import PLAIN
-from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_TWO_FILTERS
+from RootInteractive.InteractiveDrawing.bokeh.headless.scenarios.known_defects import B1_VEHICLE, with_defect
+
+# PHASE_5 Batch 1 fixed B1 and B2: their old scenarios run with the defect put back by a fault (a "vehicle")
+B1_BACK = faults.B1_REINTRODUCED
 
 pytestmark = [pytest.mark.backend("node"), pytest.mark.layer("integration"), pytest.mark.node_harness]   # target (4.2c-2c)
 
@@ -23,9 +27,26 @@ def _by(res):
     return {(o.step, o.check): o for o in res.outcomes}
 
 
+class _Sessions(dict):
+    """One Node session per fault, made on first use (a composite fault - a defect put back plus an unrelated
+    fault - needs its own bundle copy)."""
+
+    def __init__(self, root):
+        super().__init__()
+        self.root = root
+
+    def for_fault(self, f):
+        if f.id not in self:
+            self[f.id] = NodeSession(self.root, fault=f)
+        return self[f.id]
+
+    def __missing__(self, fid):
+        return self.for_fault({**faults.FAULTS, **faults.DEFECT_FAULTS}[fid])
+
+
 @pytest.fixture(scope="module")
 def fault_sessions(node_session, node_bundle_root):
-    sessions = {fid: NodeSession(node_bundle_root, fault=f) for fid, f in faults.FAULTS.items()}
+    sessions = _Sessions(node_bundle_root)
     yield sessions
     for s in sessions.values():
         s.close()
@@ -40,8 +61,20 @@ def healthy(node_session, headless_out):
 
 def test_each_fault_matches_the_bundle_exactly_once(node_bundle_root):
     text = node_bundle.model_bundle(node_bundle_root).read_text(encoding="utf-8")
-    for fid, f in faults.FAULTS.items():
+    for fid, f in {**faults.FAULTS, **faults.DEFECT_FAULTS}.items():
         assert text.count(f.search) == 1, f"fault {fid}: found {text.count(f.search)} times in the model bundle"
+
+
+@pytest.mark.parametrize("scenario,defect", known_defects.VEHICLES, ids=[s.id for s, _ in known_defects.VEHICLES])
+def test_each_vehicle_reproduces_its_defect_exactly_and_fails_without_it(scenario, defect, node_session,
+                                                                          fault_sessions, headless_out):
+    """PHASE_5 Batch 1: with the defect put back, the page equals the defect's exact signature at every declared check
+    (XFAIL, the run OK); without it, the same expectations are XPASS and the run fails - the fix is in the code."""
+    back = run(fault_sessions.for_fault(defect), scenario, headless_out, test_ref=__file__, fault=defect)
+    assert back.fault_executions >= 1
+    assert_as_declared(scenario, back)
+    fixed = run(node_session, scenario, headless_out / "without_the_fault", test_ref=__file__)
+    assert not fixed.ok and {o.outcome for o in fixed.outcomes if o.outcome != "PASS"} == {"XPASS"}, fixed.text()
 
 
 def test_update_never_triggered_is_a_fail_not_a_timeout(healthy, fault_sessions, headless_out):
@@ -63,8 +96,8 @@ def test_nd_bin_shifted_is_caught_by_the_nd_histogram_only(healthy, fault_sessio
 
 
 def test_lost_update_on_b1_is_not_masked_as_b1(fault_sessions, headless_out):
-    res = run(fault_sessions["update_never_triggered"], B1_TWO_FILTERS, headless_out, test_ref=__file__,
-              fault=faults.UPDATE_NEVER_TRIGGERED)
+    f = with_defect(B1_BACK, faults.UPDATE_NEVER_TRIGGERED)
+    res = run(fault_sessions.for_fault(f), B1_VEHICLE, headless_out, test_ref=__file__, fault=f)
     by = _by(res)
     assert res.fault_executions >= 1 and not res.ok, res.text()
     for k in (1, 2):
@@ -78,9 +111,10 @@ def test_session_and_run_must_carry_the_same_fault(node_session, headless_out):
 
 
 @pytest.mark.parametrize("fault", list(faults.FAULTS.values()), ids=list(faults.FAULTS))
-@pytest.mark.parametrize("scenario", known_defects.SCENARIOS, ids=[s.id for s in known_defects.SCENARIOS])
-def test_fault_known_defect_matrix(fault, scenario, fault_sessions, headless_out):
-    res = run(fault_sessions[fault.id], scenario, headless_out, test_ref=__file__, fault=fault)
+@pytest.mark.parametrize("scenario,defect", known_defects.DEFECT_CASES, ids=[s.id for s, _ in known_defects.DEFECT_CASES])
+def test_fault_known_defect_matrix(fault, scenario, defect, fault_sessions, headless_out):
+    f = with_defect(defect, fault)
+    res = run(fault_sessions.for_fault(f), scenario, headless_out, test_ref=__file__, fault=f)
     assert res.fault_executions >= 1, res.text()
     assert not res.ok, "fault masked by a known defect:\n" + res.text()
 

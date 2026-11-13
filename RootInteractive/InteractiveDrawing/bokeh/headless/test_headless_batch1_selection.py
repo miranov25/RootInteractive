@@ -5,6 +5,11 @@ widgets select rows. Batch 1 of the PHASE_5 bug fixes repairs that selection pat
 (gate G5a of the audit errata v0.3a): they state what such a page must show, compare it with numpy and pandas, and show
 every Batch 1 defect RED on unfixed master with its exact signature. No production code is changed.
 
+FIX COMMIT (Batch 1 fix CRR v0.1, Claude20.RI, 2026-11-13). The fix removes B1, B2, WT-D6, DS-D1, WG-D2, WG-D1 and
+H01-D1. The strict marks are off and the signature tests are removed: every page must equal the oracle. The defect
+model stays, as the record of master f1cbe0f: a page that equals the model of any set of the old defects is now a
+REGRESSION, an ordinary failure that names the defect that came back.
+
 Defects (register PHASE_5_0_Defect_Register_v0_1, master f1cbe0f):
   B1     with several range filters on a table, a later filter keeps the rows it excluded at load
          (LazyIntersectionFilter.ts 191, 193, 208, 210: `||=` skips from_bits_8 for the later filters);
@@ -18,6 +23,7 @@ Defects (register PHASE_5_0_Defect_Register_v0_1, master f1cbe0f):
          its range was enabled at its full limits).
   WG-D1 (a toggleable range alone on its table breaks the page) and H01-D1 (a slider moved back to its end with the
   arrow keys stops 2e-16 short) keep their PHASE_4 tests (test_headless_widgets.py, test_headless_oracle_dashboards.py).
+  The fix of WT-D6 also fixes H01-D1: a widget value within 1e-9 of its range of an end is that end.
 
 Selection states (audit errata v0.3a, section 3), each checked against numpy row masks:
   S1  default at load: every widget at its full automatic range keeps all exported rows (the contract's D12 proposal);
@@ -41,6 +47,7 @@ the measured rule of PHASE_4). A strict test passes when the page equals the ora
 KnownDefect only when the page equals the model with ALL Batch 1 defects at every step and output, and the defects the
 model blames (those whose removal changes the prediction) are exactly the declared ones. Anything else is an ordinary
 failure (fail-closed, gate G1). After the Batch 1 fix every strict test must pass; an XPASS fails the run.
+(Fix commit: the marks are off; see above.)
 
 THE T1 ACCEPTANCE PAGE is PHASE_3_0b's hand-compiled T1 call
     refs.draw("p/MC.p:r", type="profile", selection="$w(isMonopole)$ & $w(tgl)$", group_by="MC.p",
@@ -63,16 +70,12 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles.filters import b1_selection, range_mask
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of registered defects."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """Batch 1 fix: a page with the exact signature of a fixed defect is a regression - an ordinary failure."""
     if condition:
-        raise KnownDefect(message)
+        raise AssertionError("REGRESSION, a Batch 1 defect is back: " + message)
 
 
-STRICT = dict(strict=True, raises=KnownDefect)
 ALL_DEFECTS = ("B1", "B2", "WT-D6", "DS-D1", "WG-D2")
 
 
@@ -287,10 +290,9 @@ def classify(observed, page_kind, coding) -> tuple:
     return "UNEXPLAINED", {"lengths": [len(observed), len(intended)]}
 
 
-# The defects that explain each strict page on master f1cbe0f (the smallest set whose model equals the page): declared,
-# so that any change in what RootInteractive does - a new defect, or a defect gone - is an ordinary failure, never a
-# silent re-attribution. Checked against the model in test_the_model_blames_the_declared_defects; the fix commit
-# empties them together with the strict marks.
+# The defects that explained each page on master f1cbe0f (the smallest set whose model equals the page). Kept after the
+# fix as the record of master and as the model's own check (test_the_model_blames_the_declared_defects); the fixed
+# page must PASS, and a page equal to any of these models is a regression.
 EXPECTED_BLAME = {
     ("auto", "lossless"): ["DS-D1"],
     ("auto", "relative16"): ["B1", "B2", "DS-D1", "WT-D6"],
@@ -302,9 +304,10 @@ EXPECTED_BLAME = {
 
 
 # ===================================================================================== the page in Node
-def build_document(tmp_path: Path, page_kind: str, coding: str, mute=None) -> Path:
+def build_document(tmp_path: Path, page_kind: str, coding: str, mute=None, selection_table=False) -> Path:
     """The page through bokehDrawSA.fromArray (show suppressed) as a Bokeh document. `mute`: a widget whose link to
-    its filter is removed - only for the live falsifier."""
+    its filter is removed - only for the live falsifier. `selection_table`: also the selection table of the dashboard
+    template (bokehTools selectionTable)."""
     from bokeh.document import Document
     from bokeh.models import RangeSlider
     import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
@@ -317,9 +320,11 @@ def build_document(tmp_path: Path, page_kind: str, coding: str, mute=None) -> Pa
             [[["bin_center"], ["bin_count"], {"source": "h1"}],
              [["bin_center_0"], ["mean"], {"source": "h2_1"}],
              [["A"], ["Y"]],
-             [["row"], ["A"]]],                                        # sends `row`: the scatter's row identity
+             [["row"], ["A"]]]                                         # sends `row`: the scatter's row identity
+            + ([["selectionTable", {"name": "selection"}]] if selection_table else []),
             widgets, sourceArray=[dict(H1), dict(H2)], aliasArray=[], parameterArray=[],
-            layout=[[0, 1, 2, 3]], widgetLayout=[list(range(len(widgets)))], arrayCompression=CODINGS[coding]).pAll
+            layout=[[0, 1, 2, 3] + ([4] if selection_table else [])], widgetLayout=[list(range(len(widgets)))],
+            arrayCompression=CODINGS[coding]).pAll
     finally:
         sa.show = shown
     doc = Document()
@@ -328,7 +333,7 @@ def build_document(tmp_path: Path, page_kind: str, coding: str, mute=None) -> Pa
         sliders = [s for s in doc.select({"type": RangeSlider}) if s.title == mute]
         assert len(sliders) == 1 and any(sliders[0].js_property_callbacks.values()), "no link to break: test invalid"
         sliders[0].js_property_callbacks = {}
-    out = tmp_path / f"batch1_{page_kind}_{coding}{'_muted' if mute else ''}.json"
+    out = tmp_path / f"batch1_{page_kind}_{coding}{'_muted' if mute else ''}{'_table' if selection_table else ''}.json"
     out.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
     return out
 
@@ -505,7 +510,6 @@ def test_filter_intersection_is_claimed_only_by_tests_that_face_b1():
 @pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("HIST.histogram_nd")
 @pytest.mark.feature("DISPLAY.downsampler")
-@pytest.mark.xfail(**STRICT, reason="Batch 1: B1, B2, WT-D6, DS-D1, WG-D2 as declared per page (EXPECTED_BLAME)")
 @pytest.mark.parametrize("coding", sorted(CODINGS))
 @pytest.mark.parametrize("page_kind", ["auto", "narrow", "toggle"])
 def test_strict_adf_page_follows_every_selection_state(node_session, tmp_path, page_kind, coding):
@@ -514,10 +518,8 @@ def test_strict_adf_page_follows_every_selection_state(node_session, tmp_path, p
     verdict, detail = classify(run_page(node_session, tmp_path, page_kind, coding), page_kind, coding)
     if verdict == "PASS":
         return
-    declared = EXPECTED_BLAME[(page_kind, coding)]
-    if verdict == "KNOWN":
-        known_defect(detail == [declared], "known defects " + ", ".join(declared))
-        raise AssertionError(f"the page shows the known defects {detail}, declared {declared}")
+    regression(verdict == "KNOWN", f"the page equals the model of {detail} (on master: "
+                                   f"{EXPECTED_BLAME[(page_kind, coding)]})")
     raise AssertionError(f"neither the oracle nor any set of Batch 1 defects: {detail}")
 
 
@@ -529,10 +531,10 @@ def test_strict_adf_page_follows_every_selection_state(node_session, tmp_path, p
 def test_control_lossless_page_at_full_range_selects_and_bins_like_numpy(node_session, tmp_path):
     """Healthy control: on the lossless page whose widgets start at their full range (S1), no Batch 1 selection defect
     applies (B1 and B2 need rows excluded at load, WT-D6 needs rounding). The selected rows, both histograms and the
-    profile equal numpy at every step; only the scatter plot is left to DS-D1."""
+    profile equal numpy at every step. (Before the fix the scatter plot was left to DS-D1; now it is checked too.)"""
     observed = run_page(node_session, tmp_path, "auto", "lossless")
     for k, (o, i) in enumerate(zip(observed, expected("auto", "lossless"))):
-        assert not [d for d in _differences(o, i) if d not in ("ds_rows",)], (k, _differences(o, i))
+        assert not _differences(o, i), (k, _differences(o, i))
 
 
 @_node
@@ -543,6 +545,39 @@ def test_falsifier_a_muted_widget_is_neither_green_nor_a_known_defect(node_sessi
     observed = run_page(node_session, tmp_path, "auto", "lossless", mute="B")
     verdict, detail = classify(observed, "auto", "lossless")
     assert verdict == "UNEXPLAINED" and detail["step"] == 2, (verdict, detail)
+
+
+SELECTION_TABLE_JS = """() => {
+  const t = window.__riH.models().filter(m => m.type === 'DataTable');
+  if (t.length !== 1) throw new Error('selection table found ' + t.length + ' times');
+  const d = t[0].source.data;
+  return Object.fromEntries(Array.from(d.field, (f, i) => [f, d.value[i]]));
+}"""
+
+
+def _js_number(x: float) -> str:
+    """A number as JavaScript prints it (Python's repr, without '.0' for whole numbers)."""
+    return str(int(x)) if float(x).is_integer() else repr(float(x))
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_the_selection_table_still_shows_the_widget_values(node_session, tmp_path):
+    """The fix of WT-D6 opens an automatic widget's filter at its limits (+-Infinity). The selection table of the
+    dashboard template showed the filter's range, which was the widget's value; it now shows the widget's value
+    directly - the same text as on master: at load, after a move, and back at the limits."""
+    report = ScenarioResult(id="batch1/selection_table [node]", outdir=str(tmp_path))
+    page = node_session.new_page(report)
+    page.goto(build_document(tmp_path, "auto", "relative16", selection_table=True))
+    page.wait_for_function(page.load_condition)
+    assert page.evaluate("p => window.__riH.settle(p, 50)", PROBES).get("settled")
+    lim = limits("auto")
+    assert page.evaluate(SELECTION_TABLE_JS) == {c: f"[{lim[c][0]}, {lim[c][1]}]" for c in "AB"}   # Python's text
+    for value, text in (([2.0, 8.0], "[2, 8]"), (FULL, f"[{_js_number(lim['A'][0])}, {_js_number(lim['A'][1])}]")):
+        assert page.evaluate(ACT_JS, ["set", "A", value, PROBES]).get("settled")
+        shown = page.evaluate(SELECTION_TABLE_JS)
+        assert shown == {"A": text, "B": f"[{lim['B'][0]}, {lim['B'][1]}]"}, shown
+    assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
 
 
 # ===================================================================================== Node: WT-D6 alone
@@ -566,14 +601,6 @@ def _is_wt_d6(state) -> bool:
 
 @_node
 @pytest.mark.feature("FILTER.range")
-def test_signature_wt_d6_a_full_range_widget_loses_the_rows_rounded_outside(node_session, tmp_path):
-    """WT-D6, exact signature: one widget on A at its automatic full range, relative 16 bits: rows 17 and 311 are lost
-    at load (decoded 0.25 below the start 0.2500023, decoded 10.0 above the end 9.9999)."""
-    assert _is_wt_d6(_load_state(node_session, tmp_path, "one_auto", "relative16"))
-
-
-@_node
-@pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_nd")
 def test_control_wt_d6_the_same_widget_on_a_lossless_column_keeps_every_row(node_session, tmp_path):
     """WT-D6's control: the same page, lossless: every row selected at load, and the 2-D histogram of all rows."""
@@ -586,10 +613,11 @@ def test_control_wt_d6_the_same_widget_on_a_lossless_column_keeps_every_row(node
 @_node
 @pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="WT-D6: a full-range widget cuts the rows rounded outside its raw limits")
 def test_strict_wt_d6_a_full_range_widget_keeps_every_exported_row(node_session, tmp_path):
+    """One widget on A at its automatic full range, relative 16 bits. On master rows 17 and 311 were lost at load
+    (decoded 0.25 below the start 0.2500023, decoded 10.0 above the end 9.9999)."""
     state = _load_state(node_session, tmp_path, "one_auto", "relative16")
-    known_defect(_is_wt_d6(state), "WT-D6: rows 17 and 311 lost at load")
+    regression(_is_wt_d6(state), "WT-D6: rows 17 and 311 lost at load")
     dec = decoded("relative16")
     assert state["mask"] == [1] * N, [r for r in range(N) if not state["mask"][r]]
     assert state["h2"] == ho.counts([dec["A"], dec["Y"]], H2["nbins"], H2["range"]).tolist()
@@ -605,30 +633,23 @@ def _is_b2(state, intended_first) -> bool:
 
 @_node
 @pytest.mark.feature("HIST.histogram_1d")
-def test_signature_b2_a_widget_narrower_at_load_is_ignored_by_the_1d_histogram(node_session, tmp_path):
-    """B2, exact signature, in state S2: one widget on A with limits [2, 8]."""
-    assert _is_b2(_load_state(node_session, tmp_path, "one_narrow", "lossless"), expected("one_narrow", "lossless")[0])
-
-
-@_node
-@pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("FILTER.range")
 def test_control_b2_after_a_move_and_the_restore_the_1d_histogram_follows(node_session, tmp_path):
     """B2's control: from the first move on, the 1-D histogram follows the selection, also back at the load state.
-    (The scatter plot is left to DS-D1: the first move shrinks the selection.)"""
+    (Before the fix the scatter plot was left to DS-D1; now it is checked too.)"""
     observed = run_page(node_session, tmp_path, "one_narrow", "lossless")
     for k, (o, i) in enumerate(zip(observed, expected("one_narrow", "lossless"))):
         if k:
-            assert not [d for d in _differences(o, i) if d != "ds_rows"], (k, _differences(o, i))
+            assert not _differences(o, i), (k, _differences(o, i))
 
 
 @_node
 @pytest.mark.feature("HIST.histogram_1d")
-@pytest.mark.xfail(**STRICT, reason="B2: a 1-D histogram ignores the selection at load")
 def test_strict_b2_the_1d_histogram_follows_a_widget_narrower_at_load(node_session, tmp_path):
+    """State S2: one widget on A with limits [2, 8]. On master the 1-D histogram counted all 600 rows at load."""
     state = _load_state(node_session, tmp_path, "one_narrow", "lossless")
     first = expected("one_narrow", "lossless")[0]
-    known_defect(_is_b2(state, first), "B2: the 1-D histogram counts all rows at load")
+    regression(_is_b2(state, first), "B2: the 1-D histogram counts all rows at load")
     assert state["h1"] == first["h1"]
 
 
@@ -637,13 +658,6 @@ def _is_b1(state) -> bool:
     """B1: at load the selection is B1's rule (the second filter keeps the rows it excludes), not the intersection."""
     first, model = expected("narrow", "lossless")[0], expected("narrow", "lossless", {"B1"})[0]
     return state["mask"] == model["mask"] != first["mask"] and state["h2"] == model["h2"]
-
-
-@_node
-@pytest.mark.feature("FILTER.intersection")
-def test_signature_b1_two_widgets_narrower_at_load_select_by_the_b1_rule(node_session, tmp_path):
-    """B1, exact signature, in state S2: A in [2, 8] and B in [-3, 3] at load."""
-    assert _is_b1(_load_state(node_session, tmp_path, "narrow", "lossless"))
 
 
 @_node
@@ -659,10 +673,10 @@ def test_control_b1_one_widget_narrower_at_load_selects_its_rows(node_session, t
 @_node
 @pytest.mark.feature("FILTER.intersection")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="B1: a later filter keeps the rows it excluded at load")
 def test_strict_b1_two_widgets_narrower_at_load_select_their_intersection(node_session, tmp_path):
+    """State S2: A in [2, 8] and B in [-3, 3] at load. On master the selection was B1's rule."""
     state = _load_state(node_session, tmp_path, "narrow", "lossless")
-    known_defect(_is_b1(state), "B1: the second filter keeps the rows it excluded at load")
+    regression(_is_b1(state), "B1: the second filter keeps the rows it excluded at load")
     first = expected("narrow", "lossless")[0]
     assert state["mask"] == first["mask"] and state["h2"] == first["h2"]
 
@@ -819,7 +833,6 @@ def test_t1_pandas_reference_is_not_degenerate():
 @pytest.mark.feature("FILTER.intersection")
 @pytest.mark.feature("HIST.profile")
 @pytest.mark.feature("DSL.gather_operation")
-@pytest.mark.xfail(**STRICT, reason="B1: the T1 page's second cut keeps the rows it excluded at load")
 def test_strict_t1_acceptance_page_equals_pandas_in_every_state(node_session, tmp_path):
     """The T1 call, both cuts narrower at load: the profile cells (entries and mean ratio) equal pandas at load, after
     the tgl move, after nbZ 5 -> 3, after the restore and after nbZ -> 10."""
@@ -828,7 +841,7 @@ def test_strict_t1_acceptance_page_equals_pandas_in_every_state(node_session, tm
     if not any(diffs):
         return
     b1_diffs = [t1_differences(o, w) for o, w in zip(observed, t1_expected(b1=True))]
-    known_defect(not any(b1_diffs), "B1: the page equals B1's rule at every step")
+    regression(not any(b1_diffs), "B1: the page equals B1's rule at every step")
     raise AssertionError(f"neither pandas nor B1's rule: {[d[:3] for d in diffs]}")
 
 
