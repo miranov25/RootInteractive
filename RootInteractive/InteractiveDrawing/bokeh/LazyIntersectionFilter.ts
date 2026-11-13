@@ -219,10 +219,10 @@ export class LazyIntersectionFilter extends RIFilter {
               counts[i] -= 1
               counts[i] += old_values[i >> 5] & mask ? 1 : 0
               this._changed_values ||= (!!old_count !== !!counts[i])
-              old_values[i >> 5] |= mask
               mask = mask << 1
               if (mask === 0) mask = 1
-            }   
+            }
+            this.old_values[x] = null       // PHASE_5 Batch 1 v0.2 (review C2): the array belongs to the filter's cache
           }         
         }
     }
@@ -235,10 +235,10 @@ export class LazyIntersectionFilter extends RIFilter {
         return cached_vector
     }
     this.update_counts()
+    const n_rows = this.row_count()
     if(this.counts == null){
       // PHASE_5 Batch 1 (WG-D1): no filter is active yet (a toggleable range alone, disabled): every row is selected
-      const lengths = this.filters.map((f: any) => f.source != null ? f.source.get_length() : null).filter((n: any) => n != null)
-      this.resize_counts(Math.ceil((lengths.length ? lengths[0] : 0) / 32))
+      this.resize_counts(Math.ceil((n_rows ?? 0) / 32))
     }
     let new_vector: boolean[] = this.cached_vector
     if (new_vector == null){
@@ -253,9 +253,33 @@ export class LazyIntersectionFilter extends RIFilter {
           new_vector[i] = !this.counts[i]
       }
     }
+    if(n_rows != null){
+      // PHASE_5 Batch 1 v0.2 (review C1): the counts have room for a multiple of 32 rows; the room after the last row
+      // is not a row (it was selected when no filter, or only an inverted filter, excluded it)
+      for(let i=n_rows; i < new_vector.length; i++){
+        new_vector[i] = false
+      }
+    }
     this.cached_vector = new_vector
     this.changed_booleans = false
     return new_vector
+  }
+
+  // PHASE_5 Batch 1 v0.2 (review C1): the number of rows of the table the filters select from (null: not known);
+  // filters on tables of different lengths cannot be intersected
+  public row_count(): number | null {
+    let n: number | null = null
+    for(const f of this.filters as any[]){
+      const m = f.source != null ? f.source.get_length() : (typeof f.row_count === "function" ? f.row_count() : null)
+      if(m == null){
+        continue
+      }
+      if(n != null && m !== n){
+        throw new Error("LazyIntersectionFilter: its filters select from tables of different lengths (" + n + " and " + m + " rows)")
+      }
+      n = m
+    }
+    return n
   }
 
   public get_indices(): number[] {

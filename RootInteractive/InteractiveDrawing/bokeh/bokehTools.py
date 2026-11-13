@@ -667,15 +667,21 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 localWidget = makeBokehSliderWidget(fakeDf, True, variables[1], paramDict, **optionWidget)
                 if optionWidget["callback"] == "selection":
                     # PHASE_5 Batch 1 (WT-D6, H01-D1): a range widget whose limits come from the data keeps every exported
-                    # row while it is at its limits - also when the page receives rounded (compressed) values; a value
-                    # within rounding of a limit is that limit (arrow keys can stop 2e-16 short of it).
+                    # row while it is at its limits - also when the page receives rounded (compressed) values. A value
+                    # nearer to a limit than half the distance to the next slider position is that limit (v0.2, review
+                    # C4: no slider position is ever swallowed; arrow keys can stop a few float spacings short of it).
                     openEnds = len(variables[1]) == 1 and optionWidget.get("type", "auto") in ("auto", "minmax", "unique")
                     initialRange = [float("-inf"), float("inf")] if openEnds else list(localWidget.value)
                     widgetFilter = RangeFilter(range=initialRange, field=variables[1][0], name=variables[1][0])
                     localWidget.js_on_change("value", CustomJS(args={"target": widgetFilter, "open_ends": openEnds}, code="""
-                        const w = cb_obj, tol = 1e-9 * Math.abs(w.end - w.start)
-                        const lo = w.value[0] <= w.start + tol ? (open_ends ? -Infinity : w.start) : w.value[0]
-                        const hi = w.value[1] >= w.end - tol ? (open_ends ? Infinity : w.end) : w.value[1]
+                        const w = cb_obj, span = w.end - w.start
+                        const ulp = x => Math.max(Math.abs(x) * 2.220446049250313e-16, 5e-324)   // float spacing at x
+                        const s = (w.step > 0 && w.step <= span) ? w.step : span
+                        let gap = span - Math.floor(span / s) * s       // from the end to the last slider position below it
+                        if (!(gap > 4 * ulp(w.end))) gap = s
+                        const tol_lo = Math.max(0.5 * s, 4 * ulp(w.start)), tol_hi = Math.max(0.5 * gap, 4 * ulp(w.end))
+                        const lo = w.value[0] <= w.start + tol_lo ? (open_ends ? -Infinity : w.start) : w.value[0]
+                        const hi = w.value[1] >= w.end - tol_hi ? (open_ends ? Infinity : w.end) : w.value[1]
                         target.range = [lo, hi]
                     """))
                 widgetFull = localWidget

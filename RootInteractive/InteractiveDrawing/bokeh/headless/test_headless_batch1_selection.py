@@ -874,18 +874,9 @@ def test_control_t1_with_the_monopole_widget_at_full_range_equals_pandas(node_se
 #   C3 (P1) the page comparator ignored missing or extra profile values and the values of empty bins;
 #   C4 (P2) "within 1e-9 of the range is the end" could swallow a real fine slider step, and was smaller than the float
 #      spacing for ranges far from zero.
-# These tests come first (gate G5a of the revision): on 3658254 C1, C2 and C4 are strict expected failures with exact
-# signatures; the correction commit removes the marks. C3 is test code only.
-class KnownDefect(AssertionError):
-    """Raised only when the page shows the exact signature of a review finding (C1, C2, C4) on 3658254."""
-
-
-def known_defect(condition: bool, message: str) -> None:
-    if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
+# These tests came first (gate G5a of the revision): on 3658254 C1, C2 and C4 were strict expected failures with exact
+# signatures. The correction commit removed the marks: those signatures are now REGRESSIONS. C3 is test code only.
+# Falsifiers: the faults PHANTOM_ROWS and FILTER_CACHE_WRITTEN put C1 and C2 back into a copy of the page code.
 
 # ----------------------------------------------------------------- C1: the rows are the table's rows, never the padding
 C1_ROWS = (1, 5, 12, 31, 32, 33, 65)
@@ -1031,8 +1022,7 @@ def _is_c1_phantom(states: list, n: int) -> bool:
 @pytest.mark.feature("FILTER.range")
 @pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.parametrize("n", [pytest.param(n, marks=[] if n % 32 == 0 else [pytest.mark.xfail(**STRICT, reason="C1")])
-                               for n in C1_ROWS])
+@pytest.mark.parametrize("n", C1_ROWS)
 def test_strict_c1_a_disabled_toggleable_range_alone_selects_exactly_the_tables_rows(node_session, tmp_path, n):
     """C1: load (disabled), enable, narrow to [0.3, 0.7], disable, enable again without a move, back to full. At every
     step the selected row list, both 1-D histograms, the 2-D histogram and the scatter's rows equal numpy. 32 rows: no
@@ -1042,7 +1032,7 @@ def test_strict_c1_a_disabled_toggleable_range_alone_selects_exactly_the_tables_
     diffs = [c1_differences(g, w) for g, w in zip(states, c1_expected(n))]
     if not any(diffs):
         return
-    known_defect(_is_c1_phantom(states, n), "C1: the padding of the packed selection is selected as rows")
+    regression(n % 32 != 0 and _is_c1_phantom(states, n), "C1: the padding of the packed selection is selected as rows")
     raise AssertionError(f"neither numpy nor C1's signature: {[(s[0], d) for s, d in zip(C1_STEPS, diffs) if d]}")
 
 
@@ -1104,8 +1094,7 @@ def c2_expected(n: int = C2_N) -> dict:
 
 @_node
 @pytest.mark.feature("FILTER.intersection")
-@pytest.mark.parametrize("k", [pytest.param(k, marks=[pytest.mark.xfail(**STRICT, reason="C2")] if k >= 256 else [])
-                               for k in C2_FILTERS], ids=[f"{k}_filters" for k in C2_FILTERS])
+@pytest.mark.parametrize("k", C2_FILTERS, ids=[f"{k}_filters" for k in C2_FILTERS])
 def test_strict_c2_disabling_a_filter_keeps_its_own_cached_selection(node_session, tmp_path, k):
     """C2: the second of k filters is disabled and enabled again without a move. Its own cached bits must not change,
     and the selection must be the intersection, then the first filter alone, then the intersection again. 2 and 255
@@ -1115,8 +1104,8 @@ def test_strict_c2_disabling_a_filter_keeps_its_own_cached_selection(node_sessio
     assert got["packed"] == (k < 256)
     if all(got[key] == want[key] for key in want):
         return
-    known_defect(not got["cache_kept"] and got["mid_all_ones"] and got["s0"] == want["s0"] and got["s1"] == want["s1"]
-                 and got["s2"] == want["s1"], "C2: disabling wrote every bit of the filter's cache to 1")
+    regression(not got["cache_kept"] and got["mid_all_ones"] and got["s0"] == want["s0"] and got["s1"] == want["s1"]
+               and got["s2"] == want["s1"], "C2: disabling wrote every bit of the filter's cache to 1")
     raise AssertionError(f"neither numpy nor C2's signature: {got}")
 
 
@@ -1262,7 +1251,6 @@ def test_c4_the_half_step_rule_keeps_every_slider_position_and_catches_float_noi
 
 @_node
 @pytest.mark.feature("FILTER.range")
-@pytest.mark.xfail(**STRICT, reason="C4")
 def test_strict_c4_slider_ends_follow_the_half_step_rule(node_session, tmp_path):
     """C4: the filter range the page sets for each case equals the half-step rule (open ends for the automatic slider
     L, the limit for F)."""
@@ -1272,5 +1260,38 @@ def test_strict_c4_slider_ends_follow_the_half_step_rule(node_session, tmp_path)
     if got == want:
         return
     old = [endpoint_rule(*limits[nm], v, o, "v0.1") for nm, v, o in cases]
-    known_defect(got == old, "C4: the page applies the 1e-9 rule of 3658254")
+    regression(got == old, "C4: the page applies the 1e-9 rule of 3658254")
     raise AssertionError(f"neither rule: {list(zip(cases, got, want))}")
+
+
+# ----------------------------------------------------------------- falsifiers: C1 and C2 put back into a copy of the code
+@pytest.fixture(scope="module")
+def review_fault_sessions(node_session, node_bundle_root):
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    sessions = {f.id: NodeSession(node_bundle_root, fault=f, fresh_window=False)
+                for f in (faults.PHANTOM_ROWS, faults.FILTER_CACHE_WRITTEN)}
+    yield sessions
+    for s in sessions.values():
+        s.close()
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_falsifier_c1_phantom_rows_put_back_are_caught_as_a_regression(review_fault_sessions, tmp_path):
+    """With the padding no longer cleared (fault phantom_rows), the C1 test's check fails on 12 rows, with exactly
+    C1's old signature - so the test can fail, and would name the regression."""
+    states = c1_run(review_fault_sessions["phantom_rows"], tmp_path, 12)
+    assert any(c1_differences(g, w) for g, w in zip(states, c1_expected(12)))
+    assert _is_c1_phantom(states, 12)
+
+
+@_node
+@pytest.mark.feature("FILTER.intersection")
+def test_falsifier_c2_a_written_filter_cache_is_caught_as_a_regression(review_fault_sessions, tmp_path):
+    """With disabling writing the filter's cache again (fault filter_cache_written), the C2 check fails on 256 filters
+    with C2's old signature, and 255 filters (packed counting, another path) stay right."""
+    s = review_fault_sessions["filter_cache_written"]
+    bad, good, want = c2_run(s, tmp_path, 256), c2_run(s, tmp_path, 255), c2_expected()
+    assert not bad["cache_kept"] and bad["mid_all_ones"] and bad["s2"] == want["s1"], bad
+    assert all(good[key] == want[key] for key in want), good

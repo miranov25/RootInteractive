@@ -73,7 +73,24 @@ B2_REINTRODUCED = Fault(
     replace=f"{COUNTER}; // PHASE_5 Batch 1 (B2)",
 )
 
-DEFECT_FAULTS = {f.id: f for f in (B1_REINTRODUCED, B2_REINTRODUCED)}
+# the findings C1 and C2 of the review of the Batch 1 fix v0.1, put back (falsifiers of their tests, Batch 1 v0.2)
+PHANTOM_ROWS = Fault(
+    id="phantom_rows",
+    description="review C1 put back: the room after the table's last row in the packed selection is not cleared",
+    source="LazyIntersectionFilter.ts v_compute (fixed in PHASE_5 Batch 1 v0.2)",
+    search="for (let i = n_rows; i < new_vector.length; i++) {",
+    replace=f"for (let i = n_rows; ({COUNTER}, false); i++) {{",
+)
+
+FILTER_CACHE_WRITTEN = Fault(
+    id="filter_cache_written",
+    description="review C2 put back: with 256 or more filters, disabling a filter sets every bit of its cached array",
+    source="LazyIntersectionFilter.ts update_counts (fixed in PHASE_5 Batch 1 v0.2)",
+    search="this.old_values[x] = null; // PHASE_5 Batch 1 v0.2 (review C2)",
+    replace=f"{COUNTER}; old_values.fill(-1); // PHASE_5 Batch 1 v0.2 (review C2)",
+)
+
+DEFECT_FAULTS = {f.id: f for f in (B1_REINTRODUCED, B2_REINTRODUCED, PHANTOM_ROWS, FILTER_CACHE_WRITTEN)}
 
 
 def compose(*faults: Fault) -> Fault:
