@@ -257,14 +257,21 @@ def _same_run(xs, ys) -> bool:
 
 def _differences(got: dict, want: dict) -> list:
     """The outputs in which a page state differs from an expected one; means and std within 1e-12 (relative), every
-    count, mask and row exactly."""
+    count, mask and row exactly. Review C3 (fix v0.1): the profile arrays must have exactly the expected length, and an
+    empty bin must be empty on the page too (NaN, read as None) - a value there is a difference."""
     out = []
     for key in ("mask", "h1", "h2", "entries", "ds_length", "ds_rows"):
         if got[key] != want[key]:
             out.append(key)
     for key in ("mean", "std"):
+        if len(got[key]) != len(want[key]) or len(got[key]) != len(want["entries"]):
+            out.append(key)
+            continue
         for g, w, n in zip(got[key], want[key], want["entries"]):
             if n == 0:
+                if g is not None:
+                    out.append(key)
+                    break
                 continue
             if g is None or w is None or not np.isclose(g, w, rtol=1e-12, atol=1e-12):
                 out.append(key)
@@ -855,3 +862,415 @@ def test_control_t1_with_the_monopole_widget_at_full_range_equals_pandas(node_se
     observed = t1_run(node_session, tmp_path, monopoles_only=False)
     for k, (o, w) in enumerate(zip(observed, t1_expected(monopoles_only=False))):
         assert not t1_differences(o, w), (k, t1_differences(o, w)[:3])
+
+
+# ===================================================================================== review of the fix v0.1 (C1-C4)
+# GPT24.RI's consolidated review of the fix commit 3658254 (2026-11-13; GPT24, GPT25, GPT27, GPT29), verdict [X]:
+#   C1 (P0) a table whose only filter is a disabled toggleable range: the intersection filter selected the padding of its
+#      packed bit array as rows (12 rows -> indices 0..31). A 1-D histogram counted the missing rows in bin 0, a
+#      weighted one gave NaN. The same after enable -> disable;
+#   C2 (P1) with 256 or more filters, disabling a filter wrote into that filter's own cached bits; enabled again without
+#      a move, it then selected every row;
+#   C3 (P1) the page comparator ignored missing or extra profile values and the values of empty bins;
+#   C4 (P2) "within 1e-9 of the range is the end" could swallow a real fine slider step, and was smaller than the float
+#      spacing for ranges far from zero.
+# These tests come first (gate G5a of the revision): on 3658254 C1, C2 and C4 are strict expected failures with exact
+# signatures; the correction commit removes the marks. C3 is test code only.
+class KnownDefect(AssertionError):
+    """Raised only when the page shows the exact signature of a review finding (C1, C2, C4) on 3658254."""
+
+
+def known_defect(condition: bool, message: str) -> None:
+    if condition:
+        raise KnownDefect(message)
+
+
+STRICT = dict(strict=True, raises=KnownDefect)
+
+# ----------------------------------------------------------------- C1: the rows are the table's rows, never the padding
+C1_ROWS = (1, 5, 12, 31, 32, 33, 65)
+C1_HISTS = [{"name": "c1h", "variables": ["X"], "nbins": 4, "range": [0.0, 1.0]},
+            {"name": "c1w", "variables": ["X"], "nbins": 4, "range": [0.0, 1.0], "weights": "w"},
+            {"name": "c1n", "variables": ["X", "Y"], "nbins": [4, 2], "range": [[0.0, 1.0], [0.0, 1.0]]}]
+C1_STEPS = [("load",), ("enable", "A"), ("set", "A", [0.3, 0.7]), ("disable", "A"), ("enable", "A"), ("set", "A", FULL)]
+C1_PROBES = [["c1h", "bin_count", ["HistogramCDS"]], ["c1n", "bin_count", ["HistoNdCDS"]]]
+
+
+def c1_table(n: int) -> pd.DataFrame:
+    rng = np.random.default_rng(SEED + 7 + n)
+    return pd.DataFrame({"row": np.arange(n, dtype=np.int64), "A": rng.uniform(0.1, 0.9, n),
+                         "X": rng.uniform(0.05, 0.95, n), "Y": rng.uniform(0.05, 0.95, n), "w": rng.uniform(1.0, 2.0, n)})
+
+
+def c1_document(tmp_path: Path, n: int) -> Path:
+    """One toggleable range on A, alone on its table (disabled at load, its default); a 1-D, a weighted 1-D and a 2-D
+    histogram, and a scatter plot (DownsamplerCDS) of every row; built by bokehDrawSA.fromArray."""
+    from bokeh.document import Document
+    import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
+    shown = sa.show
+    sa.show = lambda *a, **k: None
+    try:
+        root = sa.bokehDrawSA.fromArray(
+            c1_table(n), None,
+            [[["bin_center"], ["bin_count"], {"source": "c1h"}], [["bin_center"], ["bin_count"], {"source": "c1w"}],
+             [["bin_center_0"], ["bin_center_1"], {"source": "c1n", "colorZvar": "bin_count"}], [["row"], ["X"]]],
+            [["range", ["A"], {"toggleable": True}]], sourceArray=[dict(h) for h in C1_HISTS], aliasArray=[],
+            parameterArray=[], layout=[[0, 1, 2, 3]], widgetLayout=[[0]], arrayCompression=CODINGS["lossless"]).pAll
+    finally:
+        sa.show = shown
+    doc = Document()
+    doc.add_root(root)
+    out = tmp_path / f"batch1_c1_{n}.json"
+    out.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    return out
+
+
+C1_READ_JS = """() => {
+  const H = window.__riH;
+  const one = (name, types) => { const m = H.model(name, types); if (!m) throw new Error(H.why(name, types)); return m; };
+  const h = one('c1h', ['HistogramCDS']), hw = one('c1w', ['HistogramCDS']), hn = one('c1n', ['HistoNdCDS']);
+  const ds = one('default cds', ['DownsamplerCDS']);
+  const f = h.filter;
+  if (f == null || f !== hw.filter || f !== hn.filter) throw new Error('the histograms do not share one table filter');
+  const v = f.v_compute(), num = c => Array.from(c, x => Number.isFinite(x) ? x : String(x));
+  return {indices: Array.from(f.get_indices()), selected_in_vector: Array.from(v).filter(x => x).length,
+          h1: num(h.get_column('bin_count')), hw: num(hw.get_column('bin_count')), hn: num(hn.get_column('bin_count')),
+          ds_length: ds.get_length(), ds_rows: Array.from(ds.get_column('row'), x => x === undefined ? null : x)};
+}"""
+
+C1_ACT_JS = """async ([op, name, value, probes]) => {
+  const H = window.__riH;
+  if (op === 'set') {
+    const s = H.slider(name);
+    if (!s) throw new Error('range widget ' + name + ' found ' + H.sliders(name).length + ' times');
+    s.value = value === 'full' ? [s.start, s.end] : value;
+  } else {
+    const t = H.models().filter(m => m.type === 'Toggle' && m.label === 'disable');
+    if (t.length !== 1) throw new Error('toggle of ' + name + ' found ' + t.length + ' times');
+    t[0].active = (op === 'disable');
+  }
+  return await H.settle(probes, 50);
+}"""
+
+
+def c1_run(node_session, tmp_path, n: int) -> list:
+    report = ScenarioResult(id=f"batch1/c1/{n} [node]", outdir=str(tmp_path))
+    page = node_session.new_page(report)
+    page.goto(c1_document(tmp_path, n))
+    page.wait_for_function(page.load_condition)
+    assert page.evaluate("p => window.__riH.settle(p, 50)", C1_PROBES).get("settled")
+    out = []
+    for step in C1_STEPS:
+        if step[0] != "load":
+            assert page.evaluate(C1_ACT_JS, [step[0], step[1], step[2] if len(step) > 2 else None, C1_PROBES]).get("settled")
+        out.append(page.evaluate(C1_READ_JS))
+    assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
+    return out
+
+
+def c1_expected(n: int) -> list:
+    """numpy, per step: the selected rows (the gate on A while enabled), the three histograms, the scatter's rows."""
+    t = c1_table(n)
+    a, x, y, w = (t[c].to_numpy() for c in ("A", "X", "Y", "w"))
+    out, enabled, lo_hi = [], False, None
+    for step in C1_STEPS:
+        if step[0] == "enable":
+            enabled = True
+        elif step[0] == "disable":
+            enabled = False
+        elif step[0] == "set":
+            lo_hi = None if step[2] == FULL else tuple(step[2])
+        sel = range_mask(a, *lo_hi) if (enabled and lo_hi) else np.ones(n, dtype=bool)
+        out.append({"indices": np.flatnonzero(sel).tolist(),
+                    "h1": ho.counts([x], [4], [[0.0, 1.0]], mask=sel).astype(float).tolist(),
+                    "hw": ho.counts([x], [4], [[0.0, 1.0]], mask=sel, weights=w).astype(float).tolist(),
+                    "hn": ho.counts([x, y], [4, 2], [[0.0, 1.0], [0.0, 1.0]], mask=sel).astype(float).tolist()})
+    return out
+
+
+def c1_differences(got: dict, want: dict) -> list:
+    out = []
+    if got["indices"] != want["indices"]:
+        out.append("indices")
+    if got["selected_in_vector"] != len(want["indices"]):
+        out.append("selected_in_vector")
+    for key in ("h1", "hn"):
+        if got[key] != want[key]:
+            out.append(key)
+    if (len(got["hw"]) != len(want["hw"]) or any(isinstance(g, str) for g in got["hw"])
+            or not np.allclose(got["hw"], want["hw"], rtol=1e-12, atol=1e-12)):
+        out.append("hw")
+    if got["ds_length"] != len(want["indices"]) or sorted(r for r in got["ds_rows"] if r is not None) != want["indices"] \
+            or None in got["ds_rows"]:
+        out.append("ds_rows")
+    return out
+
+
+def _is_c1_phantom(states: list, n: int) -> bool:
+    """C1's signature on 3658254: while the range is disabled, the selection is every position of the packed array,
+    0 .. 32*ceil(n/32)-1; the missing rows land in bin 0 of the 1-D histogram (an undefined value bins to 0), make bin
+    0 of the weighted one NaN, and appear in the scatter as rows without a value; the 2-D histogram (finite guard) is
+    right. While enabled, everything is right. Needs n not a multiple of 32."""
+    pad = 32 * -(-n // 32)
+    for (step, got), want in zip(zip(C1_STEPS, states), c1_expected(n)):
+        disabled = step[0] in ("load", "disable")
+        if not disabled:
+            if c1_differences(got, want):
+                return False
+            continue
+        if got["indices"] != list(range(pad)) or got["selected_in_vector"] != pad:
+            return False
+        if got["h1"] != [want["h1"][0] + (pad - n)] + want["h1"][1:] or got["hn"] != want["hn"]:
+            return False
+        if got["hw"][0] != "NaN" or not np.allclose(got["hw"][1:], want["hw"][1:], rtol=1e-12, atol=1e-12):
+            return False
+    return True
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+@pytest.mark.feature("HIST.histogram_1d")
+@pytest.mark.feature("HIST.histogram_nd")
+@pytest.mark.parametrize("n", [pytest.param(n, marks=[] if n % 32 == 0 else [pytest.mark.xfail(**STRICT, reason="C1")])
+                               for n in C1_ROWS])
+def test_strict_c1_a_disabled_toggleable_range_alone_selects_exactly_the_tables_rows(node_session, tmp_path, n):
+    """C1: load (disabled), enable, narrow to [0.3, 0.7], disable, enable again without a move, back to full. At every
+    step the selected row list, both 1-D histograms, the 2-D histogram and the scatter's rows equal numpy. 32 rows: no
+    padding, a control. (An empty table is not here: the builder cannot make an automatic slider for it - numpy raises
+    'zero-size array' in makeSliderParameters; the filter itself with 0 rows is tested in C1's filter-level test.)"""
+    states = c1_run(node_session, tmp_path, n)
+    diffs = [c1_differences(g, w) for g, w in zip(states, c1_expected(n))]
+    if not any(diffs):
+        return
+    known_defect(_is_c1_phantom(states, n), "C1: the padding of the packed selection is selected as rows")
+    raise AssertionError(f"neither numpy nor C1's signature: {[(s[0], d) for s, d in zip(C1_STEPS, diffs) if d]}")
+
+
+# ---------------------------------------------- C1 and C2 at the filter level: the intersection of 2 to 257 range filters
+C2_N = 100
+C2_FILTERS = (2, 255, 256, 257)          # 255: packed counting (< 256 filters); 256, 257: one count per row
+
+
+def c2_document(tmp_path: Path, k: int, n: int = C2_N) -> Path:
+    """A table of n rows (a = linspace(-3, 3)), k range filters on a: [-1, 1], [-0.5, 2], the rest [-10, 10] (every
+    row), and their intersection. A Bokeh document of RootInteractive's own Python models."""
+    from bokeh.document import Document
+    from bokeh.models import ColumnDataSource
+    from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
+    from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
+    cds = ColumnDataSource(data={"a": np.linspace(-3.0, 3.0, n)}, name="c2_table")
+    ranges = [(-1.0, 1.0), (-0.5, 2.0)] + [(-10.0, 10.0)] * (k - 2)
+    fs = [RangeFilter(source=cds, field="a", range=r) for r in ranges]
+    doc = Document()
+    doc.add_root(LazyIntersectionFilter(filters=fs, name="c2_intersection"))
+    out = tmp_path / f"batch1_c2_{k}_{n}.json"
+    out.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    return out
+
+
+C2_JS = """(k) => {
+  const H = window.__riH;
+  const m = H.models().filter(x => x.type === 'LazyIntersectionFilter' && x.name === 'c2_intersection');
+  if (m.length !== 1 || m[0].filters.length !== k) throw new Error('intersection of ' + k + ' filters not found');
+  const f = m[0], f1 = f.filters[1];
+  const idx = () => Array.from(f.get_indices());
+  const length = () => f.v_compute().length;
+  const s0 = idx(), len0 = length();
+  const before = Array.from(f1.as_bits(null));
+  f1.active = false;
+  const s1 = idx(), mid = Array.from(f1.as_bits(null));
+  f1.active = true;
+  const s2 = idx();
+  return {packed: Boolean(f._vectorize), s0, s1, s2, vector_length: len0,
+          cache_kept: before.length === mid.length && before.every((x, i) => x === mid[i]), mid_all_ones: mid.every(x => x === -1)};
+}"""
+
+
+def c2_run(node_session, tmp_path, k: int, n: int = C2_N) -> dict:
+    report = ScenarioResult(id=f"batch1/c2/{k}/{n} [node]", outdir=str(tmp_path))
+    page = node_session.new_page(report)
+    page.goto(c2_document(tmp_path, k, n))
+    page.wait_for_function(page.load_condition)
+    got = page.evaluate(C2_JS, k)
+    assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
+    return got
+
+
+def c2_expected(n: int = C2_N) -> dict:
+    a = np.linspace(-3.0, 3.0, n)
+    both = np.flatnonzero(range_mask(a, -1.0, 1.0) & range_mask(a, -0.5, 2.0)).tolist()
+    return {"s0": both, "s1": np.flatnonzero(range_mask(a, -1.0, 1.0)).tolist(), "s2": both, "cache_kept": True}
+
+
+@_node
+@pytest.mark.feature("FILTER.intersection")
+@pytest.mark.parametrize("k", [pytest.param(k, marks=[pytest.mark.xfail(**STRICT, reason="C2")] if k >= 256 else [])
+                               for k in C2_FILTERS], ids=[f"{k}_filters" for k in C2_FILTERS])
+def test_strict_c2_disabling_a_filter_keeps_its_own_cached_selection(node_session, tmp_path, k):
+    """C2: the second of k filters is disabled and enabled again without a move. Its own cached bits must not change,
+    and the selection must be the intersection, then the first filter alone, then the intersection again. 2 and 255
+    filters (packed counting) are the controls."""
+    got = c2_run(node_session, tmp_path, k)
+    want = c2_expected()
+    assert got["packed"] == (k < 256)
+    if all(got[key] == want[key] for key in want):
+        return
+    known_defect(not got["cache_kept"] and got["mid_all_ones"] and got["s0"] == want["s0"] and got["s1"] == want["s1"]
+                 and got["s2"] == want["s1"], "C2: disabling wrote every bit of the filter's cache to 1")
+    raise AssertionError(f"neither numpy nor C2's signature: {got}")
+
+
+@_node
+@pytest.mark.feature("FILTER.intersection")
+@pytest.mark.parametrize("n", (0, 1, 31, 33))
+def test_c1_the_intersection_of_active_filters_selects_only_the_tables_rows(node_session, tmp_path, n):
+    """C1 at the filter level, with every filter active (the path that worked on 3658254): the selected rows are the
+    table's rows only, also for an empty table, and the selection vector is at least as long as the table."""
+    got = c2_run(node_session, tmp_path, 2, n)
+    want = c2_expected(n)
+    assert (got["s0"], got["s1"], got["s2"], got["cache_kept"]) == (want["s0"], want["s1"], want["s2"], True), got
+    assert got["vector_length"] >= n
+
+
+# ----------------------------------------------------------------- C3: the page comparator checks the whole structure
+def _profile_mutants(state: dict) -> dict:
+    """The review's wrong pages, each made from a right one: a later mean missing, the std missing a value, an extra
+    cell, and a finite value in an empty bin."""
+    empty = [i for i, n in enumerate(state["entries"]) if n == 0]
+    assert empty, "the state needs an empty profile bin for the last mutant"
+    return {"a later mean missing": dict(state, mean=state["mean"][:-1]),
+            "a std value missing": dict(state, std=state["std"][1:]),
+            "an extra cell": dict(state, mean=state["mean"] + [1.0], std=state["std"] + [1.0]),
+            "an empty bin with a value": dict(state, mean=[9999.0 if i == empty[0] else m for i, m in enumerate(state["mean"])])}
+
+
+@_unit
+@pytest.mark.parametrize("case", [("narrow", "lossless"), ("auto", "relative16")], ids=["narrow-lossless", "auto-relative16"])
+def test_c3_the_comparator_rejects_missing_extra_and_empty_bin_values(case):
+    """C3: each mutant of a right page, and of a page equal to the model of master's defects, is UNEXPLAINED - never
+    PASS and never a known defect."""
+    for model in (expected(*case), expected(*case, ALL_DEFECTS)):
+        k = next(i for i, s in enumerate(model) if any(n == 0 for n in s["entries"]))
+        for name, wrong in _profile_mutants(model[k]).items():
+            observed = [dict(s) for s in model]
+            observed[k] = wrong
+            verdict, _ = classify(observed, *case)
+            assert verdict == "UNEXPLAINED", (name, verdict)
+
+
+# ----------------------------------------------------------------- C4: the ends of a range slider
+def c4_document(tmp_path: Path) -> Path:
+    """Two range sliders: L on values near 1e9 (automatic limits, 30 steps), F on [0, 1] with explicit limits and a
+    fine step of 1e-12 (option bins = 1e12)."""
+    from bokeh.document import Document
+    import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
+    rng = np.random.default_rng(SEED + 11)
+    t = pd.DataFrame({"L": 1e9 + rng.uniform(0.0, 1.0, 200), "F": rng.uniform(0.0, 1.0, 200), "X": rng.uniform(0, 1, 200)})
+    shown = sa.show
+    sa.show = lambda *a, **k: None
+    try:
+        root = sa.bokehDrawSA.fromArray(
+            t, None, [[["bin_center"], ["bin_count"], {"source": "c4h"}]],
+            [["range", ["L"]], ["range", ["F", 0.0, 1.0], {"bins": 1e12}]],
+            sourceArray=[{"name": "c4h", "variables": ["X"], "nbins": 4, "range": [0.0, 1.0]}], aliasArray=[],
+            parameterArray=[], layout=[[0]], widgetLayout=[[0, 1]], arrayCompression=CODINGS["lossless"]).pAll
+    finally:
+        sa.show = shown
+    doc = Document()
+    doc.add_root(root)
+    out = tmp_path / "batch1_c4.json"
+    out.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    return out
+
+
+C4_JS = """async ([name, value]) => {
+  const H = window.__riH;
+  const s = H.slider(name);
+  if (!s) throw new Error('range widget ' + name + ' not found');
+  if (value !== null) s.value = value;
+  await H.settle([['c4h', 'bin_count', ['HistogramCDS']]], 50);
+  const f = H.models().filter(m => m.type === 'RangeFilter' && m.field === name);
+  if (f.length !== 1) throw new Error('range filter of ' + name + ' found ' + f.length + ' times');
+  return {start: s.start, end: s.end, step: s.step, range: Array.from(f[0].range, String)};
+}"""
+
+
+def _ulp(x: float) -> float:
+    return max(abs(x) * 2.0 ** -52, 5e-324)
+
+
+def endpoint_rule(start: float, end: float, step: float, value, open_ends: bool, rule: str) -> list:
+    """The filter range a slider value gives. rule 'v0.1' (3658254): within 1e-9 of the range of an end is that end.
+    rule 'half_step' (the revision): within half the distance from the end to the nearest slider position, and never
+    less than 4 float spacings of the end. Open ends give -inf / inf, explicit limits give the limit."""
+    span = end - start
+    if rule == "v0.1":
+        tol_lo = tol_hi = 1e-9 * abs(span)
+    else:
+        s = step if 0 < step <= span else span
+        gap = span - np.floor(span / s) * s
+        if not gap > 4 * _ulp(end):
+            gap = s
+        tol_lo, tol_hi = max(0.5 * s, 4 * _ulp(start)), max(0.5 * gap, 4 * _ulp(end))
+    lo = (-np.inf if open_ends else start) if value[0] <= start + tol_lo else value[0]
+    hi = (np.inf if open_ends else end) if value[1] >= end - tol_hi else value[1]
+    return [float(lo), float(hi)]
+
+
+def c4_cases(limits: dict) -> list:
+    """(slider, value, open ends): a full step inside (kept), one float spacing inside (the end), a fine legal step."""
+    (ls, le, lstep), (fs, fe, fstep) = limits["L"], limits["F"]
+    return [("L", [ls, le - lstep], True), ("L", [ls + lstep, le], True), ("L", [ls, le - _ulp(le)], True),
+            ("L", [ls + _ulp(ls), le], True), ("F", [fs, fe - fstep], False), ("F", [fs, np.nextafter(fe, 0.0)], False),
+            ("F", [fs + fstep, fe], False)]
+
+
+def c4_run(node_session, tmp_path) -> tuple:
+    report = ScenarioResult(id="batch1/c4 [node]", outdir=str(tmp_path))
+    page = node_session.new_page(report)
+    page.goto(c4_document(tmp_path))
+    page.wait_for_function(page.load_condition)
+    limits = {}
+    for name in ("L", "F"):
+        r = page.evaluate(C4_JS, [name, None])
+        limits[name] = (r["start"], r["end"], r["step"])
+    got = []
+    for name, value, _ in c4_cases(limits):
+        r = page.evaluate(C4_JS, [name, [float(v) for v in value]])
+        got.append([float(x) for x in r["range"]])
+    assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
+    return limits, got
+
+
+@_unit
+def test_c4_the_half_step_rule_keeps_every_slider_position_and_catches_float_noise():
+    """The revision's rule on its own: on a 30-step slider near 1e9 and a fine-step slider on [0, 1], a value one
+    step inside an end is kept; a value one float spacing inside is the end. The rule of 3658254 differs on both
+    sliders (it misses the float spacing near 1e9 and swallows the 1e-12 step)."""
+    limits = {"L": (1e9 + 0.01, 1e9 + 0.99, 0.98 / 30), "F": (0.0, 1.0, 1e-12)}
+    for name, value, open_ends in c4_cases(limits):
+        start, end, step = limits[name]
+        new = endpoint_rule(start, end, step, value, open_ends, "half_step")
+        lo_kept, hi_kept = value[0] != start, value[1] != end
+        if abs(value[1] - end) >= step * (1 - 1e-6) or abs(value[0] - start) >= step * (1 - 1e-6):
+            assert new == [value[0] if lo_kept else (-np.inf if open_ends else start),
+                           value[1] if hi_kept else (np.inf if open_ends else end)], (name, value, new)
+    old = [endpoint_rule(*limits[nm], v, o, "v0.1") for nm, v, o in c4_cases(limits)]
+    new = [endpoint_rule(*limits[nm], v, o, "half_step") for nm, v, o in c4_cases(limits)]
+    assert old != new and old[2] != new[2] and old[4] != new[4]
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+@pytest.mark.xfail(**STRICT, reason="C4")
+def test_strict_c4_slider_ends_follow_the_half_step_rule(node_session, tmp_path):
+    """C4: the filter range the page sets for each case equals the half-step rule (open ends for the automatic slider
+    L, the limit for F)."""
+    limits, got = c4_run(node_session, tmp_path)
+    cases = c4_cases(limits)
+    want = [endpoint_rule(*limits[nm], v, o, "half_step") for nm, v, o in cases]
+    if got == want:
+        return
+    old = [endpoint_rule(*limits[nm], v, o, "v0.1") for nm, v, o in cases]
+    known_defect(got == old, "C4: the page applies the 1e-9 rule of 3658254")
+    raise AssertionError(f"neither rule: {list(zip(cases, got, want))}")
