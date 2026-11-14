@@ -60,6 +60,12 @@ Added (review B3-N1): a gather chain on a page WITHOUT an event figure, so only 
 event column. Side effects: aliases that do not read the changed input keep their cached values; two tables whose
 aliases read each other settle after a change (no endless loop) with the right values.
 Rule 1 of plan v0.2: every condition of a verdict's OK has a wrong page in the falsifier that breaks only it.
+
+CORRECTED AFTER THE TEST REVIEW. Before the fix is written, the reviewers check the test-only commit (here 0149b82;
+summary by GPT28.RI). GPT27.RI found that verdicts accepted a read in which a column they do not look at threw an error
+(findings G5a-F1, G5a-F2). Now a read in which ANY column threw is never OK, and never KNOWN unless that error is
+itself the exact signature: every verdict asks `_clean` of every read reply it receives. The falsifier adds, for each
+verdict and each of its read replies, the same page with one more column that threw.
 """
 from pathlib import Path
 
@@ -70,7 +76,8 @@ import pytest
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import LOSSLESS
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms as hist_oracle
 from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_node_aliases import (
-    STEPS, STRICT, KnownDefect, _FakeSession, _build_error, _js_number, _num, _request, _run, _same, cached, read, set_)
+    STEPS, STRICT, KnownDefect, _FakeSession, _build_error, _clean, _js_number, _num, _request, _run, _same, _threw, cached,
+    read, set_)
 
 def _node(*marks):
     """Node test marks: the target node_aliases (PHASE_4_5 A1), backend, layer, then the given marks."""
@@ -218,7 +225,10 @@ H_ORACLE = EX[EV_IDX] * 2 + X
 
 def verdict_alias_over_gather(reply) -> str:
     """R2 (PHASE_3_1 review): h = "g*2+x" over the gathered alias g. OK: g and h equal numpy. KNOWN (A-D1): g is right,
-    h is a number column that is NaN in every row."""
+    h is a number column that is NaN in every row. Test review correction: no column threw (`_clean`), for OK and
+    KNOWN alike."""
+    if not _clean(reply):
+        return UNEXPLAINED
     g, gk = _column(reply, "g")
     h, hk = _column(reply, "h")
     if g is None or gk != "number" or not _same(g, EX[EV_IDX]):
@@ -249,7 +259,9 @@ def _ad1_text(column) -> list:
 
 def verdict_alias_of_alias_on_the_related_table(reply) -> str:
     """OK: ex2 and ex3 equal numpy (fill row NaN). KNOWN (A-D1): ex2 is right, ex3 is the text of the whole column ex2
-    plus "1" in every row."""
+    plus "1" in every row. Test review correction: no column threw (`_clean`)."""
+    if not _clean(reply):
+        return UNEXPLAINED
     ex2, k2 = _column(reply, "ex2")
     if ex2 is None or k2 != "number" or not _same(ex2, EX2):
         return UNEXPLAINED
@@ -279,6 +291,8 @@ def verdict_chain_of_depth_3(err, reply) -> str:
     h3 equal numpy. KNOWN (A-D5): the build fails exactly with the A-D5 error for ex3."""
     if err is not None:
         return KNOWN if tuple(err) == AD5_CHAIN_SIGNATURE else UNEXPLAINED
+    if not _clean(reply):                                       # test review correction
+        return UNEXPLAINED
     g3, gk = _column(reply, "g3")
     h3, hk = _column(reply, "h3")
     ok = (g3 is not None and gk == "number" and _same(g3, EX3[EV_IDX])
@@ -306,6 +320,8 @@ def verdict_selector_in_a_gather(err, before, after) -> str:
     to y it is ex[evIdx]*y. KNOWN (A-D3): the build fails exactly with KeyError 'cdsFull' in bokehDrawArray."""
     if err is not None:
         return KNOWN if tuple(err) == AD3_SIGNATURE else UNEXPLAINED
+    if not _clean(before, after):                               # test review correction
+        return UNEXPLAINED
     b, bk = _column(before, "sg")
     a, ak = _column(after, "sg")
     ok = (b is not None and bk == "number" and _same(b, EX[EV_IDX] * X)
@@ -331,12 +347,15 @@ C_FUNC = {"name": "C", "variables": ["g"], "func": "return g+1"}       # the fun
 def verdict_gather_follows_the_table(before, ev_after, after) -> str:
     """g = ev.ex[evIdx] and C = g + 1 (function form), then the event table gets new values. OK: before and after, g
     and C equal numpy with the table's values at that time. KNOWN (A-D6): before right, the event table has the new
-    values, and g and C still have exactly the old ones."""
+    values, and g and C still have exactly the old ones. Test review correction: no column threw in any of the
+    three reads."""
     def same(reply, ex):
         g, gk = _column(reply, "g")
         c, ck = _column(reply, "C")
         return (g is not None and gk == "number" and _same(g, ex[EV_IDX])
                 and c is not None and ck == "number" and _same(c, ex[EV_IDX] + 1))
+    if not _clean(before, ev_after, after):
+        return UNEXPLAINED
     ev, evk = _column(ev_after, "ex")
     if not same(before, EX) or ev is None or not _same(ev, EX_NEW):
         return UNEXPLAINED
@@ -401,6 +420,8 @@ def verdict_related_table_only(err, reply) -> str:
     KeyError 'cdsOrig' at the end of bokehDrawArray, which returns the main table's model although no figure made it."""
     if err is not None:
         return KNOWN if tuple(err) == R4_SIGNATURE else UNEXPLAINED
+    if not _clean(reply):                                       # test review correction
+        return UNEXPLAINED
     ex, k1 = _column(reply, "ex")
     ex2, k2 = _column(reply, "ex2")
     ok = ex is not None and k1 == "number" and _same(ex, EX) and ex2 is not None and k2 == "number" and _same(ex2, EX2)
@@ -479,7 +500,10 @@ def verdict_dictionary_inputs(before, s, cache, after) -> str:
     OK: before (pa = 2) every column equals numpy; the slider's callbacks ran without error; right after the change to
     pa = 3 none of g, L, U, D1, D2, D3 is in the cache, while K and D4 still are (side effect: an alias that does not
     read the changed input is not thrown away); after it every column equals numpy with pa = 3. KNOWN (A-D11): all of
-    that, except that D1, D2 and D3 are still in the cache and equal exactly their values before the change."""
+    that, except that D1, D2 and D3 are still in the cache and equal exactly their values before the change. Test
+    review correction (finding G5a-F2): no column threw in either read, for OK and KNOWN alike."""
+    if not _clean(before, after):
+        return UNEXPLAINED
     names = list(_dict_oracle(2.0))
     if not _right(before, _dict_oracle(2.0), names) or s["callbacks"] < 1 or s["errors"]:
         return UNEXPLAINED
@@ -515,7 +539,10 @@ def verdict_dictionary_inputs_async(first, cache, after) -> str:
     dictionary. The first read of A2 comes while A1's Promise is pending, so A2 is computed from A1's placeholder
     (zeros): 1 in every row - required, it shows the asynchronous path was taken. OK: once the Promise has settled, A1
     equals numpy, A2 is no longer in the cache, and reading it gives g*10 + 1. KNOWN (A-D11): A1 right, and A2 still in
-    the cache with exactly 1 in every row."""
+    the cache with exactly 1 in every row. Test review correction (finding G5a-F2): no column threw in either
+    read."""
+    if not _clean(first, after):
+        return UNEXPLAINED
     a2_first, _ = _column(first, "A2")
     if a2_first is None or not _same(a2_first, np.ones(N_TR)):
         return UNEXPLAINED
@@ -548,7 +575,7 @@ def verdict_chain_without_an_event_figure(ev_keys, before, after) -> str:
     """Review B3-N1: ex2 = ex*2 and ex3 = ex2+1 on the event table, g3 = ev.ex3[evIdx] on the track table, and no figure
     of the event table, so only g3's own dependencies can send `ex`. OK: `ex` was sent, nothing threw, g3 equals numpy
     (orphans NaN), and after the event table's `ex` changes g3 equals numpy with the new values."""
-    if "ex" not in ev_keys or before["throws"] or after["throws"]:
+    if "ex" not in ev_keys or not _clean(before, after):
         return UNEXPLAINED
     b, _ = _column(before, "g3")
     a, _ = _column(after, "g3")
@@ -743,6 +770,38 @@ def test_falsifier_every_verdict_rejects_wrong_pages():
     assert verdict_chain_without_an_event_figure(["evIdx", "ex"], _reply(g3=EX2[EV_IDX]), na) == UNEXPLAINED
     assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, nb) == UNEXPLAINED     # did not follow the change
     assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, _reply()) == UNEXPLAINED
+    # the test review's wrong pages (GPT27, findings G5a-F1, G5a-F2): each verdict, each of its read replies in turn,
+    # one more column that threw - never OK; on a KNOWN page that is not itself an error, never KNOWN
+    def each_threw(verdict, pages, fixed=(), after_fixed=()):
+        """The verdict's answer for `pages` with reply i thrown, for each i."""
+        return [verdict(*fixed, *[_threw(p) if j == i else p for j, p in enumerate(pages)], *after_fixed)
+                for i in range(len(pages))]
+    cases = [   # (name, verdict, fixed args before, read pages, fixed args after, what the healthy pages give)
+        ("A-D1 R2", verdict_alias_over_gather, (), [_reply(g=g, h=H_ORACLE)], (), OK),
+        ("A-D1 R2 known", verdict_alias_over_gather, (), [_reply(g=g, h=nan)], (), KNOWN),
+        ("A-D1 event", verdict_alias_of_alias_on_the_related_table, (), [_reply(ex2=EX2, ex3=EX3)], (), OK),
+        ("A-D1 event known", verdict_alias_of_alias_on_the_related_table, (), [_reply(ex2=EX2, ex3=_ad1_text(EX2))], (), KNOWN),
+        ("A-D5", verdict_chain_of_depth_3, (None,), [_reply(g3=EX3[EV_IDX], h3=H3_ORACLE)], (), OK),
+        ("A-D3", verdict_selector_in_a_gather, (None,), [before, after], (), OK),
+        ("A-D6", verdict_gather_follows_the_table, (), [old, ev_new, new], (), OK),
+        ("A-D6 known", verdict_gather_follows_the_table, (), [old, ev_new, old], (), KNOWN),
+        ("R-4", verdict_related_table_only, (None,), [_reply(ex=EX, ex2=EX2)], (), OK),
+        ("B3-N1", verdict_chain_without_an_event_figure, (["evIdx", "ex"],), [nb, na], (), OK),
+        ("A-D4", verdict_gather_alone, (keys,), [good], (), OK),
+    ]
+    for name, verdict, fixed, pages, after_fixed, healthy in cases:
+        assert verdict(*fixed, *pages, *after_fixed) == healthy, name
+        assert each_threw(verdict, pages, fixed, after_fixed) == [UNEXPLAINED] * len(pages), name
+    # A-D11: the read replies are before and after (synchronous), first and after (asynchronous)
+    for bb, aa, cc, healthy in ((b, a, cache, OK), (b, stale, stale_cache, KNOWN)):
+        assert verdict_dictionary_inputs(bb, s, cc, aa) == healthy
+        assert verdict_dictionary_inputs(_threw(bb), s, cc, aa) == UNEXPLAINED                # test review: before
+        assert verdict_dictionary_inputs(bb, s, cc, _threw(aa)) == UNEXPLAINED                # test review: after
+    for ff, cc, aa, healthy in ((first, a_cache, a_after, OK),
+                                (first, {"cached": ["A1", "A2", "g"]}, _reply(g=g2, A1=g2 * 10, A2=np.ones(N_TR)), KNOWN)):
+        assert verdict_dictionary_inputs_async(ff, cc, aa) == healthy
+        assert verdict_dictionary_inputs_async(_threw(ff), cc, aa) == UNEXPLAINED             # test review: first
+        assert verdict_dictionary_inputs_async(ff, cc, _threw(aa)) == UNEXPLAINED             # test review: after
 
 
 @_unit

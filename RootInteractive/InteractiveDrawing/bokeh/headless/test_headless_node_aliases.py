@@ -55,6 +55,12 @@ the wrong pages the reviewers built. New tests of the plain alias forms (review 
 of an alias, a constant and a parameter each read directly, before and after the parameter changes; an alias inside a
 function and an alias read through an index; an alias kind that is refused, by name. D-B4 is decided (2026-11-14,
 the Architect): the browser operators stay as today, so A-D8 stays a strict expected failure.
+
+CORRECTED AFTER THE TEST REVIEW. Before the fix is written, the reviewers check the test-only commit (here 0149b82;
+summary by GPT28.RI). GPT27.RI found that a verdict accepted a read in which a column it does not look at threw an
+error (finding G5a-F1). Now a read in which ANY column threw is never OK, and never KNOWN unless that error is itself
+the exact signature (`_clean`). The first v0.2 version had dropped the no-error check that `_complete` made in
+`_ad6`; `verdict_ad6` makes it again.
 """
 import copy
 import json
@@ -616,6 +622,13 @@ def _ad4(node_session, tmp_path):
 OK, KNOWN, UNEXPLAINED = "OK", "KNOWN", "UNEXPLAINED"
 
 
+def _clean(*replies) -> bool:
+    """Correction after the test review (finding G5a-F1): every read reply is there and no column threw an error while
+    being read - any column, not only the one a verdict looks at. A read with an error is never OK, and never KNOWN
+    unless that error IS the exact signature."""
+    return all(r is not None and not r.get("throws") for r in replies)
+
+
 def _g(reply, key="g"):
     """A number column of a read step, as float64; None if it threw, is missing, or is not all numbers."""
     if reply is None or key in reply["throws"] or reply["columns"].get(key) is None or reply["kinds"].get(key) != "number":
@@ -678,7 +691,10 @@ def _ad6(node_session, tmp_path):
 def verdict_ad6(before, ev, after) -> str:
     """A-D6. OK: before the change g equals the old event values gathered (Batch 3 v0.2, review B3-C4: checked again),
     the event table has the new values, and after the change g equals the new values gathered. KNOWN: before right, the
-    table new, and g after the change exactly the old values."""
+    table new, and g after the change exactly the old values. Correction after the test review (finding G5a-F1): no
+    column threw in any of the three reads, for OK and for KNOWN alike (v0.1 required it through `_complete`)."""
+    if not _clean(before, ev, after):
+        return UNEXPLAINED
     b, a, evx = _g(before), _g(after), _g(ev, "ex")
     if b is None or not _same(b, EV[DF.evIdx]) or evx is None or not _same(evx, EV_NEW):
         return UNEXPLAINED
@@ -829,6 +845,13 @@ def _fake_read(**cols):
     return r
 
 
+def _threw(reply):
+    """The same read, but one more column, not looked at by the verdict, threw an error: the wrong page of the test
+    review (findings G5a-F1, G5a-F2)."""
+    return {**reply, "throws": {**reply["throws"], "zz": "unexpected error"},
+            "throw_kinds": {**reply["throw_kinds"], "zz": "Error"}}
+
+
 def _off(a):
     """One finite value moved by 1."""
     b = np.array(a, dtype=float)
@@ -845,6 +868,8 @@ def test_falsifier_the_migrated_verdicts_reject_wrong_pages():
     sig = {"columns": {}, "kinds": {}, "throws": {"g": "Cannot read properties of null (reading '0')"},
            "throw_kinds": {"g": "TypeError"}}
     assert verdict_ad4(_fake_read(g=g_old), ["evIdx", "ex"]) == OK
+    assert verdict_ad4(_threw(_fake_read(g=g_old)), ["evIdx", "ex"]) == UNEXPLAINED          # test review: another column threw
+    assert verdict_ad4(_threw(sig), ["evIdx"]) == UNEXPLAINED                                  # more than the signature
     assert verdict_ad4(sig, ["evIdx"]) == KNOWN
     assert verdict_ad4(_fake_read(g=g_old), ["evIdx"]) == UNEXPLAINED                    # B3-C2: ex not sent
     assert verdict_ad4({**_fake_read(g=g_old), "throws": {"h": "x"}, "throw_kinds": {"h": "Error"}},
@@ -862,6 +887,11 @@ def test_falsifier_the_migrated_verdicts_reject_wrong_pages():
     assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read(g=_off(g_new))) == UNEXPLAINED
     assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read()) == UNEXPLAINED            # g missing after
     assert verdict_ad6(_fake_read(), ev_new, _fake_read(g=g_new)) == UNEXPLAINED            # g missing before
+    # the test review's wrong pages (GPT27, finding G5a-F1): another column threw in one of the three reads
+    ok_pages, known_pages = [_fake_read(g=g_old), ev_new, _fake_read(g=g_new)], [_fake_read(g=g_old), ev_new, _fake_read(g=g_old)]
+    for i in range(3):
+        assert verdict_ad6(*[_threw(r) if j == i else r for j, r in enumerate(ok_pages)]) == UNEXPLAINED, i
+        assert verdict_ad6(*[_threw(r) if j == i else r for j, r in enumerate(known_pages)]) == UNEXPLAINED, i
     # A-D9: the reviewers' page (B3-C3): the server right, the browser alias wrong
     with np.errstate(all="ignore"):
         cosh, sinh = np.cosh(P / 1e9), np.sinh(P / 1e9)
