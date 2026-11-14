@@ -41,9 +41,22 @@ Findings (provisional ids):
 FIX COMMIT (PHASE_5 Batch 3 fix CRR v0.1, Claude20.RI, 2026-11-14): A-D1 to A-D7 and A-D9 are fixed (compileVarName.py,
 bokehTools.py, CDSAlias.ts). Their strict marks are off and their signature tests are removed: every page must equal
 numpy. The old exact signatures stay as REGRESSION checks: a page showing one again is an ordinary failure that names
-the defect. A-D8 is not part of this fix (the Architect's decision D-B4 is open): its signature test and its strict
-expected failure stay.
+the defect. A-D8 is not part of this fix: its signature test and its strict expected failure stay.
+
+BATCH 3 v0.2 (PHASE_5 Batch 3 review summary v0.1, GPT28.RI; plan v0.2 approved 2026-11-14). The fix commit above
+dropped checks when it removed the signature tests; v0.2 puts them back and closes two more gaps the reviewers found:
+  * A-D9 (review B3-C3): the cosh test checks the browser alias again, not only the server column;
+  * A-D6 (B3-C4): the gather test checks the values before the change again, not only after;
+  * A-D4 (B3-C2, in its PHASE_4 form here): OK needs the event column `ex` sent, not only the right numbers;
+  * every Node request (B3-C5): `_request` fails the test on any error the page reports (an uncaught exception, an
+    unhandled rejection, console.error), even when the numbers read are right.
+Each of these is now a pure verdict function, and `test_falsifier_the_migrated_verdicts_reject_wrong_pages` feeds it
+the wrong pages the reviewers built. New tests of the plain alias forms (review B3-N2; GPT30 F3, GPT31 F4): an alias
+of an alias, a constant and a parameter each read directly, before and after the parameter changes; an alias inside a
+function and an alias read through an index; an alias kind that is refused, by name. D-B4 is decided (2026-11-14,
+the Architect): the browser operators stay as today, so A-D8 stays a strict expected failure.
 """
+import copy
 import json
 from pathlib import Path
 
@@ -157,15 +170,31 @@ def _build_error(tmp_path, df, figures, widgets=(), **options):
     return None
 
 
+def _healthy(reply: dict, where: str) -> None:
+    """Batch 3 v0.2 (review B3-C5): the page must report no error. An error the page raised (`page_errors`: an uncaught
+    exception, an unhandled rejection) or logged (`console_errors`: console.error) fails the test, even when the numbers
+    read are right: a right number from a broken page proves nothing. Never a KnownDefect."""
+    errors = ([f"page error: {e}" for e in reply.get("page_errors", [])]
+              + [f"console.error: {e}" for e in reply.get("console_errors", [])])
+    if errors:
+        pytest.fail(f"{where}: the page reported errors: {errors}")
+
+
+def _request(node_session, op: str, **kw) -> dict:
+    """One request to the Node harness: the reply must be ok and the page healthy (B3-C5)."""
+    r = node_session.request(op, **kw)
+    if not r.get("ok"):
+        pytest.fail(f"Node harness {op} failed: {r}")
+    _healthy(r, op)
+    return r
+
+
 def _run(node_session, path: Path, steps: list) -> list:
-    """The production model's replies, one per step. A harness problem fails the test (never a KnownDefect)."""
+    """The production model's replies, one per step. A harness problem or an error the page reports fails the test
+    (never a KnownDefect)."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
-    r = node_session.request("new_doc", path=str(path))
-    if not r.get("ok"):
-        pytest.fail(f"Node harness could not load the document: {r}")
-    r = node_session.request("eval", code=STEPS, arg={"steps": steps})
-    if not r.get("ok"):
-        pytest.fail(f"Node harness eval failed: {r}")
+    _request(node_session, "new_doc", path=str(path))
+    r = _request(node_session, "eval", code=STEPS, arg={"steps": steps})
     out = decode(r["result"])
     bad = [o for o in out if "error" in o]
     if bad:
@@ -518,6 +547,50 @@ def test_control_a_d2_the_renamed_column_last_costs_only_itself(node_session, tm
     _expect(node_session, tmp_path, [("A", "x*2"), ("xx", "x")], {"A": X * 2})
 
 
+FORMS = [("A", "x*2"), ("B", "A"), ("k", "3"), ("p", "pa"), ("tail", "y+1")]
+
+
+@pytest.mark.feature("ALIAS.cdsalias")
+@pytest.mark.feature("ALIAS.parameter")
+def test_every_plain_alias_form_has_its_own_value_and_follows_its_parameter(node_session, tmp_path):
+    """Batch 3 v0.2 (review B3-N2; GPT30 F3, GPT31 F4): the plain aliases the A-D2 fix admits besides a renamed column
+    (tested above), each read directly - an alias of an alias (B = A), a constant (k = 3), a parameter (p = pa) - and
+    the aliases around them (A, tail). Before and after the parameter changes, every column equals numpy; only p
+    changes."""
+    path = _build(tmp_path, DF, _shown(*[n for n, _ in FORMS]), PA_SLIDER, aliasArray=FORMS, parameterArray=PA)
+    names = [n for n, _ in FORMS]
+    before, s, after = _run(node_session, path, [read("cdsFull", *names), set_("pa", 3.0), read("cdsFull", *names)])
+    assert s["callbacks"] >= 1 and not s["errors"], s
+    for r, pa in ((before, 2.0), (after, 3.0)):
+        _complete(r, names)
+        want = {"A": X * 2, "B": X * 2, "k": np.full(len(X), 3.0), "p": np.full(len(X), pa), "tail": Y + 1}
+        for k in names:
+            assert _same(_num(r["columns"][k]), want[k]), (k, pa, r["columns"][k])
+
+
+REFUSED = ("NotImplementedError", "alias 'f': the expression 'sin' is not a column expression (js_lambda)",
+           "bokehTools.py:bokehDrawArray")
+
+
+@pytest.mark.feature("ALIAS.cdsalias")
+def test_an_alias_that_is_not_a_column_expression_is_refused_by_name(tmp_path):
+    """Batch 3 v0.2 (B3-N2, GPT30 F3): an expression that is not a column - here a bare function name - stops the page
+    build with an error that names the alias and its expression (before the A-D2 fix it silently removed itself and
+    every later alias)."""
+    assert _build_error(tmp_path, DF, _shown("A"), aliasArray=[("f", "sin"), ("A", "x*2")]) == REFUSED
+
+
+@pytest.mark.feature("ALIAS.chain")
+@pytest.mark.feature("DSL.math_functions")
+@pytest.mark.feature("DSL.gather_operation")
+def test_an_alias_inside_a_function_and_read_through_an_index(node_session, tmp_path):
+    """Batch 3 v0.2 (GPT31 F4): the row-by-row reading of an alias (the A-D1 fix) inside a function call, and an alias
+    of the same table read through an index column (A[evIdx]: row i reads A at row evIdx[i])."""
+    with np.errstate(all="ignore"):
+        _expect(node_session, tmp_path, [("A", "x*2+y"), ("ca", "cos(A)"), ("sa", "A[evIdx]")],
+                {"ca": np.cos(A_VALUES), "sa": A_VALUES[DF.evIdx]}, rtol=MATH_RTOL, kinds=("number",))
+
+
 # ===================================================================================== A-D3 column selector in an expression
 AD3_SIGNATURE = ("KeyError", "cdsFull", "bokehTools.py:bokehDrawArray")
 SEL = [{"name": "sel", "value": "x", "options": ["x", "y"]}]
@@ -540,12 +613,36 @@ def _ad4(node_session, tmp_path):
     return _run(node_session, path, [read("cdsFull", "g"), {"op": "keys", "table": "ev"}])
 
 
+OK, KNOWN, UNEXPLAINED = "OK", "KNOWN", "UNEXPLAINED"
+
+
+def _g(reply, key="g"):
+    """A number column of a read step, as float64; None if it threw, is missing, or is not all numbers."""
+    if reply is None or key in reply["throws"] or reply["columns"].get(key) is None or reply["kinds"].get(key) != "number":
+        return None
+    return _num(reply["columns"][key])
+
+
+def verdict_ad4(r, ev_keys) -> str:
+    """A-D4. OK (Batch 3 v0.2, review B3-C2): the event table's column `ex` was sent, nothing threw, and g equals
+    numpy - the right numbers alone are not enough, the test is about sending the column. KNOWN: `ex` not sent and
+    reading g throws exactly TypeError "Cannot read properties of null (reading '0')"."""
+    g = _g(r)
+    if "ex" in ev_keys and not r["throws"] and g is not None and _same(g, EV[DF.evIdx]):
+        return OK
+    if ("ex" not in ev_keys and r["throws"] == {"g": "Cannot read properties of null (reading '0')"}
+            and r["throw_kinds"] == {"g": "TypeError"}):
+        return KNOWN
+    return UNEXPLAINED
+
+
 @pytest.mark.feature("DSL.gather_operation")
 def test_strict_a_gather_alias_alone_equals_numpy_indexing(node_session, tmp_path):
     r, keys = _ad4(node_session, tmp_path)
-    if not r["throws"] and _same(_num(r["columns"]["g"]), EV[DF.evIdx]):
+    verdict = verdict_ad4(r, keys["keys"])
+    if verdict == OK:
         return
-    regression("ex" not in keys["keys"] and r["throws"] == {"g": "Cannot read properties of null (reading '0')"}, "A-D4")
+    regression(verdict == KNOWN, "A-D4")
     raise AssertionError(f"A-D4: neither numpy nor the A-D4 signature: {r}, {keys}")
 
 
@@ -575,20 +672,32 @@ def _ad6(node_session, tmp_path):
                   aliasArray=[("g", "ev.ex[evIdx]")])
     before, _, ev, after = _run(node_session, path, [read("cdsFull", "g"), {"op": "mutate", "table": "ev", "data": {"ex": EV_NEW}},
                                                      read("ev_full", "ex"), read("cdsFull", "g")])
-    _complete(before, ["g"])
-    _complete(after, ["g"])
-    assert _same(_num(ev["columns"]["ex"]), EV_NEW), ev            # the gathered table has the new values
-    return before, after
+    return before, ev, after
+
+
+def verdict_ad6(before, ev, after) -> str:
+    """A-D6. OK: before the change g equals the old event values gathered (Batch 3 v0.2, review B3-C4: checked again),
+    the event table has the new values, and after the change g equals the new values gathered. KNOWN: before right, the
+    table new, and g after the change exactly the old values."""
+    b, a, evx = _g(before), _g(after), _g(ev, "ex")
+    if b is None or not _same(b, EV[DF.evIdx]) or evx is None or not _same(evx, EV_NEW):
+        return UNEXPLAINED
+    if a is not None and _same(a, np.array(EV_NEW)[DF.evIdx]):
+        return OK
+    if a is not None and _same(a, EV[DF.evIdx]):
+        return KNOWN
+    return UNEXPLAINED
 
 
 @pytest.mark.feature("ALIAS.change_propagation")
 @pytest.mark.feature("DSL.gather_operation")
 def test_strict_a_gather_alias_follows_the_gathered_table(node_session, tmp_path):
-    before, after = _ad6(node_session, tmp_path)
-    if _same(_num(after["columns"]["g"]), np.array(EV_NEW)[DF.evIdx]):
+    before, ev, after = _ad6(node_session, tmp_path)
+    verdict = verdict_ad6(before, ev, after)
+    if verdict == OK:
         return
-    regression(_same(_num(after["columns"]["g"]), EV[DF.evIdx]), "A-D6")
-    raise AssertionError(f"A-D6: neither numpy nor the A-D6 signature: {after}")
+    regression(verdict == KNOWN, "A-D6")
+    raise AssertionError(f"A-D6: neither numpy nor the A-D6 signature: {before}, {ev}, {after}")
 
 
 # ===================================================================================== A-D7 automatic fields
@@ -679,11 +788,24 @@ def test_control_where_the_semantics_agree_both_paths_agree(node_session, tmp_pa
 @pytest.mark.feature("DSL.server_client_parity")
 def test_strict_server_cosh_equals_numpy(node_session, tmp_path):
     alias, server = _two_paths(node_session, tmp_path, "cosh(x/1e9)")
+    verdict = verdict_ad9(alias, server)
+    if verdict == OK:
+        return
+    regression(verdict == KNOWN, "A-D9")
+    raise AssertionError(f"A-D9: neither numpy nor the A-D9 signature: alias {list(alias)}, server {list(server)}")
+
+
+def verdict_ad9(alias, server) -> str:
+    """A-D9. OK: the alias (computed in the browser) and the server column both equal numpy's cosh (Batch 3 v0.2, review
+    B3-C3: the browser alias is checked again). KNOWN: the alias right and the server column exactly numpy's sinh."""
     with np.errstate(all="ignore"):
-        if _same(server, np.cosh(P / 1e9), MATH_RTOL):
-            return
-        regression(_same(server, np.sinh(P / 1e9)), "A-D9")
-    raise AssertionError(f"A-D9: neither numpy nor the A-D9 signature: {list(server)}")
+        want, sinh = np.cosh(P / 1e9), np.sinh(P / 1e9)
+    alias_right = _same(alias, want, MATH_RTOL)
+    if alias_right and _same(server, want, MATH_RTOL):
+        return OK
+    if alias_right and _same(server, sinh):
+        return KNOWN
+    return UNEXPLAINED
 
 
 # ===================================================================================== the harness itself
@@ -696,6 +818,91 @@ def test_control_the_comparison_sees_nan_position_infinity_sign_and_one_ulp():
     assert not _same(a, np.array([np.nextafter(1.0, 2.0), np.nan, np.inf]))
     assert _same(a, np.array([np.nextafter(1.0, 2.0), np.nan, np.inf]), MATH_RTOL)
     assert not _same(a, a[:2])
+
+
+def _fake_read(**cols):
+    """A fake read step: number columns from arrays."""
+    r = {"columns": {}, "kinds": {}, "throws": {}, "throw_kinds": {}}
+    for k, v in cols.items():
+        r["columns"][k] = [None if np.isnan(x) else float(x) for x in np.asarray(v, dtype=float)]
+        r["kinds"][k] = "number"
+    return r
+
+
+def _off(a):
+    """One finite value moved by 1."""
+    b = np.array(a, dtype=float)
+    b[np.flatnonzero(np.isfinite(b))[0]] += 1.0
+    return b
+
+
+def test_falsifier_the_migrated_verdicts_reject_wrong_pages():
+    """Batch 3 v0.2 (review B3-C2 to B3-C4; plan v0.2, rule 1: every condition of an OK gets a wrong page that breaks
+    only that condition). Each verdict says OK for the oracle, KNOWN for the exact old signature, and UNEXPLAINED for
+    every wrong page - first of all the one the reviewers built."""
+    g_old, g_new = EV[DF.evIdx], np.array(EV_NEW)[DF.evIdx]
+    # A-D4: the reviewers' page (B3-C2): the right numbers, but `ex` never sent
+    sig = {"columns": {}, "kinds": {}, "throws": {"g": "Cannot read properties of null (reading '0')"},
+           "throw_kinds": {"g": "TypeError"}}
+    assert verdict_ad4(_fake_read(g=g_old), ["evIdx", "ex"]) == OK
+    assert verdict_ad4(sig, ["evIdx"]) == KNOWN
+    assert verdict_ad4(_fake_read(g=g_old), ["evIdx"]) == UNEXPLAINED                    # B3-C2: ex not sent
+    assert verdict_ad4({**_fake_read(g=g_old), "throws": {"h": "x"}, "throw_kinds": {"h": "Error"}},
+                       ["evIdx", "ex"]) == UNEXPLAINED                                     # another column threw
+    assert verdict_ad4(_fake_read(g=_off(g_old)), ["evIdx", "ex"]) == UNEXPLAINED         # a value off
+    assert verdict_ad4({**_fake_read(g=g_old), "kinds": {"g": "number,string"}}, ["evIdx", "ex"]) == UNEXPLAINED
+    assert verdict_ad4(sig, ["evIdx", "ex"]) == UNEXPLAINED                                 # sent, but still throws
+    assert verdict_ad4({**sig, "throw_kinds": {"g": "Error"}}, ["evIdx"]) == UNEXPLAINED    # a partial signature
+    # A-D6: the reviewers' page (B3-C4): wrong before the change, right after
+    ev_new, ev_old = _fake_read(ex=EV_NEW), _fake_read(ex=EV)
+    assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read(g=g_new)) == OK
+    assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read(g=g_old)) == KNOWN
+    assert verdict_ad6(_fake_read(g=np.full(len(X), -9000.0)), ev_new, _fake_read(g=g_new)) == UNEXPLAINED   # B3-C4
+    assert verdict_ad6(_fake_read(g=g_old), ev_old, _fake_read(g=g_new)) == UNEXPLAINED   # the table did not change
+    assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read(g=_off(g_new))) == UNEXPLAINED
+    assert verdict_ad6(_fake_read(g=g_old), ev_new, _fake_read()) == UNEXPLAINED            # g missing after
+    assert verdict_ad6(_fake_read(), ev_new, _fake_read(g=g_new)) == UNEXPLAINED            # g missing before
+    # A-D9: the reviewers' page (B3-C3): the server right, the browser alias wrong
+    with np.errstate(all="ignore"):
+        cosh, sinh = np.cosh(P / 1e9), np.sinh(P / 1e9)
+    assert verdict_ad9(cosh, cosh) == OK
+    assert verdict_ad9(cosh, sinh) == KNOWN
+    assert verdict_ad9(np.full(len(P), -9000.0), cosh) == UNEXPLAINED                       # B3-C3
+    assert verdict_ad9(sinh, cosh) == UNEXPLAINED
+    assert verdict_ad9(sinh, sinh) == UNEXPLAINED                                           # both wrong
+    assert verdict_ad9(cosh, _off(cosh)) == UNEXPLAINED
+
+
+class _FakeSession:
+    """Replies from a list, in order: the Node harness without Node."""
+    def __init__(self, replies):
+        self.replies = list(replies)
+
+    def request(self, op, **kw):
+        return self.replies.pop(0)
+
+
+HEALTHY = [{"ok": True, "result": {"leftover_timers": 0}, "page_errors": [], "console_errors": []},
+           {"ok": True, "result": [_fake_read(g=EV[DF.evIdx])], "page_errors": [], "console_errors": []}]
+
+
+def test_falsifier_a_page_error_fails_the_node_request():
+    """Batch 3 v0.2 (review B3-C5): right numbers from a page that reported an error fail the test - an uncaught
+    exception, an unhandled rejection or a console.error, on loading the page or on reading it. A healthy reply passes,
+    and a reply that is not ok fails."""
+    out = _run(_FakeSession(copy.deepcopy(HEALTHY)), Path("page.json"), [read("cdsFull", "g")])
+    assert _same(_num(out[0]["columns"]["g"]), EV[DF.evIdx])
+    for where in (0, 1):                                                       # new_doc, then eval
+        for key, error in (("page_errors", "uncaught exception: unrelated failure"),
+                           ("page_errors", "unhandled rejection: boom"), ("console_errors", "TypeError: x is null")):
+            replies = copy.deepcopy(HEALTHY)
+            replies[where][key] = [error]
+            with pytest.raises(pytest.fail.Exception, match="the page reported errors"):
+                _run(_FakeSession(replies), Path("page.json"), [read("cdsFull", "g")])
+        replies = copy.deepcopy(HEALTHY)
+        replies[where]["ok"] = False
+        with pytest.raises(pytest.fail.Exception, match="Node harness .* failed"):
+            _run(_FakeSession(replies), Path("page.json"), [read("cdsFull", "g")])
 
 
 def test_control_the_javascript_helpers():

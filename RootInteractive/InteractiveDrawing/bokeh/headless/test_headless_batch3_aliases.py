@@ -46,6 +46,20 @@ in the browser) waits for the Architect's decision D-B4; its tests are added the
 FIX COMMIT (PHASE_5 Batch 3 fix CRR v0.1, Claude20.RI, 2026-11-14): A-D1, A-D3, A-D4, A-D5 and A-D6 are fixed. The
 strict marks are off: every page must equal numpy. A page that equals an old exact signature (the verdict KNOWN) is now
 a REGRESSION, an ordinary failure that names the defect; the falsifier still checks every verdict.
+
+BATCH 3 v0.2 TESTS (review summary v0.1, GPT28.RI; plan v0.2 approved 2026-11-14). What the reviewers found, reproduced:
+  * A-D11 (new; review B3-C1): an alias whose inputs are listed as a DICTIONARY ({"lhs": "g"}, {"terms": ["g", "x"]}) is
+    not recomputed when an input changes; it keeps its old values. In production this form is used by ONNX model
+    aliases (OrtFunction, "variables": {"float_input": [...]}); onnxruntime does not run in Node, so the tests give the
+    PRODUCTION alias model (CDSAlias) small test transforms that take a dictionary, as OrtFunction does. Synchronous and
+    asynchronous (a Promise, as OrtFunction returns). Strict expected failures with the exact signature.
+  * B3-C2: `verdict_gather_alone` said OK when the event column `ex` was never sent. OK now needs `ex` sent, nothing
+    thrown, and the right numbers.
+  * B3-C5: every Node request goes through `_request`, which fails the test on any error the page reports.
+Added (review B3-N1): a gather chain on a page WITHOUT an event figure, so only the alias's own dependencies send the
+event column. Side effects: aliases that do not read the changed input keep their cached values; two tables whose
+aliases read each other settle after a change (no endless loop) with the right values.
+Rule 1 of plan v0.2: every condition of a verdict's OK has a wrong page in the falsifier that breaks only it.
 """
 from pathlib import Path
 
@@ -56,7 +70,7 @@ import pytest
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.scenario import LOSSLESS
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms as hist_oracle
 from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_node_aliases import (
-    STRICT, KnownDefect, _build_error, _js_number, _num, _run, _same, read, set_)
+    STEPS, STRICT, KnownDefect, _FakeSession, _build_error, _js_number, _num, _request, _run, _same, cached, read, set_)
 
 def _node(*marks):
     """Node test marks: the target node_aliases (PHASE_4_5 A1), backend, layer, then the given marks."""
@@ -114,8 +128,8 @@ def test_the_data_has_orphans_duplicates_and_finite_values():
 
 def _page(node_session, tmp_path, figures, aliases, steps, widgets=(), coding="plain", **options):
     """(build error or None, the production replies). The build error is (type, message, file:function)."""
-    err = _build_error(tmp_path, TR, figures, widgets, sourceArray=EV_SOURCE, aliasArray=aliases,
-                       arrayCompression=CODINGS[coding], **options)
+    options.setdefault("sourceArray", EV_SOURCE)
+    err = _build_error(tmp_path, TR, figures, widgets, aliasArray=aliases, arrayCompression=CODINGS[coding], **options)
     if err is not None:
         return err, None
     return None, _run(node_session, Path(tmp_path) / "aliases_document.json", steps)
@@ -138,18 +152,21 @@ MUTATE_JS = """(a) => { const doc = Bokeh.documents[Bokeh.documents.length - 1];
   return col.length; }"""
 
 
-def _mutate_then(node_session, table, column, values, steps):
-    """New values for one column of a table of the loaded page (NaN allowed), then the production replies to steps."""
+def _steps(node_session, steps):
+    """The production replies to steps on the loaded page; a harness problem or a page error fails the test."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
-    from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_node_aliases import STEPS
-    r = node_session.request("eval", code=MUTATE_JS, arg={"table": table, "column": column,
-                                                          "values": [None if np.isnan(v) else float(v) for v in values]})
-    assert r.get("ok") and r["result"] == len(values), r
-    r = node_session.request("eval", code=STEPS, arg={"steps": steps})
-    assert r.get("ok"), r
-    out = decode(r["result"])
+    out = decode(_request(node_session, "eval", code=STEPS, arg={"steps": steps})["result"])
     assert not [o for o in out if "error" in o], out
     return out
+
+
+def _mutate_then(node_session, table, column, values, steps):
+    """New values for one column of a table of the loaded page (NaN allowed), then the production replies to steps.
+    Batch 3 v0.2 (review B3-C5): both requests must be ok and the page healthy."""
+    r = _request(node_session, "eval", code=MUTATE_JS, arg={"table": table, "column": column,
+                                                           "values": [None if np.isnan(v) else float(v) for v in values]})
+    assert r["result"] == len(values), r
+    return _steps(node_session, steps)
 
 
 EV_SHOWN = [["ev.ex"], ["ev.ex"]]          # a figure that shows ev.ex, so the column is sent (keeps A-D4 out)
@@ -173,11 +190,12 @@ def test_control_a_gather_with_orphans_and_duplicates_equals_numpy(node_session,
 
 
 def verdict_gather_alone(ev_keys, reply) -> str:
-    """A-D4 in the ADF shape: a gather shown alone. OK: equal to numpy. KNOWN: the event table has no `ex` and reading
-    the gather throws exactly "Cannot read properties of null (reading '<evIdx of the first track>')" (TypeError): it
-    indexes a column that is not there."""
+    """A-D4 in the ADF shape: a gather shown alone. OK: the event table's column `ex` was sent, nothing threw, and g
+    equals numpy (Batch 3 v0.2, review B3-C2: the right numbers alone are not enough - the test is about sending the
+    column). KNOWN: the event table has no `ex` and reading the gather throws exactly "Cannot read properties of null
+    (reading '<evIdx of the first track>')" (TypeError): it indexes a column that is not there."""
     got, kinds = _column(reply, "g")
-    if got is not None and kinds == "number" and _same(got, EX[EV_IDX]):
+    if "ex" in ev_keys and not reply["throws"] and got is not None and kinds == "number" and _same(got, EX[EV_IDX]):
         return OK
     if ("ex" not in ev_keys and reply["throws"] == {"g": f"Cannot read properties of null (reading '{EV_IDX[0]}')"}
             and reply["throw_kinds"] == {"g": "TypeError"}):
@@ -347,20 +365,24 @@ BIN_COUNTS_JS = """() => { const ms = Array.from(Bokeh.documents[Bokeh.documents
   const out = {}; for (const m of ms) out[m.name] = Array.from(m.get_column('bin_count')); return out; }"""
 
 
+def _bin_counts(node_session, path):
+    """The bin counts of every histogram of the page; Batch 3 v0.2 (review B3-C5): a page error fails the test."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
+    _request(node_session, "new_doc", path=str(path))
+    r = _request(node_session, "eval", code=BIN_COUNTS_JS)
+    return {k: np.asarray(v, dtype=float) for k, v in decode(r["result"]).items()}
+
+
 @_node(pytest.mark.feature("HIST.histogram_nd"), pytest.mark.feature("HIST.histogram_1d"),
        pytest.mark.feature("DSL.gather_operation"))
 def test_histograms_of_an_alias_and_a_gathered_column_equal_numpy(node_session, tmp_path):
     """The contract's RI-ADF-02 shape: a 2-D histogram over an expression alias (x + 0.25) and a gathered column, and a
     1-D histogram of the gathered column. Orphans gather NaN and are not counted (rulebook RB-2.5; B8 fixed)."""
-    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
     err = _build_error(tmp_path, TR, [[["x"], ["g"]], EV_SHOWN, [["bin_center_0"], ["bin_count"], {"source": "h2"}],
                                       [["bin_center"], ["bin_count"], {"source": "h1"}]],
                        sourceArray=EV_SOURCE, aliasArray=[("g", "ev.ex[evIdx]"), ("xs", "x+0.25")], histogramArray=HISTS)
     assert err is None, err
-    assert node_session.request("new_doc", path=str(Path(tmp_path) / "aliases_document.json"))["ok"]
-    r = node_session.request("eval", code=BIN_COUNTS_JS)
-    assert r["ok"], r
-    got = {k: np.asarray(v, dtype=float) for k, v in decode(r["result"]).items()}
+    got = _bin_counts(node_session, Path(tmp_path) / "aliases_document.json")
     g = EX[EV_IDX]
     want = {"h2": hist_oracle.counts([X + 0.25, g], [6, 5], [[-9, 9], [5, 65]]),
             "h1": hist_oracle.counts([g], [6], [[5, 65]])}
@@ -398,6 +420,195 @@ def test_strict_a_page_of_related_table_figures_only_builds(node_session, tmp_pa
     _strict(verdict, "R-4", err or out)
 
 
+# ===================================================================================== 6. inputs as a dictionary: A-D11
+U_G = """if($output == null || $output.length !== g.length){ $output = new Float64Array(g.length) }
+for(let i=0; i<g.length; i++){ $output[i] = g[i] + 1 }
+return $output"""
+DICT_PAGE = dict(figures=[[["x"], ["g", "L", "U", "K"]]],
+                 aliases=[("g", "x*pa"), {"name": "L", "variables": ["g"], "func": "return g+1"},
+                          {"name": "U", "v_func": U_G}, ("K", "x*2")],
+                 widgets=[["slider", ["pa"]]], parameterArray=[{"name": "pa", "value": 2.0, "range": [0, 5]}])
+ADD_DICT_ALIASES_JS = """(a) => {
+  const doc = Bokeh.documents[Bokeh.documents.length - 1];
+  const m = Array.from(doc._all_models.values()).filter(x => x.name === a.table && x.constructor.__name__ === "CDSAlias");
+  if (m.length !== 1) throw new Error("CDSAlias models named " + a.table + ": " + m.length);
+  const each = (n, f) => Float64Array.from({length: n}, (_, i) => f(i));
+  const add = {                              // name: [fields as a dictionary, what the test transform computes]
+    D1: [{lhs: "g"},          f => each(f.lhs.length, i => f.lhs[i] + 1)],
+    D2: [{terms: ["g", "x"]}, f => each(f.terms[0].length, i => f.terms[0][i] + f.terms[1][i])],
+    D3: [{lhs: "g", k: "3"},  f => each(f.lhs.length, i => f.lhs[i] * f.k[i])],         // "3": a constant column
+    D4: [{lhs: "x"},          f => each(f.lhs.length, i => f.lhs[i] + 1)],               // does not read g
+    A1: [{lhs: "g"},          f => Promise.resolve(each(f.lhs.length, i => f.lhs[i] * 10))],   // as OrtFunction
+    A2: [{lhs: "A1"},         f => each(f.lhs.length, i => f.lhs[i] + 1)],
+  };
+  for (const [name, [fields, fn]] of Object.entries(add))
+    m[0].mapping[name] = {fields, transform: {id: "ri_test_transform_" + name, parameters: {}, v_compute: fn}};
+  return Object.keys(m[0].mapping).sort();
+}"""
+DICT_ALIASES = ["A1", "A2", "D1", "D2", "D3", "D4"]
+
+
+def _dict_page(node_session, tmp_path, *step_lists):
+    """The page with the dictionary aliases added to the track table's production alias model, then the replies to
+    each list of steps (one request each)."""
+    err = _build_error(tmp_path, TR, DICT_PAGE["figures"], DICT_PAGE["widgets"], sourceArray=EV_SOURCE,
+                       aliasArray=DICT_PAGE["aliases"], parameterArray=DICT_PAGE["parameterArray"])
+    assert err is None, err
+    _request(node_session, "new_doc", path=str(Path(tmp_path) / "aliases_document.json"))
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
+    keys = decode(_request(node_session, "eval", code=ADD_DICT_ALIASES_JS, arg={"table": "cdsFull"})["result"])
+    assert set(DICT_ALIASES) <= set(keys), keys
+    return [_steps(node_session, steps) for steps in step_lists]
+
+
+def _dict_oracle(pa):
+    g = X * pa
+    return {"g": g, "L": g + 1, "U": g + 1, "K": X * 2, "D1": g + 1, "D2": g + X, "D3": g * 3, "D4": X + 1}
+
+
+DICT_READS_G = ("D1", "D2", "D3")
+
+
+def _right(reply, want: dict, keys) -> bool:
+    return all(_column(reply, k)[0] is not None and _same(_column(reply, k)[0], want[k]) for k in keys)
+
+
+def verdict_dictionary_inputs(before, s, cache, after) -> str:
+    """A-D11 (review B3-C1), synchronous. g = x*pa; L (inputs as a list) and U (automatic inputs) read g; D1, D2, D3
+    read g through a dictionary ({"lhs": "g"}, {"terms": ["g", "x"]}, {"lhs": "g", "k": "3"}); K and D4 do not read g.
+    OK: before (pa = 2) every column equals numpy; the slider's callbacks ran without error; right after the change to
+    pa = 3 none of g, L, U, D1, D2, D3 is in the cache, while K and D4 still are (side effect: an alias that does not
+    read the changed input is not thrown away); after it every column equals numpy with pa = 3. KNOWN (A-D11): all of
+    that, except that D1, D2 and D3 are still in the cache and equal exactly their values before the change."""
+    names = list(_dict_oracle(2.0))
+    if not _right(before, _dict_oracle(2.0), names) or s["callbacks"] < 1 or s["errors"]:
+        return UNEXPLAINED
+    now = set(cache["cached"])
+    if not {"K", "D4"} <= now or {"g", "L", "U"} & now:
+        return UNEXPLAINED
+    if not _right(after, _dict_oracle(3.0), ["g", "L", "U", "K", "D4"]):
+        return UNEXPLAINED
+    if _right(after, _dict_oracle(3.0), DICT_READS_G) and not set(DICT_READS_G) & now:
+        return OK
+    if set(DICT_READS_G) <= now and _right(after, {k: _column(before, k)[0] for k in DICT_READS_G}, DICT_READS_G):
+        return KNOWN
+    return UNEXPLAINED
+
+
+@_node(pytest.mark.feature("ALIAS.change_propagation"))
+@pytest.mark.xfail(**STRICT, reason="A-D11: an alias whose inputs are a dictionary is not recomputed")
+def test_strict_an_alias_with_inputs_as_a_dictionary_follows_its_input(node_session, tmp_path):
+    """Review B3-C1: when g changes, every alias that reads it is recomputed - also one that lists its inputs as a
+    dictionary, as an ONNX model alias does; aliases that do not read g keep their cached values."""
+    names = list(_dict_oracle(2.0))
+    (before, s, cache, after), = _dict_page(node_session, tmp_path,
+                                            [read("cdsFull", *names), set_("pa", 3.0), cached("cdsFull"),
+                                             read("cdsFull", *names)])
+    verdict = verdict_dictionary_inputs(before, s, cache, after)
+    if verdict == KNOWN:
+        raise KnownDefect("A-D11")
+    _strict(verdict, "A-D11", (before, s, cache, after))
+
+
+def verdict_dictionary_inputs_async(first, cache, after) -> str:
+    """A-D11, asynchronous. A1 = g*10 is computed by a Promise (as OrtFunction's is), A2 = A1 + 1 reads A1 through a
+    dictionary. The first read of A2 comes while A1's Promise is pending, so A2 is computed from A1's placeholder
+    (zeros): 1 in every row - required, it shows the asynchronous path was taken. OK: once the Promise has settled, A1
+    equals numpy, A2 is no longer in the cache, and reading it gives g*10 + 1. KNOWN (A-D11): A1 right, and A2 still in
+    the cache with exactly 1 in every row."""
+    a2_first, _ = _column(first, "A2")
+    if a2_first is None or not _same(a2_first, np.ones(N_TR)):
+        return UNEXPLAINED
+    g = X * 2.0
+    if not _right(after, {"g": g, "A1": g * 10}, ["g", "A1"]):
+        return UNEXPLAINED
+    a2, _ = _column(after, "A2")
+    if a2 is not None and _same(a2, g * 10 + 1) and "A2" not in cache["cached"]:
+        return OK
+    if a2 is not None and _same(a2, np.ones(N_TR)) and "A2" in cache["cached"]:
+        return KNOWN
+    return UNEXPLAINED
+
+
+@_node(pytest.mark.feature("ALIAS.change_propagation"))
+@pytest.mark.xfail(**STRICT, reason="A-D11: an alias whose inputs are a dictionary is not recomputed")
+def test_strict_an_alias_reading_an_asynchronous_alias_through_a_dictionary_is_recomputed(node_session, tmp_path):
+    """Review B3-C1, the asynchronous path of CDSAlias (a transform that returns a Promise, as an ONNX model does):
+    when the result arrives, the aliases that read it through a dictionary are recomputed."""
+    (first,), (cache, after) = _dict_page(node_session, tmp_path, [read("cdsFull", "A2")],
+                                          [cached("cdsFull"), read("cdsFull", "g", "A1", "A2")])
+    verdict = verdict_dictionary_inputs_async(first, cache, after)
+    if verdict == KNOWN:
+        raise KnownDefect("A-D11")
+    _strict(verdict, "A-D11", (first, cache, after))
+
+
+# ===================================================================================== 7. a chain without an event figure
+def verdict_chain_without_an_event_figure(ev_keys, before, after) -> str:
+    """Review B3-N1: ex2 = ex*2 and ex3 = ex2+1 on the event table, g3 = ev.ex3[evIdx] on the track table, and no figure
+    of the event table, so only g3's own dependencies can send `ex`. OK: `ex` was sent, nothing threw, g3 equals numpy
+    (orphans NaN), and after the event table's `ex` changes g3 equals numpy with the new values."""
+    if "ex" not in ev_keys or before["throws"] or after["throws"]:
+        return UNEXPLAINED
+    b, _ = _column(before, "g3")
+    a, _ = _column(after, "g3")
+    ok = b is not None and _same(b, EX3[EV_IDX]) and a is not None and _same(a, (EX_NEW * 2 + 1)[EV_IDX])
+    return OK if ok else UNEXPLAINED
+
+
+@_node(pytest.mark.feature("ALIAS.chain"), pytest.mark.feature("DSL.gather_operation"),
+       pytest.mark.feature("ALIAS.change_propagation"))
+def test_a_gather_chain_without_an_event_figure_sends_and_follows_its_column(node_session, tmp_path):
+    """A compiled page may show only track-level quantities computed from event-level aliases."""
+    err, out = _page(node_session, tmp_path, [[["x"], ["g3"]]],
+                     [("ex2", "ex*2", "ev"), ("ex3", "ex2+1", "ev"), ("g3", "ev.ex3[evIdx]")],
+                     [read("cdsFull", "g3"), {"op": "keys", "table": "ev"}])
+    assert err is None, err
+    after, = _mutate_then(node_session, "ev", "ex", EX_NEW, [read("cdsFull", "g3")])
+    verdict = verdict_chain_without_an_event_figure(out[1]["keys"], out[0], after)
+    assert verdict == OK, (verdict, out, after)
+
+
+# ===================================================================================== 8. two tables that read each other
+_rng_run = np.random.default_rng(20261115)
+N_RUN = 6
+RX = np.append(np.round(_rng_run.uniform(100.0, 200.0, N_RUN), 3), np.nan)        # the run table, fill row last
+RX_NEW = np.append(RX[:N_RUN] + 1000.0, np.nan)
+RUN_IDX = np.append(_rng_run.integers(0, N_RUN, N_EV), N_RUN).astype(np.int32)   # the event fill row -> the run fill row
+EV_FIRST = np.array([np.flatnonzero(RUN_IDX[:N_EV] == r)[0] if np.any(RUN_IDX[:N_EV] == r) else FILL
+                     for r in range(N_RUN)] + [FILL], dtype=np.int32)              # a run's first event
+CYCLE_SOURCES = [{"name": "ev", "data": {"ex": EX, "ey": EY, "runIdx": RUN_IDX}},
+                 {"name": "run", "data": {"rx": RX, "evFirst": EV_FIRST}}]
+CYCLE_ALIASES = [("er", "run.rx[runIdx]", "ev"), ("re", "ev.ex[evFirst]", "run"), ("g", "ev.ex[evIdx]"),
+                 ("gr", "ev.er[evIdx]")]
+CYCLE_READS = [read("cdsFull", "g", "gr"), read("ev_full", "er"), read("run_full", "re")]
+
+
+def _cycle_want(ex, rx):
+    er = rx[RUN_IDX]
+    return {"g": ex[EV_IDX], "gr": er[EV_IDX], "er": er, "re": ex[EV_FIRST]}
+
+
+@_node(pytest.mark.feature("ALIAS.change_propagation"), pytest.mark.feature("DSL.gather_operation"))
+def test_two_tables_whose_aliases_read_each_other_settle_after_a_change(node_session, tmp_path):
+    """Side effect of the A-D6 fix (an alias table now listens to every table its aliases read): the event table reads
+    the run table (er = run.rx[runIdx]) and the run table reads the event table (re = ev.ex[evFirst]), so each listens
+    to the other. A change of either must end - every request answers, no endless loop - and every alias, also the
+    track table's gather of a gathered alias (gr = ev.er[evIdx]), equals numpy after each change."""
+    assert len(set(EV_FIRST[:N_RUN])) >= 4 and np.sum(RUN_IDX[:N_EV] == RUN_IDX[0]) >= 2      # non-vacuous
+    err, first = _page(node_session, tmp_path, [[["x"], ["g", "gr"]], [["ev.ex"], ["ev.er"]], [["run.rx"], ["run.re"]]],
+                       CYCLE_ALIASES, CYCLE_READS, sourceArray=CYCLE_SOURCES)
+    assert err is None, err
+    second = _mutate_then(node_session, "ev", "ex", EX_NEW, CYCLE_READS)
+    third = _mutate_then(node_session, "run", "rx", RX_NEW, CYCLE_READS)
+    for state, out, want in (("before", first, _cycle_want(EX, RX)), ("after ev.ex changed", second, _cycle_want(EX_NEW, RX)),
+                             ("after run.rx changed", third, _cycle_want(EX_NEW, RX_NEW))):
+        got = {**{k: _column(out[0], k)[0] for k in ("g", "gr")}, "er": _column(out[1], "er")[0],
+               "re": _column(out[2], "re")[0]}
+        for k, w in want.items():
+            assert got[k] is not None and _same(got[k], w), (state, k, got[k], list(w))
+
+
 # ===================================================================================== the verdicts can fail
 def _reply(**cols):
     """A fake production reply: number columns from arrays, text columns from lists of strings."""
@@ -420,55 +631,135 @@ def _shifted(a):
 @_unit
 def test_falsifier_every_verdict_rejects_wrong_pages():
     """Each verdict says OK for the oracle and KNOWN for the exact signature, and UNEXPLAINED for pages that are wrong
-    in another way: one value off, a column missing, the signature in a column it does not concern, orphans not NaN,
-    a partial signature."""
+    in another way. Batch 3 v0.2 (plan v0.2, rule 1): every condition of an OK has a wrong page that breaks only that
+    condition - the reviewers' pages first (B3-C2: the right numbers without the column sent)."""
     g = EX[EV_IDX]
     nan = np.full(N_TR, np.nan)
-    # A-D4
-    good = _reply(g=g)
+    text = ["a"] * N_TR
+    # A-D4: OK = ex sent, nothing thrown, g numbers, g values
+    good, keys = _reply(g=g), ["evIdx", "ex", "ey"]
     sig = {"columns": {}, "kinds": {}, "throws": {"g": f"Cannot read properties of null (reading '{EV_IDX[0]}')"},
            "throw_kinds": {"g": "TypeError"}}
-    assert verdict_gather_alone(["ey"], good) == OK and verdict_gather_alone(["ey"], sig) == KNOWN
-    assert verdict_gather_alone(["ex", "ey"], sig) == UNEXPLAINED                       # the column was sent after all
-    assert verdict_gather_alone(["ey"], {**sig, "throws": {"g": "other error"}}) == UNEXPLAINED
-    assert verdict_gather_alone(["ey"], _reply(g=_shifted(g))) == UNEXPLAINED
-    assert verdict_gather_alone(["ey"], _reply(g=np.where(EV_IDX == FILL, 0.0, g))) == UNEXPLAINED   # orphans not NaN
-    # A-D1, R2
+    assert verdict_gather_alone(keys, good) == OK and verdict_gather_alone(["evIdx", "ey"], sig) == KNOWN
+    assert verdict_gather_alone(["evIdx", "ey"], good) == UNEXPLAINED                    # B3-C2: ex never sent
+    assert verdict_gather_alone(keys, {**good, "throws": {"h": "x"}, "throw_kinds": {"h": "Error"}}) == UNEXPLAINED
+    assert verdict_gather_alone(keys, _reply(g=text)) == UNEXPLAINED                    # not numbers
+    assert verdict_gather_alone(keys, _reply(g=EY[EV_IDX])) == UNEXPLAINED              # the other column gathered
+    assert verdict_gather_alone(keys, _reply(g=_shifted(g))) == UNEXPLAINED
+    assert verdict_gather_alone(keys, _reply(g=np.where(EV_IDX == FILL, 0.0, g))) == UNEXPLAINED   # orphans not NaN
+    assert verdict_gather_alone(keys, sig) == UNEXPLAINED                               # the column was sent after all
+    assert verdict_gather_alone(["evIdx", "ey"], {**sig, "throws": {"g": "other error"}}) == UNEXPLAINED
+    assert verdict_gather_alone(["evIdx", "ey"], {**sig, "throw_kinds": {"g": "Error"}}) == UNEXPLAINED
+    # A-D1, R2: OK = g right, h right
     assert verdict_alias_over_gather(_reply(g=g, h=H_ORACLE)) == OK
     assert verdict_alias_over_gather(_reply(g=g, h=nan)) == KNOWN
+    assert verdict_alias_over_gather(_reply(h=H_ORACLE)) == UNEXPLAINED                 # g missing
+    assert verdict_alias_over_gather(_reply(g=text, h=H_ORACLE)) == UNEXPLAINED         # g not numbers
+    assert verdict_alias_over_gather(_reply(g=_shifted(g), h=H_ORACLE)) == UNEXPLAINED  # g off
     assert verdict_alias_over_gather(_reply(g=g, h=_shifted(H_ORACLE))) == UNEXPLAINED
     assert verdict_alias_over_gather(_reply(g=g, h=g * 2)) == UNEXPLAINED              # "+x" lost
     assert verdict_alias_over_gather(_reply(g=nan, h=nan)) == UNEXPLAINED               # g wrong too
     assert verdict_alias_over_gather(_reply(g=g)) == UNEXPLAINED                        # h missing
-    # A-D1 on the event table
+    # A-D1 on the event table: OK = ex2 right, ex3 right
     assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=EX2, ex3=EX3)) == OK
     assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=EX2, ex3=_ad1_text(EX2))) == KNOWN
+    assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=_shifted(EX2), ex3=EX3)) == UNEXPLAINED
+    assert verdict_alias_of_alias_on_the_related_table(_reply(ex3=EX3)) == UNEXPLAINED   # ex2 missing
+    assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=EX2)) == UNEXPLAINED   # ex3 missing
     assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=EX2, ex3=_ad1_text(EX))) == UNEXPLAINED
     assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=EX2, ex3=_shifted(EX3))) == UNEXPLAINED
     assert verdict_alias_of_alias_on_the_related_table(_reply(ex2=_shifted(EX2), ex3=_ad1_text(EX2))) == UNEXPLAINED
-    # A-D5, depth 3
+    # A-D5, depth 3: OK = built, g3 right, h3 right
     assert verdict_chain_of_depth_3(None, _reply(g3=EX3[EV_IDX], h3=H3_ORACLE)) == OK
     assert verdict_chain_of_depth_3(AD5_CHAIN_SIGNATURE, None) == KNOWN
     assert verdict_chain_of_depth_3(("KeyError", "Column ex2 not found in data source None",
                                      "compileVarName.py:visit_Attribute"), None) == UNEXPLAINED
+    assert verdict_chain_of_depth_3(None, _reply(g3=_shifted(EX3[EV_IDX]), h3=H3_ORACLE)) == UNEXPLAINED
+    assert verdict_chain_of_depth_3(None, _reply(h3=H3_ORACLE)) == UNEXPLAINED          # g3 missing
     assert verdict_chain_of_depth_3(None, _reply(g3=EX3[EV_IDX], h3=nan)) == UNEXPLAINED  # A-D1 behind a fixed A-D5
     assert verdict_chain_of_depth_3(None, _reply(g3=EX2[EV_IDX], h3=EX2[EV_IDX] * X)) == UNEXPLAINED
-    # A-D3
+    # A-D3: OK = built, before right, after right
     before, after = _reply(sg=g * X), _reply(sg=g * Y)
     assert verdict_selector_in_a_gather(None, before, after) == OK
     assert verdict_selector_in_a_gather(AD3_SIGNATURE, None, None) == KNOWN
     assert verdict_selector_in_a_gather(None, before, before) == UNEXPLAINED             # the selector did nothing
+    assert verdict_selector_in_a_gather(None, after, after) == UNEXPLAINED               # wrong before the change
+    assert verdict_selector_in_a_gather(None, before, _reply()) == UNEXPLAINED           # missing after
     assert verdict_selector_in_a_gather(("KeyError", "cdsOrig", "bokehTools.py:bokehDrawArray"), None, None) == UNEXPLAINED
-    # A-D6
+    # A-D6: OK = before right, the table changed, after right (g and C)
     old, new = _reply(g=g, C=g + 1), _reply(g=EX_NEW[EV_IDX], C=EX_NEW[EV_IDX] + 1)
     ev_new = _reply(ex=EX_NEW)
     assert verdict_gather_follows_the_table(old, ev_new, new) == OK
     assert verdict_gather_follows_the_table(old, ev_new, old) == KNOWN
+    assert verdict_gather_follows_the_table(_reply(g=np.full(N_TR, -9000.0), C=g + 1), ev_new, new) == UNEXPLAINED
+    assert verdict_gather_follows_the_table(_reply(g=g, C=_shifted(g + 1)), ev_new, new) == UNEXPLAINED
     assert verdict_gather_follows_the_table(old, _reply(ex=EX), old) == UNEXPLAINED       # the table did not change
+    assert verdict_gather_follows_the_table(old, _reply(), new) == UNEXPLAINED            # the table not read
     assert verdict_gather_follows_the_table(old, ev_new, _reply(g=EX_NEW[EV_IDX], C=g + 1)) == UNEXPLAINED  # C stale only
     assert verdict_gather_follows_the_table(old, ev_new, _reply(g=g, C=EX_NEW[EV_IDX] + 1)) == UNEXPLAINED
-    # R-4
+    # R-4: OK = built, ex right, ex2 right
     assert verdict_related_table_only(None, _reply(ex=EX, ex2=EX2)) == OK
     assert verdict_related_table_only(R4_SIGNATURE, None) == KNOWN
     assert verdict_related_table_only(("KeyError", "cdsFull", "bokehTools.py:bokehDrawArray"), None) == UNEXPLAINED
+    assert verdict_related_table_only(None, _reply(ex=_shifted(EX), ex2=EX2)) == UNEXPLAINED
     assert verdict_related_table_only(None, _reply(ex=EX, ex2=_shifted(EX2))) == UNEXPLAINED
+    # A-D11, synchronous: OK = before right, callbacks ran without error, K and D4 still cached, g L U not cached,
+    # g L U K D4 right after, D1 D2 D3 right after and not cached
+    b, s = _reply(**_dict_oracle(2.0)), {"callbacks": 1, "errors": []}
+    a, cache = _reply(**_dict_oracle(3.0)), {"cached": ["D4", "K", "x"]}
+    stale = _reply(**{**_dict_oracle(3.0), **{k: _dict_oracle(2.0)[k] for k in DICT_READS_G}})
+    stale_cache = {"cached": ["D1", "D2", "D3", "D4", "K", "x"]}
+    assert verdict_dictionary_inputs(b, s, cache, a) == OK
+    assert verdict_dictionary_inputs(b, s, stale_cache, stale) == KNOWN
+    assert verdict_dictionary_inputs(_reply(**{**_dict_oracle(2.0), "D2": _shifted(_dict_oracle(2.0)["D2"])}), s, cache, a) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, {"callbacks": 0, "errors": []}, cache, a) == UNEXPLAINED   # the slider did nothing
+    assert verdict_dictionary_inputs(b, {"callbacks": 1, "errors": ["boom"]}, cache, a) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, s, {"cached": ["D4", "x"]}, a) == UNEXPLAINED     # K thrown away (side effect)
+    assert verdict_dictionary_inputs(b, s, {"cached": ["K", "x"]}, a) == UNEXPLAINED      # D4 thrown away (side effect)
+    assert verdict_dictionary_inputs(b, s, {"cached": ["D4", "K", "U"]}, a) == UNEXPLAINED  # U not invalidated
+    assert verdict_dictionary_inputs(b, s, cache, _reply(**{**_dict_oracle(3.0), "L": _dict_oracle(2.0)["L"]})) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, s, cache, _reply(**{**_dict_oracle(3.0), "D4": _shifted(X + 1)})) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, s, cache, _reply(**{**_dict_oracle(3.0), "D3": _shifted(X * 9)})) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, s, {"cached": ["D1", "D4", "K"]}, a) == UNEXPLAINED  # right, yet not invalidated
+    assert verdict_dictionary_inputs(b, s, stale_cache, _reply(**{**_dict_oracle(3.0), "D1": _dict_oracle(2.0)["D1"]})) == UNEXPLAINED
+    assert verdict_dictionary_inputs(b, s, stale_cache, _reply(**{**_dict_oracle(3.0), **{k: _shifted(_dict_oracle(2.0)[k]) for k in DICT_READS_G}})) == UNEXPLAINED
+    # A-D11, asynchronous: OK = first A2 the placeholder, g and A1 right, A2 right and not cached
+    g2 = X * 2.0
+    first, a_cache, a_after = _reply(A2=np.ones(N_TR)), {"cached": ["A1", "g"]}, _reply(g=g2, A1=g2 * 10, A2=g2 * 10 + 1)
+    assert verdict_dictionary_inputs_async(first, a_cache, a_after) == OK
+    assert verdict_dictionary_inputs_async(first, {"cached": ["A1", "A2", "g"]}, _reply(g=g2, A1=g2 * 10, A2=np.ones(N_TR))) == KNOWN
+    assert verdict_dictionary_inputs_async(_reply(A2=g2 * 10 + 1), a_cache, a_after) == UNEXPLAINED   # not asynchronous
+    assert verdict_dictionary_inputs_async(first, a_cache, _reply(g=g2, A1=_shifted(g2 * 10), A2=g2 * 10 + 1)) == UNEXPLAINED
+    assert verdict_dictionary_inputs_async(first, a_cache, _reply(g=_shifted(g2), A1=g2 * 10, A2=g2 * 10 + 1)) == UNEXPLAINED
+    assert verdict_dictionary_inputs_async(first, {"cached": ["A1", "A2", "g"]}, a_after) == UNEXPLAINED  # right, yet cached
+    assert verdict_dictionary_inputs_async(first, a_cache, _reply(g=g2, A1=g2 * 10, A2=np.ones(N_TR))) == UNEXPLAINED
+    assert verdict_dictionary_inputs_async(first, a_cache, _reply(g=g2, A1=g2 * 10, A2=_shifted(g2 * 10 + 1))) == UNEXPLAINED
+    # B3-N1: OK = ex sent, nothing thrown, g3 right before, g3 right after the change
+    nb, na = _reply(g3=EX3[EV_IDX]), _reply(g3=(EX_NEW * 2 + 1)[EV_IDX])
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, na) == OK
+    assert verdict_chain_without_an_event_figure(["evIdx"], nb, na) == UNEXPLAINED          # ex not sent
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], {**nb, "throws": {"h": "x"}}, na) == UNEXPLAINED
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, {**na, "throws": {"h": "x"}}) == UNEXPLAINED
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], _reply(g3=EX2[EV_IDX]), na) == UNEXPLAINED
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, nb) == UNEXPLAINED     # did not follow the change
+    assert verdict_chain_without_an_event_figure(["evIdx", "ex"], nb, _reply()) == UNEXPLAINED
+
+
+@_unit
+def test_falsifier_a_page_error_fails_every_batch3_request_path():
+    """Batch 3 v0.2 (review B3-C5): the right numbers from a page that reported an error fail the test, on every request
+    path of this file - the change of a table and its read (_mutate_then), the histogram counts (_bin_counts). A healthy
+    page passes."""
+    ok = {"ok": True, "page_errors": [], "console_errors": []}
+    mutate = [{**ok, "result": N_EV + 1}, {**ok, "result": [_reply(g=EX_NEW[EV_IDX])]}]
+    bins = [{**ok, "result": {}}, {**ok, "result": {"h1": [1.0, 2.0]}}]
+    assert _mutate_then(_FakeSession(mutate), "ev", "ex", EX_NEW, [read("cdsFull", "g")])[0]["kinds"]["g"] == "number"
+    assert list(_bin_counts(_FakeSession(bins), "page.json")["h1"]) == [1.0, 2.0]
+    for call, replies in ((lambda s: _mutate_then(s, "ev", "ex", EX_NEW, [read("cdsFull", "g")]), mutate),
+                          (lambda s: _bin_counts(s, "page.json"), bins)):
+        for where in range(len(replies)):
+            for key, error in (("page_errors", "uncaught exception: unrelated failure"), ("console_errors", "boom")):
+                bad = [dict(r) for r in replies]
+                bad[where] = {**bad[where], key: [error]}
+                with pytest.raises(pytest.fail.Exception, match="the page reported errors"):
+                    call(_FakeSession(bad))
