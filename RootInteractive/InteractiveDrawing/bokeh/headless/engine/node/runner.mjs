@@ -134,6 +134,7 @@ async function handle(req) {
         const iso = freshDocument(text);
         let r = f();
         if (r && typeof r.then === "function") r = await r;
+        checkInvariants();
         out.push({ result: enc(r), isolation: { timers: iso.leftover_timers, channels: iso.closed_channels,
                                                 not_removed: iso.not_removed } });
       }
@@ -142,6 +143,7 @@ async function handle(req) {
     case "eval": {
       let r = fn(req.code)(inWindow(req.arg));
       if (r && typeof r.then === "function") r = await r;
+      checkInvariants();
       return enc(r);
     }
     case "wait_for": {
@@ -182,6 +184,18 @@ async function handle(req) {
     default:
       throw new Error("unknown op " + req.op);
   }
+}
+
+// PHASE_5 Batch 1 (review C1): after every evaluation, the page helper's read-only invariants (engine/runner.py
+// __riH.invariants). A violation is reported as a page error with this prefix; the Python session raises on it.
+const INVARIANT_PREFIX = "RI invariant violated: ";
+function checkInvariants() {
+  try {
+    const h = w.__riH;
+    if (!h || typeof h.invariants !== "function") return;
+    const bad = h.invariants();
+    if (bad.length) pageErrors.push(INVARIANT_PREFIX + bad.join("; "));
+  } catch (e) { /* the check reads cached results only */ }
 }
 
 function reply(o) {

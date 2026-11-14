@@ -93,6 +93,51 @@ def test_missing_probe_is_an_error(headless_session):
         page.close()
 
 
+GENERAL_CHECK_JS = """() => {
+  const H = window.__riH, M = Bokeh.documents[0]._all_models;
+  const range = n => Array.from({length: n}, (_, i) => i);
+  const lif = (name, n, picked, stale) => ({type: 'LazyIntersectionFilter', name, row_count: () => n,
+      changed_indices: stale, cached_indices: picked, changed_booleans: stale,
+      cached_vector: Array.from({length: 32}, (_, i) => picked.includes(i))});
+  const hist = (type, name, n, counts, extra) => Object.assign({type, name, weights: null, source: {get_length: () => n},
+      data: {bin_count: counts}, get_column: () => counts}, extra || {});
+  const out = {};
+  M.clear(); M.set(1, lif('ok', 12, range(12), false)); M.set(2, hist('HistogramCDS', 'h_ok', 12, [10, 2]));
+  out.healthy = H.invariants();
+  M.set(3, lif('bad', 12, range(32), false));
+  M.set(4, lif('stale', 12, range(32), true));                                   // marked out of date: not judged
+  M.set(5, hist('HistogramCDS', 'h_bad', 12, [30, 2]));
+  M.set(6, hist('HistogramCDS', 'h_weighted', 12, [30, 2], {weights: 'w'}));      // weighted: totals not bounded
+  M.set(7, hist('HistoNdCDS', 'hn_stale', 12, [30, 2], {cached_columns: new Set()}));   // bin_count not current
+  M.set(8, hist('HistoNdCDS', 'hn_bad', 12, [7, 6], {cached_columns: new Set(['bin_count'])}));
+  M.set(9, {type: 'LazyIntersectionFilter', name: 'throws', row_count: () => { throw new Error('x'); }});
+  out.broken = H.invariants();
+  return out;
+}"""
+
+
+def test_the_general_check_judges_only_current_results(headless_session):
+    """PHASE_5 Batch 1 (review C1): the page helper's read-only check, in Chromium on stand-in models. A filter that
+    selects past its table's last row, and an unweighted histogram with more entries than rows, are reported; results
+    marked out of date, weighted histograms and models that cannot be read are not judged. settle() then throws."""
+    page = headless_session.browser.new_page()
+    try:
+        page.set_content("<html><body></body></html>")
+        page.add_script_tag(content="window.Bokeh = {documents: [{_all_models: new Map()}]};" + HELPER_JS)
+        out = page.evaluate(GENERAL_CHECK_JS)
+        assert out["healthy"] == []
+        assert out["broken"] == [
+            "filter bad selects 20 positions outside its table of 12 rows (first 12, 13, 14)",
+            "filter bad: position 12 past the last row of its table (12 rows) is selected",
+            "HistogramCDS h_bad counts 32 entries from a table of 12 rows",
+            "HistoNdCDS hn_bad counts 13 entries from a table of 12 rows"], out["broken"]
+        err = page.evaluate("""async () => { try { await window.__riH.settle([['h_ok', 'bin_count', ['HistogramCDS']]], 5);
+                                               return null; } catch (e) { return String(e.message); } }""")
+        assert err is not None and err.startswith("RI invariant violated: filter bad selects 20 positions"), err
+    finally:
+        page.close()
+
+
 def test_frozen_probe_fails_responds(headless_session, headless_out):
     sc = Scenario(id="harness/frozen_probe_responds",
                   data=Tables(TableSpec(2000, 4, {"x": "uniform(0,1)", "a": "normal(0,1)"})),

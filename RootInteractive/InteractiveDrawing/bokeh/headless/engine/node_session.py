@@ -41,6 +41,15 @@ class NodeUnavailable(RuntimeError):
     """Node.js or jsdom missing, or the harness could not start."""
 
 
+INVARIANT_PREFIX = "RI invariant violated: "        # engine/node/runner.mjs checkInvariants, __riH.invariants
+
+
+class InvariantViolated(AssertionError):
+    """A page broke a read-only invariant of the page helper (PHASE_5 Batch 1, review C1): an intersection filter
+    selected a position past its table's last row, or an unweighted histogram counted more entries than its table has
+    rows. Raised by NodeSession.request for every request, so no test can read past it."""
+
+
 def decode(x: Any) -> Any:
     if isinstance(x, dict):
         if "__f64" in x:
@@ -128,6 +137,9 @@ class NodeSession:
         reply = self._read(timeout_s)
         if reply.get("id") != self._next:
             raise NodeUnavailable(f"protocol out of step: sent {self._next}, got {reply.get('id')}")
+        broken = [e for e in reply.get("page_errors", []) if str(e).startswith(INVARIANT_PREFIX)]
+        if broken:            # PHASE_5 Batch 1 (review C1): never silently accepted, whatever the test reads next
+            raise InvariantViolated("; ".join(broken))
         return reply
 
     def close(self) -> int:

@@ -1278,12 +1278,18 @@ def review_fault_sessions(node_session, node_bundle_root):
 
 @_node
 @pytest.mark.feature("FILTER.range")
-def test_falsifier_c1_phantom_rows_put_back_are_caught_as_a_regression(review_fault_sessions, tmp_path):
-    """With the padding no longer cleared (fault phantom_rows), the C1 test's check fails on 12 rows, with exactly
-    C1's old signature - so the test can fail, and would name the regression."""
-    states = c1_run(review_fault_sessions["phantom_rows"], tmp_path, 12)
-    assert any(c1_differences(g, w) for g, w in zip(states, c1_expected(12)))
-    assert _is_c1_phantom(states, 12)
+def test_falsifier_c1_phantom_rows_put_back_are_caught_by_the_general_check(review_fault_sessions, tmp_path):
+    """With the padding no longer cleared (fault phantom_rows), the page fails at load - before any test reads it -
+    through the general check that runs on every page (engine/runner.py __riH.invariants): the filter selects the 20
+    positions 12..31 past the 12 rows, and the 1-D histogram counts 32 entries from 12 rows. The 2-D histogram is
+    right (its finite guard), so it is not named."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import InvariantViolated
+    with pytest.raises((InvariantViolated, RuntimeError)) as caught:
+        c1_run(review_fault_sessions["phantom_rows"], tmp_path, 12)
+    text = str(caught.value)
+    assert "RI invariant violated" in text and "selects 20 positions outside its table of 12 rows (first 12, 13, 14)" in text
+    assert "position 12 past the last row of its table (12 rows) is selected" in text
+    assert "HistogramCDS c1h counts 32 entries from a table of 12 rows" in text and "c1n" not in text and "c1w" not in text
 
 
 @_node
@@ -1295,3 +1301,16 @@ def test_falsifier_c2_a_written_filter_cache_is_caught_as_a_regression(review_fa
     bad, good, want = c2_run(s, tmp_path, 256), c2_run(s, tmp_path, 255), c2_expected()
     assert not bad["cache_kept"] and bad["mid_all_ones"] and bad["s2"] == want["s1"], bad
     assert all(good[key] == want[key] for key in want), good
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_falsifier_the_general_check_also_runs_after_a_plain_read(review_fault_sessions, tmp_path):
+    """Tests that never settle (they open a document and read a column) are covered too: the Node harness runs the
+    same check after every evaluation and the session raises InvariantViolated - here on the first read after the
+    document of 5 rows is opened with phantom rows put back."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import InvariantViolated
+    s = review_fault_sessions["phantom_rows"]
+    s.request("new_doc", path=str(c1_document(tmp_path, 5)))
+    with pytest.raises(InvariantViolated, match=r"selects 27 positions outside its table of 5 rows"):
+        s.request("eval", code="() => window.__riH.model('c1h', ['HistogramCDS']).get_column('bin_count').length")

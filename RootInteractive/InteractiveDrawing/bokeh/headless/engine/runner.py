@@ -102,6 +102,41 @@ window.__riH = {
   snapshot(probes) {
     return this.encode(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));
   },
+  invariants() {                    // PHASE_5 Batch 1 (review C1): checked after every settled step, on every page.
+    // Read only: it looks at results the page already computed and never starts a computation, so it cannot change
+    // what a test observes. (1) No intersection filter selects a position at or past its table's last row.
+    // (2) No unweighted histogram counts more entries than its table has rows.
+    const out = [];
+    for (const m of this.models()) {
+      try {
+        if (m.type === 'LazyIntersectionFilter' && typeof m.row_count === 'function') {
+          const n = m.row_count();
+          if (n == null) continue;
+          if (m.changed_indices === false && m.cached_indices != null) {
+            const bad = Array.from(m.cached_indices).filter(i => !(Number.isInteger(i) && i >= 0 && i < n));
+            if (bad.length) out.push('filter ' + (m.name || m.id) + ' selects ' + bad.length + ' positions outside its table of ' +
+                                     n + ' rows (first ' + bad.slice(0, 3).join(', ') + ')');
+          }
+          if (m.changed_booleans === false && m.cached_vector != null) {
+            const v = m.cached_vector;
+            for (let i = n; i < v.length; i++) if (v[i]) {
+              out.push('filter ' + (m.name || m.id) + ': position ' + i + ' past the last row of its table (' + n + ' rows) is selected');
+              break;
+            }
+          }
+        } else if ((m.type === 'HistogramCDS' || m.type === 'HistoNdCDS') && m.weights == null && m.source != null) {
+          const fresh = m.type === 'HistogramCDS' || (m.cached_columns != null && m.cached_columns.has('bin_count'));
+          const bc = fresh && m.data ? m.data.bin_count : null;
+          const n = m.source.get_length();
+          if (bc == null || n == null) continue;
+          let total = 0;
+          for (const x of bc) if (Number.isFinite(x)) total += x;
+          if (total > n) out.push(m.type + ' ' + (m.name || m.id) + ' counts ' + total + ' entries from a table of ' + n + ' rows');
+        }
+      } catch (e) { /* the check reads cached results only; a model it cannot read is not judged here */ }
+    }
+    return out;
+  },
   async settle(probes, maxRounds) {
     await Promise.resolve();
     const miss = this.missing(probes);
@@ -110,7 +145,11 @@ window.__riH = {
     for (let r = 1; r <= maxRounds; r++) {
       await new Promise(res => setTimeout(res, 0));
       const cur = this.snapshot(probes);
-      if (cur === prev) return {settled: true, rounds: r};
+      if (cur === prev) {
+        const bad = this.invariants();
+        if (bad.length) throw new Error('RI invariant violated: ' + bad.join('; '));
+        return {settled: true, rounds: r};
+      }
       prev = cur;
     }
     return {settled: false, rounds: maxRounds};
