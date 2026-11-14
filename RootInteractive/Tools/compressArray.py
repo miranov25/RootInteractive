@@ -48,17 +48,28 @@ def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
 SAFE_INTEGER = 2 ** 53          # the largest magnitude below which every integer is exact as a double
 
 
+def checkSafeIntegers(column, name=None):
+    """PHASE_5 Batch 2A (TR-D3), v0.2 (review F2; Architect decision of 2026-11-14): a 64-bit integer beyond 2^53
+    cannot be represented exactly in the browser (2^53 + 1 arrives as 2^53). Such a column is refused at build time by
+    name - with and without compression. Any other column passes unchanged."""
+    type = getattr(column, "dtype", None)
+    if type is not None and type.kind in ['i', 'u'] and type.itemsize == 8 and len(column):
+        maxvalue = column.max()
+        minvalue = column.min()
+        if maxvalue > SAFE_INTEGER or (type.kind == 'i' and minvalue < -SAFE_INTEGER):
+            raise UnsafeIntegerColumn(f"column {name!r}: 64-bit integers beyond 2^53 (here {minvalue} .. {maxvalue}) "
+                                      f"cannot be represented exactly in the browser; send them as strings, or "
+                                      f"split them into two 32-bit columns")
+    return column
+
+
 def removeInt64(column, name=None):
     type = column.dtype
     if type.kind in ['i', 'u'] and type.itemsize == 8:
         maxvalue = column.max()
         minvalue = column.min()
         if maxvalue > 0x7FFFFFFF or minvalue < -0x80000000:
-            # PHASE_5 Batch 2A (TR-D3): beyond +-2^53 a double cannot hold every integer (2^53 + 1 arrived as 2^53)
-            if maxvalue > SAFE_INTEGER or (type.kind == 'i' and minvalue < -SAFE_INTEGER):
-                raise UnsafeIntegerColumn(f"column {name!r}: 64-bit integers beyond 2^53 (here {minvalue} .. {maxvalue}) "
-                                          f"cannot be represented exactly in the browser; send them as strings, or "
-                                          f"split them into two 32-bit columns")
+            checkSafeIntegers(column, name)            # PHASE_5 Batch 2A (TR-D3): refused beyond +-2^53
             return column.astype("float64")
         return column.astype("int32")
     return column

@@ -19,7 +19,7 @@ from bokeh.models import CustomJS, ColumnDataSource
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
-from RootInteractive.Tools.compressArray import compressCDSPipe, removeInt64
+from RootInteractive.Tools.compressArray import checkSafeIntegers, compressCDSPipe, removeInt64
 from RootInteractive.InteractiveDrawing.bokeh.CDSCompress import CDSCompress
 from RootInteractive.InteractiveDrawing.bokeh.HistoStatsCDS import HistoStatsCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdProfile import HistoNdProfile
@@ -1219,6 +1219,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     elif value["type"] == "column":
                         sent_data[value["name"]] = cdsValue["data"][value["name"]]
             cdsOrig = cdsValue["cdsOrig"]
+            for i, iColumn in sent_data.items():   # PHASE_5 v0.2 (review F2): beyond 2^53 refused, compressed or not
+                checkSafeIntegers(np.asarray(iColumn), i)
             if cdsValue['arrayCompression'] is not None:
                 print("compressCDSPipe")
                 # PHASE_5 Batch 2A (B7, TR-D3): integer columns are never rounded; beyond 2^53 they are refused

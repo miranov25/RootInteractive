@@ -46,6 +46,8 @@ strict marks are off and the signature tests removed; each exact signature is no
 v0.2 (after the review of the fix, the Architect's decisions of 2026-11-14, decision register v0.4): integer columns
 stay without lossy compression until a dedicated phase brings protected columns (the old definition, see section 5);
 the integer tests document that rule and its one known gap. TR-D3 is refused also without compression (review F2).
+FIX COMMIT v0.2: that refusal is in the product (compressArray.checkSafeIntegers, called by bokehTools for every
+column); its test is an ordinary test, the old signature a REGRESSION check.
 """
 import itertools
 import json
@@ -657,12 +659,11 @@ def test_keys_above_2_53_are_refused_with_compression(node_session, tmp_path, co
 
 
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
-@pytest.mark.xfail(**STRICT, reason="TR-D3 without compression: Bokeh rounds keys beyond 2^53 and only warns (review F2)")
 def test_strict_keys_above_2_53_are_refused_without_compression(node_session, tmp_path):
     """Review F2 (decision register v0.4): without arrayCompression the page goes through Bokeh's own serializer, which rounds 64-bit
     integers beyond 2^53 to doubles and only warns. The column must be refused by name, as with compression."""
     values, kind = int_state(node_session, tmp_path, KEYS_BIG, "none")
-    known_defect(values is not None and _is_tr_d3(values), "TR-D3 without compression: keys above 2^53 rounded")
+    regression(values is not None and _is_tr_d3(values), "TR-D3 without compression: keys above 2^53 rounded")
     assert values is None, (values, kind)
 
 
