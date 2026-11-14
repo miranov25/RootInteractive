@@ -42,6 +42,10 @@ R-4   (new, found while building these pages; not an alias defect, not fixed in 
         the main table's model although no figure made it. A strict expected failure.
 A-D2, A-D7 and A-D9 keep their PHASE_4 tests (test_headless_node_aliases.py). A-D8 (operators that mean something else
 in the browser) waits for the Architect's decision D-B4; its tests are added then.
+
+FIX COMMIT (PHASE_5 Batch 3 fix CRR v0.1, Claude20.RI, 2026-11-14): A-D1, A-D3, A-D4, A-D5 and A-D6 are fixed. The
+strict marks are off: every page must equal numpy. A page that equals an old exact signature (the verdict KNOWN) is now
+a REGRESSION, an ordinary failure that names the defect; the falsifier still checks every verdict.
 """
 from pathlib import Path
 
@@ -72,11 +76,12 @@ OK, KNOWN, UNEXPLAINED = "OK", "KNOWN", "UNEXPLAINED"
 
 
 def _strict(verdict: str, defect: str, detail) -> None:
-    """The strict test's end: pass on OK, KnownDefect on KNOWN, an ordinary failure on anything else."""
+    """The test's end: pass on OK; on KNOWN, the old exact signature of a fixed defect, a REGRESSION (fix commit); an
+    ordinary failure on anything else."""
     if verdict == OK:
         return
     if verdict == KNOWN:
-        raise KnownDefect(defect)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + defect)
     raise AssertionError(f"{defect}: neither the oracle nor the exact signature: {detail}")
 
 
@@ -181,7 +186,6 @@ def verdict_gather_alone(ev_keys, reply) -> str:
 
 
 @_node(pytest.mark.feature("DSL.gather_operation"))
-@pytest.mark.xfail(**STRICT, reason="A-D4")
 def test_strict_a_gather_alone_sends_its_column(node_session, tmp_path):
     """A compiled page gathers columns it does not show. The gather alone must work: the page sends the column."""
     err, out = _page(node_session, tmp_path, [[["x"], ["g"]]], [("g", "ev.ex[evIdx]")],
@@ -209,7 +213,6 @@ def verdict_alias_over_gather(reply) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.chain"), pytest.mark.feature("DSL.gather_operation"))
-@pytest.mark.xfail(**STRICT, reason="A-D1")
 def test_strict_alias_over_a_gathered_alias(node_session, tmp_path):
     """The PHASE_3_1 R2 case in a page: an expression over a gathered alias equals numpy, orphans NaN."""
     err, out = _page(node_session, tmp_path, [[["x"], ["g", "h"]], EV_SHOWN], [("g", "ev.ex[evIdx]"), ("h", "g*2+x")],
@@ -241,7 +244,6 @@ def verdict_alias_of_alias_on_the_related_table(reply) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.chain"), pytest.mark.feature("ALIAS.context"))
-@pytest.mark.xfail(**STRICT, reason="A-D1")
 def test_strict_alias_of_an_alias_on_the_related_table(node_session, tmp_path):
     """Derived columns of the event table that build on each other: ex3 = ex2 + 1, ex2 = ex * 2."""
     err, out = _page(node_session, tmp_path, [[["x"], ["y"]], [["ev.ex"], ["ev.ex3"]]],
@@ -267,7 +269,6 @@ def verdict_chain_of_depth_3(err, reply) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.chain"), pytest.mark.feature("DSL.gather_operation"))
-@pytest.mark.xfail(**STRICT, reason="A-D5")
 def test_strict_alias_chain_of_depth_3_across_two_tables(node_session, tmp_path):
     """A chain over two tables, as compiled ADF queries build them: two derived columns of the event table, gathered to
     the tracks, used in an expression with a track column."""
@@ -295,7 +296,6 @@ def verdict_selector_in_a_gather(err, before, after) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.parameter"), pytest.mark.feature("DSL.gather_operation"))
-@pytest.mark.xfail(**STRICT, reason="A-D3")
 def test_strict_a_column_selector_inside_a_gathering_expression(node_session, tmp_path):
     """A widget-driven variable inside an expression that also gathers ($w(var)$ in a compiled query)."""
     err, out = _page(node_session, tmp_path, [[["x"], ["sg"]], EV_SHOWN], [("sg", "ev.ex[evIdx]*sel")],
@@ -330,7 +330,6 @@ def verdict_gather_follows_the_table(before, ev_after, after) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.change_propagation"), pytest.mark.feature("DSL.gather_operation"))
-@pytest.mark.xfail(**STRICT, reason="A-D6")
 def test_strict_a_gather_and_its_dependents_follow_the_gathered_table(node_session, tmp_path):
     """New values in the event table: the gather and the alias built on it are recomputed."""
     err, out = _page(node_session, tmp_path, [[["x"], ["g", "C"]], EV_SHOWN], [("g", "ev.ex[evIdx]"), C_FUNC],

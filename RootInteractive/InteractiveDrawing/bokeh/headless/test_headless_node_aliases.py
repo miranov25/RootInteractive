@@ -37,6 +37,12 @@ Findings (provisional ids):
         shown directly in a figure from table columns is computed on the SERVER with numpy and is correct, so one
         expression has two results.
   A-D9  on that server path `cosh` computes sinh (compileVarName.py, math_functions: "cosh": np.sinh).
+
+FIX COMMIT (PHASE_5 Batch 3 fix CRR v0.1, Claude20.RI, 2026-11-14): A-D1 to A-D7 and A-D9 are fixed (compileVarName.py,
+bokehTools.py, CDSAlias.ts). Their strict marks are off and their signature tests are removed: every page must equal
+numpy. The old exact signatures stay as REGRESSION checks: a page showing one again is an ordinary failure that names
+the defect. A-D8 is not part of this fix (the Architect's decision D-B4 is open): its signature test and its strict
+expected failure stay.
 """
 import json
 from pathlib import Path
@@ -55,6 +61,13 @@ class KnownDefect(AssertionError):
 def known_defect(condition: bool, message: str) -> None:
     if condition:
         raise KnownDefect(message)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 3 fix commit: the exact signature of a fixed defect is a regression - an ordinary failure that
+    names it."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
@@ -464,25 +477,13 @@ def _ad1_read(node_session, tmp_path):
 
 
 @pytest.mark.feature("ALIAS.chain")
-def test_signature_a_d1_alias_of_an_alias_reads_the_whole_column(node_session, tmp_path):
-    """A-D1, exact signature: B = "A+1" is the text of the whole column A plus "1" in every row; M = "A*2" and the
-    figure expression "A*2" are NaN in every row. The prediction differs from numpy."""
-    r = _ad1_read(node_session, tmp_path)
-    assert r["columns"]["B"] == _ad1_prediction("+") and r["kinds"]["B"] == "string", r["columns"]["B"]
-    for k in ("M", "A*2"):
-        assert _same(_num(r["columns"][k]), _ad1_prediction("*")) and r["kinds"][k] == "number", (k, r["columns"][k])
-    assert not _same(_ad1_prediction("*"), A_VALUES * 2)
-
-
-@pytest.mark.feature("ALIAS.chain")
-@pytest.mark.xfail(**STRICT, reason="A-D1")
 def test_strict_alias_of_an_alias_equals_numpy(node_session, tmp_path):
     r = _ad1_read(node_session, tmp_path)
     good = {"B": A_VALUES + 1, "M": A_VALUES * 2, "A*2": A_VALUES * 2}
     if all(r["kinds"][k] == "number" and _same(_num(r["columns"][k]), w) for k, w in good.items()):
         return
-    known_defect(r["columns"]["B"] == _ad1_prediction("+")
-                 and all(_same(_num(r["columns"][k]), _ad1_prediction("*")) for k in ("M", "A*2")), "A-D1")
+    regression(r["columns"]["B"] == _ad1_prediction("+")
+               and all(_same(_num(r["columns"][k]), _ad1_prediction("*")) for k in ("M", "A*2")), "A-D1")
     raise AssertionError(f"A-D1: neither numpy nor the A-D1 signature: {r['columns']}")
 
 
@@ -500,18 +501,10 @@ AD2_CASES = {
 
 @pytest.mark.feature("ALIAS.cdsalias")
 @pytest.mark.parametrize("case", list(AD2_CASES))
-def test_signature_a_d2_a_non_computed_alias_stops_the_alias_list(tmp_path, case):
-    aliases, shown, _, signature = AD2_CASES[case]
-    assert _build_error(tmp_path, DF, _shown(*shown), aliasArray=aliases) == signature
-
-
-@pytest.mark.feature("ALIAS.cdsalias")
-@pytest.mark.xfail(**STRICT, reason="A-D2")
-@pytest.mark.parametrize("case", list(AD2_CASES))
 def test_strict_every_alias_of_the_list_is_usable(node_session, tmp_path, case):
     aliases, shown, oracle, signature = AD2_CASES[case]
     err = _build_error(tmp_path, DF, _shown(*shown), aliasArray=aliases)
-    known_defect(err == signature, f"A-D2 ({case})")
+    regression(err == signature, f"A-D2 ({case})")
     assert err is None, f"A-D2 ({case}): neither a page nor the A-D2 signature: {err}"
     r = _run(node_session, tmp_path / "aliases_document.json", [read("cdsFull", *shown)])[0]
     _complete(r, shown)
@@ -531,16 +524,9 @@ SEL = [{"name": "sel", "value": "x", "options": ["x", "y"]}]
 
 
 @pytest.mark.feature("ALIAS.parameter")
-def test_signature_a_d3_column_selector_in_an_expression_fails_the_build(tmp_path):
-    assert _build_error(tmp_path, DF, _shown("S"), [["select", ["sel"]]], aliasArray=[("S", "sel*2")],
-                        parameterArray=SEL) == AD3_SIGNATURE
-
-
-@pytest.mark.feature("ALIAS.parameter")
-@pytest.mark.xfail(**STRICT, reason="A-D3")
 def test_strict_column_selector_in_an_expression(node_session, tmp_path):
     err = _build_error(tmp_path, DF, _shown("S"), [["select", ["sel"]]], aliasArray=[("S", "sel*2")], parameterArray=SEL)
-    known_defect(err == AD3_SIGNATURE, "A-D3")
+    regression(err == AD3_SIGNATURE, "A-D3")
     assert err is None, f"A-D3: neither a page nor the A-D3 signature: {err}"
     before, s, after = _run(node_session, tmp_path / "aliases_document.json",
                             [read("cdsFull", "S"), set_("sel", "y"), read("cdsFull", "S")])
@@ -555,19 +541,11 @@ def _ad4(node_session, tmp_path):
 
 
 @pytest.mark.feature("DSL.gather_operation")
-def test_signature_a_d4_a_gather_alias_alone_does_not_send_the_gathered_column(node_session, tmp_path):
-    r, keys = _ad4(node_session, tmp_path)
-    assert "ex" not in keys["keys"], keys
-    assert r["throws"] == {"g": "Cannot read properties of null (reading '0')"} and r["throw_kinds"] == {"g": "TypeError"}, r
-
-
-@pytest.mark.feature("DSL.gather_operation")
-@pytest.mark.xfail(**STRICT, reason="A-D4")
 def test_strict_a_gather_alias_alone_equals_numpy_indexing(node_session, tmp_path):
     r, keys = _ad4(node_session, tmp_path)
     if not r["throws"] and _same(_num(r["columns"]["g"]), EV[DF.evIdx]):
         return
-    known_defect("ex" not in keys["keys"] and r["throws"] == {"g": "Cannot read properties of null (reading '0')"}, "A-D4")
+    regression("ex" not in keys["keys"] and r["throws"] == {"g": "Cannot read properties of null (reading '0')"}, "A-D4")
     raise AssertionError(f"A-D4: neither numpy nor the A-D4 signature: {r}, {keys}")
 
 
@@ -579,17 +557,9 @@ AD5_PAGE = dict(figures=[[["x"], ["g2"]], [["ev.ex"], ["ev.ex2"]]],
 
 @pytest.mark.feature("DSL.gather_operation")
 @pytest.mark.feature("ALIAS.chain")
-def test_signature_a_d5_gather_of_an_alias_of_another_table_fails_the_build(tmp_path):
-    assert _build_error(tmp_path, DF, AD5_PAGE["figures"], sourceArray=EV_SOURCE,
-                        aliasArray=AD5_PAGE["aliases"]) == AD5_SIGNATURE
-
-
-@pytest.mark.feature("DSL.gather_operation")
-@pytest.mark.feature("ALIAS.chain")
-@pytest.mark.xfail(**STRICT, reason="A-D5")
 def test_strict_gather_of_an_alias_of_another_table(node_session, tmp_path):
     err = _build_error(tmp_path, DF, AD5_PAGE["figures"], sourceArray=EV_SOURCE, aliasArray=AD5_PAGE["aliases"])
-    known_defect(err == AD5_SIGNATURE, "A-D5")
+    regression(err == AD5_SIGNATURE, "A-D5")
     assert err is None, f"A-D5: neither a page nor the A-D5 signature: {err}"
     r = _run(node_session, tmp_path / "aliases_document.json", [read("cdsFull", "g2")])[0]
     _complete(r, ["g2"])
@@ -613,20 +583,11 @@ def _ad6(node_session, tmp_path):
 
 @pytest.mark.feature("ALIAS.change_propagation")
 @pytest.mark.feature("DSL.gather_operation")
-def test_signature_a_d6_a_gather_alias_keeps_old_values_after_the_gathered_table_changes(node_session, tmp_path):
-    before, after = _ad6(node_session, tmp_path)
-    assert _same(_num(before["columns"]["g"]), EV[DF.evIdx]) and after["columns"]["g"] == before["columns"]["g"]
-    assert not _same(EV[DF.evIdx], np.array(EV_NEW)[DF.evIdx])
-
-
-@pytest.mark.feature("ALIAS.change_propagation")
-@pytest.mark.feature("DSL.gather_operation")
-@pytest.mark.xfail(**STRICT, reason="A-D6")
 def test_strict_a_gather_alias_follows_the_gathered_table(node_session, tmp_path):
     before, after = _ad6(node_session, tmp_path)
     if _same(_num(after["columns"]["g"]), np.array(EV_NEW)[DF.evIdx]):
         return
-    known_defect(_same(_num(after["columns"]["g"]), EV[DF.evIdx]), "A-D6")
+    regression(_same(_num(after["columns"]["g"]), EV[DF.evIdx]), "A-D6")
     raise AssertionError(f"A-D6: neither numpy nor the A-D6 signature: {after}")
 
 
@@ -650,19 +611,11 @@ def _ad7(node_session, tmp_path):
 
 
 @pytest.mark.feature("ALIAS.change_propagation")
-def test_signature_a_d7_an_alias_with_automatic_fields_is_not_invalidated(node_session, tmp_path):
-    cache, after = _ad7(node_session, tmp_path)
-    assert "U" in cache["cached"] and "E" not in cache["cached"], cache
-    assert _same(_num(after["columns"]["U"]), X * 2 + 1), after["columns"]["U"]
-
-
-@pytest.mark.feature("ALIAS.change_propagation")
-@pytest.mark.xfail(**STRICT, reason="A-D7")
 def test_strict_an_alias_with_automatic_fields_follows_its_input(node_session, tmp_path):
     cache, after = _ad7(node_session, tmp_path)
     if _same(_num(after["columns"]["U"]), X * 3 + 1):
         return
-    known_defect("U" in cache["cached"] and _same(_num(after["columns"]["U"]), X * 2 + 1), "A-D7")
+    regression("U" in cache["cached"] and _same(_num(after["columns"]["U"]), X * 2 + 1), "A-D7")
     raise AssertionError(f"A-D7: neither numpy nor the A-D7 signature: {after}")
 
 
@@ -724,22 +677,12 @@ def test_control_where_the_semantics_agree_both_paths_agree(node_session, tmp_pa
 
 @pytest.mark.feature("DSL.math_functions")
 @pytest.mark.feature("DSL.server_client_parity")
-def test_signature_a_d9_server_cosh_is_sinh(node_session, tmp_path):
-    alias, server = _two_paths(node_session, tmp_path, "cosh(x/1e9)")
-    with np.errstate(all="ignore"):
-        assert _same(server, np.sinh(P / 1e9)) and not _same(server, np.cosh(P / 1e9), MATH_RTOL), list(server)
-        assert _same(alias, np.cosh(P / 1e9), MATH_RTOL), list(alias)
-
-
-@pytest.mark.feature("DSL.math_functions")
-@pytest.mark.feature("DSL.server_client_parity")
-@pytest.mark.xfail(**STRICT, reason="A-D9")
 def test_strict_server_cosh_equals_numpy(node_session, tmp_path):
     alias, server = _two_paths(node_session, tmp_path, "cosh(x/1e9)")
     with np.errstate(all="ignore"):
         if _same(server, np.cosh(P / 1e9), MATH_RTOL):
             return
-        known_defect(_same(server, np.sinh(P / 1e9)), "A-D9")
+        regression(_same(server, np.sinh(P / 1e9)), "A-D9")
     raise AssertionError(f"A-D9: neither numpy nor the A-D9 signature: {list(server)}")
 
 

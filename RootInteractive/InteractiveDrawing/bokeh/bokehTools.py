@@ -481,18 +481,23 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             context = i.get("context", None)
             evaluator = ColumnEvaluator(context, cdsDict, paramDict, jsFunctionDict, i["expr"], aliasDict)
             result = evaluator.visit(exprTree.body)
-            if result["type"] == "javascript":
+            # PHASE_5 Batch 3 (A-D2): a plain column, another alias, a constant or a parameter is an alias too; before,
+            # it stopped the processing of every later alias (break)
+            if result["type"] in ("javascript", "column", "alias", "constant", "parameter"):
                 func = evaluator.make_vfunc(result["implementation"])
                 fields = list(evaluator.aliasDependencies.values())
                 parameters = [i for i in evaluator.paramDependencies if "options" not in paramDict[i]]
                 variablesParam = [i for i in evaluator.paramDependencies if "options" in paramDict[i]]
-                customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies}
+                # PHASE_5 Batch 3 (A-D3): a column selector is a field of the function, not also a scalar parameter (the
+                # browser refused the function: "Duplicate parameter name"), as getOrMakeColumns already does
+                customJsArgList = {i:paramDict[i]["value"] for i in evaluator.paramDependencies if "options" not in paramDict[i]}
                 nvars_local = len(fields)
                 variablesAlias = list(evaluator.aliasDependencies.keys())
                 for j in variablesParam:
                     if "subscribed_events" not in paramDict[j]:
                         paramDict[j]["subscribed_events"] = []
-                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
+                    # PHASE_5 Batch 3 (A-D3): the table's alias model is made here if it does not exist yet (KeyError before)
+                    paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"idx":nvars_local, "column_name":i["name"], "table":getOrMakeCdsFull(cdsDict, paramDict, context)}, code="""
                                         table.mapping[column_name].fields[idx] = this.value
                                         table.invalidate_column(column_name)
                                                 """)])
@@ -500,16 +505,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     fields.append(j)
                     nvars_local = nvars_local+1
                 transform = CustomJSNAryFunction(parameters={**customJsArgList, **{i[0]:getOrMakeCdsFull(cdsDict, paramDict, i[0]) for i in evaluator.dependencies_table.keys()}}, fields=fields.copy(), v_func=func)
+                # PHASE_5 Batch 3 (A-D4, A-D3): what the expression reads beyond this table's own columns - other tables'
+                # columns and aliases, the options of column selectors - read by compileVarName when the alias is used
+                transform._ri_dependencies = sorted(evaluator.dependencies, key=repr)
                 fields = variablesAlias
             else:
-                aliasDict[i["name"]] = result["name"]
-                break
+                raise NotImplementedError(f"alias {i['name']!r}: the expression {i['expr']!r} is not a column expression "
+                                          f"({result['type']})")
         else:
             parameters = i.get("parameters", None)
             fields = i.get("variables", None)
             if isinstance(fields, str):
                 if fields in paramDict:
-                    paramDict[fields]["subscribed_events"].append(["value", CustomJS(args={"column_name":i["name"], "table":cdsDict[context]["cdsFull"]}, code="""
+                    # PHASE_5 Batch 3 (A-D3): the alias's own table (before: `context` left over from an earlier alias)
+                    paramDict[fields]["subscribed_events"].append(["value", CustomJS(args={"column_name":i["name"], "table":getOrMakeCdsFull(cdsDict, paramDict, i.get("context", None))}, code="""
                         table.mapping[column_name].fields = this.value
                         table.invalidate_column(column_name)
                         """)])

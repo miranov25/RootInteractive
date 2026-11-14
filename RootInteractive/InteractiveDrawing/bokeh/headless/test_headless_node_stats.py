@@ -29,7 +29,8 @@ Run on the pinned toolchain: 20 of 31 cases passed as delivered. Changes, each m
            packed matrix twice (once in each inner loop); one predictor (2 x 2) is correct;
     ST-D3  an alias whose variables are chosen by a parameter fails the page build: bokehTools.py bokehDrawArray reads
            `context` in the function-form alias branch, where it is set only by an earlier expression alias
-           (UnboundLocalError);
+           (UnboundLocalError). Fixed in PHASE_5 Batch 3 (with A-D3): the signature test is removed, the exact signature
+           is a REGRESSION check, and the strict test now waits for ST-D2, which the page shows once it builds;
     ST-D4  the statistics table computes quantiles in one pass that assumes an ascending list; a list in another order
            (the table keeps the order the histograms request) gives wrong values under the right titles.
            Fixed in PHASE_5 Batch 2B: the signature test is removed, the strict test is an ordinary test, and the exact
@@ -771,13 +772,6 @@ def _is_st_d3(err) -> bool:
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-def test_signature_st_d3_parameter_chosen_alias_variables_fail_the_build(tmp_path):
-    err = _fit_build_error(tmp_path, _df(), ["x"], parameter=True, suffix="varX_signature")
-    assert _is_st_d3(err), err
-
-
-@NODE
-@pytest.mark.feature("STAT.linear_fit")
 def test_control_st_d3_after_an_expression_alias_the_page_builds_and_follows_the_predictor(node_session,tmp_path):
     """ST-D3's control: the same page with an expression alias declared first builds (that alias sets `context`), and
     the fitted alias follows the predictor parameter (one predictor at a time, so ST-D2 does not apply)."""
@@ -791,11 +785,12 @@ def test_control_st_d3_after_an_expression_alias_the_page_builds_and_follows_the
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="ST-D3: parameter-chosen alias variables fail the build (bokehTools.py context)")
+@pytest.mark.xfail(**STRICT, reason="ST-D2: the fit with two predictors is wrong (ST-D3, fixed in PHASE_5 Batch 3, no "
+                                    "longer stops the page before it)")
 def test_stat_client_fit_predictor_count_change_recomputes(node_session,tmp_path):
     d=_df()
     err=_fit_build_error(tmp_path,d,["x"],parameter=True,suffix="varX")
-    known_defect(_is_st_d3(err), "ST-D3: the page does not build")
+    regression(_is_st_d3(err), "ST-D3: the page does not build")
     assert err is None, err
     _node_open(node_session,_fit_page(tmp_path,d,["x"],parameter=True,suffix="varX"))
     before=_read(node_session,"CDSAlias",["fitted"],name="cdsFull")["data"]["fitted"]

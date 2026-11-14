@@ -76,6 +76,23 @@ export class CDSAlias extends ColumnarDataSource {
 	this.invalidate_columns(value[1])
       })
     }
+    // PHASE_5 Batch 3 (A-D6): a column that reads another table (a gather, ev.ex[evIdx]) is recomputed when that
+    // table changes - the table is one of its transform's parameters
+    const read_tables = new Map<string, [ColumnarDataSource, string[]]>()
+    for(const key in this.mapping){
+      const parameters = this.mapping[key]?.transform?.parameters
+      if(parameters == null) continue
+      for(const table of Object.values(parameters)){
+        if(table instanceof ColumnarDataSource && table !== this){
+          const entry = read_tables.get(table.id)
+          if(entry == null) read_tables.set(table.id, [table, [key]])
+          else if(!entry[1].includes(key)) entry[1].push(key)
+        }
+      }
+    }
+    for(const [table, keys] of read_tables.values()){
+      this.connect(table.change, () => this.invalidate_columns(keys))
+    }
 
     this.connect(this.selected.change, () => this.update_selection())
   }
@@ -163,8 +180,9 @@ export class CDSAlias extends ColumnarDataSource {
                 const column = this.mapping[new_key]
                 let should_invalidate = false
                 if(column.hasOwnProperty("fields")){
-                  for(let i=0; i < column.fields.length; i++){
-                    if(key === column.fields[i]){
+                  const fields = this.field_names(column)      // PHASE_5 Batch 3 (A-D7)
+                  for(let i=0; i < fields.length; i++){
+                    if(key === fields[i]){
                       should_invalidate = true
                       break
                     }
@@ -277,6 +295,15 @@ export class CDSAlias extends ColumnarDataSource {
     return old_columns.concat(new_columns)
   }
 
+  field_names(column: any): string[]{
+    // PHASE_5 Batch 3 (A-D7): the columns an alias reads. With automatic fields, `fields` is the text "auto" and the
+    // transform knows them (as compute_function reads them); walking the text letter by letter missed every dependency
+    if(column.fields === "auto"){
+      return column.transform.get_fields()
+    }
+    return Array.isArray(column.fields) ? column.fields : []
+  }
+
   invalidate_columns(keys: string[], emit_change=true){
     let watched_changed = false
     for(const key of keys){
@@ -300,8 +327,9 @@ export class CDSAlias extends ColumnarDataSource {
       const column = this.mapping[new_key]
       let should_invalidate = false
       if(column.hasOwnProperty("fields")){
-        for(let i=0; i < column.fields.length; i++){
-          if(key === column.fields[i]){
+        const fields = this.field_names(column)                // PHASE_5 Batch 3 (A-D7)
+        for(let i=0; i < fields.length; i++){
+          if(key === fields[i]){
             should_invalidate = true
             break
           }

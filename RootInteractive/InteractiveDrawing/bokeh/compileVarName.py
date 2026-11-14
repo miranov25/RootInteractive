@@ -59,7 +59,7 @@ math_functions = {
     "sqrt": np.sqrt,
     "abs": np.absolute,
     "sinh": np.sinh,
-    "cosh": np.sinh,
+    "cosh": np.cosh,                 # PHASE_5 Batch 3 (A-D9): was np.sinh
     "arctan2": np.arctan2,
     "arccosh": np.arccosh,
     "arcsinh": np.arcsinh,
@@ -225,11 +225,19 @@ class ColumnEvaluator:
                                 self.dependencies.add((value, j))
                         else:
                             self.dependencies.add((value, i))
-                        
-            self.aliasDependencies[node.attr] = tmp_name
+            # PHASE_5 Batch 3 (A-D4, A-D3): the columns the alias's expression reads in other tables, and the options of
+            # its column selectors, recorded when the alias was compiled (bokehTools.py) - so they are sent to the page
+            for i in getattr(self.aliasDict[value][node.attr].get("transform", None), "_ri_dependencies", ()):
+                self.dependencies.add(tuple(i))
+            if value == self.context:
+                self.aliasDependencies[node.attr] = tmp_name
+            else:
+                # PHASE_5 Batch 3 (A-D5): an alias of another table is read from that table ($tmp_n, make_vfunc), not as a
+                # column of this one
+                self.dependencies.add((value, node.attr))
             return {
                 "name": node.attr,
-                "implementation": tmp_name,
+                "implementation": tmp_name + "{index_suffix}",    # PHASE_5 Batch 3 (A-D1): the row's value, not the column
                 "type": "alias",
                 "table": value
             }
