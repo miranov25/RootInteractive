@@ -31,7 +31,16 @@ for TR-D3 and B7 (no test before), and the RI-ADF-01 acceptance page (hist2d and
 THE STRICT LOGIC is that of Batch 1: a strict test passes when the page equals the oracle; it raises KnownDefect only
 when the page shows exactly the declared defects, each by its exact signature; any other deviation is an ordinary
 failure. Quantiles are read but never judged here (Batch 2B, decision D-B7).
+
+TEST CORRECTION v0.2 (GPT24.RI's review of the test commits, 2026-11-13, findings 2A-P1-01 and 2A-P1-02):
+- the weight series are explained only by an exact port of the present code (oracles/profile_port.py): the page must
+  equal it bit for bit - entries, mean, std and quantile of every series in every X bin - with the smallest set of
+  WT-D2 and WT-D4 switched on. Any other wrong value (a mean of 1e12, a NaN std, another quantile, other pairings)
+  is UNEXPLAINED;
+- an integer column counts as refused only when the build raises the deliberate refusal UnsafeIntegerColumn that
+  names the column and 2^53; any other exception is an ordinary failure. Integers within 2^53 must arrive exactly.
 """
+import itertools
 import json
 from pathlib import Path
 
@@ -41,8 +50,9 @@ import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.report import ScenarioResult
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms as ho
-from .test_headless_node_weights import (BOOL_ERROR, SPEC, XEDGE, _first_visited_weight, _is_wt_d1, _is_wt_d2,
-                                         _is_wt_d4, _open, _page, _profile, _series, _weighted_ref)
+from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import profile_port
+from .test_headless_node_weights import (BOOL_ERROR, SPEC, XEDGE, _first_visited_weight, _is_wt_d1, _open, _page,
+                                         _profile, _series, _weighted_ref)
 
 
 class KnownDefect(AssertionError):
@@ -140,31 +150,35 @@ def _close(a, b, keys=("entries", "mean", "std")) -> bool:
                for k in keys)
 
 
-def classify_series(d, names, multi, alone) -> tuple:
-    """PASS: every series of the multi-weight profile equals numpy (entries, mean, std). KNOWN: the page is explained
-    by WT-D2 (a series alone shows WT-D2's exact signature) and WT-D4 (the first series equals itself alone; a later
-    series keeps numpy's entries but differs from itself alone). UNEXPLAINED: anything else."""
+WT_SWITCHES = ("WT-D2", "WT-D4")
+SERIES_KEYS = ("entries", "mean", "std", "quantile_0")
+
+
+def port_series(d, names, defects) -> dict:
+    """The present code's profile (oracles/profile_port.py) of the weight table, the series in the order `names`."""
+    out = profile_port.profile([(d.x.to_numpy(float), 4, (0.0, 4.0))], d.y.to_numpy(float), (4, (0.0, 4.0)),
+                               {s: d[s].to_numpy(float) for s in names}, quantiles=(0.5,), defects=defects)
+    return {s: {k: np.asarray(out[s][k], float) for k in SERIES_KEYS} for s in names}
+
+
+def _exact(a, b) -> bool:
+    return all(len(a[k]) == len(b[k]) and np.array_equal(np.asarray(a[k], float), np.asarray(b[k], float), equal_nan=True)
+               for k in SERIES_KEYS)
+
+
+def classify_series(d, names, multi) -> tuple:
+    """PASS: every series of the multi-weight profile equals numpy (entries, mean, std; 1e-12). KNOWN: the page equals,
+    bit for bit, the port of the present code with the smallest set of WT-D2 and WT-D4 switched on - entries, mean,
+    std and quantile of every series in every X bin. UNEXPLAINED: anything else."""
     intended = {s: _weighted_ref(d, s) for s in names}
-    if all(_close(multi[s], intended[s]) for s in names):
+    if set(multi) == set(names) and all(_close(multi[s], intended[s]) for s in names):
         return "PASS", []
-    found = set()
-    for s in names:
-        if _close(alone[s], intended[s]):
-            continue
-        if _is_wt_d2(alone[s], d, s):
-            found.add("WT-D2")
-            continue
-        return "UNEXPLAINED", f"series {s} alone is neither numpy nor WT-D2"
-    if not _close(multi[names[0]], alone[names[0]], ("entries", "mean", "std", "quantile_0")):
-        return "UNEXPLAINED", f"the first series {names[0]} differs from itself alone"
-    for s in names[1:]:
-        if not np.allclose(multi[s]["entries"], intended[s]["entries"], rtol=1e-12, atol=1e-12):
-            return "UNEXPLAINED", f"series {s}: entries differ from numpy"
-        if not _close(multi[s], alone[s], ("entries", "mean", "std", "quantile_0")):
-            found.add("WT-D4")
-    if not found:
-        return "UNEXPLAINED", "differs from numpy, but no defect signature applies"
-    return "KNOWN", sorted(found)
+    for size in range(1, len(WT_SWITCHES) + 1):
+        for subset in itertools.combinations(WT_SWITCHES, size):
+            port = port_series(d, names, subset)
+            if set(multi) == set(names) and all(_exact(multi[s], port[s]) for s in names):
+                return "KNOWN", sorted(subset)
+    return "UNEXPLAINED", "neither numpy nor the present code's port with any set of WT-D2 and WT-D4"
 
 
 def weight_series(node_session, tmp_path, names) -> tuple:
@@ -204,8 +218,8 @@ def test_strict_compiled_weight_series_each_equal_numpy(node_session, tmp_path, 
     """C03, C04, RI-ADF-04: every series of a multi-weight profile - entries (sum of weights), weighted mean and
     weighted population std per X bin - equals numpy, whatever series come before it."""
     names = WEIGHT_PAGES[shape]
-    d, multi, alone = weight_series(node_session, tmp_path, names)
-    verdict, detail = classify_series(d, names, multi, alone)
+    d, multi, _ = weight_series(node_session, tmp_path, names)
+    verdict, detail = classify_series(d, names, multi)
     if verdict == "PASS":
         return
     if verdict == "KNOWN":
@@ -221,11 +235,49 @@ def test_falsifier_swapped_weight_names_and_std_for_mean_are_unexplained(node_se
     names = WEIGHT_PAGES["weights_vector"]
     d, multi, alone = weight_series(node_session, tmp_path, names)
     swapped = {names[0]: multi[names[1]], names[1]: multi[names[0]]}
-    assert classify_series(d, names, swapped, alone)[0] == "UNEXPLAINED"
+    assert classify_series(d, names, swapped)[0] == "UNEXPLAINED"
     std_for_mean = {s: {**multi[s], "mean": multi[s]["std"]} for s in names}
-    assert classify_series(d, names, std_for_mean, alone)[0] == "UNEXPLAINED"
+    assert classify_series(d, names, std_for_mean)[0] == "UNEXPLAINED"
     intended = {s: {**_weighted_ref(d, s), "quantile_0": alone[s]["quantile_0"]} for s in names}
-    assert classify_series(d, names, intended, alone) == ("PASS", [])
+    assert classify_series(d, names, intended) == ("PASS", [])
+
+
+@_unit
+@pytest.mark.parametrize("shape", sorted(WEIGHT_PAGES))
+def test_falsifier_a_later_series_changed_in_any_way_is_unexplained(shape):
+    """2A-P1-01 (GPT24): the model of the present code itself, changed only in its later series - a mean of 1e12, a NaN
+    std, a quantile moved to the next value of the bin, or the weights paired as if the series came in the other order
+    - is UNEXPLAINED, never WT-D4. The unchanged model is KNOWN with exactly the declared defects."""
+    d, names = weight_table(), WEIGHT_PAGES[shape]
+    model = port_series(d, names, WT_SWITCHES)
+    assert classify_series(d, names, model) == ("KNOWN", EXPECTED_WEIGHT_DEFECTS[shape])
+    later = names[1]
+
+    def changed(key, i, value):
+        s = {k: v.copy() for k, v in model[later].items()}
+        s[key][i] = value
+        return {**model, later: s}
+    q = model[later]["quantile_0"]
+    shuffled = d.copy()                       # the later weight given to other rows of the same X bin
+    rng = np.random.default_rng(SEED + 5)
+    for i in range(4):
+        rows = np.flatnonzero((d.x >= XEDGE[i]) & (d.x < XEDGE[i + 1]))
+        shuffled.loc[rows, later] = d[later].to_numpy()[rng.permutation(rows)]
+    mutants = {"mean 1e12": changed("mean", 1, 1e12), "NaN std": changed("std", 2, np.nan),
+               "another quantile": changed("quantile_0", 0, float(np.nextafter(q[0], np.inf))),
+               "other pairing": {**model, later: port_series(shuffled, names, WT_SWITCHES)[later]}}
+    for name, page in mutants.items():
+        assert classify_series(d, names, page)[0] == "UNEXPLAINED", name
+
+
+@_unit
+@pytest.mark.parametrize("shape", sorted(WEIGHT_PAGES))
+def test_the_port_without_defects_is_numpy(shape):
+    """The port of the present code with no defect switched on gives numpy's entries, means and stds (1e-12)."""
+    d, names = weight_table(), WEIGHT_PAGES[shape]
+    port = port_series(d, names, ())
+    for s in names:
+        assert _close(port[s], _weighted_ref(d, s)), s
 
 
 @_node(pytest.mark.feature("HIST.stack"))
@@ -429,14 +481,27 @@ INTS_JS = """() => { const v = window.__riH.model('cdsOrig', ['CDSCompress']).ge
                                      : (Number.isInteger(x) ? BigInt(x).toString() : 'not an integer: ' + x))}; }"""
 
 
+REFUSAL = "UnsafeIntegerColumn"       # the deliberate build-time refusal of the 2A fix (RootInteractive/Tools/compressArray.py)
+
+
+def is_refusal(exc: BaseException, column: str) -> bool:
+    """2A-P1-02 (GPT24): only the deliberate refusal counts - the exception class UnsafeIntegerColumn (a ValueError),
+    naming the column and the 2^53 limit. Any other exception at build time is an ordinary failure."""
+    text = str(exc)
+    return type(exc).__name__ == REFUSAL and isinstance(exc, ValueError) and repr(column) in text and "2^53" in text
+
+
 def int_state(node_session, tmp_path, keys, compression):
-    """None and the error if the build refuses the column; else the page's decoded key column as exact integers."""
+    """None and the refusal's text if the build refuses the column deliberately; else the page's decoded key column
+    as exact integers. Any other build error propagates (an ordinary failure)."""
     df = pd.DataFrame({"key": keys, "x": np.arange(len(keys), dtype=float)})
     try:
         path = _build(tmp_path, df, [[["x"], ["key"]]], f"ints_{compression}_{len(keys)}.json",
                       compression=[(".*", RELATIVE16 if compression == "relative16" else LOSSLESS)])
-    except Exception as exc:                                                   # noqa: BLE001 - a refusal is allowed
-        return None, f"{type(exc).__name__}: {exc}"
+    except ValueError as exc:
+        if is_refusal(exc, "key"):
+            return None, f"{type(exc).__name__}: {exc}"
+        raise
     page, report = _node_page(node_session, tmp_path, path)
     got = page.evaluate(INTS_JS)
     _no_errors(report)
@@ -469,10 +534,10 @@ def test_control_integer_keys_below_2_53_are_exact_when_lossless(node_session, t
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"),
        pytest.mark.xfail(**STRICT, reason="B7: relative compression rounds integer columns"), target=pytest.mark.node_transport)
 def test_strict_integer_keys_survive_relative16_or_are_refused(node_session, tmp_path):
-    """Lossless or refused: an integer key is never silently rounded (reviewers' recommendation on B7)."""
+    """An integer key within 2^53 arrives exactly, also when the page uses relative 16-bit coding (the Architect's
+    default of 2026-11-13: integer columns skip relative coding). A refusal is not expected for these keys."""
     values, kind = int_state(node_session, tmp_path, KEYS_SMALL, "relative16")
-    if values is None:
-        return                                                                 # a loud refusal at build time
+    assert values is not None, f"keys within 2^53 refused: {kind}"
     known_defect(_is_b7(values), "B7: integer keys rounded")
     assert values == KEYS_SMALL.tolist(), (values, kind)
 
@@ -482,6 +547,19 @@ def test_signature_tr_d3_keys_above_2_53_lose_precision_even_lossless(node_sessi
     """TR-D3, exact signature: every key arrives as the nearest double (2^53 + 1 -> 2^53), in a Float64Array."""
     values, kind = int_state(node_session, tmp_path, KEYS_BIG, "lossless")
     assert values is not None and _is_tr_d3(values) and kind == "Float64Array", (values, kind)
+
+
+@_unit
+def test_falsifier_only_the_deliberate_refusal_counts():
+    """2A-P1-02 (GPT24): an unrelated ValueError, TypeError or KeyError at build time, or the refusal naming another
+    column, is not a refusal of the key column."""
+    class UnsafeIntegerColumn(ValueError):
+        pass
+    good = UnsafeIntegerColumn("column 'key': 64-bit integers beyond 2^53 cannot be represented exactly in the browser")
+    assert is_refusal(good, "key")
+    for bad in (ValueError(str(good)), TypeError(str(good)), KeyError("key"),
+                UnsafeIntegerColumn("column 'other': 64-bit integers beyond 2^53"), UnsafeIntegerColumn("column 'key'")):
+        assert not is_refusal(bad, "key"), repr(bad)
 
 
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"),

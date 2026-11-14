@@ -30,6 +30,14 @@ PHASE_4's `_quantile_candidates`). WT-D3 is a zero-weight row's value that is no
 Shapes: RI-ADF-05 (quantiles .15, .5, .9 per facet and group) and RI-ADF-06 (.45, .55), plus the ends 0 and 1, in a
 profile of Y per (X bin, group) cell. Weighted: a selection branch as a 0/1 weight (contract C03), whose integer
 cumulative weights reach the exact boundaries where WT-D3 acts.
+
+TEST CORRECTION v0.2 (GPT24.RI's review of the test commits, 2026-11-13, findings 2B-P1-01 to -03):
+- a page must have exactly the 15 cells, no cell twice, and exactly one value per requested level in each cell;
+- an error must equal the expected one in full, with its number (not only up to the colon);
+- the weighted page is KNOWN (WT-D3, q=1) only when it equals, bit for bit, the exact port of the present weighted code
+  (oracles/profile_port.py) - not merely when its bad values are zero-weight values. Mutants of each kind are tests.
+The set of accepted weighted values stays a temporary bounded set (inverse CDF, next value, midpoint), not the future
+weighted method (2B-P2-01): the method-free properties remain the target.
 """
 import json
 import math
@@ -42,6 +50,7 @@ import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.report import ScenarioResult
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms as ho
+from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import profile_port
 from .test_headless_node_weights import _quantile_candidates
 
 
@@ -137,7 +146,9 @@ def page_quantiles(node_session, tmp_path, d, quantiles, weights=None, name="q")
     assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
     cells = {}
     for i, (c0, c1) in enumerate(zip(got["c0"], got["c1"])):
-        cells[(int(c0), int(c1))] = [got[f"quantile_{j}"][i] for j in range(len(quantiles))]
+        key = (int(c0), int(c1))
+        assert key not in cells, f"the page has the cell {key} twice"
+        cells[key] = [got[f"quantile_{j}"][i] for j in range(len(quantiles))]
     return {"cells": cells}
 
 
@@ -261,14 +272,21 @@ def expected(d, qs, defects=()) -> dict:
     return {"cells": cells}
 
 
+N_CELLS = NBINS[0] * NBINS[1]
+
+
 def _same(got, want) -> bool:
-    """Equal outputs: the same error kind, or the same cells with every quantile equal (NaN = NaN; 1e-12 relative)."""
+    """Equal outputs: the same error in full (its number included), or exactly the same N_CELLS cells, each with
+    exactly one value per requested level, in the requested order, every value equal (NaN = NaN; 1e-12 relative)."""
     if "error" in got or "error" in want:
-        return "error" in got and "error" in want and got["error"].split(":")[0] == want["error"].split(":")[0]
-    if set(got["cells"]) != set(want["cells"]):
+        return "error" in got and "error" in want and got["error"] == want["error"]
+    if set(got["cells"]) != set(want["cells"]) or len(got["cells"]) != N_CELLS:
         return False
     for key, w in want["cells"].items():
-        for a, b in zip(got["cells"][key], w):
+        g = got["cells"][key]
+        if len(g) != len(w):
+            return False
+        for a, b in zip(g, w):
             if (a is None) != (b is None) or (a is not None and not np.isclose(a, b, rtol=1e-12, atol=1e-12)):
                 return False
     return True
@@ -359,6 +377,27 @@ def test_the_comparator_rejects_mutants():
     assert explanations(filled, d, ASCENDING) == []
 
 
+@_unit
+def test_the_comparator_rejects_structure_and_error_mutants():
+    """2B-P1-01/02 (GPT24): a cell with one value missing, a cell with an extra value 99999, a missing cell - each
+    made from the oracle and from the full model - and the expected error with another number: none is explained."""
+    d = table()
+    for model in (expected(d, ASCENDING), expected(d, ASCENDING, QUANTILE_DEFECTS)):
+        key = sorted(model["cells"])[4]
+        short = {"cells": {**model["cells"], key: model["cells"][key][:-1]}}
+        extra = {"cells": {**model["cells"], key: model["cells"][key] + [99999.0]}}
+        missing = {"cells": {k: v for k, v in model["cells"].items() if k != key}}
+        for name, bad in (("one value missing", short), ("an extra value", extra), ("a missing cell", missing)):
+            assert not _same(bad, model) and explanations(bad, d, ASCENDING) == [], name
+    want = expected(d, MIXED, QUANTILE_DEFECTS)
+    # the page's exact text (measured in Node, equal to the model); the CRR v0.1 rounded it to -0.45
+    assert want == {"error": "ERR Quantile out of range: -0.446875"}, want
+    assert _same({"error": "ERR Quantile out of range: -0.446875"}, want)
+    assert not _same({"error": "ERR Quantile out of range: -0.45"}, want)
+    assert not _same({"error": "ERR Quantile out of range: 12345"}, want)
+    assert explanations({"error": "ERR Quantile out of range: 12345"}, d, MIXED) == []
+
+
 # ===================================================================================== Node: unweighted quantiles
 CASES = {"ascending": ("table", ASCENDING), "permuted": ("permuted", ASCENDING), "mixed": ("table", MIXED)}
 
@@ -407,28 +446,58 @@ def test_control_interior_levels_in_wide_sub_bins_are_right_today(node_session, 
 WEIGHTED = [0.15, 0.5, 0.9, 1.0]
 
 
-def weighted_verdict(d, got) -> tuple:
-    """Every weighted quantile must be a value a standard definition gives from the cell's positive-weight rows
-    (PHASE_4 `_quantile_candidates`). Returns (set of defects explaining the violations, unexplained violations):
-    WT-D3 = a zero-weight row's value that is no standard value; q=1 = NaN at q = 1 where the cell has weight."""
+def weighted_port(d) -> dict:
+    """The present code's weighted quantiles per cell (oracles/profile_port.py, the exact port; a single weight, so
+    WT-D4 cannot act), None for NaN - what the page shows today."""
+    (nx, ng, ny), (rx, rg, ry) = NBINS, RANGES
+    out = profile_port.profile([(d.x.to_numpy(float), nx, tuple(rx)), (d.g.to_numpy(float), ng, tuple(rg))],
+                               d.y.to_numpy(float), (ny, tuple(ry)), {"b": d.b.to_numpy(float)}, quantiles=WEIGHTED,
+                               defects=("WT-D2", "WT-D4"))["b"]
+    return {"cells": {(z % nx, z // nx): [None if math.isnan(out[f"quantile_{i}"][z]) else out[f"quantile_{i}"][z]
+                                          for i in range(len(WEIGHTED))] for z in range(nx * ng)}}
+
+
+def weighted_violations(d, got) -> list:
+    """The values that are no standard weighted value of the cell's positive-weight rows (PHASE_4
+    `_quantile_candidates`), as ((ix, ig), q, value, kind); kind 'WT-D3' = a zero-weight row's value, 'q=1' = NaN at
+    q = 1, 'other' = anything else. A cell without weight must give None."""
     idx = ho.bin_index_nd([d.x, d.g, d.y], NBINS, RANGES)
     nx, ng, _ = NBINS
-    found, unexplained = set(), []
+    bad = []
     for (ix, ig), values in got["cells"].items():
         sel = (idx >= 0) & (idx % nx == ix) & ((idx // nx) % ng == ig)
         y, w = d.y.to_numpy()[sel], d.b.to_numpy()[sel]
-        if w.sum() <= 0:
-            continue
         for q, v in zip(WEIGHTED, values):
-            if v is not None and float(v) in _quantile_candidates(y, w, q):
+            if w.sum() <= 0:
+                if v is not None:
+                    bad.append(((ix, ig), q, v, "other"))
+            elif v is not None and float(v) in _quantile_candidates(y, w, q):
                 continue
-            if q == 1 and v is None:
-                found.add("q=1")
+            elif q == 1 and v is None:
+                bad.append(((ix, ig), q, v, "q=1"))
             elif v is not None and float(v) in set(y[w == 0].astype(float)):
-                found.add("WT-D3")
+                bad.append(((ix, ig), q, v, "WT-D3"))
             else:
-                unexplained.append(((ix, ig), q, v))
-    return found, unexplained
+                bad.append(((ix, ig), q, v, "other"))
+    return bad
+
+
+def weighted_verdict(d, got) -> tuple:
+    """Structure first: exactly the N_CELLS cells, each with one value per requested level. PASS: no violation (every
+    value a standard weighted value of the positive-weight rows). KNOWN: the page equals the exact port of the present
+    code in every cell and at every level, and its violations are only WT-D3 and q=1 - returns the set found.
+    UNEXPLAINED: anything else (a missing or extra cell or value, another value, a page unlike the port)."""
+    cells = got.get("cells", {})
+    if len(cells) != N_CELLS or set(cells) != set(weighted_port(d)["cells"]) or \
+            any(len(v) != len(WEIGHTED) for v in cells.values()):
+        return "UNEXPLAINED", "the structure: cells or values missing or extra"
+    bad = weighted_violations(d, got)
+    if not bad:
+        return "PASS", set()
+    port = weighted_port(d)
+    if got["cells"] == port["cells"] and all(kind != "other" for *_, kind in bad):
+        return "KNOWN", {kind for *_, kind in bad}
+    return "UNEXPLAINED", [b for b in bad if b[3] == "other"][:5] or "the page is not the present code's port"
 
 
 @_unit
@@ -446,17 +515,46 @@ def test_strict_weighted_quantiles_are_standard_values_of_the_positive_rows(node
     d = table()
     got = page_quantiles(node_session, tmp_path, d, WEIGHTED, weights="b", name="weighted")
     assert "error" not in got, got
-    found, unexplained = weighted_verdict(d, got)
-    if not found and not unexplained:
+    verdict, detail = weighted_verdict(d, got)
+    if verdict == "PASS":
         return
-    known_defect(not unexplained and found == {"WT-D3", "q=1"}, "WT-D3 and q=1")
-    raise AssertionError(f"explained {sorted(found)}, declared ['WT-D3', 'q=1']; unexplained {unexplained[:5]}")
+    known_defect(verdict == "KNOWN" and detail == {"WT-D3", "q=1"}, "WT-D3 and q=1")
+    raise AssertionError(f"{verdict}: {detail}; declared ['WT-D3', 'q=1']")
 
 
 @_node(pytest.mark.feature("HIST.profile_unbinned"))
 def test_signature_wt_d3_a_zero_weight_row_is_returned(node_session, tmp_path):
     """WT-D3 and q=1, exact: every violation is a zero-weight row's value or NaN at q = 1, and both occur."""
     d = table()
-    found, unexplained = weighted_verdict(d, page_quantiles(node_session, tmp_path, d, WEIGHTED, weights="b",
-                                                             name="weighted_sig"))
-    assert found == {"WT-D3", "q=1"} and not unexplained, (found, unexplained[:5])
+    got = page_quantiles(node_session, tmp_path, d, WEIGHTED, weights="b", name="weighted_sig")
+    assert got == weighted_port(d), "the page is not the exact port of the present weighted code"
+    assert weighted_verdict(d, got) == ("KNOWN", {"WT-D3", "q=1"})
+
+
+@_unit
+def test_falsifier_weighted_structure_and_value_mutants_are_unexplained():
+    """2B-P1-03 (GPT24): made from the port of the present code - one cell left out (the reviewer's one-cell page),
+    a zero-weight value replaced by another zero-weight row of the same cell, a value outside the cell, two levels
+    swapped, an extra value - each is UNEXPLAINED, never WT-D3."""
+    d = table()
+    port = weighted_port(d)
+    assert weighted_verdict(d, port) == ("KNOWN", {"WT-D3", "q=1"})
+    bad = weighted_violations(d, port)
+    key, q, v, _ = next(b for b in bad if b[3] == "WT-D3")
+    i = WEIGHTED.index(q)
+    idx = ho.bin_index_nd([d.x, d.g, d.y], NBINS, RANGES)
+    nx, ng, _ = NBINS
+    sel = (idx >= 0) & (idx % nx == key[0]) & ((idx // nx) % ng == key[1])
+    zeros = [float(x) for x in d.y.to_numpy()[sel & (d.b.to_numpy() == 0)] if float(x) != v]
+    def with_value(value, k=key, j=i):
+        return {"cells": {**port["cells"], k: [value if n == j else x for n, x in enumerate(port["cells"][k])]}}
+    swapped = list(port["cells"][key])
+    swapped[0], swapped[1] = swapped[1], swapped[0]
+    mutants = {"one cell only": {"cells": {key: port["cells"][key]}},
+               "a cell left out": {"cells": {k: x for k, x in port["cells"].items() if k != key}},
+               "another zero-weight row": with_value(zeros[0]),
+               "a value outside the cell": with_value(123.0),
+               "two levels swapped": {"cells": {**port["cells"], key: swapped}},
+               "an extra value": {"cells": {**port["cells"], key: port["cells"][key] + [1.0]}}}
+    for name, page in mutants.items():
+        assert weighted_verdict(d, page)[0] == "UNEXPLAINED", name
