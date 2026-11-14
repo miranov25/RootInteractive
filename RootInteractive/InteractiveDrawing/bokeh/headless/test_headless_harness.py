@@ -96,10 +96,11 @@ def test_missing_probe_is_an_error(headless_session):
 GENERAL_CHECK_JS = """() => {
   const H = window.__riH, M = Bokeh.documents[0]._all_models;
   const range = n => Array.from({length: n}, (_, i) => i);
-  const lif = (name, n, picked, stale) => ({type: 'LazyIntersectionFilter', name, row_count: () => n,
+  const table = n => ({type: 'ColumnDataSource', name: 't' + n, get_length: () => n});
+  const lif = (name, n, picked, stale, filters) => ({type: 'LazyIntersectionFilter', name, filters: filters || [{source: table(n)}],
       changed_indices: stale, cached_indices: picked, changed_booleans: stale,
       cached_vector: Array.from({length: 32}, (_, i) => picked.includes(i))});
-  const hist = (type, name, n, counts, extra) => Object.assign({type, name, weights: null, source: {get_length: () => n},
+  const hist = (type, name, n, counts, extra) => Object.assign({type, name, weights: null, source: table(n),
       data: {bin_count: counts}, get_column: () => counts}, extra || {});
   const out = {};
   M.clear(); M.set(1, lif('ok', 12, range(12), false)); M.set(2, hist('HistogramCDS', 'h_ok', 12, [10, 2]));
@@ -110,16 +111,25 @@ GENERAL_CHECK_JS = """() => {
   M.set(6, hist('HistogramCDS', 'h_weighted', 12, [30, 2], {weights: 'w'}));      // weighted: totals not bounded
   M.set(7, hist('HistoNdCDS', 'hn_stale', 12, [30, 2], {cached_columns: new Set()}));   // bin_count not current
   M.set(8, hist('HistoNdCDS', 'hn_bad', 12, [7, 6], {cached_columns: new Set(['bin_count'])}));
-  M.set(9, {type: 'LazyIntersectionFilter', name: 'throws', row_count: () => { throw new Error('x'); }});
+  // v0.2 (review F3): a current filter whose table cannot be read is a failure, never skipped
+  M.set(9, lif('throws', 12, [0], false, [{source: {type: 'ColumnDataSource', get_length: () => { throw new Error('x'); }}}]));
+  // v0.2 (review F3): a compressed table not decoded yet is reported as not checked - its get_length() is never called
+  M.set(10, lif('lazy', 12, [0], false, [{source: {type: 'CDSCompress', name: 'cz', _length: -1,
+      get_length: () => { throw new Error('get_length() of a compressed table must not be called'); }}}]));
+  M.set(11, lif('mixed', 12, [0], false, [{source: table(12)}, {source: table(13)}]));   // inconsistent lengths
   out.broken = H.invariants();
+  out.unchecked = H.lastUnchecked;
   return out;
 }"""
 
 
 def test_the_general_check_judges_only_current_results(headless_session):
-    """PHASE_5 Batch 1 (review C1): the page helper's read-only check, in Chromium on stand-in models. A filter that
-    selects past its table's last row, and an unweighted histogram with more entries than rows, are reported; results
-    marked out of date, weighted histograms and models that cannot be read are not judged. settle() then throws."""
+    """PHASE_5 Batch 1 (review C1), Batches 2A/2B v0.2 (review F3): the page helper's strictly observing check, in
+    Chromium on stand-in models. A filter that selects past its table's last row, and an unweighted histogram with
+    more entries than rows, are reported; results marked out of date and weighted histograms are not judged. A current
+    filter whose table cannot be read, or whose filters disagree on the table length, is a failure; a current filter
+    on a compressed table not decoded yet is reported as not checked, and its length is never computed. settle()
+    then throws."""
     page = headless_session.browser.new_page()
     try:
         page.set_content("<html><body></body></html>")
@@ -130,7 +140,10 @@ def test_the_general_check_judges_only_current_results(headless_session):
             "filter bad selects 20 positions outside its table of 12 rows (first 12, 13, 14)",
             "filter bad: position 12 past the last row of its table (12 rows) is selected",
             "HistogramCDS h_bad counts 32 entries from a table of 12 rows",
-            "HistoNdCDS hn_bad counts 13 entries from a table of 12 rows"], out["broken"]
+            "HistoNdCDS hn_bad counts 13 entries from a table of 12 rows",
+            "the general check could not read filter throws: x",
+            "filter mixed: its filters select from tables of different lengths (12 and 13 rows)"], out["broken"]
+        assert out["unchecked"] == ["filter lazy: compressed table cz is not decoded yet"], out["unchecked"]
         err = page.evaluate("""async () => { try { await window.__riH.settle([['h_ok', 'bin_count', ['HistogramCDS']]], 5);
                                                return null; } catch (e) { return String(e.message); } }""")
         assert err is not None and err.startswith("RI invariant violated: filter bad selects 20 positions"), err

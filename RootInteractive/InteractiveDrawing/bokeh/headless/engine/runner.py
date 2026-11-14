@@ -64,6 +64,7 @@ CONSOLE_ALLOWED = (
 
 HELPER_JS = r"""
 window.__riH = {
+  lastUnchecked: [],               // results the general check could not verify at its last run (review F3)
   models() { return (window.Bokeh && Bokeh.documents.length) ? Array.from(Bokeh.documents[0]._all_models.values()) : []; },
   find(n, types) { return this.models().filter(m => m.name === n && (!types || types.includes(m.type))); },
   model(n, types) { const c = this.find(n, types); return c.length === 1 ? c[0] : null; },
@@ -102,39 +103,92 @@ window.__riH = {
   snapshot(probes) {
     return this.encode(probes.map(([n, c, t]) => Array.from(this.model(n, t).get_column(c))));
   },
-  invariants() {                    // PHASE_5 Batch 1 (review C1): checked after every settled step, on every page.
-    // Read only: it looks at results the page already computed and never starts a computation, so it cannot change
-    // what a test observes. (1) No intersection filter selects a position at or past its table's last row.
-    // (2) No unweighted histogram counts more entries than its table has rows.
-    const out = [];
+  knownLength(src, depth) {        // PHASE_5 Batch 2A/2B v0.2 (review F3): a table's row count only if the page
+    // already knows it. It never calls get_length() of a table that would compute or decode to answer, so the general
+    // check cannot change what a test observes. Returns {n} or {unknown: reason}.
+    const d = (depth || 0) + 1, name = src == null ? '' : (src.name || src.id);
+    if (src == null) return {unknown: 'no table'};
+    if (d > 20) return {unknown: 'tables nested more than 20 deep'};
+    switch (src.type) {
+      case 'ColumnDataSource': return {n: src.get_length()};          // plain columns: their length computes nothing
+      case 'CDSCompress':
+        return src._length >= 0 ? {n: src._length} : {unknown: 'compressed table ' + name + ' is not decoded yet'};
+      case 'CDSAlias': return this.knownLength(src.source, d);
+      case 'CDSJoin':
+        if (src._indices_left != null) return {n: src._indices_left.length};
+        if (src._indices_right != null) return {n: src._indices_right.length};
+        return {unknown: 'join ' + name + ' is not computed yet'};
+      case 'DownsamplerCDS':
+        if (src.watched && src._needs_update) return {unknown: 'downsampled table ' + name + ' is not updated yet'};
+        return src._is_trivial ? this.knownLength(src.source, d) : {n: src._downsampled_indices.length};
+      default: return {unknown: 'table type ' + src.type + ' (' + name + ') is not known to the general check'};
+    }
+  },
+  knownRows(lif, depth) {           // the row count of an intersection filter's table, as its row_count() would give
+    const d = (depth || 0) + 1;
+    if (d > 20) return {unknown: 'filters nested more than 20 deep'};
+    let n = null;
+    for (const f of lif.filters || []) {
+      const k = f.source != null ? this.knownLength(f.source)
+              : (f.type === 'LazyIntersectionFilter' ? this.knownRows(f, d) : null);
+      if (k == null) continue;                                     // a filter without a table, as in row_count()
+      if (k.unknown || k.bad) return k;
+      if (n != null && k.n !== n) return {bad: 'its filters select from tables of different lengths (' + n + ' and ' + k.n + ' rows)'};
+      n = k.n;
+    }
+    return n == null ? {unknown: 'none of its filters has a table'} : {n};
+  },
+  invariants() {                    // PHASE_5 Batch 1 (review C1); v0.2 (review F3): strictly observing, fail-closed.
+    // Checked after every settled step (and in Node after every evaluation), on every page:
+    // (1) no intersection filter selects a position at or past its table's last row;
+    // (2) no unweighted histogram counts more entries than its table has rows.
+    // Only current results are judged (a result marked out of date is skipped on purpose). A current result whose
+    // table length the page does not know yet is reported in lastUnchecked, with the reason ("not checked", never a
+    // silent pass). An error while reading a current result is a violation, never ignored.
+    const out = [], unchecked = [];
     for (const m of this.models()) {
+      const label = (m.type === 'LazyIntersectionFilter' ? 'filter ' : m.type + ' ') + (m.name || m.id);
       try {
-        if (m.type === 'LazyIntersectionFilter' && typeof m.row_count === 'function') {
-          const n = m.row_count();
-          if (n == null) continue;
-          if (m.changed_indices === false && m.cached_indices != null) {
-            const bad = Array.from(m.cached_indices).filter(i => !(Number.isInteger(i) && i >= 0 && i < n));
-            if (bad.length) out.push('filter ' + (m.name || m.id) + ' selects ' + bad.length + ' positions outside its table of ' +
-                                     n + ' rows (first ' + bad.slice(0, 3).join(', ') + ')');
+        if (m.type === 'LazyIntersectionFilter') {
+          const idx = m.changed_indices === false && m.cached_indices != null;
+          const vec = m.changed_booleans === false && m.cached_vector != null;
+          if (!idx && !vec) continue;                               // nothing current: not judged
+          const k = this.knownRows(m);
+          if (k.bad) { out.push(label + ': ' + k.bad); continue; }
+          if (k.unknown) { unchecked.push(label + ': ' + k.unknown); continue; }
+          const n = k.n;
+          if (idx) {
+            const ci = m.cached_indices;
+            let bad = 0;
+            const first = [];
+            for (let j = 0; j < ci.length; j++) {
+              const i = ci[j];
+              if (!(Number.isInteger(i) && i >= 0 && i < n)) { bad++; if (first.length < 3) first.push(i); }
+            }
+            if (bad) out.push(label + ' selects ' + bad + ' positions outside its table of ' + n + ' rows (first ' + first.join(', ') + ')');
           }
-          if (m.changed_booleans === false && m.cached_vector != null) {
+          if (vec) {
             const v = m.cached_vector;
             for (let i = n; i < v.length; i++) if (v[i]) {
-              out.push('filter ' + (m.name || m.id) + ': position ' + i + ' past the last row of its table (' + n + ' rows) is selected');
+              out.push(label + ': position ' + i + ' past the last row of its table (' + n + ' rows) is selected');
               break;
             }
           }
         } else if ((m.type === 'HistogramCDS' || m.type === 'HistoNdCDS') && m.weights == null && m.source != null) {
           const fresh = m.type === 'HistogramCDS' || (m.cached_columns != null && m.cached_columns.has('bin_count'));
           const bc = fresh && m.data ? m.data.bin_count : null;
-          const n = m.source.get_length();
-          if (bc == null || n == null) continue;
+          if (bc == null) continue;                                 // not computed or not current: not judged
+          const k = this.knownLength(m.source);
+          if (k.unknown) { unchecked.push(label + ': ' + k.unknown); continue; }
           let total = 0;
           for (const x of bc) if (Number.isFinite(x)) total += x;
-          if (total > n) out.push(m.type + ' ' + (m.name || m.id) + ' counts ' + total + ' entries from a table of ' + n + ' rows');
+          if (total > k.n) out.push(label + ' counts ' + total + ' entries from a table of ' + k.n + ' rows');
         }
-      } catch (e) { /* the check reads cached results only; a model it cannot read is not judged here */ }
+      } catch (e) {
+        out.push('the general check could not read ' + label + ': ' + (e && e.message ? e.message : String(e)));
+      }
     }
+    this.lastUnchecked = unchecked;
     return out;
   },
   async settle(probes, maxRounds) {
@@ -148,7 +202,7 @@ window.__riH = {
       if (cur === prev) {
         const bad = this.invariants();
         if (bad.length) throw new Error('RI invariant violated: ' + bad.join('; '));
-        return {settled: true, rounds: r};
+        return this.lastUnchecked.length ? {settled: true, rounds: r, unchecked: this.lastUnchecked} : {settled: true, rounds: r};
       }
       prev = cur;
     }
@@ -446,6 +500,9 @@ def _drive(pg, scenario: Scenario, df: pd.DataFrame, res: ScenarioResult, fault:
             if miss:
                 raise StepNotComplete("probed model or column: " + "; ".join(miss))
             res.completion.append({"step": i, "name": name, **done, "seconds": round(time.time() - ts, 3)})
+            for u in done.get("unchecked", []):                      # PHASE_5 v0.2 (review F3): shown, never silent
+                if u not in res.general_check_unverified:
+                    res.general_check_unverified.append(u)
             if isinstance(step, Load) and scenario.page.widgets:
                 state["load_masks"] = _widget_mask(pg, scenario, df)[2]
         except Exception as exc:                                   # the step itself failed: ERROR, then SKIP

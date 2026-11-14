@@ -1323,3 +1323,84 @@ def test_falsifier_the_general_check_also_runs_after_a_plain_read(review_fault_s
     s.request("new_doc", path=str(c1_document(tmp_path, 5)))
     with pytest.raises(InvariantViolated, match=r"selects 27 positions outside its table of 5 rows"):
         s.request("eval", code="() => window.__riH.model('c1h', ['HistogramCDS']).get_column('bin_count').length")
+
+
+# ------------------------------------------------- the general check is strictly observing (Batches 2A/2B v0.2, review F3)
+LAZY_CHECK_JS = """() => {
+  const H = window.__riH;
+  const cz = H.models().filter(m => m.type === 'CDSCompress');
+  const lif = H.models().filter(m => m.type === 'LazyIntersectionFilter');
+  if (cz.length !== 1 || lif.length !== 1) throw new Error('expected one compressed table and one intersection filter, found ' +
+                                                           cz.length + ' and ' + lif.length);
+  const t = cz[0], calls = {get_length: 0, get_column: 0};
+  const gl = t.get_length, gc = t.get_column;                         // spies on the two methods that decode
+  t.get_length = function (...a) { calls.get_length++; return gl.apply(this, a); };
+  t.get_column = function (...a) { calls.get_column++; return gc.apply(this, a); };
+  lif[0].changed_indices = false; lif[0].cached_indices = [0];        // a current selection, as if computed
+  const out = {};
+  const known = t._length;
+  t._length = -1;                                                     // as before its first decode
+  out.undecoded = {bad: H.invariants(), unchecked: H.lastUnchecked.slice(), length: t._length};
+  t._length = known;                                                  // decoded: its length is known
+  out.decoded = {bad: H.invariants(), unchecked: H.lastUnchecked.slice()};
+  delete t.get_length; delete t.get_column;                           // the class methods again
+  out.calls = calls;
+  out.known = known;
+  return out;
+}"""
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_the_general_check_never_decodes_a_compressed_table(node_session, tmp_path):
+    """Review F3 (a): the check never asks a compressed table to decode. On a real page, with spies on the table's
+    get_length() and get_column(): while the table counts as not decoded, the current filter on it is reported as
+    not checked (with the reason) and nothing is decoded; once its length is known, the filter is judged - and in
+    neither case is either method called."""
+    node_session.request("new_doc", path=str(c1_document(tmp_path, 12)))
+    r = node_session.request("eval", code=LAZY_CHECK_JS)
+    assert r["ok"], r
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
+    got = decode(r["result"])
+    assert got["known"] == 12, got
+    assert got["undecoded"]["bad"] == [] and got["undecoded"]["length"] == -1, got
+    assert len(got["undecoded"]["unchecked"]) == 1 and got["undecoded"]["unchecked"][0].endswith("is not decoded yet"), got
+    assert got["decoded"] == {"bad": [], "unchecked": []}, got
+    assert got["calls"] == {"get_length": 0, "get_column": 0}, got
+    # the Node harness passes "not checked" on with its reply (NodeSession.last_unchecked)
+    cz = "window.__riH.models().find(m => m.type === 'CDSCompress')"
+    node_session.request("eval", code=f"() => {{ const t = {cz}; window.__riKnown = t._length; t._length = -1; return 1; }}")
+    relayed = list(node_session.last_unchecked)
+    node_session.request("eval", code=f"() => {{ const t = {cz}; t._length = window.__riKnown; return 1; }}")
+    assert len(relayed) == 1 and relayed[0].endswith("is not decoded yet"), relayed
+    assert node_session.last_unchecked == []
+
+
+THROWING_FILTER_JS = """() => {
+  const F = Object.create(window.__riH);                      // the real check, on one stand-in model
+  F.models = () => [{type: 'LazyIntersectionFilter', name: 'broken', changed_indices: false, cached_indices: [0],
+                     filters: [{source: {type: 'ColumnDataSource', get_length: () => { throw new Error('length lost'); }}}]}];
+  return F.invariants();
+}"""
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_the_general_check_reports_a_current_filter_it_cannot_read(node_session):
+    """Review F3 (c): a current filter whose table length throws is a named failure, not skipped."""
+    r = node_session.request("eval", code=THROWING_FILTER_JS)
+    assert r["ok"] and r["result"] == ["the general check could not read filter broken: length lost"], r
+
+
+@_node
+@pytest.mark.feature("FILTER.range")
+def test_the_general_check_failing_itself_is_a_failure(node_session):
+    """Review F3 (b): when the check itself throws, the Node harness reports it and the session raises
+    InvariantViolated - before v0.2 the error was swallowed and the request passed."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import InvariantViolated
+    try:
+        with pytest.raises(InvariantViolated, match=r"the general check itself failed: boom"):
+            node_session.request("eval", code="""() => { window.__riSavedCheck = window.__riH.invariants;
+                window.__riH.invariants = () => { throw new Error('boom'); }; return 1; }""")
+    finally:
+        node_session.request("eval", code="() => { window.__riH.invariants = window.__riSavedCheck; return 1; }")

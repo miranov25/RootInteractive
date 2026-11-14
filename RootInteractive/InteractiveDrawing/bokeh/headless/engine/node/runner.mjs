@@ -189,16 +189,22 @@ async function handle(req) {
 // PHASE_5 Batch 1 (review C1): after every evaluation, the page helper's read-only invariants (engine/runner.py
 // __riH.invariants). A violation is reported as a page error with this prefix; the Python session raises on it.
 const INVARIANT_PREFIX = "RI invariant violated: ";
-function checkInvariants() {
+let lastUnchecked = [];
+function checkInvariants() {          // PHASE_5 Batch 2A/2B v0.2 (review F3): an error of the check itself is a failure
+  const h = w.__riH;
+  if (!h || typeof h.invariants !== "function") return;
   try {
-    const h = w.__riH;
-    if (!h || typeof h.invariants !== "function") return;
     const bad = h.invariants();
     if (bad.length) pageErrors.push(INVARIANT_PREFIX + bad.join("; "));
-  } catch (e) { /* the check reads cached results only */ }
+    lastUnchecked = Array.isArray(h.lastUnchecked) ? h.lastUnchecked.slice() : [];
+  } catch (e) {
+    pageErrors.push(INVARIANT_PREFIX + "the general check itself failed: " + (e && e.message ? e.message : String(e)));
+    lastUnchecked = [];
+  }
 }
 
 function reply(o) {
+  if (lastUnchecked.length) o.unchecked = lastUnchecked.splice(0);   // results the general check could not verify
   o.page_errors = pageErrors.splice(0);
   o.console_errors = consoleErrors.splice(0);
   process.stdout.write(JSON.stringify(o) + "\n");

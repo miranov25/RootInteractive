@@ -141,12 +141,23 @@ def page_quantiles(node_session, tmp_path, d, quantiles, weights=None, name="q")
     if errors:
         return {"error": errors[0]}
     assert not report.page_errors and not report.console_errors, (report.page_errors, report.console_errors)
+    return {"cells": raw_cells(got, len(quantiles))}
+
+
+def raw_cells(got, nq) -> dict:
+    """Review F4 (GPT24, Batches 2A/2B fix v0.1): the page's raw output, checked BEFORE the cells are paired. Every
+    column - both cell coordinates, entries and each quantile_i - must have exactly N_CELLS values, so an extra value
+    at the end of one column, or a column of another length, can no longer be cut off unseen by zip(). Then every
+    cell must appear once."""
+    names = ["c0", "c1", "entries"] + [f"quantile_{j}" for j in range(nq)]
+    lengths = {n: len(got[n]) for n in names}
+    assert all(v == N_CELLS for v in lengths.values()), f"malformed page output, column lengths {lengths} (expected {N_CELLS} each)"
     cells = {}
-    for i, (c0, c1) in enumerate(zip(got["c0"], got["c1"])):
-        key = (int(c0), int(c1))
+    for i in range(N_CELLS):
+        key = (int(got["c0"][i]), int(got["c1"][i]))
         assert key not in cells, f"the page has the cell {key} twice"
-        cells[key] = [got[f"quantile_{j}"][i] for j in range(len(quantiles))]
-    return {"cells": cells}
+        cells[key] = [got[f"quantile_{j}"][i] for j in range(nq)]
+    return cells
 
 
 # ===================================================================================== the port of the present code
@@ -374,6 +385,43 @@ def test_the_comparator_rejects_mutants():
     assert explanations(filled, d, ASCENDING) == []
 
 
+def _raw_from(cells, nq) -> dict:
+    """The page's raw column form of a cell map (inverse of raw_cells), for the mutants below."""
+    keys = sorted(cells)
+    out = {"c0": [k[0] + 0.5 for k in keys], "c1": [k[1] + 0.5 for k in keys], "entries": [1.0] * len(keys)}
+    for j in range(nq):
+        out[f"quantile_{j}"] = [cells[k][j] for k in keys]
+    return out
+
+
+@_unit
+def test_the_raw_output_check_rejects_extra_and_missing_values():
+    """Review F4 (GPT24): 15 correct coordinate pairs with quantile_0 one value longer (99999 at the end) passed the
+    v0.1 comparator, because zip() cut the extra value off. Now each of these raw mutants is rejected before pairing:
+    an extra value at the end of a quantile column, of a coordinate column, or of entries; a quantile column one value
+    short; a cell twice. The unchanged raw form is accepted and gives back the same cells."""
+    d = table()
+    want = expected(d, ASCENDING)["cells"]
+    nq = len(ASCENDING)
+    good = _raw_from(want, nq)
+    assert raw_cells(good, nq) == want
+    mutants = {}
+    for col in ("quantile_0", "c1", "entries"):
+        m = {k: list(v) for k, v in good.items()}
+        m[col] = m[col] + [99999.0]
+        mutants[f"extra value at the end of {col}"] = m
+    short = {k: list(v) for k, v in good.items()}
+    short["quantile_3"] = short["quantile_3"][:-1]
+    mutants["quantile_3 one value short"] = short
+    twice = {k: list(v) for k, v in good.items()}
+    twice["c0"][1], twice["c1"][1] = twice["c0"][0], twice["c1"][0]
+    mutants["a cell twice"] = twice
+    for name, m in mutants.items():
+        with pytest.raises(AssertionError):
+            raw_cells(m, nq)
+            pytest.fail(f"accepted: {name}")
+
+
 @_unit
 def test_the_comparator_rejects_structure_and_error_mutants():
     """2B-P1-01/02 (GPT24): a cell with one value missing, a cell with an extra value 99999, a missing cell - each
@@ -534,3 +582,20 @@ def test_falsifier_weighted_structure_and_value_mutants_are_unexplained():
                "an extra value": {"cells": {**port["cells"], key: port["cells"][key] + [1.0]}}}
     for name, page in mutants.items():
         assert weighted_verdict(d, page)[0] == "UNEXPLAINED", name
+
+
+# ===================================================================================== v0.2: ties and the weight domain
+@_node(pytest.mark.feature("HIST.profile_unbinned"))
+def test_weighted_ties_and_the_weight_domain(node_session, tmp_path):
+    """Reviews F5 and F6 (Batches 2A/2B fix v0.1). The supported weight domain, stated without choosing a weighted
+    method (the Architect's statistics decision of 2026-11-13): finite, non-negative weights; a cell has defined
+    quantiles only when its total weight is positive.
+    Cell (0, 0): y = 2, 2, 3.5 with weights 0, 2, 0 - a tie of equal values, one of them of weight 0. Every level
+    (0, 0.5, 1) is 2: the returned VALUE always has positive weight (the row the search returns may be the 2 of weight
+    0; its value is the same). 3.5 has weight 0 and is never the answer, also not at q = 1.
+    Cell (1, 0): y = 1, 2, 3, all of weight 0 - total weight 0, so no level is defined (NaN)."""
+    d = pd.DataFrame({"x": [0.5, 0.5, 0.5, 1.5, 1.5, 1.5], "g": [0.5] * 6, "y": [2.0, 2.0, 3.5, 1.0, 2.0, 3.0],
+                      "w": [0.0, 2.0, 0.0, 0.0, 0.0, 0.0]})
+    got = page_quantiles(node_session, tmp_path, d, [0.0, 0.5, 1.0], weights="w", name="ties_domain")
+    assert got["cells"][(0, 0)] == [2.0, 2.0, 2.0], got["cells"][(0, 0)]
+    assert got["cells"][(1, 0)] == [None, None, None], got["cells"][(1, 0)]

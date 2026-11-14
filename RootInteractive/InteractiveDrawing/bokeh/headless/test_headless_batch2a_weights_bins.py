@@ -42,6 +42,10 @@ TEST CORRECTION v0.2 (GPT24.RI's review of the test commits, 2026-11-13, finding
 
 FIX COMMIT (Batch 2A fix CRR v0.1, Claude20.RI, 2026-11-13): B8, B10, WT-D1, B7, TR-D3, WT-D2 and WT-D4 are fixed. The
 strict marks are off and the signature tests removed; each exact signature is now a REGRESSION check.
+
+v0.2 (after the review of the fix, the Architect's decisions of 2026-11-14, decision register v0.4): integer columns
+stay without lossy compression until a dedicated phase brings protected columns (the old definition, see section 5);
+the integer tests document that rule and its one known gap. TR-D3 is refused also without compression (review F2).
 """
 import itertools
 import json
@@ -56,6 +60,18 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import histograms
 from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import profile_port
 from .test_headless_node_weights import (BOOL_ERROR, SPEC, XEDGE, _first_visited_weight, _is_wt_d1, _open, _page,
                                          _profile, _series, _weighted_ref)
+
+
+class KnownDefect(AssertionError):
+    """Raised only when the page shows the exact signature of a declared defect (v0.2: the integer items)."""
+
+
+def known_defect(condition: bool, message: str) -> None:
+    if condition:
+        raise KnownDefect(message)
+
+
+STRICT = dict(strict=True, raises=KnownDefect)
 
 
 def regression(condition: bool, message: str) -> None:
@@ -80,8 +96,9 @@ def _unit(test):
     return pytest.mark.headless_unit(pytest.mark.backend("python")(pytest.mark.layer("unit")(test)))
 
 
-def _build(tmp_path, df, figures, name, *, sources=(), histograms=(), compression=None):
-    """A page through bokehDrawSA.fromArray (show suppressed) as a Bokeh document."""
+def _build(tmp_path, df, figures, name, *, sources=(), histograms=(), compression=None, uncompressed=False):
+    """A page through bokehDrawSA.fromArray (show suppressed) as a Bokeh document. uncompressed: no arrayCompression
+    at all (Bokeh's own serializer), else the given coding or lossless."""
     from bokeh.document import Document
     import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
     shown = sa.show
@@ -89,7 +106,8 @@ def _build(tmp_path, df, figures, name, *, sources=(), histograms=(), compressio
     try:
         root = sa.bokehDrawSA.fromArray(df, None, figures, [], sourceArray=list(sources) + list(histograms),
                                         aliasArray=[], parameterArray=[], layout=[list(range(len(figures)))],
-                                        widgetLayout=[], arrayCompression=compression or [(".*", LOSSLESS)]).pAll
+                                        widgetLayout=[],
+                                        arrayCompression=None if uncompressed else (compression or [(".*", LOSSLESS)])).pAll
     finally:
         sa.show = shown
     doc = Document()
@@ -487,9 +505,64 @@ def test_falsifier_b10_put_back_shows_the_signature_its_regression_check_names(p
 
 
 # ===================================================================================== 5. integers: B7 and TR-D3
-KEYS_SMALL = np.array([65537, 70001, 1000003, -5, 3, 2 ** 31 + 1], dtype=np.int64)      # B7: rounded by relative16
-KEYS_BIG = np.array([2 ** 53 + 1, 2 ** 60 + 7, -(2 ** 55) - 3, 12345], dtype=np.int64)   # TR-D3: above 2^53
-INTS_JS = """() => { const v = window.__riH.model('cdsOrig', ['CDSCompress']).get_column('key');
+# v0.2, the Architect's decisions of 2026-11-14 (decision register v0.4):
+#   Until a dedicated phase brings protection, the old definition stays: integer columns are not lossy-compressed
+#   (commit 2a0e3d5 of 2025-07-15, "temporarily disable lossy compression for integer columns until a
+#   fix for broken bitmasks gets implemented", covered `delta`; `sqrt_scaling` skips integers since 5cb29c4; the 2A
+#   fix added `relative`). The tests below document that rule, and its one known gap: a 64-bit column with values
+#   beyond the 32-bit range travels as float64, so `delta` and `sqrt_scaling` round it (the reviewers' F1 example).
+#   Later (a dedicated phase): an automatic list of protected columns (all index and bitmask columns) and lossy
+#   compression of integers by an algorithm that knows the integer type.
+#   Now, as a bug fix: a 64-bit integer beyond 2^53 cannot be exact in the browser, so such a column is refused at
+#   build time by name (UnsafeIntegerColumn) - with and without compression.
+KEYS_SMALL = np.array([65537, 70001, 1000003, -5, 3, 2 ** 31 + 1], dtype=np.int64)
+KEYS_BIG = np.array([2 ** 53 + 1, 2 ** 60 + 7, -(2 ** 55) - 3, 12345], dtype=np.int64)   # TR-D3: beyond 2^53
+LOSSY = {"relative4": [("relative", 4), "code", "zip"], "delta10": [("delta", 10), "code", "zip"],
+         "sqrt_scaling": [("sqrt_scaling", 1, 0.1), "code", "zip"]}
+PAGE_INT_TYPES = (np.int8, np.int16, np.int32, np.uint8, np.uint16, np.uint32)   # int64 goes through removeInt64
+
+
+def int_edges(dtype) -> np.ndarray:
+    """The type's two limits, their neighbours, and values a lossy step would change (100, 109, 1000, 65537)."""
+    info = np.iinfo(dtype)
+    vals = [info.min, info.min + 1, info.max - 1, info.max, 0, 1, 100, 109]
+    vals += [v for v in (1000, -1000, 30000, -30000, 65537, 1000003) if info.min <= v <= info.max]
+    return np.array(vals, dtype=dtype)
+
+
+INT_COLUMNS_JS = """(names) => { const t = window.__riH.model('cdsOrig', ['CDSCompress', 'ColumnDataSource']);
+  const out = {};
+  for (const n of names) out[n] = Array.from(t.get_column(n), x => typeof x === 'bigint' ? Number(x) : x);
+  return out; }"""
+
+
+def int_columns_page(node_session, tmp_path, coding, name):
+    """Columns of six integer types (their limits included) and one float column x, all under one recipe."""
+    cols = {np.dtype(t).name: int_edges(t) for t in PAGE_INT_TYPES}
+    n = max(len(v) for v in cols.values())
+    df = pd.DataFrame({k: np.resize(v, n).astype(v.dtype) for k, v in cols.items()})
+    df["x"] = np.linspace(0.1, 9.7, n)
+    path = _build(tmp_path, df, [[["x"], [k]] for k in cols], name,      # a column is sent only when a figure uses it
+                  compression=[(".*", coding)])
+    page, report = _node_page(node_session, tmp_path, path)
+    got = page.evaluate(INT_COLUMNS_JS, list(cols) + ["x"])
+    _no_errors(report)
+    return df, cols, got
+
+
+@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
+@pytest.mark.parametrize("coding", ["lossless", "relative4", "delta10", "sqrt_scaling"])
+def test_integer_columns_are_not_lossy_compressed(node_session, tmp_path, coding):
+    """The old definition, documented: under any recipe, lossless or lossy, a column of 8, 16 or 32 bits arrives
+    exactly - every value of six integer types, their limits included. The float column next to them does follow
+    the lossy recipe (so the recipe really ran)."""
+    df, cols, got = int_columns_page(node_session, tmp_path, LOSSY.get(coding, LOSSLESS), f"ints_{coding}.json")
+    assert {k: got[k] for k in cols} == {k: df[k].tolist() for k in cols}, coding
+    if coding != "lossless":
+        assert got["x"] != df["x"].tolist(), f"{coding}: the float column was not rounded - the recipe did not run"
+
+
+INTS_JS = """() => { const v = window.__riH.model('cdsOrig', ['CDSCompress', 'ColumnDataSource']).get_column('key');
   return {type: v.constructor.name,
           values: Array.from(v, x => typeof x === 'bigint' ? x.toString()
                                      : (Number.isInteger(x) ? BigInt(x).toString() : 'not an integer: ' + x))}; }"""
@@ -505,13 +578,21 @@ def is_refusal(exc: BaseException, column: str) -> bool:
     return type(exc).__name__ == REFUSAL and isinstance(exc, ValueError) and repr(column) in text and "2^53" in text
 
 
+CODING = {"lossless": [(".*", LOSSLESS)], "relative16": [(".*", RELATIVE16)], "delta10": [(".*", LOSSY["delta10"])],
+          "none": None}
+
+
 def int_state(node_session, tmp_path, keys, compression):
-    """None and the refusal's text if the build refuses the column deliberately; else the page's decoded key column
-    as exact integers. Any other build error propagates (an ordinary failure)."""
+    """None and the refusal's text if the build refuses the column deliberately; else the page's key column as exact
+    integers. compression: 'lossless', 'relative16', or 'none' (no arrayCompression: Bokeh's own serializer). Any
+    other build error propagates (an ordinary failure)."""
+    import warnings
     df = pd.DataFrame({"key": keys, "x": np.arange(len(keys), dtype=float)})
     try:
-        path = _build(tmp_path, df, [[["x"], ["key"]]], f"ints_{compression}_{len(keys)}.json",
-                      compression=[(".*", RELATIVE16 if compression == "relative16" else LOSSLESS)])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")                 # Bokeh's "out of range integer" warning (TR-D3 today)
+            path = _build(tmp_path, df, [[["x"], ["key"]]], f"ints_{compression}_{len(keys)}.json",
+                          compression=CODING[compression], uncompressed=compression == "none")
     except ValueError as exc:
         if is_refusal(exc, "key"):
             return None, f"{type(exc).__name__}: {exc}"
@@ -520,12 +601,6 @@ def int_state(node_session, tmp_path, keys, compression):
     got = page.evaluate(INTS_JS)
     _no_errors(report)
     return [int(v) if not v.startswith("not") else v for v in got["values"]], got["type"]
-
-
-def _is_b7(values) -> bool:
-    from RootInteractive.Tools.compressArray import roundRelativeBinary
-    rounded = [int(v) for v in roundRelativeBinary(KEYS_SMALL.astype(np.float64), 16)]
-    return values == rounded and values != KEYS_SMALL.tolist()
 
 
 def _is_tr_d3(values) -> bool:
@@ -539,13 +614,23 @@ def test_control_integer_keys_below_2_53_are_exact_when_lossless(node_session, t
 
 
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
-def test_strict_integer_keys_survive_relative16_or_are_refused(node_session, tmp_path):
-    """An integer key within 2^53 arrives exactly, also when the page uses relative 16-bit coding (the Architect's
-    default of 2026-11-13: integer columns skip relative coding). A refusal is not expected for these keys."""
+def test_large_64_bit_keys_are_not_rounded_by_relative(node_session, tmp_path):
+    """The old definition, documented, for a 64-bit column beyond the 32-bit range (it travels as float64): `relative`
+    is skipped for it (2A), so 65537 and 2^31 + 1 arrive exactly."""
     values, kind = int_state(node_session, tmp_path, KEYS_SMALL, "relative16")
-    assert values is not None, f"keys within 2^53 refused: {kind}"
-    regression(_is_b7(values), "B7: integer keys rounded")
     assert values == KEYS_SMALL.tolist(), (values, kind)
+
+
+@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
+def test_documented_gap_large_64_bit_keys_are_rounded_by_delta(node_session, tmp_path):
+    """The one known gap of the old definition, documented with its exact values (decision register v0.4; closed by
+    the protected-columns phase, when this test must change): a 64-bit column beyond the 32-bit range travels as
+    float64, and `delta 10` rounds it - keys 2^40 + 1 and 2^40 + 2 arrive as the same value (the reviewers' F1)."""
+    keys = np.array([2 ** 40 + 1, 2 ** 40 + 2, 7], dtype=np.int64)
+    values, kind = int_state(node_session, tmp_path, keys, "delta10")
+    assert values is not None, kind
+    assert values[0] == values[1] != keys[0], (values, kind)              # two keys merged: the gap
+    assert values != keys.tolist()
 
 
 @_unit
@@ -562,12 +647,23 @@ def test_falsifier_only_the_deliberate_refusal_counts():
 
 
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
-def test_strict_keys_above_2_53_are_exact_or_refused(node_session, tmp_path):
-    values, kind = int_state(node_session, tmp_path, KEYS_BIG, "lossless")
-    if values is None:
-        return
-    regression(_is_tr_d3(values), "TR-D3: keys above 2^53 rounded to doubles")
-    assert values == KEYS_BIG.tolist(), (values, kind)
+@pytest.mark.parametrize("compression", ["lossless", "relative16"])
+def test_keys_above_2_53_are_refused_with_compression(node_session, tmp_path, compression):
+    """Beyond 2^53 (positive and negative), the column is refused by name - with lossless coding and also under
+    a lossy recipe."""
+    values, kind = int_state(node_session, tmp_path, KEYS_BIG, compression)
+    regression(values is not None and _is_tr_d3(values), "TR-D3: keys above 2^53 rounded to doubles")
+    assert values is None, (values, kind)
+
+
+@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
+@pytest.mark.xfail(**STRICT, reason="TR-D3 without compression: Bokeh rounds keys beyond 2^53 and only warns (review F2)")
+def test_strict_keys_above_2_53_are_refused_without_compression(node_session, tmp_path):
+    """Review F2 (decision register v0.4): without arrayCompression the page goes through Bokeh's own serializer, which rounds 64-bit
+    integers beyond 2^53 to doubles and only warns. The column must be refused by name, as with compression."""
+    values, kind = int_state(node_session, tmp_path, KEYS_BIG, "none")
+    known_defect(values is not None and _is_tr_d3(values), "TR-D3 without compression: keys above 2^53 rounded")
+    assert values is None, (values, kind)
 
 
 # ===================================================================================== 6. RI-ADF-01: hist2d and profile2d
