@@ -3,11 +3,12 @@ declared checks and steps, exactly as its signature describes; every other check
 later fix removes a defect, its expectation turns into XPASS, which fails the run until the expectation is removed
 (proposal D-13: a fix declares in advance which scenarios it flips).
 
-PHASE_5 Batch 1 fixed B1 and B2. Their scenarios keep their ids and now run as regressions: no expectation, every
-check must PASS. The engine's proof that a known defect never hides another problem still needs a live defect, so
-the old expectations live on in "vehicles": the same scenarios, run with the defect put back by a fault
-(engine/faults.py B1_REINTRODUCED, B2_REINTRODUCED). Run without that fault, a vehicle must fail (XPASS): the fix is
-in the code.
+PHASE_5 Batch 1 fixed B1 and B2, Batch 2A fixed B8. Their scenarios keep their ids and now run as regressions: no
+expectation, every check must PASS. The engine's proof that a known defect never hides another problem still needs a
+live defect, so the old expectations live on in "vehicles": the same scenarios, run with the defect put back by a
+fault (engine/faults.py B1_REINTRODUCED, B2_REINTRODUCED, B8_REINTRODUCED). Run without that fault, a vehicle must
+fail (XPASS): the fix is in the code. After Batch 2A no scenario here has a defect in the code itself: every defect
+case is a vehicle.
 
 B1  — with several range filters, later filters are not fully applied (LazyIntersectionFilter.ts 191/193/208/210,
       `||=`). Exact mechanism, measured (4.2b review): the first filter works; every later filter keeps the rows it
@@ -75,15 +76,16 @@ B8_NAN_IN_BIN0 = Scenario(
               widgets=(range_("a"),)),
     steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
     checks=(auto(),),
-    expect=(
-        expected_failure("B8", "h1.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
-                         note="bin 0 exceeds the oracle by exactly the selected rows whose x is NaN; the 2-D "
-                              "histogram excludes them correctly"),
-    ),
+    expect=(),                                            # B8 fixed in PHASE_5 Batch 2A: a regression scenario now
     labels=Labels(family="known_defects", models=("RangeFilter", "HistogramCDS", "HistoNdCDS"),
                   verified=("RangeFilter", "HistogramCDS", "HistoNdCDS"),
-                  features=("HIST.histogram_1d",), technique="boundary value (missing values), known defect B8",
+                  features=("HIST.histogram_1d",), technique="boundary value (missing values), known defect B8 (fixed)",
                   priority="p0"),
+)
+B8_EXPECT = (
+    expected_failure("B8", "h1.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
+                     note="bin 0 exceeds the oracle by exactly the selected rows whose x is NaN; the 2-D "
+                          "histogram excludes them correctly"),
 )
 
 # ---- regression scenarios written by the reviewers of stage 4.2b without touching the engine (credited by name) ----
@@ -113,12 +115,13 @@ C3_B8_WEIGHTED = Scenario(
               widgets=(range_("a"),)),
     steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
     checks=(auto(),),
-    expect=(expected_failure("B8", "h1.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
-                             note="bin 0 exceeds the oracle by the summed weights of the selected NaN rows"),),
+    expect=(),                                            # B8 fixed in PHASE_5 Batch 2A: a regression scenario now
     labels=Labels(family="known_defects", models=("RangeFilter", "HistogramCDS", "HistoNdCDS"),
                   verified=("RangeFilter", "HistogramCDS", "HistoNdCDS"), features=("HIST.histogram_1d",),
-                  technique="known defect B8, weighted (reviewer Claude3)", priority="p1"),
+                  technique="known defect B8, weighted (reviewer Claude3; fixed)", priority="p1"),
 )
+C3_B8_EXPECT = (expected_failure("B8", "h1.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
+                                 note="bin 0 exceeds the oracle by the summed weights of the selected NaN rows"),)
 
 C10_B8_WEIGHTED = Scenario(
     id="known_defects/claude10_b8_weighted_1d_histogram_nan_in_bin0",
@@ -129,17 +132,19 @@ C10_B8_WEIGHTED = Scenario(
               widgets=(range_("a"),)),
     steps=(load(), set_("a", [-1, 1]), set_("a", "full")),
     checks=(auto(),),
-    expect=(expected_failure("B8", "h1w.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
-                             note="weighted variant: bin 0 exceeds the oracle by the weight sum of the selected "
-                                  "NaN rows"),),
+    expect=(),                                            # B8 fixed in PHASE_5 Batch 2A: a regression scenario now
     labels=Labels(family="known_defects", models=("RangeFilter", "HistogramCDS", "HistoNdCDS"),
                   verified=("RangeFilter", "HistogramCDS", "HistoNdCDS"), features=("HIST.histogram_1d",),
-                  technique="known defect B8, weighted (reviewer Claude10)", priority="p1"),
+                  technique="known defect B8, weighted (reviewer Claude10; fixed)", priority="p1"),
 )
+C10_B8_EXPECT = (expected_failure("B8", "h1w.bin_count", (0, 1, 2), ExcessInCells((0,), "nan_rows"),
+                                  note="weighted variant: bin 0 exceeds the oracle by the weight sum of the selected "
+                                       "NaN rows"),)
 
 SCENARIOS = (B1_TWO_FILTERS, B2_LOAD_SELECTION, B8_NAN_IN_BIN0, C3_B1_THREE_FILTERS, C3_B8_WEIGHTED, C10_B8_WEIGHTED)
-FIXED = (B1_TWO_FILTERS, B2_LOAD_SELECTION, C3_B1_THREE_FILTERS)               # PHASE_5 Batch 1
-STILL_KNOWN = tuple(s for s in SCENARIOS if s not in FIXED)
+FIXED = (B1_TWO_FILTERS, B2_LOAD_SELECTION, C3_B1_THREE_FILTERS,                # PHASE_5 Batch 1
+         B8_NAN_IN_BIN0, C3_B8_WEIGHTED, C10_B8_WEIGHTED)                        # PHASE_5 Batch 2A
+STILL_KNOWN = tuple(s for s in SCENARIOS if s not in FIXED)                      # empty after Batch 2A
 
 
 # ---- vehicles: a fixed defect put back by a fault, with its old exact expectation (PHASE_5 Batch 1) ----
@@ -152,8 +157,12 @@ def _vehicle(s: Scenario, expect, defect: faults.Fault) -> Scenario:
 B1_VEHICLE = _vehicle(B1_TWO_FILTERS, B1_EXPECT, faults.B1_REINTRODUCED)
 B2_VEHICLE = _vehicle(B2_LOAD_SELECTION, B2_EXPECT, faults.B2_REINTRODUCED)
 C3_B1_VEHICLE = _vehicle(C3_B1_THREE_FILTERS, C3_B1_EXPECT, faults.B1_REINTRODUCED)
+B8_VEHICLE = _vehicle(B8_NAN_IN_BIN0, B8_EXPECT, faults.B8_REINTRODUCED)
+C3_B8_VEHICLE = _vehicle(C3_B8_WEIGHTED, C3_B8_EXPECT, faults.B8_REINTRODUCED)
+C10_B8_VEHICLE = _vehicle(C10_B8_WEIGHTED, C10_B8_EXPECT, faults.B8_REINTRODUCED)
 VEHICLES = ((B1_VEHICLE, faults.B1_REINTRODUCED), (B2_VEHICLE, faults.B2_REINTRODUCED),
-            (C3_B1_VEHICLE, faults.B1_REINTRODUCED))
+            (C3_B1_VEHICLE, faults.B1_REINTRODUCED), (B8_VEHICLE, faults.B8_REINTRODUCED),
+            (C3_B8_VEHICLE, faults.B8_REINTRODUCED), (C10_B8_VEHICLE, faults.B8_REINTRODUCED))
 
 # every scenario with a live known defect, and the fault that makes it live (None: the defect is in the code)
 DEFECT_CASES = tuple((s, None) for s in STILL_KNOWN) + VEHICLES

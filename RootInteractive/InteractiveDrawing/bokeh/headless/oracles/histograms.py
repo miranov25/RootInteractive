@@ -13,7 +13,10 @@ RB-2.3  The last edge is inclusive: v == max goes into the last bin (1-D 225, N-
 RB-2.4  Values outside [min, max] are not counted (1-D: getbin returns -1 / nbins, counting keeps
         0 <= bin < nbins, 174/181/189; N-D: the row gets -1, 337). +-Inf therefore not counted. Verified in code.
 RB-2.5  Non-finite values are not counted. N-D: verified in code (337, `!isFinite(val)`).
-        1-D: intended rule; known defect B8 (NaN is counted in bin 0).
+        1-D: intended rule; known defect B8 (NaN is counted in bin 0), fixed in PHASE_5 Batch 2A.
+RB-2.6  (PHASE_5 Batch 2A, B10) A value inside [min, max] whose bin computes as nbins (one rounding step below the
+        maximum) is in the last bin. Before the fix it was dropped (1-D) or moved to bin 0 of the next row of bins
+        (N-D; dropped in the last row): `b10=True` reproduces that, for the runs with B10 put back by a fault.
 """
 import itertools
 
@@ -27,8 +30,8 @@ def _trunc_int32(x: np.ndarray) -> np.ndarray:
     return np.trunc(x).astype(np.int64)
 
 
-def bin_index_1d(values, nbins: int, lo: float, hi: float) -> np.ndarray:
-    """RB-2.1, 2.3, 2.4, 2.5: bin per row of a 1-D histogram, -1 where the row is not counted."""
+def bin_index_1d(values, nbins: int, lo: float, hi: float, b10: bool = False) -> np.ndarray:
+    """RB-2.1, 2.3 … 2.6: bin per row of a 1-D histogram, -1 where the row is not counted; `b10`: B10 put back."""
     v = np.asarray(values, dtype=np.float64)
     scale = nbins / (hi - lo)
     origin = -lo * scale
@@ -39,12 +42,15 @@ def bin_index_1d(values, nbins: int, lo: float, hi: float) -> np.ndarray:
     mid = inside & ~last
     out[last] = nbins - 1
     out[mid] = _trunc_int32(v[mid] * scale + origin)
+    if not b10:
+        out[mid] = np.minimum(out[mid], nbins - 1)        # RB-2.6
     out[(out < 0) | (out >= nbins)] = -1                  # counting keeps 0 <= bin < nbins
     return out
 
 
-def bin_index_nd(columns, nbins, ranges) -> np.ndarray:
-    """RB-2.2 … 2.5: flat bin per row of an N-D histogram (first variable fastest), -1 where not counted."""
+def bin_index_nd(columns, nbins, ranges, b10: bool = False) -> np.ndarray:
+    """RB-2.2 … 2.6: flat bin per row of an N-D histogram (first variable fastest), -1 where not counted; `b10`: B10
+    put back."""
     n = len(columns[0])
     flat = np.zeros(n, dtype=np.int64)
     dropped = np.zeros(n, dtype=bool)
@@ -61,6 +67,8 @@ def bin_index_nd(columns, nbins, ranges) -> np.ndarray:
         b = np.zeros(n, dtype=np.int64)
         b[last] = nb - 1
         b[mid] = _trunc_int32(v[mid] * scale - origin)
+        if not b10:
+            b[mid] = np.minimum(b[mid], nb - 1)          # RB-2.6
         flat += b * stride
         stride *= nb
     flat[dropped] = -1
@@ -68,14 +76,14 @@ def bin_index_nd(columns, nbins, ranges) -> np.ndarray:
     return flat
 
 
-def counts(columns, nbins, ranges, mask=None, weights=None) -> np.ndarray:
+def counts(columns, nbins, ranges, mask=None, weights=None, b10: bool = False) -> np.ndarray:
     """Expected `bin_count` of a histogram: 1-D if one variable, N-D otherwise; rows outside `mask`
-    are not counted; `weights` sums the weight instead of 1."""
+    are not counted; `weights` sums the weight instead of 1; `b10`: B10 put back (RB-2.6)."""
     if len(columns) == 1:
-        idx = bin_index_1d(columns[0], nbins[0], *ranges[0])
+        idx = bin_index_1d(columns[0], nbins[0], *ranges[0], b10=b10)
         length = nbins[0]
     else:
-        idx = bin_index_nd(columns, nbins, ranges)
+        idx = bin_index_nd(columns, nbins, ranges, b10=b10)
         length = int(np.prod(nbins))
     keep = idx >= 0
     if mask is not None:

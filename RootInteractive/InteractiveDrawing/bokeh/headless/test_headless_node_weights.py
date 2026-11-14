@@ -7,6 +7,8 @@ tests build small pages with RootInteractive's public builder (bokehDrawSA.fromA
 in Node and compare every number with numpy. Each defect has:
 - an exact signature (what the page computes today, predicted from the data, never a loose "something is wrong");
 - a strict expected failure (the test of the desired behaviour; it turns into a pass when PHASE_5 fixes the defect);
+  PHASE_5 Batches 2A and 2B fixed WT-D1, WT-D2, WT-D3 and WT-D4: those tests are now ordinary tests, and the exact
+  signature of each is a REGRESSION check (an ordinary failure that names the defect). WT-D5 is still a known defect;
 - a healthy control (the same feature where it works today, so the test is not vacuous).
 
 The defects, all in production code that this phase does not change (DEC-01):
@@ -47,6 +49,13 @@ class KnownDefect(AssertionError):
 def known_defect(condition: bool, message: str) -> None:
     if condition:
         raise KnownDefect(message)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 2A/2B fix commit: the exact signature of a fixed defect is a regression - an ordinary failure
+    that names it."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
@@ -330,13 +339,12 @@ def test_wt_zero_weight_not_first_contributes_nothing(node_session, tmp_path):
         _equal(got[k], ref[k], k)
 
 
-@_marks(pytest.mark.feature("HIST.profile_unbinned"),
-        pytest.mark.xfail(**STRICT, reason="WT-D2: a zero weight visited first makes the bin's mean and std NaN"))
+@_marks(pytest.mark.feature("HIST.profile_unbinned"))
 def test_wt_zero_weight_first_contributes_nothing(node_session, tmp_path):
     d = _zero_rows()
     _open(node_session, _page(tmp_path, d, ["w"], [None, "w"], suffix="zero_first"))
     got, ref = _series(_profile(node_session), "w"), _weighted_ref(d, "w")
-    known_defect(_is_wt_d2(got, d, "w"), "WT-D2: mean and std NaN where the first visited row has weight 0")
+    regression(_is_wt_d2(got, d, "w"), "WT-D2: mean and std NaN where the first visited row has weight 0")
     for k in ("entries", "mean", "std"):
         _equal(got[k], ref[k], k)
 
@@ -352,13 +360,12 @@ def test_wt_weighted_median_without_zero_weight_rows(node_session, tmp_path):
     assert float(got["quantile_0"][1]) in _quantile_candidates(s1.y, s1.w, .5), got["quantile_0"]
 
 
-@_marks(pytest.mark.feature("HIST.profile_unbinned"),
-        pytest.mark.xfail(**STRICT, reason="WT-D3: a zero-weight row is returned as the weighted median"))
+@_marks(pytest.mark.feature("HIST.profile_unbinned"))
 def test_wt_weighted_median_ignores_zero_weight_rows(node_session, tmp_path):
     d = _zero_rows()
     _open(node_session, _page(tmp_path, d, ["w"], [None, "w"], suffix="median_zero"))
     got = _series(_profile(node_session), "w")
-    known_defect(_is_wt_d3(got["quantile_0"], d, "w", .5, 1), "WT-D3: the median is a zero-weight row's value")
+    regression(_is_wt_d3(got["quantile_0"], d, "w", .5, 1), "WT-D3: the median is a zero-weight row's value")
     s1 = _slices(d)[1]
     assert float(got["quantile_0"][1]) in _quantile_candidates(s1.y, s1.w, .5), got["quantile_0"]
 
@@ -388,13 +395,12 @@ def test_wt_first_series_equals_the_weight_alone_and_numpy(node_session, tmp_pat
         _equal(first[k], alone[k], f"{name} first {k}")
 
 
-@_marks(pytest.mark.feature("HIST.stack"),
-        pytest.mark.xfail(**STRICT, reason="WT-D4: a later series is computed with weights paired to the wrong rows"))
+@_marks(pytest.mark.feature("HIST.stack"))
 @pytest.mark.parametrize("name,other", [("w", None), ("v", "w")], ids=["None_then_w", "w_then_v"])
 def test_wt_series_do_not_depend_on_the_series_before_them(node_session, tmp_path, name, other):
     d = _random_rows()
     alone, first, later = _three_orders(node_session, tmp_path, d, name, other)
-    known_defect(_is_wt_d4(alone, first, later), f"WT-D4: series {name} changes when {other} is computed before it")
+    regression(_is_wt_d4(alone, first, later), f"WT-D4: series {name} changes when {other} is computed before it")
     for k in ("entries", "mean", "std", "quantile_0"):
         _equal(later[k], alone[k], f"{name} after {other}: {k}")
 
@@ -445,7 +451,7 @@ def test_wt_numeric_indicator_weight_in_a_compressed_page(node_session, tmp_path
     _equal(got["mean"][ok], ref["mean"][ok], "mean")
 
 
-@_transport(pytest.mark.xfail(**STRICT, reason="WT-D1: a Boolean weight column cannot be decoded (Unknown dtype: bool)"))
+@_transport()
 @pytest.mark.parametrize("compression", ["lossless", "relative16"])
 def test_wt_boolean_weight_in_a_compressed_page(node_session, tmp_path, compression):
     """The dashboard's own kind of weight: an expression that is true or false ("A>.5"), here "x>2"."""
@@ -456,7 +462,7 @@ def test_wt_boolean_weight_in_a_compressed_page(node_session, tmp_path, compress
     assert r.get("ok"), r
     spec = decode(r["result"]) or {}
     got = _profile(node_session)
-    known_defect(_is_wt_d1(got, spec, compression), f"WT-D1: {BOOL_ERROR} ({compression}, spec {spec})")
+    regression(_is_wt_d1(got, spec, compression), f"WT-D1: {BOOL_ERROR} ({compression}, spec {spec})")
     ref = _weighted_ref(d.assign(cut=lambda z: (z.x > 2).astype(float)), "cut")
     series = _series(got, "x>2")
     _equal(series["entries"], ref["entries"], "entries")

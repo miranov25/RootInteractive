@@ -32,6 +32,8 @@ Run on the pinned toolchain: 20 of 31 cases passed as delivered. Changes, each m
            (UnboundLocalError);
     ST-D4  the statistics table computes quantiles in one pass that assumes an ascending list; a list in another order
            (the table keeps the order the histograms request) gives wrong values under the right titles.
+           Fixed in PHASE_5 Batch 2B: the signature test is removed, the strict test is an ordinary test, and the exact
+           signature is a REGRESSION check.
   The fit tests show the fit's columns in a second figure (ST-D1 workaround), as A1 does for A-D4.
 """
 from __future__ import annotations
@@ -144,6 +146,13 @@ class KnownDefect(AssertionError):
 def known_defect(condition: bool, message: str) -> None:
     if condition:
         raise KnownDefect(message)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 2A/2B fix commit: the exact signature of a fixed defect is a regression - an ordinary failure
+    that names it."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
@@ -574,14 +583,6 @@ def _is_st_d4(d, got) -> bool:
 
 @NODE
 @pytest.mark.feature("STAT.histogram_table")
-def test_signature_st_d4_an_unsorted_quantile_list_gives_one_pass_values(node_session,tmp_path):
-    d, got = _quantile_table(node_session, tmp_path, MIXED_QUANTILES, "quantile_order_signature")
-    assert got["extra"]["quantiles"] == [.75, .25, .5, .125], got["extra"]["quantiles"]   # the requested order, kept
-    assert _is_st_d4(d, got), got
-
-
-@NODE
-@pytest.mark.feature("STAT.histogram_table")
 def test_control_st_d4_an_ascending_merged_list_is_correct(node_session,tmp_path):
     """The same two histograms and data; the requested lists merge into an ascending list: every value is right."""
     d, got = _quantile_table(node_session, tmp_path, ASCENDING_QUANTILES, "quantile_order_control")
@@ -594,11 +595,11 @@ def test_control_st_d4_an_ascending_merged_list_is_correct(node_session,tmp_path
 
 @NODE
 @pytest.mark.feature("STAT.histogram_table")
-@pytest.mark.xfail(**STRICT, reason="ST-D4: the statistics table assumes an ascending quantile list")
 def test_stat_table_mixed_quantile_requests_preserve_column_titles(node_session,tmp_path):
     d, got = _quantile_table(node_session, tmp_path, MIXED_QUANTILES, "quantile_order")
     assert got["data"]["name"] == ["ha","hb"]
-    known_defect(_is_st_d4(d, got), "ST-D4: one-pass quantile values for an unsorted list")
+    assert got["extra"]["quantiles"] == [.75, .25, .5, .125], got["extra"]["quantiles"]   # the requested order, kept
+    regression(_is_st_d4(d, got), "ST-D4: one-pass quantile values for an unsorted list")
     qlist=got["extra"]["quantiles"]
     assert len(qlist)==4 and set(qlist)=={.125,.25,.5,.75}
     for j,q in enumerate(qlist):

@@ -106,9 +106,13 @@ export function weighted_kth_value(sample:number[], weights: number[], k:number,
           --pointer_high
         }
       }
-      if(k < pivot_cumsum_lower){
+      // PHASE_5 Batch 2B (WT-D3): rows whose weight is 0 are never the answer. At an exact cumulative boundary the
+      // pivot's rows could be returned although they carry no weight; then the search goes on below the pivot (k
+      // reached by smaller values with weight) or above it (k = 0, or k beyond them)
+      const no_weight = pivot_cumsum_upper === pivot_cumsum_lower
+      if(k < pivot_cumsum_lower || (no_weight && k === pivot_cumsum_lower && pivot_cumsum_lower > 0)){
         end = pivot_idx
-      } else if (k > pivot_cumsum_upper) {
+      } else if (k > pivot_cumsum_upper || no_weight) {
         k -= pivot_cumsum_upper
         begin = pointer_mid
         if (pointer_mid === end_orig) return pointer_mid-1
@@ -129,11 +133,25 @@ export function quantile(sample:number[], q:number, begin=0, end=-1){
   }
   if(end - begin <= 0) return NaN
   if(end - begin === 1) return sample[begin]
-  if(end - begin === 2) return (sample[begin] + sample[begin+1]) * q
+  if(end - begin === 2){
+    // PHASE_5 Batch 2B (B5): interpolate from the smaller to the larger value - it was (a + b) * q
+    const a = Math.min(sample[begin], sample[begin+1]), b = Math.max(sample[begin], sample[begin+1])
+    return a + (b - a) * q
+  }
   const k = begin + (end - begin - 1) * q
   const k1 = Math.floor(k)
-  if(k === begin) return sample[begin]
-  if(k1 === end - 1) return sample[end - 1]
+  // PHASE_5 Batch 2B (B5b): the ends of the range are its minimum and maximum - not the first and last element of the
+  // unsorted range, which depended on the row order
+  if(k === begin){
+    let lo = sample[begin]
+    for(let i=begin+1; i < end; ++i) if(sample[i] < lo) lo = sample[i]
+    return lo
+  }
+  if(k1 === end - 1){
+    let hi = sample[begin]
+    for(let i=begin+1; i < end; ++i) if(sample[i] > hi) hi = sample[i]
+    return hi
+  }
   kth_value(sample, k1, (a, b) => a - b, begin, end)
   if(k % 1 === 0) {
     return sample[k1]

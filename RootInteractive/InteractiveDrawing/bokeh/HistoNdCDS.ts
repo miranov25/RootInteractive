@@ -342,7 +342,10 @@ export class HistoNdCDS extends ColumnarDataSource {
         if(val === range_max){
           bins[i] += (nbins - 1) * stride
         } else {
-          bins[i] += ((val * scale - origin) | 0) * stride
+          // PHASE_5 Batch 2A (B10): a value one rounding step below the maximum can compute as nbins - it belongs to
+          // the last bin of its axis, not to bin 0 of the next row of bins
+          const bin = (val * scale - origin) | 0
+          bins[i] += (bin < nbins ? bin : nbins - 1) * stride
         }
       }
     }

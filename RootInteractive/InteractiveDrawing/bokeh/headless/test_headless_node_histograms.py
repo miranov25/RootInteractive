@@ -31,7 +31,10 @@ Findings (ids of the bug report; reproduced here in Node, exact signatures):
        (MathUtils.ts `quantile`); it can lie outside the bin's values (19.5 for the values 12 and 14).
   B5b  an unbinned quantile at the lower edge of its bin's share returns the bin's first row in row order, not the
        bin's smallest value: the result depends on the row order.
-Question (not a test): q = 1 gives NaN, binned and unbinned, not the largest value.
+Question (not a test here): q = 1 gave NaN, binned and unbinned, not the largest value. Fixed in PHASE_5 Batch 2B
+(q = 1 is the largest value) and tested in test_headless_batch2b_quantiles.py; the reference below is never asked q = 1.
+PHASE_5 Batches 2A and 2B fixed B4 (as WT-D2), B5 and B5b: their signature tests are removed, the strict tests are
+ordinary tests, and the exact signature of each defect is a REGRESSION check (an ordinary failure that names it).
 """
 import json
 from pathlib import Path
@@ -57,6 +60,13 @@ class KnownDefect(AssertionError):
 def known_defect(condition: bool, message: str) -> None:
     if condition:
         raise KnownDefect(message)
+
+
+def regression(condition: bool, message: str) -> None:
+    """PHASE_5 Batch 2A/2B fix commit: the exact signature of a fixed defect is a regression - an ordinary failure
+    that names it."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
@@ -415,22 +425,13 @@ def _weighted_moments(y, w):
 
 @NODE
 @pytest.mark.feature("HIST.profile_unbinned")
-def test_signature_b4_zero_weight_first_gives_nan_moments(node_session, tmp_path):
-    got = _profile(node_session, tmp_path, _one_slice(Y5, B4_W), ("entries", "mean", "std"), weights="w", **UNBINNED)
-    assert got["entries"] == [4.0] and np.isnan(got["mean"][0]) and np.isnan(got["std"][0]), got
-    assert np.isfinite(_weighted_moments(Y5, B4_W)[0])
-
-
-@NODE
-@pytest.mark.feature("HIST.profile_unbinned")
-@pytest.mark.xfail(**STRICT, reason="B4")
 def test_strict_zero_weight_rows_do_not_spoil_the_weighted_moments(node_session, tmp_path):
     got = _profile(node_session, tmp_path, _one_slice(Y5, B4_W), ("entries", "mean", "std"), weights="w", **UNBINNED)
     m, s = _weighted_moments(Y5, B4_W)
     # A2 v0.2 (review F5): the correct result needs the right entries (the summed weights) as well as mean and std
     if got["entries"] == [float(sum(B4_W))] and np.allclose([got["mean"][0], got["std"][0]], [m, s], rtol=1e-13):
         return
-    known_defect(got["entries"] == [4.0] and np.isnan(got["mean"][0]) and np.isnan(got["std"][0]), "B4")
+    regression(got["entries"] == [4.0] and np.isnan(got["mean"][0]) and np.isnan(got["std"][0]), "B4 (WT-D2)")
     raise AssertionError(f"B4: neither numpy nor the B4 signature: {got}")
 
 
@@ -455,21 +456,12 @@ def _b5_prediction(q):
 
 @NODE
 @pytest.mark.feature("HIST.profile_unbinned")
-def test_signature_b5_two_row_bin_quantile_is_the_sum_times_q(node_session, tmp_path):
-    got = _profile(node_session, tmp_path, _one_slice(Y5), ("quantile_0", "quantile_1"), quantiles=list(B5_Q), **UNBINNED)
-    assert [got["quantile_0"][0], got["quantile_1"][0]] == [_b5_prediction(q) for q in B5_Q], got     # 6.5, 19.5
-    assert [_subbin_quantile(Y5, q) for q in B5_Q] == [12.5, 13.5]
-
-
-@NODE
-@pytest.mark.feature("HIST.profile_unbinned")
-@pytest.mark.xfail(**STRICT, reason="B5")
 def test_strict_a_quantile_lies_among_its_bin_values_and_equals_the_definition(node_session, tmp_path):
     got = _profile(node_session, tmp_path, _one_slice(Y5), ("quantile_0", "quantile_1"), quantiles=list(B5_Q), **UNBINNED)
     values = [got["quantile_0"][0], got["quantile_1"][0]]
     if all(12. <= v <= 14. for v in values) and np.allclose(values, [_subbin_quantile(Y5, q) for q in B5_Q], rtol=1e-13):
         return
-    known_defect(values == [_b5_prediction(q) for q in B5_Q], "B5")
+    regression(values == [_b5_prediction(q) for q in B5_Q], "B5")
     raise AssertionError(f"B5: neither the definition nor the B5 signature: {values}")
 
 
@@ -488,21 +480,11 @@ def _b5b(node_session, tmp_path):
 
 @NODE
 @pytest.mark.feature("HIST.profile_unbinned")
-def test_signature_b5b_quantile_depends_on_the_row_order(node_session, tmp_path):
-    """B5b, exact signature: each order returns the first row of bin 1 in ROW order (15, then 12); the definition
-    gives the bin's smallest value, 12, for both."""
-    assert _b5b(node_session, tmp_path) == [15., 12.]
-    assert [_subbin_quantile(o, B5B_Q) for o in B5B_ORDERS] == [12., 12.]
-
-
-@NODE
-@pytest.mark.feature("HIST.profile_unbinned")
-@pytest.mark.xfail(**STRICT, reason="B5b")
 def test_strict_a_quantile_does_not_depend_on_the_row_order(node_session, tmp_path):
     got = _b5b(node_session, tmp_path)
     if got == [12., 12.]:
         return
-    known_defect(got == [15., 12.], "B5b")
+    regression(got == [15., 12.], "B5b")
     raise AssertionError(f"B5b: neither the definition nor the B5b signature: {got}")
 
 
@@ -512,5 +494,5 @@ def test_control_the_sub_bin_quantile_reference():
     """The unbinned reference on hand-calculated values: bin 0 = 1, 2, 3 and bin 1 = 12, 14 (five rows)."""
     assert _subbin_quantile(Y5, .1) == pytest.approx(1 + 2 * (0.5 / 3))      # local share 1/6 of [1, 2, 3]
     assert _subbin_quantile(Y5, .7) == 12.5 and _subbin_quantile(Y5, .9) == 13.5
-    assert _subbin_quantile(Y5, 1.0) != _subbin_quantile(Y5, 1.0)            # q = 1: no bin holds more: NaN (question)
+    assert _subbin_quantile(Y5, 1.0) != _subbin_quantile(Y5, 1.0)            # q = 1: outside this reference (NaN)
     assert _subbin_quantile([1., 2., 15., 12., 18.], .4) == 12.

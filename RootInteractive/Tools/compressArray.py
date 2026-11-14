@@ -19,6 +19,11 @@ def getSize(inputObject):
     return len(pickle.dumps(inputObject))
 
 
+class UnsafeIntegerColumn(ValueError):
+    """PHASE_5 Batch 2A (TR-D3): a 64-bit integer column with values beyond +-2^53 cannot be sent to the browser
+    exactly (it decodes numbers as doubles); the page is not built, instead of showing rounded keys."""
+
+
 def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     """ TODO - check more optimal implementation using shifts ... and pipes
     roundRelativeBinary     - round mantissa of float number in nBits, assuming better lossy compression later
@@ -27,8 +32,9 @@ def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     :return:                - rounded array
     """
     type=df.dtype
-    # If dtype is not floating point number or int, skip this step
-    if type.kind not in ['f', 'c', 'i', 'u']:
+    # If dtype is not floating point number, skip this step. PHASE_5 Batch 2A (B7): integers are never rounded -
+    # they are keys and counts (65537 became 65536 at 16 bits)
+    if type.kind not in ['f', 'c']:
         return df
     shiftN = 2 ** nBits
     mantissa, exp2 = np.frexp(df)
@@ -39,12 +45,20 @@ def roundRelativeBinary(df, nBits, eps=0., downgradeType = True):
     return np.ldexp(mantissa, exp2).astype(type)
 
 
-def removeInt64(column):
+SAFE_INTEGER = 2 ** 53          # the largest magnitude below which every integer is exact as a double
+
+
+def removeInt64(column, name=None):
     type = column.dtype
     if type.kind in ['i', 'u'] and type.itemsize == 8:
         maxvalue = column.max()
         minvalue = column.min()
         if maxvalue > 0x7FFFFFFF or minvalue < -0x80000000:
+            # PHASE_5 Batch 2A (TR-D3): beyond +-2^53 a double cannot hold every integer (2^53 + 1 arrived as 2^53)
+            if maxvalue > SAFE_INTEGER or (type.kind == 'i' and minvalue < -SAFE_INTEGER):
+                raise UnsafeIntegerColumn(f"column {name!r}: 64-bit integers beyond 2^53 (here {minvalue} .. {maxvalue}) "
+                                          f"cannot be represented exactly in the browser; send them as strings, or "
+                                          f"split them into two 32-bit columns")
             return column.astype("float64")
         return column.astype("int32")
     return column
@@ -300,13 +314,14 @@ def tobytes(inputArray):
     #TODO: Add logic for numpy
     return (inputArray, None)
 
-def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
+def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None, integerColumns=()):
     """
     compress CDSPipe - based on the arrayCompression
     :param df:                   input map of arrays (DF)
     :param arrayCompression:     compression descriptions array of pairs  (regular expression, array compression description)
     :param verbosity
     :param  columnsSelect        columsn which will be used to compress - in None all colusms from df are used
+    :param integerColumns        columns that were integers before removeInt64: never rounded (PHASE_5 Batch 2A, B7)
     :return:                     map
     Example array description
     actionArrayDelta=[("delta",0.01), ("code",0), ("zip",0), ("base64",0)]
@@ -327,7 +342,10 @@ def compressCDSPipe(df, arrayCompression, verbosity, columnsSelect=None):
         for action in arrayCompression:
             if re.match(action[0], col) == None:
                 continue
-            arrayC = compressArray(df[col], action[1], False, verbosity)
+            actions = action[1]
+            if col in integerColumns:       # PHASE_5 Batch 2A (B7): an integer column is never rounded relatively
+                actions = [a for a in actions if not (isinstance(a, tuple) and a[0] == "relative") and a != "relative"]
+            arrayC = compressArray(df[col], actions, False, verbosity)
             sizeIn = getSize(df[col])
             sizeOut = getSize(arrayC)
             sizeOutAll += sizeOut

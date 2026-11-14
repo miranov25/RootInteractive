@@ -7,10 +7,13 @@ into a page with a 1-D, a 2-D and a weighted 1-D histogram; Node builds the page
     edge-value column kind;
   - check 1, the implementation: the page equals the oracle that copies RootInteractive's arithmetic, in every cell;
   - check 2, the RULE (oracles.histograms.rule_bounds, the per-cell rule): every finite value inside the ranges is
-    counted once, in a cell that contains it (interior-edge values may go to either side). The rule's violations
-    must be exactly the B10 rows (a value one rounding step below the top edge of x): in 1-D they are dropped, in 2-D
-    they move to bin 0 of x in the NEXT bin of y, or are dropped when y is in its last bin. Each B10 row is
-    classified by its destination, repaired, and the repaired page must satisfy the rule — else FAIL;
+    counted once, in a cell that contains it (interior-edge values may go to either side). PHASE_5 Batch 2A fixed
+    B10: the page must satisfy the rule as it is, the "edge rows" (a value one rounding step below the top edge of x
+    whose bin computes as nbins) included - they are counted in the last bin of x. With B10 put back by the fault
+    B10_REINTRODUCED (configuration claude3_b10_6, the only one with such rows), the rule's violations must be
+    exactly the B10 rows: in 1-D they are dropped, in 2-D they move to bin 0 of x in the NEXT bin of y, or are
+    dropped when y is in its last bin. Each B10 row is classified by its destination, repaired, and the repaired
+    page must satisfy the rule — else FAIL (the classification stays proven, so the fault stays a faithful B10);
   - the gate of V-1 (substituted documents equal fresh builds as model graphs, references kept); isolation; timings.
 Filters (document cases): B1 with the refined rule (b1_first_changed) swept over 1-200 rows; 2 to 5 filters in every
   move order; the 20 000 / 20 001-row pair. Every expected B1 step is computed from the rule, every other must PASS.
@@ -49,6 +52,7 @@ READ = """() => [window.__riH.col('h1', 'bin_count', ['HistogramCDS']), window._
                  window.__riH.col('hw', 'bin_count', ['HistogramCDS'])]"""
 B1_RULE = "b1_later_filters_keep_rows_excluded_at_load"
 CODES = [pytest.param(False, id="fixed"), pytest.param(True, id="b1_put_back")]   # PHASE_5 Batch 1
+B10_CONFIG = CONFIGS[1]                          # the configuration with edge rows (B10's rows); PHASE_5 Batch 2A
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +63,15 @@ def b1_back_session(node_session, node_bundle_root):
     families' hundreds of documents (measured: the process ended after about 170)."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
     s = NodeSession(node_bundle_root, fault=faults.B1_REINTRODUCED, fresh_window=False)
+    yield s
+    s.close()
+
+
+@pytest.fixture(scope="module")
+def b10_back_session(node_session, node_bundle_root):
+    """A Node session whose bundle copy has B10 put back (engine/faults.py B10_REINTRODUCED), one window as above."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    s = NodeSession(node_bundle_root, fault=faults.B10_REINTRODUCED, fresh_window=False)
     yield s
     s.close()
 
@@ -100,25 +113,32 @@ def _generated_frames(nb, lo, hi, count):
 class Judgement:
     """The verdict on one case."""
     implementation_equal: bool          # check 1: page = implementation oracle in every cell (1-D, 2-D, weighted)
-    unexplained: List[str]              # check 2: rule violations left after repairing the B10 rows (must be empty)
-    b10_1d_dropped: int                 # B10 rows dropped by the 1-D histogram
+    unexplained: List[str]              # check 2: rule violations (B10 put back: after repairing its rows; must be empty)
+    edge_rows: int                      # rows one rounding step below the top edge whose bin computes as nbins
+    edge_rows_y_inside: int             # ... of them with y inside its range (the ones the 2-D histogram counts)
+    b10_1d_dropped: int                 # B10 put back: B10 rows dropped by the 1-D histogram
     b10_2d_moved: int                   # ... moved by the 2-D histogram to bin 0 of x in the next bin of y
     b10_2d_dropped: int                 # ... dropped by the 2-D histogram (y in its last bin)
 
 
-def judge(df, page, nb, lo, hi) -> Judgement:
+def judge(df, page, nb, lo, hi, b10_live: bool = False) -> Judgement:
+    """The verdict on one case. `b10_live`: the page runs with B10 put back (fault B10_REINTRODUCED); its B10 rows are
+    then classified and repaired before the rule is applied. Without it (the fixed code) nothing is repaired."""
     x, y, w = (df[c].to_numpy() for c in ("x", "y", "w"))
     p1, p2, pw = (np.asarray(p, dtype=np.float64) for p in page)
-    impl_equal = (np.array_equal(p1, ho.counts([x], [nb], [(lo, hi)]))
-                  and np.array_equal(p2, ho.counts([x, y], [nb, 4], [(lo, hi), (0.0, 1.0)]))
-                  and np.allclose(pw, ho.counts([x], [nb], [(lo, hi)], weights=w), rtol=1e-12, atol=1e-9))
+    impl_equal = (np.array_equal(p1, ho.counts([x], [nb], [(lo, hi)], b10=b10_live))
+                  and np.array_equal(p2, ho.counts([x, y], [nb, 4], [(lo, hi), (0.0, 1.0)], b10=b10_live))
+                  and np.allclose(pw, ho.counts([x], [nb], [(lo, hi)], weights=w, b10=b10_live), rtol=1e-12, atol=1e-9))
     with np.errstate(invalid="ignore"):
         scale = nb / (hi - lo)
         x_in = np.isfinite(x) & (x >= lo) & (x <= hi)
         y_in = np.isfinite(y) & (y >= 0.0) & (y <= 1.0)
         raw = np.where(x_in, x, lo) * scale - lo * scale                 # RootInteractive's arithmetic on axis x
         b10 = x_in & (x < hi) & (np.trunc(raw) == nb)                    # the B10 signature
+    edge, edge_y = int(b10.sum()), int((b10 & y_in).sum())
     iy = np.clip(ho.bin_index_1d(np.where(y_in, y, 0.0), 4, 0.0, 1.0), 0, 3)
+    if not b10_live:                                                     # the fixed code: nothing to repair
+        b10 = np.zeros_like(b10)
     moved = b10 & y_in & (iy < 3)
     dropped2 = b10 & y_in & (iy == 3)
     fix1, fixw, fix2 = p1.copy(), pw.copy(), p2.copy()                   # repair the B10 rows, then apply the rule
@@ -132,7 +152,7 @@ def judge(df, page, nb, lo, hi) -> Judgement:
                                               ("weighted", [x], [nb], [(lo, hi)], w, fixw)):
         lower, upper, total = ho.rule_bounds(cols, nbins, rng, weights=wt)
         problems += [f"{name}: {v}" for v in ho.rule_violations(fixed, lower, upper, total)]
-    return Judgement(impl_equal, problems, int(b10.sum()), int(moved.sum()), int(dropped2.sum()))
+    return Judgement(impl_equal, problems, edge, edge_y, int(b10.sum()), int(moved.sum()), int(dropped2.sum()))
 
 
 def _histogram_family_run(node_session, tpl, frames):
@@ -177,15 +197,15 @@ def test_histogram_family(config, size, node_session, headless_out):
         compared = len(verdicts)
         bad_impl = [i for i, v in enumerate(verdicts) if not v.implementation_equal]
         bad_rule = [i for i, v in enumerate(verdicts) if v.unexplained]
-        d1, m2, d2 = (sum(getattr(v, f) for v in verdicts) for f in ("b10_1d_dropped", "b10_2d_moved", "b10_2d_dropped"))
+        edge = sum(v.edge_rows for v in verdicts)
         failures += [(kind, i) for i in bad_impl + bad_rule]
         res.add(0, name, f"{kind} cases ({compared}): page = implementation oracle (1-D, 2-D, weighted)",
                 "PASS" if not bad_impl and compared == len(frames) else "FAIL",
                 f"{compared - len(bad_impl)} of {len(frames)} cases compared and equal in every cell"
                 + (f"; first failing case {bad_impl[0]}" if bad_impl else ""), feature="HIST.histogram_1d")
-        res.add(0, name, f"{kind} cases ({compared}): rule check, 1-D B10 dropped {d1}, 2-D B10 moved {m2} / dropped {d2}",
-                "FAIL" if bad_rule else ("XFAIL" if (d1 or m2 or d2) else "PASS"),
-                "the per-cell rule holds in all three histograms once the B10 rows are repaired"
+        res.add(0, name, f"{kind} cases ({compared}): rule check, edge rows {edge} counted in the last bin of x",
+                "FAIL" if bad_rule else "PASS",
+                "the per-cell rule holds in all three histograms, the edge rows included (B10 fixed, PHASE_5 Batch 2A)"
                 + (f"; unexplained in case {bad_rule[0]}: {verdicts[bad_rule[0]].unexplained[:2]}" if bad_rule else ""),
                 feature="HIST.histogram_nd")
         timings[kind] = {"cases": len(frames), "compared": compared, "substitution_s": round(t_sub, 3),
@@ -203,6 +223,27 @@ def test_histogram_family(config, size, node_session, headless_out):
     (outdir / "timings.json").write_text(json.dumps(timings, indent=1))
     res.write()
     assert res.ok and not failures, res.text() + f"\nfailures (kind, case): {failures[:10]}"
+
+
+@pytest.mark.node_histograms
+def test_histogram_family_with_b10_put_back(b10_back_session, headless_out):
+    """PHASE_5 Batch 2A: the named and the fast generated cases of the configuration with edge rows, with B10 put back
+    (fault B10_REINTRODUCED). The page must equal the implementation oracle with B10 (RB-2.6, `b10=True`) in every
+    cell, every edge row must be a B10 row at its predicted destination (dropped in 1-D; moved, or dropped in the last
+    bin of y, in 2-D), and once repaired the rule must hold: the classification stays proven."""
+    name, nb, lo, hi = B10_CONFIG
+    sc = _page(name, nb, lo, hi)
+    tpl = sweep.Template(sc, data_mod.generate(sc.data.main), headless_out / f"b10_put_back_{name}_template.json",
+                         models_only=MODELS)
+    for kind, frames in (("named", _named_frames(nb, lo, hi)),
+                         ("generated", _generated_frames(nb, lo, hi, GENERATED_PER_CONFIG["fast"]))):
+        pages, _, _ = _histogram_family_run(b10_back_session, tpl, frames)
+        verdicts = [judge(df, p, nb, lo, hi, b10_live=True) for df, p in zip(frames, pages)]
+        bad = [(i, v) for i, v in enumerate(verdicts) if not v.implementation_equal or v.unexplained]
+        assert not bad, f"{kind}: {bad[:3]}"
+        edge, edge_y, d1, m2, d2 = (sum(getattr(v, f) for v in verdicts) for f in
+                                    ("edge_rows", "edge_rows_y_inside", "b10_1d_dropped", "b10_2d_moved", "b10_2d_dropped"))
+        assert edge > 0 and d1 == edge and m2 + d2 == edge_y and m2 > 0 and d2 > 0, (kind, edge, edge_y, d1, m2, d2)
 
 
 # ------------------------------------------------------------------- controls: the reviewers' counterexamples
@@ -245,17 +286,36 @@ def test_rule_tolerance_at_an_edge_at_zero():
         assert not v.unexplained, (xv, v)
 
 
+def _b10_pages(df, b10):
+    return [ho.counts([df.x], [6], [(-2.0, 2.28)], b10=b10),
+            ho.counts([df.x, df.y], [6, 4], [(-2.0, 2.28), (0.0, 1.0)], b10=b10),
+            ho.counts([df.x], [6], [(-2.0, 2.28)], weights=df.w, b10=b10)]
+
+
 @pytest.mark.node_histograms
 def test_b10_destination_in_2d_moved_or_dropped():
-    """GPT22/GPT23/GPT24/Claude10: a B10 value moves to bin 0 of x in the next bin of y, or is dropped when y is in
-    its last bin; both are classified, repaired, and leave no unexplained violation."""
+    """GPT22/GPT23/GPT24/Claude10: with B10 put back, a B10 value moves to bin 0 of x in the next bin of y, or is
+    dropped when y is in its last bin; both are classified, repaired, and leave no unexplained violation."""
     x = np.nextafter(2.28, -np.inf)
     for y, moved, dropped in ((0.5, 1, 0), (1.0, 0, 1)):
         df = pd.DataFrame({"x": [x], "y": [y], "w": [1.5]})
-        page = [ho.counts([df.x], [6], [(-2.0, 2.28)]), ho.counts([df.x, df.y], [6, 4], [(-2.0, 2.28), (0.0, 1.0)]),
-                ho.counts([df.x], [6], [(-2.0, 2.28)], weights=df.w)]
-        v = judge(df, page, 6, -2.0, 2.28)
+        v = judge(df, _b10_pages(df, True), 6, -2.0, 2.28, b10_live=True)
         assert (v.b10_2d_moved, v.b10_2d_dropped, v.b10_1d_dropped) == (moved, dropped, 1) and not v.unexplained, v
+
+
+@pytest.mark.node_histograms
+def test_b10_fixed_edge_row_is_in_the_last_bin_and_b10_is_a_violation():
+    """PHASE_5 Batch 2A: on the fixed code an edge row is counted in the last bin of x and satisfies the rule as it is;
+    a page with B10 (the edge row dropped or moved) judged as fixed code is a violation - nothing is repaired."""
+    x = np.nextafter(2.28, -np.inf)
+    for y in (0.5, 1.0):
+        df = pd.DataFrame({"x": [x], "y": [y], "w": [1.5]})
+        fixed = _b10_pages(df, False)
+        assert fixed[0][5] == 1 and fixed[2][5] == 1.5 and fixed[1][5 + 6 * (3 if y == 1.0 else 2)] == 1
+        v = judge(df, fixed, 6, -2.0, 2.28)
+        assert v.implementation_equal and not v.unexplained and v.edge_rows == 1 and v.b10_1d_dropped == 0, v
+        bad = judge(df, _b10_pages(df, True), 6, -2.0, 2.28)
+        assert not bad.implementation_equal and bad.unexplained, bad
 
 
 @pytest.mark.node_histograms

@@ -235,7 +235,7 @@ export function interpretArray(ab: ArrayBuffer, byteorder: "little" | "big", dty
   if (dtype == "int8"){
     return new Int8Array(ab, offset, bytelength)
   }
-  if (dtype == "uint8"){
+  if (dtype == "uint8" || dtype == "bool"){        // PHASE_5 Batch 2A (WT-D1): a numpy bool is one byte, 0 or 1
     return new Uint8Array(ab, offset, bytelength)
   }
   if (dtype == "int16"){
@@ -264,7 +264,7 @@ function makeTypedArray(n_elems: number, dtype: string){
   if (dtype == "int8"){
     return new Int8Array(n_elems)
   }
-  if (dtype == "uint8"){
+  if (dtype == "uint8" || dtype == "bool"){        // PHASE_5 Batch 2A (WT-D1)
     return new Uint8Array(n_elems)
   }
   if (dtype == "int16"){
@@ -292,6 +292,7 @@ function getElementSize(dtype: string): number {
   switch (dtype) {
     case "int8":
     case "uint8":
+    case "bool":                                      // PHASE_5 Batch 2A (WT-D1)
       return 1;
     case "int16":
     case "uint16":

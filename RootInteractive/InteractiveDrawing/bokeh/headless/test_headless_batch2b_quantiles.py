@@ -38,6 +38,9 @@ TEST CORRECTION v0.2 (GPT24.RI's review of the test commits, 2026-11-13, finding
   (oracles/profile_port.py) - not merely when its bad values are zero-weight values. Mutants of each kind are tests.
 The set of accepted weighted values stays a temporary bounded set (inverse CDF, next value, midpoint), not the future
 weighted method (2B-P2-01): the method-free properties remain the target.
+
+FIX COMMIT (Batch 2B fix CRR v0.1, Claude20.RI, 2026-11-13): B5, B5b, q = 1, ST-D4 and WT-D3 are fixed. The strict
+marks are off and the signature tests removed; a page equal to the port of master's code is now a REGRESSION.
 """
 import json
 import math
@@ -54,16 +57,10 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import profile_po
 from .test_headless_node_weights import _quantile_candidates
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of registered defects."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """FIX COMMIT: the exact signature of a fixed defect is a regression - an ordinary failure that names it."""
     if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 QUANTILE_DEFECTS = ("B5", "B5b", "q=1", "ST-D4")
 
 
@@ -402,8 +399,7 @@ def test_the_comparator_rejects_structure_and_error_mutants():
 CASES = {"ascending": ("table", ASCENDING), "permuted": ("permuted", ASCENDING), "mixed": ("table", MIXED)}
 
 
-@_node(pytest.mark.feature("HIST.profile_unbinned"),
-       pytest.mark.xfail(**STRICT, reason="B5, B5b, q=1, ST-D4 as declared per page (EXPECTED_SETS)"))
+@_node(pytest.mark.feature("HIST.profile_unbinned"))
 @pytest.mark.parametrize("case", sorted(CASES))
 def test_strict_profile_quantiles_follow_the_present_method_without_its_bugs(node_session, tmp_path, case):
     """RI-ADF-05/06 shape: every quantile of every (X bin, group) cell equals RootInteractive's sub-bin method with
@@ -414,18 +410,8 @@ def test_strict_profile_quantiles_follow_the_present_method_without_its_bugs(nod
     if _same(got, expected(d, qs)):
         return
     sets = explanations(got, d, qs)
-    known_defect(sets == [EXPECTED_SETS[case]], "known defects " + ", ".join(EXPECTED_SETS[case]))
+    regression(sets == [EXPECTED_SETS[case]], "known defects " + ", ".join(EXPECTED_SETS[case]))
     raise AssertionError(f"the page shows {sets or 'no known set of defects'}, declared {EXPECTED_SETS[case]}")
-
-
-@_node(pytest.mark.feature("HIST.profile_unbinned"))
-def test_signature_the_page_equals_the_port_of_the_present_code(node_session, tmp_path):
-    """The exact signature of all four defects together: on every page the present code equals its port with every
-    defect switched on - in every cell and at every level."""
-    for case, (order, qs) in CASES.items():
-        d = table(order)
-        got = page_quantiles(node_session, tmp_path, d, qs, name=f"sig_{case}")
-        assert _same(got, expected(d, qs, QUANTILE_DEFECTS)), case
 
 
 @_node(pytest.mark.feature("HIST.profile_unbinned"))
@@ -507,8 +493,7 @@ def test_weighted_candidates_include_q1_as_the_maximum_and_exclude_zero_weight_r
     assert 2.0 not in _quantile_candidates(y, w, 0.5)
 
 
-@_node(pytest.mark.feature("HIST.profile_unbinned"),
-       pytest.mark.xfail(**STRICT, reason="WT-D3 and q=1: weighted quantiles with a 0/1 branch weight"))
+@_node(pytest.mark.feature("HIST.profile_unbinned"))
 def test_strict_weighted_quantiles_are_standard_values_of_the_positive_rows(node_session, tmp_path):
     """C03 shape: a selection branch as a 0/1 weight. Every weighted quantile of every cell is a value a standard
     weighted definition gives (no definition is chosen: Architect, 2026-11-13); never a zero-weight row's value."""
@@ -518,17 +503,8 @@ def test_strict_weighted_quantiles_are_standard_values_of_the_positive_rows(node
     verdict, detail = weighted_verdict(d, got)
     if verdict == "PASS":
         return
-    known_defect(verdict == "KNOWN" and detail == {"WT-D3", "q=1"}, "WT-D3 and q=1")
+    regression(verdict == "KNOWN" and detail == {"WT-D3", "q=1"}, "WT-D3 and q=1")
     raise AssertionError(f"{verdict}: {detail}; declared ['WT-D3', 'q=1']")
-
-
-@_node(pytest.mark.feature("HIST.profile_unbinned"))
-def test_signature_wt_d3_a_zero_weight_row_is_returned(node_session, tmp_path):
-    """WT-D3 and q=1, exact: every violation is a zero-weight row's value or NaN at q = 1, and both occur."""
-    d = table()
-    got = page_quantiles(node_session, tmp_path, d, WEIGHTED, weights="b", name="weighted_sig")
-    assert got == weighted_port(d), "the page is not the exact port of the present weighted code"
-    assert weighted_verdict(d, got) == ("KNOWN", {"WT-D3", "q=1"})
 
 
 @_unit

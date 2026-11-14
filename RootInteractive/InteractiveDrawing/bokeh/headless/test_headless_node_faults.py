@@ -62,7 +62,9 @@ def healthy(node_session, headless_out):
 def test_each_fault_matches_the_bundle_exactly_once(node_bundle_root):
     text = node_bundle.model_bundle(node_bundle_root).read_text(encoding="utf-8")
     for fid, f in {**faults.FAULTS, **faults.DEFECT_FAULTS}.items():
-        assert text.count(f.search) == 1, f"fault {fid}: found {text.count(f.search)} times in the model bundle"
+        for part in f.parts or (f,):                       # a composite fault: each part (PHASE_5 Batch 2A, B10)
+            assert part.search and text.count(part.search) == 1, \
+                f"fault {fid} ({part.id}): found {text.count(part.search)} times in the model bundle"
 
 
 @pytest.mark.parametrize("scenario,defect", known_defects.VEHICLES, ids=[s.id for s, _ in known_defects.VEHICLES])

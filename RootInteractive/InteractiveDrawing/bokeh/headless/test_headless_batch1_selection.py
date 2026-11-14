@@ -1270,7 +1270,8 @@ def review_fault_sessions(node_session, node_bundle_root):
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
     sessions = {f.id: NodeSession(node_bundle_root, fault=f, fresh_window=False)
-                for f in (faults.PHANTOM_ROWS, faults.FILTER_CACHE_WRITTEN)}
+                for f in (faults.PHANTOM_ROWS, faults.FILTER_CACHE_WRITTEN,
+                          faults.compose(faults.PHANTOM_ROWS, faults.B8_REINTRODUCED))}   # PHASE_5 Batch 2A
     yield sessions
     for s in sessions.values():
         s.close()
@@ -1281,15 +1282,23 @@ def review_fault_sessions(node_session, node_bundle_root):
 def test_falsifier_c1_phantom_rows_put_back_are_caught_by_the_general_check(review_fault_sessions, tmp_path):
     """With the padding no longer cleared (fault phantom_rows), the page fails at load - before any test reads it -
     through the general check that runs on every page (engine/runner.py __riH.invariants): the filter selects the 20
-    positions 12..31 past the 12 rows, and the 1-D histogram counts 32 entries from 12 rows. The 2-D histogram is
-    right (its finite guard), so it is not named."""
+    positions 12..31 past the 12 rows. The histograms are right: the 2-D one by its finite guard, the 1-D one since
+    the B8 fix of PHASE_5 Batch 2A (a position past the table reads `undefined`, which is in no bin). With B8 put back
+    as well (phantom_rows + b8_reintroduced), the 1-D histogram counts 32 entries from 12 rows, and the general check
+    names it too - its histogram half stays proven on a live page."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import InvariantViolated
-    with pytest.raises((InvariantViolated, RuntimeError)) as caught:
-        c1_run(review_fault_sessions["phantom_rows"], tmp_path, 12)
-    text = str(caught.value)
-    assert "RI invariant violated" in text and "selects 20 positions outside its table of 12 rows (first 12, 13, 14)" in text
-    assert "position 12 past the last row of its table (12 rows) is selected" in text
-    assert "HistogramCDS c1h counts 32 entries from a table of 12 rows" in text and "c1n" not in text and "c1w" not in text
+    both = faults.compose(faults.PHANTOM_ROWS, faults.B8_REINTRODUCED).id
+    for fid, histogram_named in (("phantom_rows", False), (both, True)):
+        out = tmp_path / fid.replace("+", "_")
+        out.mkdir()
+        with pytest.raises((InvariantViolated, RuntimeError)) as caught:
+            c1_run(review_fault_sessions[fid], out, 12)
+        text = str(caught.value)
+        assert "RI invariant violated" in text and "selects 20 positions outside its table of 12 rows (first 12, 13, 14)" in text
+        assert "position 12 past the last row of its table (12 rows) is selected" in text
+        assert ("HistogramCDS c1h counts 32 entries from a table of 12 rows" in text) == histogram_named, (fid, text)
+        assert "c1n" not in text and "c1w" not in text, (fid, text)
 
 
 @_node

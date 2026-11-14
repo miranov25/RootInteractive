@@ -39,6 +39,9 @@ TEST CORRECTION v0.2 (GPT24.RI's review of the test commits, 2026-11-13, finding
   is UNEXPLAINED;
 - an integer column counts as refused only when the build raises the deliberate refusal UnsafeIntegerColumn that
   names the column and 2^53; any other exception is an ordinary failure. Integers within 2^53 must arrive exactly.
+
+FIX COMMIT (Batch 2A fix CRR v0.1, Claude20.RI, 2026-11-13): B8, B10, WT-D1, B7, TR-D3, WT-D2 and WT-D4 are fixed. The
+strict marks are off and the signature tests removed; each exact signature is now a REGRESSION check.
 """
 import itertools
 import json
@@ -55,16 +58,10 @@ from .test_headless_node_weights import (BOOL_ERROR, SPEC, XEDGE, _first_visited
                                          _profile, _series, _weighted_ref)
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of registered defects."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """FIX COMMIT: the exact signature of a fixed defect is a regression - an ordinary failure that names it."""
     if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 LOSSLESS = [("code", 0), ("zip", 0), ("base64", 0)]
 RELATIVE16 = [("relative", 16), "code", "zip"]
 
@@ -211,8 +208,7 @@ def test_weight_table_reaches_both_defects():
     np.testing.assert_allclose(ref["std"], [p.std(ddof=0) for p in plain], rtol=1e-12)
 
 
-@_node(pytest.mark.feature("HIST.stack"), pytest.mark.feature("HIST.profile_unbinned"),
-       pytest.mark.xfail(**STRICT, reason="WT-D2 and WT-D4 as declared per page (EXPECTED_WEIGHT_DEFECTS)"))
+@_node(pytest.mark.feature("HIST.stack"), pytest.mark.feature("HIST.profile_unbinned"))
 @pytest.mark.parametrize("shape", sorted(WEIGHT_PAGES))
 def test_strict_compiled_weight_series_each_equal_numpy(node_session, tmp_path, shape):
     """C03, C04, RI-ADF-04: every series of a multi-weight profile - entries (sum of weights), weighted mean and
@@ -223,7 +219,7 @@ def test_strict_compiled_weight_series_each_equal_numpy(node_session, tmp_path, 
     if verdict == "PASS":
         return
     if verdict == "KNOWN":
-        known_defect(detail == EXPECTED_WEIGHT_DEFECTS[shape], "known defects " + ", ".join(detail))
+        regression(detail == EXPECTED_WEIGHT_DEFECTS[shape], "known defects " + ", ".join(detail))
         raise AssertionError(f"the page shows {detail}, declared {EXPECTED_WEIGHT_DEFECTS[shape]}")
     raise AssertionError(detail)
 
@@ -289,7 +285,6 @@ def test_control_a_single_positive_weight_equals_numpy(node_session, tmp_path):
 
 # ===================================================================================== 2. Boolean branches (WT-D1)
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"),
-       pytest.mark.xfail(**STRICT, reason="WT-D1: a Boolean branch weight cannot be decoded in a compressed page"),
        target=pytest.mark.node_transport)
 @pytest.mark.parametrize("compression", ["lossless", "relative16"])
 def test_strict_boolean_branch_weights_are_read_and_equal_numpy(node_session, tmp_path, compression):
@@ -304,7 +299,7 @@ def test_strict_boolean_branch_weights_are_read_and_equal_numpy(node_session, tm
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
     spec = decode(r["result"]) or {}
     read = _profile(node_session)
-    known_defect(_is_wt_d1(read, spec, compression), f"WT-D1: {BOOL_ERROR} ({compression})")
+    regression(_is_wt_d1(read, spec, compression), f"WT-D1: {BOOL_ERROR} ({compression})")
     for s, ref in (("c1", "b1"), ("c2", "b2")):
         np.testing.assert_allclose(_series(read, s)["entries"], _weighted_ref(d, ref)["entries"], rtol=0, atol=0)
 
@@ -359,13 +354,6 @@ def _is_b8(state, refs, tracks) -> bool:
     return state["h2"] == want["h2"]
 
 
-@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
-def test_signature_b8_every_orphan_lands_in_bin_0_of_a_1d_histogram(node_session, tmp_path):
-    """B8, exact signature, in the compiler's shape: 1-D histograms of a gathered column, plain and weighted."""
-    refs, tracks, state = orphan_state(node_session, tmp_path)
-    assert _is_b8(state, refs, tracks)
-
-
 @_node(pytest.mark.feature("HIST.histogram_nd"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
 def test_control_b8_the_2d_histogram_skips_the_orphans(node_session, tmp_path):
     """B8's control (errata C-06): the N-D histogram's finite guard excludes every orphan."""
@@ -373,11 +361,10 @@ def test_control_b8_the_2d_histogram_skips_the_orphans(node_session, tmp_path):
     assert state["h2"] == orphan_oracle(refs, tracks)["h2"]
 
 
-@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("DSL.gather_operation"),
-       pytest.mark.xfail(**STRICT, reason="B8: NaN (every orphan) is counted in bin 0 of a 1-D histogram"), target=pytest.mark.node_histograms)
+@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
 def test_strict_orphans_are_not_counted_in_a_1d_histogram(node_session, tmp_path):
     refs, tracks, state = orphan_state(node_session, tmp_path)
-    known_defect(_is_b8(state, refs, tracks), "B8: the orphans are in bin 0")
+    regression(_is_b8(state, refs, tracks), "B8: the orphans are in bin 0")
     want = orphan_oracle(refs, tracks)
     assert state["h1"] == want["h1"]
     np.testing.assert_allclose(state["h1w"], want["h1w"], rtol=1e-12)
@@ -429,10 +416,11 @@ def edge_state(node_session, tmp_path, with_edge_rows=True):
 
 
 def _is_b10(d, state) -> bool:
-    """B10, exact: the page equals RootInteractive's unclamped arithmetic (rulebook oracle RB-2): the edge rows are
-    dropped in 1-D and moved to bin 0 of the next group in 2-D (dropped in the last group); not the intended counts."""
-    model = {"e1": ho.counts([d.r], [20], [(0, 50)]).tolist(),
-             "e2": ho.counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)]).tolist()}
+    """B10, exact: the page equals RootInteractive's unclamped arithmetic (rulebook oracle RB-2 with B10 put back):
+    the edge rows are dropped in 1-D and moved to bin 0 of the next group in 2-D (dropped in the last group); not the
+    intended counts."""
+    model = {"e1": ho.counts([d.r], [20], [(0, 50)], b10=True).tolist(),
+             "e2": ho.counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)], b10=True).tolist()}
     want = {"e1": intended_counts([d.r], [20], [(0, 50)]), "e2": intended_counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)])}
     return state == model and model != want
 
@@ -443,16 +431,14 @@ def test_edge_rows_are_b10_rows_and_the_intended_rule_counts_them():
     edge = d.r == TOP
     assert int(np.trunc(TOP * (20 / 50))) == 20                         # the B10 arithmetic
     assert sum(intended_counts([d.r], [20], [(0, 50)])) == len(d)
-    assert sum(ho.counts([d.r], [20], [(0, 50)])) == len(d) - edge.sum()
+    assert sum(ho.counts([d.r], [20], [(0, 50)], b10=True)) == len(d) - edge.sum()
+    # the rulebook oracle follows the fix (RB-2.6): it equals the intended rule, also on the edge rows
+    assert ho.counts([d.r], [20], [(0, 50)]).tolist() == intended_counts([d.r], [20], [(0, 50)])
+    assert ho.counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)]).tolist() == \
+        intended_counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)])
     clean = edge_table(False)
     assert intended_counts([clean.r, clean.g], [20, 5], [(0, 50), (0, 5)]) == \
         ho.counts([clean.r, clean.g], [20, 5], [(0, 50), (0, 5)]).tolist()
-
-
-@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"), target=pytest.mark.node_histograms)
-def test_signature_b10_edge_rows_are_dropped_or_moved_to_the_next_group(node_session, tmp_path):
-    d, state = edge_state(node_session, tmp_path)
-    assert _is_b10(d, state)
 
 
 @_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"), target=pytest.mark.node_histograms)
@@ -462,14 +448,42 @@ def test_control_b10_without_edge_rows_every_group_is_right(node_session, tmp_pa
                      "e2": intended_counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)])}
 
 
-@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"),
-       pytest.mark.xfail(**STRICT, reason="B10: a value just below the top edge lands one bin too far"), target=pytest.mark.node_histograms)
+@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"), target=pytest.mark.node_histograms)
 def test_strict_edge_rows_are_counted_in_the_last_bin_of_their_group(node_session, tmp_path):
     """G02/F01: a group or facet axis must keep every row in its own group."""
     d, state = edge_state(node_session, tmp_path)
-    known_defect(_is_b10(d, state), "B10: edge rows dropped or moved to the next group")
+    regression(_is_b10(d, state), "B10: edge rows dropped or moved to the next group")
     assert state == {"e1": intended_counts([d.r], [20], [(0, 50)]),
                      "e2": intended_counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)])}
+
+
+# ----------------------------------------------------------------- falsifiers: B8 and B10 put back into a copy of the code
+@pytest.fixture(scope="module")
+def put_back_sessions(node_session, node_bundle_root):
+    """Node sessions whose bundle copy has B8 or B10 put back (engine/faults.py B8_REINTRODUCED, B10_REINTRODUCED)."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    sessions = {f.id: NodeSession(node_bundle_root, fault=f, fresh_window=False)
+                for f in (faults.B8_REINTRODUCED, faults.B10_REINTRODUCED)}
+    yield sessions
+    for s in sessions.values():
+        s.close()
+
+
+@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
+def test_falsifier_b8_put_back_shows_the_signature_its_regression_check_names(put_back_sessions, tmp_path):
+    """With B8 put back (fault b8_reintroduced: getbin's lower test is `val < min` again), the page equals B8's exact
+    signature - the regression check of test_strict_orphans_are_not_counted_in_a_1d_histogram is live."""
+    refs, tracks, state = orphan_state(put_back_sessions["b8_reintroduced"], tmp_path)
+    assert _is_b8(state, refs, tracks), state
+
+
+@_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"), target=pytest.mark.node_histograms)
+def test_falsifier_b10_put_back_shows_the_signature_its_regression_check_names(put_back_sessions, tmp_path):
+    """With B10 put back in the 1-D and the N-D histogram (fault b10_reintroduced), the page equals B10's exact
+    signature - the regression check of test_strict_edge_rows_are_counted_in_the_last_bin_of_their_group is live."""
+    d, state = edge_state(put_back_sessions["b10_reintroduced"], tmp_path)
+    assert _is_b10(d, state), state
 
 
 # ===================================================================================== 5. integers: B7 and TR-D3
@@ -519,34 +533,19 @@ def _is_tr_d3(values) -> bool:
 
 
 @_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
-def test_signature_b7_relative16_rounds_integer_keys(node_session, tmp_path):
-    """B7, exact signature (no test before): 65537 -> 65536, 70001 -> 70000, ...; -5 and 3 survive."""
-    values, kind = int_state(node_session, tmp_path, KEYS_SMALL, "relative16")
-    assert values is not None and _is_b7(values), (values, kind)
-
-
-@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
 def test_control_integer_keys_below_2_53_are_exact_when_lossless(node_session, tmp_path):
     values, kind = int_state(node_session, tmp_path, KEYS_SMALL, "lossless")
     assert values == KEYS_SMALL.tolist(), (values, kind)
 
 
-@_node(pytest.mark.feature("ENC.cds_compress.page_decode"),
-       pytest.mark.xfail(**STRICT, reason="B7: relative compression rounds integer columns"), target=pytest.mark.node_transport)
+@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
 def test_strict_integer_keys_survive_relative16_or_are_refused(node_session, tmp_path):
     """An integer key within 2^53 arrives exactly, also when the page uses relative 16-bit coding (the Architect's
     default of 2026-11-13: integer columns skip relative coding). A refusal is not expected for these keys."""
     values, kind = int_state(node_session, tmp_path, KEYS_SMALL, "relative16")
     assert values is not None, f"keys within 2^53 refused: {kind}"
-    known_defect(_is_b7(values), "B7: integer keys rounded")
+    regression(_is_b7(values), "B7: integer keys rounded")
     assert values == KEYS_SMALL.tolist(), (values, kind)
-
-
-@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
-def test_signature_tr_d3_keys_above_2_53_lose_precision_even_lossless(node_session, tmp_path):
-    """TR-D3, exact signature: every key arrives as the nearest double (2^53 + 1 -> 2^53), in a Float64Array."""
-    values, kind = int_state(node_session, tmp_path, KEYS_BIG, "lossless")
-    assert values is not None and _is_tr_d3(values) and kind == "Float64Array", (values, kind)
 
 
 @_unit
@@ -562,13 +561,12 @@ def test_falsifier_only_the_deliberate_refusal_counts():
         assert not is_refusal(bad, "key"), repr(bad)
 
 
-@_node(pytest.mark.feature("ENC.cds_compress.page_decode"),
-       pytest.mark.xfail(**STRICT, reason="TR-D3: 64-bit integers above 2^53 lose precision in the page"), target=pytest.mark.node_transport)
+@_node(pytest.mark.feature("ENC.cds_compress.page_decode"), target=pytest.mark.node_transport)
 def test_strict_keys_above_2_53_are_exact_or_refused(node_session, tmp_path):
     values, kind = int_state(node_session, tmp_path, KEYS_BIG, "lossless")
     if values is None:
         return
-    known_defect(_is_tr_d3(values), "TR-D3: keys above 2^53 rounded to doubles")
+    regression(_is_tr_d3(values), "TR-D3: keys above 2^53 rounded to doubles")
     assert values == KEYS_BIG.tolist(), (values, kind)
 
 

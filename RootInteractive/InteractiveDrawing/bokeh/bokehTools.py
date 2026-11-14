@@ -1221,8 +1221,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             cdsOrig = cdsValue["cdsOrig"]
             if cdsValue['arrayCompression'] is not None:
                 print("compressCDSPipe")
-                sent_data = {i:removeInt64(iColumn) for i, iColumn in sent_data.items()}
-                cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1)
+                # PHASE_5 Batch 2A (B7, TR-D3): integer columns are never rounded; beyond 2^53 they are refused
+                integerColumns = {i for i, iColumn in sent_data.items() if np.asarray(iColumn).dtype.kind in "iu"}
+                sent_data = {i:removeInt64(iColumn, i) for i, iColumn in sent_data.items()}
+                cdsCompress0, sizeMap= compressCDSPipe(sent_data, options["arrayCompression"],1, integerColumns=integerColumns)
                 for keyCompressed, valueCompressed in cdsCompress0.items():
                     if isinstance(valueCompressed["array"], bytes):
                         cdsCompress0[keyCompressed]["array"] = base64.b64encode(valueCompressed["array"]).decode("utf-8")

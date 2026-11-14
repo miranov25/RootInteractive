@@ -128,23 +128,34 @@ export class HistoStatsCDS extends ColumnDataSource {
             if(edges_left === null || edges_right === null ){
               throw "Cannot compute quantiles without specifying bin edges"
             }
-            while(iQuantile < this.quantiles.length && this.quantiles[iQuantile] < 0){
-              quantile_columns[iQuantile].push(NaN)
+            // PHASE_5 Batch 2B (ST-D4): the levels in ascending order, each written to its own column
+            const qs = this.quantiles
+            const order = qs.map((_q: number, n: number) => n).sort((a: number, b: number) => qs[a] - qs[b] || a - b)
+            const cell_quantiles: number[] = Array(qs.length).fill(NaN)
+            while(iQuantile < order.length && qs[order[iQuantile]] < 0){
               iQuantile++
             }
-            for (let j = 0; j < cumulative_histogram.length && iQuantile < this.quantiles.length; j++) {
+            for (let j = 0; j < cumulative_histogram.length && iQuantile < order.length; j++) {
               high = cumulative_histogram[j]
-              while(iQuantile < this.quantiles.length && high > this.quantiles[iQuantile] * entries){
+              while(iQuantile < order.length && high > qs[order[iQuantile]] * entries){
                 // TODO: Use lerp
-                const m = (this.quantiles[iQuantile] * entries - low)/(high-low)
-                quantile_columns[iQuantile].push(edges_left[j]*(1-m)+edges_right[j]*m)
+                const m = (qs[order[iQuantile]] * entries - low)/(high-low)
+                cell_quantiles[order[iQuantile]] = edges_left[j]*(1-m)+edges_right[j]*m
                 iQuantile++
               }
               low = high
             }
-            while(iQuantile < this.quantiles.length){
-              quantile_columns[iQuantile].push(NaN)
+            // PHASE_5 Batch 2B (q = 1): never reached by "high > q * entries" - the upper edge of the last non-empty bin
+            while(iQuantile < order.length && qs[order[iQuantile]] === 1){
+              let top = NaN
+              for (let j = 0; j < cumulative_histogram.length; j++){
+                if(cumulative_histogram[j] > (j ? cumulative_histogram[j-1] : 0)) top = edges_right[j]
+              }
+              cell_quantiles[order[iQuantile]] = top
               iQuantile++
+            }
+            for (let n = 0; n < qs.length; n++){
+              quantile_columns[n].push(cell_quantiles[n])
             }
           } else {
             for (let iQuantile = 0; iQuantile < quantile_columns.length; iQuantile++) {

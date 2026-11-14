@@ -221,11 +221,14 @@ export class HistogramCDS extends ColumnarDataSource {
   getbin(val: number): number{
       // Overflow bins
       if(val > this._range_max) return this._nbins
-      if(val < this._range_min) return -1
+      // PHASE_5 Batch 2A (B8): NaN (and a missing value) is in no bin - it used to fall through to bin 0
+      if(!(val >= this._range_min)) return -1
       // Make the max value inclusive
       if(val === this._range_max) return this._nbins-1
-      // Compute the bin in the normal case
-      return (val*this._transform_scale+this._transform_origin)|0
+      // Compute the bin in the normal case; PHASE_5 Batch 2A (B10): a value one rounding step below the maximum can
+      // compute as nbins - it belongs to the last bin
+      const bin = (val*this._transform_scale+this._transform_origin)|0
+      return bin < this._nbins ? bin : this._nbins-1
   }
 
   get_length(){

@@ -12,7 +12,7 @@ Rules:
 The targets are compiled TypeScript of RootInteractive 4e8d783 as Bokeh 3.3.x emits it; a new Bokeh version that
 changes the text makes the fault ERROR ("not applied") rather than pass.
 
-Defect faults (PHASE_5 Batch 1). A fixed defect is put back into the disposable copy by a fault, so that the engine's
+Defect faults (PHASE_5 Batch 1; B8 and B10 in Batch 2A). A fixed defect is put back into the disposable copy by a fault, so that the engine's
 classification can still be proven on it: a known defect explained exactly is XFAIL, and an unrelated fault on top of
 it is FAIL ("a different problem"), never XFAIL. A composite fault (`compose`) applies several faults, each exactly
 once; the outcomes of the run show that each part acted (the defect's exact signature, and the unrelated failure).
@@ -48,8 +48,8 @@ UPDATE_NEVER_TRIGGERED = Fault(
 ND_BIN_SHIFTED = Fault(
     id="nd_bin_shifted",
     description="the N-D histogram puts every in-range value one bin higher on each axis",
-    source="HistoNdCDS.ts 343",
-    search="bins[i] += ((val * scale - origin) | 0) * stride;",
+    source="HistoNdCDS.ts 343 (the line as fixed for B10 in PHASE_5 Batch 2A)",
+    search="bins[i] += (bin < nbins ? bin : nbins - 1) * stride;",
     replace=f"bins[i] += (((val * scale - origin) | 0) + ({COUNTER}, 1)) * stride;",
 )
 
@@ -90,7 +90,31 @@ FILTER_CACHE_WRITTEN = Fault(
     replace=f"{COUNTER}; old_values.fill(-1); // PHASE_5 Batch 1 v0.2 (review C2)",
 )
 
-DEFECT_FAULTS = {f.id: f for f in (B1_REINTRODUCED, B2_REINTRODUCED, PHANTOM_ROWS, FILTER_CACHE_WRITTEN)}
+# ---- PHASE_5 Batch 2A: B8 and B10 put back (the text searched is the fixed line) ----
+B8_REINTRODUCED = Fault(
+    id="b8_reintroduced",
+    description="B8 put back: a 1-D histogram counts NaN (a missing value) in bin 0 - getbin's lower test is `val < min`",
+    source="HistogramCDS.ts getbin (fixed in PHASE_5 Batch 2A)",
+    search="if (!(val >= this._range_min))",
+    replace=f"if (val < this._range_min || ({COUNTER}, false))",
+)
+
+B10_REINTRODUCED = Fault(
+    id="b10_reintroduced",
+    description="B10 put back: a value one rounding step below the maximum computes as bin nbins - dropped by a 1-D "
+                "histogram, moved to bin 0 of the next row of bins (or dropped) by an N-D histogram",
+    source="HistogramCDS.ts getbin and HistoNdCDS.ts compute_bins (fixed in PHASE_5 Batch 2A)",
+    parts=(Fault(id="b10_reintroduced_1d", description="B10 put back in the 1-D histogram",
+                 source="HistogramCDS.ts getbin (fixed in PHASE_5 Batch 2A)",
+                 search="return bin < this._nbins ? bin : this._nbins - 1;", replace=f"return ({COUNTER}, bin);"),
+           Fault(id="b10_reintroduced_nd", description="B10 put back in the N-D histogram",
+                 source="HistoNdCDS.ts compute_bins (fixed in PHASE_5 Batch 2A)",
+                 search="bins[i] += (bin < nbins ? bin : nbins - 1) * stride;",
+                 replace=f"bins[i] += ({COUNTER}, bin) * stride;")),
+)
+
+DEFECT_FAULTS = {f.id: f for f in (B1_REINTRODUCED, B2_REINTRODUCED, PHANTOM_ROWS, FILTER_CACHE_WRITTEN,
+                                   B8_REINTRODUCED, B10_REINTRODUCED)}
 
 
 def compose(*faults: Fault) -> Fault:

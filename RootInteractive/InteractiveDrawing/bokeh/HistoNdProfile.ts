@@ -64,6 +64,8 @@ export class HistoNdProfile extends ColumnarDataSource {
 
   update(): void {
         const {source, axis_idx, unbinned, quantiles, sum_range, weights} = this
+        // PHASE_5 Batch 2B (ST-D4): the requested levels in ascending order (a stable sort of their positions)
+        const order = quantiles.map((_q: number, i: number) => i).sort((a: number, b: number) => quantiles[a] - quantiles[b] || a - b)
         const mean_column = []
         const std_column = []
         const entries_column = []
@@ -127,9 +129,17 @@ export class HistoNdProfile extends ColumnarDataSource {
           weights_array = weights
         }
 
-        const sorted_entries = unbinned ? source.sorted_column_orig(axis_name) : null
+        let sorted_entries = unbinned ? source.sorted_column_orig(axis_name) : null
 
+        let first_series = true
         for(const current_weights of weights_array){
+          if(!first_series && sorted_entries != null){
+            // PHASE_5 Batch 2A (WT-D4): the quantiles of the series before reordered these values in place together
+            // with that series' weights; this series pairs its own weights with the values in bin order again
+            source.return_column_to_pool(sorted_entries)
+            sorted_entries = source.sorted_column_orig(axis_name)
+          }
+          first_series = false
           const sorted_weights = unbinned && current_weights != null? source.sorted_column_orig(current_weights) : null
 
           let entries_total = 0
@@ -184,7 +194,9 @@ export class HistoNdProfile extends ColumnarDataSource {
                       }
                     } else {
                       for(let i=index_low; i < index_high; ++i){
-                        if (isFinite(sorted_entries![i])){
+                        // PHASE_5 Batch 2A (WT-D2): a row of weight 0 adds nothing; as the first row of a bin it made
+                        // the running mean 0/0 = NaN
+                        if (isFinite(sorted_entries![i]) && sorted_weights[i] !== 0){
 				entries_ += sorted_weights[i]
 				old_mean = mean
                         	mean += (sorted_entries![i] - mean) * sorted_weights[i] / entries_
@@ -211,13 +223,15 @@ export class HistoNdProfile extends ColumnarDataSource {
                 isOK_column.push(true)
                 let low = 0
                 let high = 0
-                let iQuantile = 0
+                // PHASE_5 Batch 2B (ST-D4): the levels are found in ascending order, each written to its own column -
+                // a request list in another order (.55, .15, ...) gave wrong values or "Quantile out of range"
+                const cell_quantiles: number[] = Array(quantiles.length).fill(NaN)
+                let iq = 0
                 // Invalid quantiles - negative
-                while(iQuantile < quantiles.length && quantiles[iQuantile] < 0){
-                  quantile_columns[iQuantile].push(NaN)
-                  iQuantile++
+                while(iq < order.length && quantiles[order[iq]] < 0){
+                  iq++
                 }
-                for (let j = 0; j < cumulative_histogram.length && iQuantile < quantiles.length; j++) {
+                for (let j = 0; j < cumulative_histogram.length && iq < order.length; j++) {
                   const y = j*stride_low
                   high = cumulative_histogram[j]
                   if(unbinned){
@@ -225,33 +239,54 @@ export class HistoNdProfile extends ColumnarDataSource {
                     const index_high = global_cumulative_histogram![x+y+z]
                     if(sorted_weights == null){
                       // In this case maybe we could use kth value instead
-                      while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
-                        const q_scaled = (quantiles[iQuantile] * entries - low) / (high - low)
-                        quantile_columns[iQuantile].push(quantile(sorted_entries!, q_scaled, index_low, index_high))
-                        iQuantile++
-                      }                   
+                      while(iq < order.length && high > quantiles[order[iq]] * entries){
+                        const q_scaled = (quantiles[order[iq]] * entries - low) / (high - low)
+                        cell_quantiles[order[iq]] = quantile(sorted_entries!, q_scaled, index_low, index_high)
+                        iq++
+                      }
                     } else {
-                      while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
-                        const k = quantiles[iQuantile] * entries - low
+                      while(iq < order.length && high > quantiles[order[iq]] * entries){
+                        const k = quantiles[order[iq]] * entries - low
                         const idx = weighted_kth_value(sorted_entries!, sorted_weights, k, index_low, index_high)
-                        quantile_columns[iQuantile].push(sorted_entries![idx])
-                        iQuantile++
+                        cell_quantiles[order[iq]] = sorted_entries![idx]
+                        iq++
                       }
                     }
                   } else {
                     // Lerp within bin
-                    while(iQuantile < quantiles.length && high > quantiles[iQuantile] * entries){
-                      const m = (quantiles[iQuantile] * entries - low)/(high-low)
-                      quantile_columns[iQuantile].push(edges_left[y]*(1-m)+edges_right[y]*m)
-                      iQuantile++
+                    while(iq < order.length && high > quantiles[order[iq]] * entries){
+                      const m = (quantiles[order[iq]] * entries - low)/(high-low)
+                      cell_quantiles[order[iq]] = edges_left[y]*(1-m)+edges_right[y]*m
+                      iq++
                     }
                   }
                   low = high
                 }
-                // Invalid quantiles - more than 100% or empty bin
-                while(iQuantile < quantiles.length){
-                  quantile_columns[iQuantile].push(NaN)
-                  iQuantile++
+                // PHASE_5 Batch 2B (q = 1): "high > q * entries" is never true at q = 1 - the level is the maximum: of
+                // the cell's values (unbinned), of its values with positive weight (weighted), or the upper edge of its
+                // last non-empty sub-bin (binned). Levels above 1, and an empty cell, stay NaN.
+                while(iq < order.length && quantiles[order[iq]] === 1){
+                  let top = NaN
+                  for (let j = 0; j < cumulative_histogram.length; j++) {
+                    const y = j*stride_low
+                    if(unbinned){
+                      const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
+                      const index_high = global_cumulative_histogram![x+y+z]
+                      for(let i=index_low; i < index_high; ++i){
+                        const v = sorted_entries![i]
+                        if(isFinite(v) && (sorted_weights == null || sorted_weights[i] > 0) && !(v <= top)){
+                          top = v
+                        }
+                      }
+                    } else if(bin_count[x+y+z] > 0){
+                      top = edges_right[y]
+                    }
+                  }
+                  cell_quantiles[order[iq]] = top
+                  iq++
+                }
+                for (let i = 0; i < quantiles.length; i++) {
+                  quantile_columns[i].push(cell_quantiles[i])
                 }
               } else {
                 mean_column.push(NaN)
