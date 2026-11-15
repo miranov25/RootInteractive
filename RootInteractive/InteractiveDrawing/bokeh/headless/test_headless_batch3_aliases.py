@@ -66,6 +66,9 @@ summary by GPT28.RI). GPT27.RI found that verdicts accepted a read in which a co
 (findings G5a-F1, G5a-F2). Now a read in which ANY column threw is never OK, and never KNOWN unless that error is
 itself the exact signature: every verdict asks `_clean` of every read reply it receives. The falsifier adds, for each
 verdict and each of its read replies, the same page with one more column that threw.
+
+BATCH 3 v0.2 FIX (CDSAlias.ts, field_names: the values of a dictionary of inputs are inputs too): A-D11 is fixed. Its
+two tests lose their strict marks; their exact signature (the verdict KNOWN) is now a REGRESSION.
 """
 from pathlib import Path
 
@@ -520,7 +523,6 @@ def verdict_dictionary_inputs(before, s, cache, after) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.change_propagation"))
-@pytest.mark.xfail(**STRICT, reason="A-D11: an alias whose inputs are a dictionary is not recomputed")
 def test_strict_an_alias_with_inputs_as_a_dictionary_follows_its_input(node_session, tmp_path):
     """Review B3-C1: when g changes, every alias that reads it is recomputed - also one that lists its inputs as a
     dictionary, as an ONNX model alias does; aliases that do not read g keep their cached values."""
@@ -529,8 +531,6 @@ def test_strict_an_alias_with_inputs_as_a_dictionary_follows_its_input(node_sess
                                             [read("cdsFull", *names), set_("pa", 3.0), cached("cdsFull"),
                                              read("cdsFull", *names)])
     verdict = verdict_dictionary_inputs(before, s, cache, after)
-    if verdict == KNOWN:
-        raise KnownDefect("A-D11")
     _strict(verdict, "A-D11", (before, s, cache, after))
 
 
@@ -558,15 +558,12 @@ def verdict_dictionary_inputs_async(first, cache, after) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.change_propagation"))
-@pytest.mark.xfail(**STRICT, reason="A-D11: an alias whose inputs are a dictionary is not recomputed")
 def test_strict_an_alias_reading_an_asynchronous_alias_through_a_dictionary_is_recomputed(node_session, tmp_path):
     """Review B3-C1, the asynchronous path of CDSAlias (a transform that returns a Promise, as an ONNX model does):
     when the result arrives, the aliases that read it through a dictionary are recomputed."""
     (first,), (cache, after) = _dict_page(node_session, tmp_path, [read("cdsFull", "A2")],
                                           [cached("cdsFull"), read("cdsFull", "g", "A1", "A2")])
     verdict = verdict_dictionary_inputs_async(first, cache, after)
-    if verdict == KNOWN:
-        raise KnownDefect("A-D11")
     _strict(verdict, "A-D11", (first, cache, after))
 
 

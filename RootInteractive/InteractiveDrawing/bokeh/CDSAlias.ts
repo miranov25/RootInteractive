@@ -301,7 +301,23 @@ export class CDSAlias extends ColumnarDataSource {
     if(column.fields === "auto"){
       return column.transform.get_fields()
     }
-    return Array.isArray(column.fields) ? column.fields : []
+    if(Array.isArray(column.fields)){
+      return column.fields
+    }
+    // PHASE_5 Batch 3 v0.2 (A-D11): inputs given as a dictionary, as an ONNX model alias has them
+    // ({float_input: ["A", "B"]}): its values, each one name or a list of names; a number is a constant, not a column
+    // (as compute_function reads them)
+    const names: string[] = []
+    if(column.fields != null && typeof column.fields === "object"){
+      for(const value of Object.values(column.fields)){
+        for(const name of (Array.isArray(value) ? value : [value])){
+          if(typeof name === "string" && isNaN(Number(name))){
+            names.push(name)
+          }
+        }
+      }
+    }
+    return names
   }
 
   invalidate_columns(keys: string[], emit_change=true){
