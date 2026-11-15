@@ -5,6 +5,10 @@ PHASE_4 Node session fixture and actual Bokeh CDSJoin deserialization.  Only
 known J-D1/J-D2/J-D5 signatures are strict expected failures; any other wrong
 result, harness error or exception is a normal failure.  The Python oracle is
 calculated from the original four DataFrames, not from the CDSJoin output.
+
+FIX COMMIT (PHASE_5 Batch 4, Claude21.RI, 2026-11-15): J-D1, J-D2 and J-D5 are fixed in CDSJoin.ts. The three strict
+marks are off; each test still checks the correct result first, and the old exact signature (KnownJoinDefect) is now
+an ordinary failure that names the defect.
 """
 from __future__ import annotations
 
@@ -270,7 +274,6 @@ def test_tmc_orphan_left_gather_nan_fill(node_session, tmp_path, physics):
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
-@pytest.mark.xfail(**STRICT, reason="J-D1: left field gathered using right-side indices")
 def test_tmc_strict_left_column_must_use_track_row(node_session, tmp_path, physics):
     src = _sources(physics)
     out = _read(node_session, tmp_path, physics, _single("TE"), "TE", ["tRow"])
@@ -284,7 +287,6 @@ def test_tmc_strict_left_column_must_use_track_row(node_session, tmp_path, physi
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
-@pytest.mark.xfail(**STRICT, reason="J-D2: INNER index join incorrectly drops parent row 0")
 def test_tmc_strict_inner_keeps_event_zero(node_session, tmp_path, physics):
     src = _sources(physics)
     out = _read(node_session, tmp_path, physics, _single("TE", how="inner"), "TE", [])
@@ -295,7 +297,6 @@ def test_tmc_strict_inner_keeps_event_zero(node_session, tmp_path, physics):
 
 
 @pytest.mark.feature("JOIN.recursive")
-@pytest.mark.xfail(**STRICT, reason="J-D5: left-nested CDSJoin reads empty cached join key")
 def test_tmc_strict_left_nested_v0_track_collision(node_session, tmp_path, physics):
     joins = {"VT": _relation("V0", "TR", "vPos"),
              "VTE": _relation("VT", "CO", "tEventIdx")}

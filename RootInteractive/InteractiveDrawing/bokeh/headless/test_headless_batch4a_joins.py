@@ -23,6 +23,10 @@ How a test decides. The production model is loaded in the Node harness and its c
 A known defect is a strict expected failure: only KNOWN is accepted. After the fix the marks come off and each
 case becomes an ordinary regression check. Every sorting function has replies that are wrong in one way and must be
 rejected (the last section).
+
+FIX COMMIT (PHASE_5 Batch 4, Claude21.RI, 2026-11-15): the join is fixed in CDSJoin.ts. Every strict mark of this file
+is off, so each case is now an ordinary check: the reply must equal the reference. The result of the code before the
+fix (KNOWN) is an ordinary failure that says a fixed defect is back. No test and no case is removed.
 """
 from __future__ import annotations
 
@@ -50,8 +54,6 @@ UNDEF, NAN, NULL = "<undefined>", "<NaN>", "<null>"    # how the page's special 
 class KnownJoinDefect(AssertionError):
     """Raised only when production shows exactly the registered wrong result of today."""
 
-
-STRICT = dict(strict=True, raises=KnownJoinDefect)
 
 READ = """(a) => {
   const doc = Bokeh.documents[Bokeh.documents.length - 1];
@@ -197,8 +199,9 @@ def _run(node_session, tmp_path, tables, joins, name, keys, want, ordered=True):
 
 
 def _strict(verdict, label):
+    """Since the fix commit: today's-before-the-fix result is a regression, an ordinary failure that names the case."""
     if verdict == "KNOWN":
-        raise KnownJoinDefect(label)
+        raise KnownJoinDefect("REGRESSION, a fixed defect is back: " + label)
 
 
 # ============================================================================================ small tables
@@ -214,7 +217,6 @@ def _index_join(how):
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
-@pytest.mark.xfail(**STRICT, reason="a missing parent shows undefined today; NaN and null are decided (L-35, L-36)")
 def test_strict_a_missing_parent_shows_nan_and_null_in_text(node_session, tmp_path):
     tables = {"CH": _child([2, -1, 0, -1]), "PA": PARENT}
     want = {"x": [2.5, NAN, 0.5, NAN], "n": [9, NAN, 7, NAN], "s": ["c", NULL, "a", NULL]}
@@ -232,7 +234,6 @@ def test_control_every_parent_present_reads_floats_integers_and_text(node_sessio
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("how", ["left", "inner"])
-@pytest.mark.xfail(**STRICT, reason="a row number past the parent's end is accepted today; refusal by name is decided (L-33)")
 def test_strict_a_row_number_past_the_end_is_refused_by_name(node_session, tmp_path, how):
     tables = {"CH": _child([1, 3, 2]), "PA": PARENT}                     # 3 is past the end of a 3-row parent
     out = _read(node_session, tmp_path, tables, _index_join(how), "J", ["x"])
@@ -283,8 +284,6 @@ def _lost_reference(tables, how_child, position_in_the_shortened_table=False):
 
 @pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("how_child", ["inner", "left"])
-@pytest.mark.xfail(**STRICT, reason="a join into an inner join that lost rows: the child's row number must mean the "
-                                    "original parent table (Architect, 2026-11-15); today J-D1 and J-D2 also show")
 def test_strict_a_row_number_means_the_original_parent_table(node_session, tmp_path, how_child):
     """Track rows 0 and 2 have no collision, so the inner track table loses its first row and one in the middle."""
     want = _lost_reference(LOST, how_child)
@@ -361,8 +360,6 @@ def _key_case(node_session, tmp_path, case, how, ordered):
 @pytest.mark.feature("JOIN.cdsjoin.outer")
 @pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("case,how", [(c, h) for c in KEY_CASES for h in KEY_MODES if (c, h) not in RIGHT_TODAY_ANY_ORDER])
-@pytest.mark.xfail(**STRICT, reason="key joins: unsorted keys (L-32), NaN keys (L-34), a key without a partner (J-D4), "
-                                    "undefined for no partner (L-35), child columns (J-D1)")
 def test_strict_key_join_pairs_the_right_rows(node_session, tmp_path, case, how):
     """Child and parent columns together, the rows in any order: which child row is paired with which parent row."""
     _strict(_key_case(node_session, tmp_path, case, how, ordered=False), f"{case}, {how}")
@@ -378,8 +375,6 @@ def test_control_key_join_pairs_that_are_right_today(node_session, tmp_path, cas
 @pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("case,how", [(c, h) for c in KEY_CASES for h in ("inner", "left")
                                       if (c, h) not in RIGHT_TODAY_CHILD_ORDER])
-@pytest.mark.xfail(**STRICT, reason="key joins: the rows in the child's order (L-39, a proposal), on top of the "
-                                    "defects of the test above")
 def test_strict_key_join_rows_keep_the_childs_order(node_session, tmp_path, case, how):
     _strict(_key_case(node_session, tmp_path, case, how, ordered=True), f"{case}, {how}")
 
@@ -455,8 +450,6 @@ def _chain(node_session, tmp_path, tables, chain, how):
 @pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("chain", CHAINS)
 @pytest.mark.parametrize("how", ["left", "inner"])
-@pytest.mark.xfail(**STRICT, reason="chains: child columns through the parent's row numbers (J-D1), row 0 dropped by "
-                                    "an inner join (J-D2), a join of a join empty (J-D5)")
 def test_strict_every_level_of_a_chain_is_right(node_session, tmp_path, physics, chain, how):
     """Every table of the chain has a parent here, so `inner` and `left` must give the same rows."""
     _strict(_chain(node_session, tmp_path, physics, chain, how), f"{chain}, {how}")
@@ -465,8 +458,6 @@ def test_strict_every_level_of_a_chain_is_right(node_session, tmp_path, physics,
 @pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("chain,how", [(c, "left") for c in CHAINS]
                          + [(c, "inner") for c in CHAINS if c not in RIGHT_NESTED_WITH_DROPPED_ROWS])
-@pytest.mark.xfail(**STRICT, reason="chains with missing parents: the same three defects, and undefined for a "
-                                    "missing parent (L-35)")
 def test_strict_every_level_of_a_chain_with_missing_parents(node_session, tmp_path, physics, chain, how):
     """The ToyMC with rows that have no parent (-1), also deeper in the chain. `left` keeps them, filled with NaN;
     `inner` drops them. An inner join INTO an inner join that dropped rows is left out HERE, because the reused

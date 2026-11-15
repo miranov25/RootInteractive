@@ -12,6 +12,9 @@ of part 1; a known defect is a strict expected failure.
 
 The V0 mass uses the generator's own formula and its own mass table (toy_mc_events.py: MASS, V0_DAUGHTERS); nothing
 is invented here. A test without the browser checks that this formula reproduces the mass the generator stored.
+FIX COMMIT (PHASE_5 Batch 4, Claude21.RI, 2026-11-15): the join is fixed in CDSJoin.ts. Every strict mark of this file
+is off, so each case is now an ordinary check: the reply must equal the reference. The result of the code before the
+fix (KNOWN) is an ordinary failure that says a fixed defect is back. No test and no case is removed.
 """
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ import numpy as np
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_batch4a_joins import (
-    NAN, STRICT, UNDEF, _clean_reply, _clean_session, _link, _reference_chain, _strict, _today, _verdict)
+    NAN, UNDEF, _clean_reply, _clean_session, _link, _reference_chain, _strict, _today, _verdict)
 
 GEN_DIR = Path(__file__).resolve().parents[3] / "Tools" / "generators"
 sys.path.insert(0, str(GEN_DIR))
@@ -154,8 +157,6 @@ def _derived(node_session, tmp_path, tables, joins, on, which):
 
 @pytest.mark.feature("JOIN.recursive")
 @pytest.mark.parametrize("how", ["left", "inner"])
-@pytest.mark.xfail(**STRICT, reason="a derived column on a V0 table with both daughters: the join of a join is "
-                                    "empty (J-D5)")
 def test_strict_v0_mass_from_both_joined_daughters(node_session, tmp_path, physics, how):
     """The physics check of the whole chain: the browser computes the V0 mass from the joined daughters' momenta."""
     src = _sources(physics)
@@ -163,8 +164,6 @@ def test_strict_v0_mass_from_both_joined_daughters(node_session, tmp_path, physi
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
-@pytest.mark.xfail(**STRICT, reason="a derived column from a child column and a parent column: the child column comes "
-                                    "from the wrong rows (J-D1)")
 def test_strict_derived_column_from_a_child_and_a_parent_column(node_session, tmp_path, physics):
     """The share of the V0's transverse momentum carried by its positive daughter: V0 column over track column."""
     joins = {"VP": _link("V0", "TR", "vPos", "left", prefix_right="pos_")}
@@ -207,7 +206,6 @@ def test_control_histogram_of_a_parent_column_is_right_today(node_session, tmp_p
 
 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
-@pytest.mark.xfail(**STRICT, reason="a histogram of a child column of a join counts the wrong rows (J-D1)")
 def test_strict_histogram_of_a_child_column(node_session, tmp_path, physics):
     _strict(_histogram(node_session, tmp_path, _sources(physics), TE, "TE", "tPt"), "histogram of the track pt")
 
@@ -244,8 +242,6 @@ def test_control_a_changed_pointer_is_followed_in_parent_columns(node_session, t
 @pytest.mark.feature("JOIN.change_propagation")
 @pytest.mark.parametrize("table,column,read", [("TR", "tPt", "tPt"), ("V0", "vMass", "vMass"),
                                                ("TR", "tEventIdx", "tRow")])
-@pytest.mark.xfail(**STRICT, reason="a change after a read, seen in child columns of a chain: followed, but the child "
-                                    "columns come from the wrong rows (J-D1)")
 def test_strict_a_change_after_a_read_is_followed_in_child_columns(node_session, tmp_path, physics, table, column, read):
     """A value of the middle table, a value of the child table, and the pointer itself, each changed after a read."""
     src = _sources(physics)

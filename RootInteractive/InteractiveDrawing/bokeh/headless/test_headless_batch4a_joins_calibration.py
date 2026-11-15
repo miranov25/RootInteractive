@@ -16,6 +16,10 @@ join (defect J-D5: for key joins today's code then pairs the rows by position).
 
 The words, the way a test decides (OK, KNOWN, anything else fails) and the helpers are those of part 1
 (test_headless_batch4a_joins.py). The reference is plain Python on the source tables: a lookup of each row's keys.
+
+FIX COMMIT (PHASE_5 Batch 4, Claude21.RI, 2026-11-15): the join is fixed in CDSJoin.ts. Every strict mark of this file
+is off, so each case is now an ordinary check: the reply must equal the reference. The result of the code before the
+fix (KNOWN) is an ordinary failure that says a fixed defect is back. No test and no case is removed.
 """
 from __future__ import annotations
 
@@ -23,7 +27,7 @@ import math
 
 import pytest
 
-from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_batch4a_joins import NAN, STRICT, _run, _strict
+from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_batch4a_joins import NAN, _run, _strict
 
 pytestmark = [pytest.mark.node_joins]
 nan = float("nan")
@@ -96,8 +100,6 @@ CHAINS = [("by run",), ("by run and sector",), ("by time",), ("by run", "by run 
 @pytest.mark.feature("JOIN.cdsjoin.basic")
 @pytest.mark.parametrize("links", CHAINS, ids=[" then ".join(c) for c in CHAINS])
 @pytest.mark.parametrize("how", ["left", "inner"])
-@pytest.mark.xfail(**STRICT, reason="the calibration chain: unsorted keys (L-32), a key without a partner (J-D4, L-35), "
-                                    "a NaN key (L-34), child columns (J-D1), a key join of a join (J-D5)")
 def test_strict_every_measurement_gets_its_calibration(node_session, tmp_path, links, how):
     """One calibration table alone, two in a chain, and all three in a chain in two different orders."""
     _strict(_case(node_session, tmp_path, TABLES, links, how), f"{' then '.join(links)}, {how}")
