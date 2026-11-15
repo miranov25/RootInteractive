@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -87,12 +88,20 @@ def _read(node_session, tmp_path, tables, joins, name, keys):
         doc.add_root(models[n])
     path = tmp_path / "batch4a_join_document.json"
     path.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    _clean_session(node_session)
     for op, kw in (("new_doc", dict(path=str(path))), ("eval", dict(code=READ, arg={"name": name, "keys": list(keys)}))):
         reply = node_session.request(op, **kw)
         _clean_reply(reply, op)
     out = decode(reply["result"])
     assert "error" not in out, out
     return out
+
+
+def _clean_session(session):
+    """Errors the Node session collected while it started. They are stored on the session, not in a reply, so a
+    clean reply alone does not show them (review finding of GPT25.RI)."""
+    for kind in ("startup_page_errors", "startup_console_errors"):
+        assert not getattr(session, kind, []), f"the Node session started with {kind}: {getattr(session, kind)}"
 
 
 def _clean_reply(reply, op):
@@ -136,12 +145,16 @@ def _verdict(out, keys, want, today, ordered=True):
 
 
 def _is_refusal(out, keys, join, column, value):
-    """L-33: every read (the length and each column) throws a plain Error naming the join, the column and the value."""
+    """L-33: every read (the length and each column) throws a plain Error that names the join and the column in
+    double quotes and the offending value as `row number <value>`. The value is matched in that place only: the same
+    digits elsewhere in the message, for example in the size of the parent table, do not count (review finding of
+    GPT25.RI, GPT27.RI and GPT28.RI)."""
     reads = {"length", *keys}
     if set(out.get("throws", {})) != reads or out.get("columns") or "length" in out:
         return False
+    number = re.compile(rf"\brow number {re.escape(str(value))}(?![\d.])")
     return all(out["kinds"].get(r) == "Error" and f'"{join}"' in out["throws"][r] and f'"{column}"' in out["throws"][r]
-               and str(value) in out["throws"][r] for r in reads)
+               and number.search(out["throws"][r]) is not None for r in reads)
 
 
 def _today(tables, joins, name, keys):
@@ -229,6 +242,68 @@ def test_strict_a_row_number_past_the_end_is_refused_by_name(node_session, tmp_p
     assert out.get("throws") == {} and out.get("columns") == today and out.get("length") == len(today["x"]), \
         f"neither a refusal by name nor today's registered result: {out}"
     raise KnownJoinDefect("the row number past the end is accepted silently")
+
+
+# -------------------------------------------------------------------------------------------- a parent that lost rows
+# Decided by the Architect on 2026-11-15: an inner join may drop rows of the parent table (here tracks without a
+# collision). A row number held by the child (here a V0) still means the ORIGINAL parent table, not the position in
+# the shortened one, and the child row is kept only if its parent row is still there.
+GRAND = {"cRow": [0, 1, 2], "cVz": [0.5, 1.5, 2.5]}
+MIDDLE = {"tRow": [0, 1, 2, 3, 4], "tEventIdx": [-1, 0, -1, 1, 2], "tPt": [10.0, 11.0, 12.0, 13.0, 14.0]}   # rows 0, 2 lost
+SMALL = {"vRow": [0, 1, 2, 3, 4, 5], "vPos": [1, 0, 3, 2, 4, 3], "vMass": [0.50, 0.51, 0.52, 0.53, 0.54, 0.55]}
+LOST = {"CO": GRAND, "TR": MIDDLE, "V0": SMALL}
+LOST_KEYS = ["vRow", "vMass", "tRow", "tPt", "cVz"]
+
+
+def _lost_joins(how_child):
+    return {"TE": dict(left="TR", right="CO", on_left=["tEventIdx"], on_right=[], how="inner"),
+            "VTE": dict(left="V0", right="TE", on_left=["vPos"], on_right=[], how=how_child)}
+
+
+def _lost_reference(tables, how_child, position_in_the_shortened_table=False):
+    """Plain Python on the ORIGINAL row numbers; it does not use the reused pandas reference, which renumbers the
+    rows after dropping some. With `position_in_the_shortened_table` it gives the WRONG page a join would show if
+    it took the child's row number as a position in the shortened parent - the mistake the test must catch."""
+    tr, co, v0 = tables["TR"], tables["CO"], tables["V0"]
+    kept = [t for t, e in enumerate(tr["tEventIdx"]) if e != -1]                # the track rows that survive
+    out = {k: [] for k in LOST_KEYS}
+    for row, pointer in enumerate(v0["vPos"]):
+        if position_in_the_shortened_table:
+            track = kept[pointer] if 0 <= pointer < len(kept) else None
+        else:
+            track = pointer if pointer in kept else None
+        if track is None and how_child == "inner":
+            continue
+        out["vRow"].append(v0["vRow"][row]); out["vMass"].append(v0["vMass"][row])
+        out["tRow"].append(NAN if track is None else tr["tRow"][track])
+        out["tPt"].append(NAN if track is None else tr["tPt"][track])
+        out["cVz"].append(NAN if track is None else co["cVz"][tr["tEventIdx"][track]])
+    return out
+
+
+@pytest.mark.feature("JOIN.recursive")
+@pytest.mark.parametrize("how_child", ["inner", "left"])
+@pytest.mark.xfail(**STRICT, reason="a join into an inner join that lost rows: the child's row number must mean the "
+                                    "original parent table (Architect, 2026-11-15); today J-D1 and J-D2 also show")
+def test_strict_a_row_number_means_the_original_parent_table(node_session, tmp_path, how_child):
+    """Track rows 0 and 2 have no collision, so the inner track table loses its first row and one in the middle."""
+    want = _lost_reference(LOST, how_child)
+    _strict(_run(node_session, tmp_path, LOST, _lost_joins(how_child), "VTE", LOST_KEYS, want), f"lost rows, {how_child}")
+
+
+def test_the_lost_rows_reference_uses_original_row_numbers():
+    inner = _lost_reference(LOST, "inner")
+    assert inner["vRow"] == [0, 2, 4, 5] and inner["tRow"] == [1, 3, 4, 3] and inner["cVz"] == [0.5, 1.5, 2.5, 1.5]
+    left = _lost_reference(LOST, "left")
+    assert left["vRow"] == SMALL["vRow"] and left["tRow"] == [1, NAN, 3, NAN, 4, 3]
+    for how_child in ("inner", "left"):                           # the wrong page, by position, must be rejected
+        want, shifted = _lost_reference(LOST, how_child), _lost_reference(LOST, how_child, True)
+        today = _today(LOST, _lost_joins(how_child), "VTE", LOST_KEYS)
+        assert not _same(shifted, want) and not _same(shifted, today) and not _same(today, want)
+        good = {"length": len(want["vRow"]), "columns": want, "throws": {}}
+        assert _verdict(good, LOST_KEYS, want, today) == "OK"
+        with pytest.raises(AssertionError):
+            _verdict({"length": len(shifted["vRow"]), "columns": shifted, "throws": {}}, LOST_KEYS, want, today)
 
 
 # -------------------------------------------------------------------------------------------- key joins
@@ -394,8 +469,9 @@ def test_strict_every_level_of_a_chain_is_right(node_session, tmp_path, physics,
                                     "missing parent (L-35)")
 def test_strict_every_level_of_a_chain_with_missing_parents(node_session, tmp_path, physics, chain, how):
     """The ToyMC with rows that have no parent (-1), also deeper in the chain. `left` keeps them, filled with NaN;
-    `inner` drops them. An inner join INTO an inner join that dropped rows is left out: the row numbers then point
-    into a table that was renumbered, and what that means is not decided."""
+    `inner` drops them. An inner join INTO an inner join that dropped rows is left out HERE, because the reused
+    pandas reference renumbers the rows after dropping some and is wrong for that case. It is tested with a
+    reference of its own in `test_strict_a_row_number_means_the_original_parent_table`."""
     _strict(_chain(node_session, tmp_path, inject_orphan_test_rows(physics), chain, how), f"{chain}, {how}, missing parents")
 
 
@@ -468,4 +544,24 @@ def test_the_refusal_check_accepts_only_a_refusal_by_name():
              {**good, "columns": {"x": [0.5]}},                                           # a column still answers
              {**good, "length": 3},
              {"columns": {"x": [1.5, UNDEF, 2.5]}, "throws": {}, "kinds": {}, "length": 3}]   # today's silent result
+    for other in ("13", "30", "500", "3.5", "-3"):                 # an error about ANOTHER row number, same table size
+        text = msg.replace("row number 3 ", f"row number {other} ")
+        assert text != msg and "(3 rows)" in text
+        wrong.append({**good, "throws": {"length": text, "x": text}})
+    wrong.append({**good, "throws": {"length": msg.replace("row number 3 ", "a row number "), "x": msg}})   # no value
     assert not any(_is_refusal(reply, ["x"], "J", "ref", 3) for reply in wrong)
+    assert _is_refusal({**good, "throws": {"length": msg.replace("(3 rows)", "(13 rows)"), "x": msg}}, ["x"], "J", "ref", 3)
+
+
+class _Session:
+    startup_page_errors, startup_console_errors = [], []
+
+
+def test_errors_at_the_start_of_the_session_fail_a_test():
+    """A reply can be clean although the page reported an error while it started; that must not count as healthy."""
+    _clean_session(_Session())
+    for kind in ("startup_page_errors", "startup_console_errors"):
+        broken = _Session()
+        setattr(broken, kind, ["ReferenceError: something failed while the page was loading"])
+        with pytest.raises(AssertionError, match=kind):
+            _clean_session(broken)

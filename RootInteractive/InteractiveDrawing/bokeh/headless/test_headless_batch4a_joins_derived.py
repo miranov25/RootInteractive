@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_batch4a_joins import (
-    NAN, STRICT, UNDEF, _clean_reply, _link, _reference_chain, _strict, _today, _verdict)
+    NAN, STRICT, UNDEF, _clean_reply, _clean_session, _link, _reference_chain, _strict, _today, _verdict)
 
 GEN_DIR = Path(__file__).resolve().parents[3] / "Tools" / "generators"
 sys.path.insert(0, str(GEN_DIR))
@@ -75,6 +75,7 @@ def _read(node_session, tmp_path, tables, joins, name, keys, more=None, change=N
         doc.add_root(model)
     path = tmp_path / "batch4a_derived_document.json"
     path.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
+    _clean_session(node_session)
     arg = {"name": name, "keys": list(keys), "change": change}
     for op, kw in (("new_doc", dict(path=str(path))), ("eval", dict(code=READ, arg=arg))):
         reply = node_session.request(op, **kw)
