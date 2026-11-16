@@ -7,7 +7,20 @@ The "Consistency" tab compares the stored mass of a V0 and of a cascade with the
 the joined tracks; the two must agree. RootInteractive's code is not changed: the page is built by bokehDrawSA from an
 ordinary page description.
 
-Stage A of the plan of 2026-11-16 (display only): the page has no selection sliders yet.
+Selections (stage B of the plan of 2026-11-16). Below the figures the page has one tab per table: Collisions, Tracks,
+Pos, Neg, V0s, Cascades. Each tab holds the range sliders of that table and one switch for the whole table.
+  * The mask of a table is the logical AND of the cuts in its tab. The switch of the tab turns the whole mask ON or
+    OFF; each slider has its own switch too.
+  * A row is shown only if its parents are selected. A cut on collisions acts on the tracks, V0s and cascades of
+    those collisions; a cut on tracks acts on the V0s and cascades made of those tracks. A V0 needs both its tracks
+    and both their collisions; a cascade needs its V0 and its bachelor track with its collision.
+  * Pos and Neg are separate: a cut in the Pos tab acts only on the positive track of a V0.
+  * A row without a parent is hidden while the mask of that parent is ON, and shown when it is OFF.
+  * A slider at the end of its scale is open there: it keeps the values beyond the scale.
+  * Nothing acts upwards: a cut on tracks does not hide collisions.
+The controls use only models RootInteractive already has (RangeFilter, LazyIntersectionFilter); they are created here,
+after the page builder has run, because the page builder cannot yet put a slider on a table other than the main one.
+The page without controls (stage A) is still available: toy_mc_joins_dashboard(raw, selections=False).
 
 Words used.
   role      The same table seen through one pointer. The tracks appear as Tracks (all tracks), Pos (the positive
@@ -17,8 +30,8 @@ Words used.
             reads a column by its plain name, and the ToyMC tables share names (pt, mass, collisionIdx).
   join      The browser model CDSJoin. A join by row number: the child row holds the row number of its parent.
 
-Known limit of this stage: a table that is used in several roles is sent once per role (the tracks four times, the
-collisions three times), each with only the columns its role needs.
+Known limits: a table that is used in several roles is sent once per role (the tracks four times, the collisions
+four times), each with only the columns its role needs. Each cut is computed once for every join it acts on.
 
 Use:
     python toy_mc_joins_dashboard.py --n-collisions 2000 --output /tmp/toy_mc_joins_dashboard.html
@@ -42,10 +55,11 @@ ROLES = {
     "Collisions": ("collisions", "coll_", ("vz", "nTracks")),
     "PosCollisions": ("collisions", "posColl_", ("vz",)),
     "NegCollisions": ("collisions", "negColl_", ("vz",)),
+    "BachCollisions": ("collisions", "bachColl_", ("vz",)),
     "Tracks": ("tracks", "trk_", ("pt", "eta", "phi", "collisionIdx")),
     "Pos": ("tracks", "pos_", ("pt", "eta", "phi", "collisionIdx")),
     "Neg": ("tracks", "neg_", ("pt", "eta", "phi", "collisionIdx")),
-    "Bachelor": ("tracks", "bach_", ("pt", "eta", "phi")),
+    "Bachelor": ("tracks", "bach_", ("pt", "eta", "phi", "collisionIdx")),
     "V0s": ("v0s", "v0_", ("mass", "pdgMass", "pdg", "pt", "px", "py", "pz", "posTrackIdx", "negTrackIdx")),
     "Cascades": ("cascades", "casc_", ("mass", "pdgMass", "pdg", "pt", "v0Idx", "bachelorTrackIdx")),
 }
@@ -59,7 +73,8 @@ JOINS = {
     "V0P": ("V0s", "PosJ", "v0_posTrackIdx"),                      # a V0, its positive track, that track's collision
     "V0J": ("V0P", "NegJ", "v0_negTrackIdx"),                      # ... and its negative track with its collision
     "CascV": (MAIN, "V0J", "casc_v0Idx"),                          # a cascade and everything of its V0
-    "CascJ": ("CascV", "Bachelor", "casc_bachelorTrackIdx"),       # ... and its bachelor track
+    "BachJ": ("Bachelor", "BachCollisions", "bach_collisionIdx"),  # a bachelor track and its collision
+    "CascJ": ("CascV", "BachJ", "casc_bachelorTrackIdx"),          # ... and its bachelor track with its collision
 }
 
 _P4 = lambda p, m: {                                   # the four-momentum of a track from pt, eta, phi and a mass
@@ -84,6 +99,7 @@ ALIASES = [
      "expr": f"sqrt((sqrt(v0_mass**2 + v0_px**2 + v0_py**2 + v0_pz**2) + {_BACH['E']})**2 - (v0_px + {_BACH['px']})**2"
              f" - (v0_py + {_BACH['py']})**2 - (v0_pz + {_BACH['pz']})**2)"},
     {"name": "casc_massDiff", "expr": "casc_massFromV0AndBachelor - casc_mass", "context": "CascJ"},
+    {"name": "casc_collisionVzDiff", "expr": "posColl_vz - bachColl_vz", "context": "CascJ"},
 ]
 
 # name -> (column, source, number of bins, low, high, axis title, what is counted)
@@ -108,11 +124,123 @@ HISTOGRAMS = {
     "hCascMassDiff": ("casc_massDiff", "CascJ", 50, -1e-9, 1e-9,
                       "cascade: mass from V0 and Bachelor minus stored mass (GeV/c2)", "cascades"),
     "hV0CollVzDiff": ("v0_collisionVzDiff", "V0J", 50, -1e-9, 1e-9, "Pos.Collision.vz minus Neg.Collision.vz (cm)", "V0s"),
+    "hCascCollVzDiff": ("casc_collisionVzDiff", "CascJ", 50, -1e-9, 1e-9,
+                        "V0.Pos.Collision.vz minus Bachelor.Collision.vz (cm)", "cascades"),
 }
 # the profile of Pos.pt/pt against 1/pt, one curve per particle type: a 3-dimensional histogram and its projection
 PROFILE = {"name": "hV0Profile", "variables": ["v0_invPt", "v0_posPtOverPt", "v0_pdg"], "nbins": [24, 60, 3],
            "range": [[0.0, 2.4], [0.0, 3.0], [-4000.0, 4000.0]], "source": "V0J", "axis": [1], "quantiles": [0.5],
            "unbinned_projections": True}
+
+
+# The selection tabs. tab -> (prefix of the table, [(column without prefix, title, start, end, step), ...])
+SELECTIONS = {
+    "Collisions": ("coll_", [("vz", "collision vz (cm)", -30.0, 30.0, 0.5)]),
+    "Tracks": ("trk_", [("pt", "track pt (GeV/c)", 0.0, 10.0, 0.1), ("eta", "track eta", -1.5, 1.5, 0.05)]),
+    "Pos": ("pos_", [("pt", "Pos.pt (GeV/c)", 0.0, 10.0, 0.1), ("eta", "Pos.eta", -1.5, 1.5, 0.05)]),
+    "Neg": ("neg_", [("pt", "Neg.pt (GeV/c)", 0.0, 10.0, 0.1), ("eta", "Neg.eta", -1.5, 1.5, 0.05)]),
+    "V0s": ("v0_", [("mass", "V0 mass (GeV/c2)", 0.0, 3.0, 0.01),
+                    ("deltaMass", "V0 mass minus nominal mass (GeV/c2)", -0.1, 0.1, 0.002),
+                    ("tgl", "V0 pz/pt", -2.0, 2.0, 0.05), ("pt", "V0 pt (GeV/c)", 0.0, 10.0, 0.1)]),
+    "Cascades": ("casc_", [("mass", "cascade mass (GeV/c2)", 1.0, 4.0, 0.01),
+                           ("deltaMass", "cascade mass minus nominal mass (GeV/c2)", -0.1, 0.1, 0.002),
+                           ("pt", "cascade pt (GeV/c)", 0.0, 10.0, 0.1)]),
+}
+# Where a tab acts. tab -> {table or join whose rows are cut: the prefixes under which that table or join holds the
+# columns of the tab's table}. Two prefixes: both must pass (a V0 needs the collisions of both its tracks).
+SELECTION_TARGETS = {
+    "Collisions": {"Collisions": ("coll_",), "TrkJ": ("coll_",), "V0J": ("posColl_", "negColl_"),
+                   "CascJ": ("posColl_", "negColl_", "bachColl_")},
+    "Tracks": {"TrkJ": ("trk_",), "V0J": ("pos_", "neg_"), "CascJ": ("pos_", "neg_", "bach_")},
+    "Pos": {"V0J": ("pos_",), "CascJ": ("pos_",)},
+    "Neg": {"V0J": ("neg_",), "CascJ": ("neg_",)},
+    "V0s": {"V0J": ("v0_",), "CascJ": ("v0_",)},
+    "Cascades": {"CascJ": ("casc_",)},
+}
+TARGETS = {"Collisions": "collisions", "TrkJ": "tracks", "V0J": "V0s", "CascJ": "cascades"}    # what its rows are
+
+_UPDATE = """
+// One callback for every slider and every switch: put the state of the controls into the filters, then count.
+for (let i = 0; i < sliders.length; i++) {
+  const w = sliders[i], half = 0.5 * w.step
+  const lo = w.value[0] <= w.start + half ? -Infinity : w.value[0]      // open at the ends of the scale
+  const hi = w.value[1] >= w.end - half ? Infinity : w.value[1]
+  const on = table_switches[table_of_slider[i]].active && slider_switches[i].active
+  slider_switches[i].label = slider_switches[i].active ? "ON" : "OFF"
+  w.disabled = !on
+  for (const f of filters[i]) {
+    if (f.range[0] !== lo || f.range[1] !== hi) f.range = [lo, hi]
+    if (f.active !== on) f.active = on
+  }
+}
+for (let t = 0; t < table_switches.length; t++)
+  table_switches[t].label = "Selection on " + table_names[t] + ": " + (table_switches[t].active ? "ON" : "OFF")
+const parts = []
+for (let k = 0; k < masks.length; k++) {
+  const v = masks[k].v_compute(), total = mask_sources[k].get_length()
+  let n = 0
+  for (let i = 0; i < total; i++) if (v[i]) n++
+  parts.push(mask_rows[k] + " " + n + " of " + total)
+}
+counter.text = "<b>Selected rows:</b> " + parts.join(" &nbsp;|&nbsp; ")
+"""
+
+
+def add_selections(page):
+    """The selection tabs of SELECTIONS under the page. `page` is the layout of toy_mc_joins_dashboard; its figures
+    get one combined filter per table or join of TARGETS. Returns the new layout."""
+    from bokeh.layouts import column, row
+    from bokeh.models import CustomJS, Div, RangeSlider, TabPanel, Tabs, Toggle
+    from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
+    from RootInteractive.InteractiveDrawing.bokeh.DownsamplerCDS import DownsamplerCDS
+    from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
+    from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
+    from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
+    from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
+
+    # the table every figure of a target reads: the page builder names it "<target>_full"
+    tables = {m.name[:-len("_full")]: m for m in page.select({"type": CDSAlias}) if m.name.endswith("_full")}
+    per_target = {target: [] for target in TARGETS}
+    sliders, slider_switches, table_switches, table_of_slider, filters, panels = [], [], [], [], [], []
+    for number, (tab, (prefix, cuts)) in enumerate(SELECTIONS.items()):
+        table_switch = Toggle(label=f"Selection on {tab}: ON", active=True, width=260, name=f"selection_switch_{tab}")
+        table_switches.append(table_switch)
+        rows = [table_switch]
+        for column_name, title, start, end, step in cuts:
+            slider = RangeSlider(title=f"{tab}: {title}", start=start, end=end, step=step, value=(start, end),
+                                 width=520, name=f"selection_{prefix}{column_name}")
+            switch = Toggle(label="ON", active=True, width=60, name=f"selection_switch_{prefix}{column_name}")
+            mine = []
+            for target, prefixes in SELECTION_TARGETS[tab].items():
+                for target_prefix in prefixes:
+                    mine.append(RangeFilter(source=tables[target], field=target_prefix + column_name,
+                                            range=[float("-inf"), float("inf")],
+                                            name=f"{prefix}{column_name} on {target}.{target_prefix}{column_name}"))
+                    per_target[target].append(mine[-1])
+            sliders.append(slider)
+            slider_switches.append(switch)
+            table_of_slider.append(number)
+            filters.append(mine)
+            rows.append(row(slider, switch))
+        panels.append(TabPanel(child=column(*rows), title=tab))
+    masks = {target: LazyIntersectionFilter(filters=per_target[target], name=f"selection_mask_{target}")
+             for target in TARGETS}
+    for kind in (HistogramCDS, HistoNdCDS, DownsamplerCDS):                # histograms, the profile, scatter figures
+        for model in page.select({"type": kind}):
+            for target in TARGETS:
+                if model.source is tables[target]:
+                    model.filter = masks[target]
+    counter = Div(text="<b>Selected rows:</b> shown after the first change of a control", name="selection_counter")
+    update = CustomJS(args={
+        "sliders": sliders, "slider_switches": slider_switches, "table_switches": table_switches,
+        "table_of_slider": table_of_slider, "table_names": list(SELECTIONS), "filters": filters,
+        "masks": [masks[t] for t in TARGETS], "mask_sources": [tables[t] for t in TARGETS],
+        "mask_rows": list(TARGETS.values()), "counter": counter}, code=_UPDATE)
+    for slider in sliders:
+        slider.js_on_change("value", update)
+    for switch in slider_switches + table_switches:
+        switch.js_on_change("active", update)
+    return column(page, counter, Tabs(tabs=panels, name="selection_tabs"), sizing_mode="stretch_width")
 
 
 def page_tables(raw: dict) -> dict:
@@ -159,8 +287,8 @@ def page_description(raw: dict, how: str = "left") -> dict:
                                              "errY": "std/sqrt(entries)", "xAxisTitle": "1/pt of the V0 (c/GeV)",
                                              "yAxisTitle": "mean of Pos.pt/pt",
                                              "plotTitle": "V0s: mean of Pos.pt/pt against 1/pt, one colour per particle type"}])
-    add("sMain", [["casc_pt"], ["casc_mass"], {"xAxisTitle": "cascade pt (GeV/c)", "yAxisTitle": "cascade mass (GeV/c2)",
-                                               "plotTitle": "Cascades: mass against pt (the main table, no join)"}])
+    scatter("sCascPt", "CascJ.casc_pt", "CascJ.casc_mass", "cascade pt (GeV/c)", "cascade mass (GeV/c2)",
+            "Cascades: mass against pt")
     row = lambda *keys: [index[k] for k in keys]
     figure_layout = {
         "Collisions": [row("hCollVz", "hCollNTracks"), {"plot_height": 350}],
@@ -168,26 +296,28 @@ def page_description(raw: dict, how: str = "left") -> dict:
         "V0s": [row("hV0Mass", "hV0DeltaMass", "hV0PosCollVz"), row("hV0PosPt", "hV0NegPt", "sV0PosNeg"), row("hV0Tgl", "pV0"),
                 {"plot_height": 280}],
         "Cascades": [row("hCascMass", "hCascDeltaMass", "hCascPosCollVz"), row("hCascV0Mass", "hCascBachPt", "sCascV0"),
-                     row("sMain"), {"plot_height": 280}],
-        "Consistency": [row("hV0MassDiff", "sV0Mass", "hV0CollVzDiff"), row("hCascMassDiff", "sCascMass"),
+                     row("sCascPt"), {"plot_height": 280}],
+        "Consistency": [row("hV0MassDiff", "sV0Mass", "hV0CollVzDiff"), row("hCascMassDiff", "sCascMass", "hCascCollVzDiff"),
                         {"plot_height": 320}],
     }
     return {"main": pd.DataFrame(tables[MAIN]), "tables": tables, "sources": sources, "aliases": [dict(a) for a in ALIASES],
             "figures": figures, "figure_index": index, "figure_layout": figure_layout}
 
 
-def toy_mc_joins_dashboard(raw: dict, how: str = "left", n_point_render: int = 5000):
-    """The page as a Bokeh layout, built by bokehDrawSA.fromArray; nothing is shown and nothing is written."""
+def toy_mc_joins_dashboard(raw: dict, how: str = "left", n_point_render: int = 5000, selections: bool = True):
+    """The page as a Bokeh layout, built by bokehDrawSA.fromArray; nothing is shown and nothing is written.
+    `selections=False`: the figures alone, without the selection tabs."""
     import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
     d = page_description(raw, how)
     shown = sa.show
     sa.show = lambda *a, **k: None
     try:
-        return sa.bokehDrawSA.fromArray(d["main"], None, d["figures"], [], sourceArray=d["sources"],
+        page = sa.bokehDrawSA.fromArray(d["main"], None, d["figures"], [], sourceArray=d["sources"],
                                         aliasArray=d["aliases"], layout=d["figure_layout"], widgetLayout=[],
                                         nPointRender=n_point_render).pAll
     finally:
         sa.show = shown
+    return add_selections(page) if selections else page
 
 
 def main():
@@ -195,12 +325,13 @@ def main():
     parser.add_argument("--n-collisions", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--how", choices=("left", "inner"), default="left")
+    parser.add_argument("--no-selections", action="store_true", help="the figures alone, without the selection tabs")
     parser.add_argument("--output", type=Path, required=True, help="the page file to write (.html)")
     args = parser.parse_args()
     from bokeh.io import save
     from bokeh.resources import INLINE
     raw = generate_toy_mc_events(n_collisions=args.n_collisions, seed=args.seed)
-    save(toy_mc_joins_dashboard(raw, args.how), filename=str(args.output), resources=INLINE,
+    save(toy_mc_joins_dashboard(raw, args.how, selections=not args.no_selections), filename=str(args.output), resources=INLINE,
          title="ToyMC: collisions, tracks, V0s and cascades through joins")
     print("rows:", {name: len(table) for name, table in raw.items()})
     print("Wrote", args.output, "(%.1f MB)" % (args.output.stat().st_size / 1e6))

@@ -1,5 +1,6 @@
 """PHASE_5 Batch 4.c, stage A of the selections plan: the ToyMC dashboard through joins, display only. Tests only;
-RootInteractive's code is not changed.
+RootInteractive's code is not changed. The page is built here without its selection tabs (selections=False); the
+selections are tested in test_headless_batch4c_toymc_joins_dashboard_selections.py.
 
 In plain words. The page (Tools/generators/toy_mc_joins_dashboard.py) is built by bokehDrawSA, as a user builds it,
 from the four ToyMC tables. Its figures read parents through joins by row number:
@@ -16,8 +17,7 @@ with references that use no join and no RootInteractive code:
     stored mass (the consistency check of the page);
   * the five AliasDataFrame queries the Architect ran on alma2 on 2026-11-16 (27,500 collisions, seed 42): the
     number of entries, means, standard deviations and correlations that AliasDataFrame printed.
-The page has no selection sliders in this stage; a cut of a query is applied here, in the test, to the columns read
-from the page.
+A cut of a query is applied here, in the test, to the columns read from the page.
 """
 from __future__ import annotations
 
@@ -40,7 +40,8 @@ KEYS = {
             "neg_collisionIdx", "posColl_vz", "negColl_vz", "v0_deltaMass", "v0_tgl", "v0_invPt", "v0_posPtOverPt",
             "v0_collisionVzDiff", "v0_massFromTracks", "v0_massDiff"],
     "CascJ": ["casc_mass", "casc_v0Idx", "casc_bachelorTrackIdx", "v0_mass", "pos_pt", "neg_pt", "posColl_vz",
-              "negColl_vz", "bach_pt", "casc_deltaMass", "casc_massFromV0AndBachelor", "casc_massDiff"],
+              "negColl_vz", "bach_pt", "bachColl_vz", "casc_deltaMass", "casc_massFromV0AndBachelor", "casc_massDiff",
+              "casc_collisionVzDiff"],
 }
 # computed in the browser as a small difference of large numbers: compared within MASS_TOLERANCE, not cell by cell
 MASS_KEYS = {"v0_massFromTracks", "v0_massDiff", "casc_massFromV0AndBachelor", "casc_massDiff"}
@@ -120,7 +121,8 @@ def _reference(raw):
     v0["v0_massDiff"] = v0["v0_massFromTracks"] - f(v, "mass")
     cv, cb = n(ca, "v0Idx"), n(ca, "bachelorTrackIdx")
     casc = {"casc_mass": f(ca, "mass"), "casc_v0Idx": cv, "casc_bachelorTrackIdx": cb,
-            "bach_pt": _take(t["pt"], cb), "casc_deltaMass": f(ca, "mass") - f(ca, "pdgMass")}
+            "bach_pt": _take(t["pt"], cb), "bachColl_vz": _take(c["vz"], _take(t["collisionIdx"], cb)),
+            "casc_deltaMass": f(ca, "mass") - f(ca, "pdgMass")}
     for key in ("v0_mass", "pos_pt", "neg_pt", "posColl_vz", "negColl_vz"):
         casc[key] = _take(v0[key], cv)
     # the generator adds the bachelor to the V0's four-momentum; the V0's energy follows from its stored mass
@@ -131,18 +133,22 @@ def _reference(raw):
     total = np.column_stack([np.sqrt(v0_m ** 2 + v0_px ** 2 + v0_py ** 2 + v0_pz ** 2), v0_px, v0_py, v0_pz]) + np.array(bach).reshape(-1, 4)
     casc["casc_massFromV0AndBachelor"] = np.array([np.nan if np.isnan(p).any() else gen.inv_mass(p) for p in total])
     casc["casc_massDiff"] = casc["casc_massFromV0AndBachelor"] - f(ca, "mass")
+    casc["casc_collisionVzDiff"] = casc["posColl_vz"] - casc["bachColl_vz"]
     out = {"TrkJ": trk, "V0J": v0, "CascJ": casc}
     assert all(set(out[j]) == set(KEYS[j]) for j in KEYS)
     return out
 
 
-def _histograms(ref, raw):
-    """numpy.histogram for every histogram of the page, from the reference columns (NaN is not counted)."""
+def _histograms(ref, raw, selected=None):
+    """numpy.histogram for every histogram of the page, from the reference columns (NaN is not counted).
+    `selected`: {table or join: boolean mask of its rows}; only these rows are counted."""
     own = {"Collisions": {"coll_vz": raw["collisions"]["vz"].to_numpy(dtype=float),
                           "coll_nTracks": raw["collisions"]["nTracks"].to_numpy(dtype=float)}}
     out = {}
     for name, (column, source, nbins, low, high, _, _) in dash.HISTOGRAMS.items():
         values = np.asarray({**own, **ref}[source][column], dtype=float)
+        if selected is not None:
+            values = values[np.asarray(selected[source], dtype=bool)]
         out[name] = np.histogram(values[np.isfinite(values)], bins=nbins, range=(low, high))[0].tolist()
     return out
 
@@ -207,7 +213,7 @@ def _node(node_session, tmp_path, raw, how="left", arg=None):
     from bokeh.document import Document
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
     doc = Document()
-    doc.add_root(dash.toy_mc_joins_dashboard(raw, how))
+    doc.add_root(dash.toy_mc_joins_dashboard(raw, how, selections=False))
     path = tmp_path / "toy_mc_joins_dashboard.json"
     path.write_text(json.dumps(doc.to_json(deferred=False)), encoding="utf-8")
     _clean_session(node_session)
@@ -219,8 +225,8 @@ def _node(node_session, tmp_path, raw, how="left", arg=None):
     return out
 
 
-def _assert_histograms(out, ref, raw):
-    want = _histograms(ref, raw)
+def _assert_histograms(out, ref, raw, selected=None):
+    want = _histograms(ref, raw, selected)
     assert set(out["histograms"]) == set(want)
     for name, counts in want.items():
         got = out["histograms"][name]
@@ -313,6 +319,7 @@ def test_node_the_mass_from_the_joined_tracks_equals_the_stored_mass(node_sessio
         assert len(got) == rows and np.isfinite(got).all()
         assert np.abs(got - stored.to_numpy()).max() < MASS_TOLERANCE, (join, key)
     assert all(v == 0 for v in out["columns"]["V0J"]["v0_collisionVzDiff"])       # both tracks of a V0: one collision
+    assert all(v == 0 for v in out["columns"]["CascJ"]["casc_collisionVzDiff"])   # the bachelor track too
 
 
 @pytest.mark.node_joins
@@ -348,11 +355,11 @@ def test_node_the_five_aliasdataframe_queries_of_the_architect(node_session, tmp
 @pytest.mark.layer("integration")
 def test_browser_the_page_shows_the_same_values_in_tabs(headless_session, tmp_path, physics):
     """The same page as a standalone HTML file in Chromium, read with the same code as in Node: the same columns, the
-    same histograms, the five figure tabs, no selection control yet, and no page error."""
+    same histograms, the five figure tabs, no selection control on this page, and no page error."""
     from bokeh.io import save
     from bokeh.resources import INLINE
     html = tmp_path / "toy_mc_joins_dashboard.html"
-    save(dash.toy_mc_joins_dashboard(physics), filename=str(html), resources=INLINE, title="ToyMC through joins")
+    save(dash.toy_mc_joins_dashboard(physics, selections=False), filename=str(html), resources=INLINE, title="ToyMC through joins")
     ctx, page, errors = _open(headless_session, html)
     try:
         out = page.evaluate(READ, _arg())
