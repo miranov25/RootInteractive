@@ -31,6 +31,9 @@ Run on the pinned toolchain: 20 of 31 cases passed as delivered. Changes, each m
            `context` in the function-form alias branch, where it is set only by an earlier expression alias
            (UnboundLocalError). Fixed in PHASE_5 Batch 3 (with A-D3): the signature test is removed, the exact signature
            is a REGRESSION check, and the strict test now waits for ST-D2, which the page shows once it builds;
+    ST-D5  (PHASE_5 Group 1, new) the solver treats a diagonal element below the absolute number 1e-6 as zero, so a
+           fit with small predictors is wrong without a message, also with one predictor. Strict expected failures
+           until the fix commit of Group 1.
     ST-D4  the statistics table computes quantiles in one pass that assumes an ascending list; a list in another order
            (the table keeps the order the histograms request) gives wrong values under the right titles.
            Fixed in PHASE_5 Batch 2B: the signature test is removed, the strict test is an ordinary test, and the exact
@@ -707,6 +710,107 @@ def test_control_st_d2_one_predictor_fit_equals_numpy(node_session,tmp_path,weig
     ref,beta=_fit_ref(d,["x"],weight=weight,alpha=alpha)
     _values_equal(vals,ref)
     _values_equal(_read(node_session,"ClientLinearFitter",[])["extra"]["parameters"],beta)
+
+
+# --------- PHASE_5 Group 1: more fits against numpy (ST-D2), and the solver's absolute threshold (ST-D5)
+GROUP1_SLOPES = [2., 3., -1.5, .5, -2.5]
+
+
+def _group1_frame(case):
+    """Exact data for the fit cases of Group 1: 40 rows, target = 1 + 2*p0 + 3*p1 - 1.5*p2 + 0.5*p3 - 2.5*p4 (as many
+    terms as the case has predictors), so the fit must return these numbers. `w` is a weight column."""
+    rng = np.random.default_rng(20261116)
+    n = 40
+    if case == "parabola":                       # x and x squared, x from 0 to 1
+        x = rng.uniform(0., 1., n)
+        cols = {"p0": x, "p1": x ** 2}
+    else:
+        count, scale = {"three": (3, 1.), "five": (5, 1.), "small": (2, 1e-2), "tiny": (2, 1e-5),
+                        "tiny_line": (1, 1e-5), "zero_predictor": (2, 1.)}[case]
+        cols = {f"p{i}": rng.normal(1., 1., n) * scale for i in range(count)}
+        if case == "zero_predictor":             # a predictor that is 0 in every row: the system cannot be solved
+            cols["p1"] = np.zeros(n)
+    d = pd.DataFrame(cols)
+    d["target"] = 1. + sum(s * d[c] for s, c in zip(GROUP1_SLOPES, cols))
+    d["w"] = rng.uniform(.5, 2., n)
+    return d, list(cols)
+
+
+def _group1_fit_page(tmp_path, df, predictors, *, weight=None, suffix="g1"):
+    """A fit page for any predictor names; a second figure shows the fit's own columns (the ST-D1 workaround)."""
+    fit = {"name": "C1fit", "type": "linearFit", "varX": list(predictors), "varY": "target", "alpha": 0.,
+           "weights": weight}
+    figures = [[[predictors[0]], ["fitted"]], [["target"], list(predictors) + ([weight] if weight else [])]]
+    aliases = [{"name": "fitted", "variables": list(predictors), "transform": "C1fit"}]
+    return _page(tmp_path, df, figures, js=[fit], aliases=aliases, suffix=suffix)
+
+
+def _group1_read(node_session, tmp_path, case, weight):
+    d, predictors = _group1_frame(case)
+    _node_open(node_session, _group1_fit_page(tmp_path, d, predictors, weight=weight, suffix=f"g1_{case}_{weight}"))
+    vals = _read(node_session, "CDSAlias", ["fitted"], name="cdsFull")["data"]["fitted"]
+    got = _read(node_session, "ClientLinearFitter", [])["extra"]["parameters"]
+    return d, predictors, np.asarray(vals, dtype=float), np.asarray(got, dtype=float)
+
+
+def _is_old_solver(vals, d, predictors, weight) -> bool:
+    """ST-D2 / ST-D5, exact: the fitted values equal the transcription of the solver before the fix, and that
+    transcription is not numpy's fit."""
+    ref = _fit_ref(d, predictors, weight=weight)[0]
+    pred = _ri_fit_prediction(d, predictors, weight, 0.)[0]
+    return bool(np.allclose(vals, pred, rtol=1e-9, atol=1e-9, equal_nan=True)
+                and not np.allclose(pred, ref, rtol=1e-6, atol=1e-6, equal_nan=True))
+
+
+GROUP1_FITS = dict(argnames="case,weight", argvalues=[("three", None), ("three", "w"), ("five", None), ("five", "w"),
+                                                      ("parabola", None), ("small", None), ("tiny", None),
+                                                      ("tiny_line", None)],
+                   ids=["three_predictors", "three_predictors_weighted", "five_predictors", "five_predictors_weighted",
+                        "parabola_x_and_x_squared", "predictors_of_size_0.01", "predictors_of_size_0.00001",
+                        "one_predictor_of_size_0.00001"])
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.parametrize(**GROUP1_FITS)
+@pytest.mark.xfail(**STRICT, reason="ST-D2: wrong fit with two or more predictors; ST-D5: a diagonal element below "
+                                    "the absolute number 1e-6 counts as zero (MathUtils.ts chol)")
+def test_stat_client_fit_group1_cases_equal_numpy_and_the_true_coefficients(node_session, tmp_path, case, weight):
+    """Exact data, so the fit must return numpy's fit AND the coefficients the data were made with. The last case has
+    one predictor: it is wrong today only because of the absolute threshold (ST-D5), not because of ST-D2.
+    The cases with small predictors are compared less tightly: the fit solves the normal equations, which lose
+    digits when the predictors are much smaller than 1 (the reference, numpy lstsq, does not)."""
+    d, predictors, vals, got = _group1_read(node_session, tmp_path, case, weight)
+    known_defect(_is_old_solver(vals, d, predictors, weight), f"ST-D2 / ST-D5: the fit of case {case} is the old solver's")
+    ref, beta = _fit_ref(d, predictors, weight=weight)
+    small = case in ("small", "tiny", "tiny_line")
+    np.testing.assert_allclose(vals, ref, rtol=0, atol=1e-7 if small else 1e-10)
+    np.testing.assert_allclose(got, beta, rtol=1e-4 if small else 1e-9)
+    np.testing.assert_allclose(got, GROUP1_SLOPES[:len(predictors)] + [1.], rtol=1e-4 if small else 1e-9)
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_control_st_d5_a_fit_that_cannot_be_solved_shows_no_fit(node_session, tmp_path):
+    """ST-D5's control, the same before and after the fix: a predictor that is 0 in every row has no fit, and every
+    fitted value is NaN, so the page shows no fit instead of a wrong one."""
+    d, predictors, vals, got = _group1_read(node_session, tmp_path, "zero_predictor", None)
+    assert len(vals) == len(d) and np.isnan(vals).all(), vals
+    assert np.isnan(got[:len(predictors)]).all(), got
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_group1_reference_data_are_exact_and_the_old_solver_prediction_is_wrong_on_them():
+    """No page: before the cases above are used, numpy returns the true coefficients on every data set, and the
+    transcription of the solver before the fix does not (so its signature can be told from the right answer)."""
+    for case, weight in GROUP1_FITS["argvalues"]:
+        d, predictors = _group1_frame(case)
+        ref, beta = _fit_ref(d, predictors, weight=weight)
+        np.testing.assert_allclose(beta, GROUP1_SLOPES[:len(predictors)] + [1.], rtol=1e-6)
+        with np.errstate(all="ignore"):
+            old = _ri_fit_prediction(d, predictors, weight, 0.)[0]
+        assert not np.allclose(old, ref, rtol=1e-6, atol=1e-6, equal_nan=True), case
 
 
 # ST-D1: the fit's response and weight columns are not sent
