@@ -260,9 +260,15 @@ class ColumnEvaluator:
             cds_used = 0
             if attrChain[0] == self.context:
                 cds_used = 1
-            if(cds_used < len(attrChain)):
-                if attrChain[cds_used] in [cds["left"], cds["right"]]:
-                    self.dependencies.add((attrChain[cds_used], node.attr))
+            if cds_used < len(attrChain) and attrChain[cds_used] in [cds["left"], cds["right"]]:
+                self.dependencies.add((attrChain[cds_used], node.attr))
+            else:
+                # PHASE_5 Batch 4 (B1): a column read through the join without naming its side also depends on the
+                # table that holds it, so that the column is sent to the page. Before, it arrived only if a figure or
+                # a widget of its own table used it; without that the join was empty or refused.
+                side = joinSideOfColumn(self.cdsDict, self.aliasDict, cds, node.attr)
+                if side is not NO_TABLE:
+                    self.dependencies.add((side, node.attr))
             if attrChain[0] == "self":
                 attrChainStr = '.'.join(attrChain[1:] + [node.attr])
             else:
@@ -598,6 +604,36 @@ def checkColumn(columnKey, tableKey, cdsDict):
 
 def defaultCdsFullGetter(cdsDict, _, key):
     return cdsDict.get(key, None)
+
+NO_TABLE = object()    # "no table holds this column"; None cannot say it, because None names the main table
+
+
+def tableHasColumn(cdsDict: dict, aliasDict: dict, table, name: str) -> bool:
+    """Whether the table can give the column to the page: from its own data, as one of its aliases, or - a join -
+    from either of its two sides."""
+    cds = cdsDict.get(table)
+    if cds is None:
+        return False
+    if cds["type"] == "join":
+        return (tableHasColumn(cdsDict, aliasDict, cds["left"], name)
+                or tableHasColumn(cdsDict, aliasDict, cds["right"], name))
+    if aliasDict is not None and name in aliasDict.get(table, {}):
+        return True
+    data = cds.get("data")
+    try:
+        return data is not None and name in data
+    except TypeError:
+        return False
+
+
+def joinSideOfColumn(cdsDict: dict, aliasDict: dict, join: dict, name: str):
+    """The side of a join that holds a column read without naming the side: the left table first, then the right
+    one - the order in which the page looks (CDSJoin.get_column). NO_TABLE if neither holds it."""
+    for side in (join["left"], join["right"]):
+        if tableHasColumn(cdsDict, aliasDict, side, name):
+            return side
+    return NO_TABLE
+
 
 def getOrMakeColumns(variableNames, context = None, cdsDict: dict = {}, paramDict: dict = {}, funcDict: dict = {},
                      memoizedColumns: dict = None, aliasDict: dict = None, forbiddenColumns: set = set(), cdsFullGetter = defaultCdsFullGetter):

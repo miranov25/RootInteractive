@@ -15,13 +15,15 @@ two references that use no join:
     SHA256 checked below).
 The page is read in Node and, with the same reading code, in a real browser (Chromium).
 
-Two defects of the dashboard show here; each is a strict expected failure that accepts only its exact signature:
-  B1  the page builder does not send the columns a join needs (the pointer columns and the columns read through the
-      join). A column arrives only if a figure of its own table uses it. Without such figures the join track ->
-      collision is empty and the cascade joins refuse with "(0 rows)".
-  B2  on a dashboard every table is wrapped in an alias table, and a row number pointing into an alias table around
-      an inner join that lost rows is taken as a position, not as the row of the original table (review finding F1
-      of the join fix). The result: a wrong row without any message, or a refusal of a row that exists.
+Two defects of the dashboard show here:
+  B1  FIXED in the commit that follows the test commit (PHASE_5 Batch 4, compileVarName.py): the page builder did not
+      send the columns a join needs (the pointer columns and the columns read through the join). A column arrived only
+      if a figure of its own table used it; without such figures the join track -> collision was empty and the cascade
+      joins refused with "(0 rows)". Its strict mark is off; that exact signature is now a regression.
+  B2  OPEN, a strict expected failure that accepts only its exact signature: on a dashboard every table is wrapped
+      in an alias table, and a row number pointing into an alias table around an inner join that lost rows is taken
+      as a position, not as the row of the original table (review finding F1 of the join fix). The result: a wrong
+      row without any message, or a refusal of a row that exists.
 """
 from __future__ import annotations
 
@@ -95,9 +97,13 @@ def _page(tables, how, own_figures):
     sources = [{"name": n, "data": arrays(n)} for n in ("CO", "TR", "V0")] + [
         join("TE", "TR", "CO", "tEventIdx"), join("VPE", "V0", "TE", "vPos"), join("VNE", "V0", "TE", "vNeg"),
         join("CVPE", None, "VPE", "caV0"), join("CVNE", None, "VNE", "caV0"), join("CBE", None, "TE", "caBachelor")]
+    # every column the tests read is used by a figure THROUGH its join: the page sends only columns that are used
     figures = [[["caRow"], ["caMass"]],
-               [["CVPE.vMass"], ["CVPE.tPt"]], [["CVPE.caMass"], ["CVPE.cVz"]],
-               [["CVNE.vMass"], ["CVNE.tPt"]], [["CBE.tPt"], ["CBE.cVz"]]]
+               [["CVPE.vMass"], ["CVPE.tPt"]], [["CVPE.caMass"], ["CVPE.cVz"]], [["CVPE.vRow"], ["CVPE.tRow"]],
+               [["CVPE.caRow"], ["CVPE.cRow"]],
+               [["CVNE.vMass"], ["CVNE.tPt"]], [["CVNE.caMass"], ["CVNE.cVz"]], [["CVNE.vRow"], ["CVNE.tRow"]],
+               [["CVNE.caRow"], ["CVNE.cRow"]],
+               [["CBE.tPt"], ["CBE.cVz"]], [["CBE.tRow"], ["CBE.cRow"]], [["CBE.caRow"], ["CBE.caMass"]]]
     if own_figures:
         figures += [[["caV0"], ["caBachelor"]], [["CO.cRow"], ["CO.cVz"]], [["TR.tRow"], ["TR.tEventIdx"]],
                     [["TR.tRow"], ["TR.tPt"]], [["V0.vRow"], ["V0.vPos"]], [["V0.vNeg"], ["V0.vMass"]]]
@@ -269,14 +275,25 @@ def test_node_a_change_of_the_collision_table_reaches_the_cascade_joins(node_ses
     assert not _same(want["CVPE"], _reference(tables, "left")["CVPE"])                 # the change is visible
 
 
+@pytest.mark.node_joins
+@pytest.mark.feature("JOIN.recursive")
+def test_node_the_chain_on_about_twenty_thousand_tracks(node_session, tmp_path):
+    """The same page with 1800 collisions (19606 tracks, 4379 V0s, 1338 cascades), without extra figures: every
+    column of the three cascade joins, row by row, equals the plain gather."""
+    tables = _tables(generate_toy_mc_events(n_collisions=1800, seed=42))
+    assert (len(tables["TR"]["tRow"]), len(tables["V0"]["vRow"]), len(tables["CA"]["caRow"])) == (19606, 4379, 1338)
+    want = _all_right(_node(node_session, tmp_path, tables, "left", own_figures=False), tables, "left")
+    assert len(set(want["CVPE"]["cRow"])) > 500 and len(set(want["CBE"]["tRow"])) > 1000     # many different parents
+
+
 # ============================================================================================ B1: columns not sent
 @pytest.mark.node_joins
 @pytest.mark.feature("JOIN.recursive")
-@pytest.mark.xfail(**STRICT, reason="B1: the page builder does not send the columns a join needs")
 def test_strict_the_chain_needs_no_extra_figures(node_session, tmp_path, physics):
-    """The same page without the figures that show the pointer columns in their own tables. It must give the same
-    values. Today the tracks' pointer column is not on the page: the join track -> collision has no rows, and every
-    cascade join refuses its first row number as outside a parent table of 0 rows."""
+    """B1, fixed. The same page without the figures that show the pointer columns in their own tables: it gives the
+    same values. Before the fix the tracks' pointer column was not on the page: the join track -> collision had no
+    rows, and every cascade join refused its first row number as outside a parent table of 0 rows; that exact result
+    is now a regression."""
     tables = _tables(physics)
     out = _node(node_session, tmp_path, tables, "left", own_figures=False, names=("TE",) + tuple(VIEWS))
     want = _reference(tables, "left")
@@ -288,7 +305,7 @@ def test_strict_the_chain_needs_no_extra_figures(node_session, tmp_path, physics
     refused = all(_is_refusal(out[n], KEYS[n], n, *first[n]) and all("(0 rows)" in m for m in out[n]["throws"].values())
                   for n in VIEWS)
     if empty and refused:
-        raise KnownDashboardDefect("B1: the join's columns are not sent to the page")
+        raise AssertionError("REGRESSION, a fixed defect is back: B1, the join's columns are not sent to the page")
     raise AssertionError(f"neither the reference nor the registered signature of B1: {out}")
 
 
