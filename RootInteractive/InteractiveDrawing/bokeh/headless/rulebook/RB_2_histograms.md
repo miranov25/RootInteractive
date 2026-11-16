@@ -1,17 +1,51 @@
-# RB-2 — Histograms (stage 4.2a entries)
+# RB-2 — Histogram bin membership (RI-HIST-BINEDGE-20261115-01)
 
-Statement · source evidence at RootInteractive `4e8d783` · status. Implemented by `oracles/histograms.py`, which reproduces
-RootInteractive's own arithmetic and never calls `numpy.histogram` (the two differ at bin edges).
+**Candidate scientific-contract migration (GPT31.RI; final code review pending).**
+This replaces the historical implementation-arithmetic rule, which allowed
+wrong-side assignment at represented internal bin edges.
 
-| Rule | Statement | Evidence | Status |
-|---|---|---|---|
-| RB-2.1 | 1-D bin index: `scale = nbins/(max−min)`, `origin = −min·scale`, `bin = (v·scale + origin) \| 0` | `HistogramCDS.ts` 143–144, 227 | verified in code |
-| RB-2.2 | N-D bin index per axis: `scale = nbins/(max−min)`, `origin = min·scale`, `bin = (v·scale − origin) \| 0`; flat index with strides, first variable fastest. In IEEE arithmetic `a + (−b) = a − b`, so 1-D and N-D agree | `HistoNdCDS.ts` 167–168, 330–345 | verified in code (was "to verify" in proposal v0.2) |
-| RB-2.3 | The last edge is inclusive: `v == max` goes into the last bin | `HistogramCDS.ts` 225; `HistoNdCDS.ts` 341 | verified in code |
-| RB-2.4 | Values outside `[min, max]` are **not counted** (there is no under- or overflow bin in `bin_count`); ±Inf therefore not counted | 1-D: `getbin` 222–223 returns −1 / `nbins`, counting keeps `0 <= bin < nbins` (174, 181, 189); N-D: 337 | verified in code |
-| RB-2.5 | Non-finite values are not counted | N-D: `HistoNdCDS.ts` 337 `!isFinite(val)` | verified in code (N-D); 1-D: known defect B8 (NaN counted in bin 0) |
-| RB-2.6 | The histogram follows the selection at page load | N-D: `HistoNdCDS.ts` 62 calls `change_selection()` | verified in code (N-D); 1-D: known defect B2 |
-| RB-2.7 | Example of the edge difference: 0.3, 0.6, 0.7 on [0, 1] × 10 → RootInteractive bins 3, 6, 7; `numpy.histogram` 2, 5, 6 | unit test `test_rb2_bin_formula_is_rootinteractive_not_numpy` | verified by test |
+For finite `lo < hi` and positive integral `nbins`, define **one** binary64
+edge vector `edges = numpy.linspace(lo, hi, nbins + 1)` with exactly matching
+browser edge representation. The vector must be strictly increasing; the
+numerical domain must be finite with representable, finite width.
 
-Weights: a weighted histogram sums the row's weight instead of 1 (`HistoNdCDS.ts` 237–247); compared with a relative tolerance
-of 1e-12, because the order of the floating sums is not part of the rule.
+- **RB-2.1 (1-D)** Each bin `i < nbins-1` is `[edges[i], edges[i+1])`.
+- **RB-2.2 (N-D)** Apply the same membership independently on every axis,
+  with first-variable-fastest flattened index. Any excluded axis drops the row.
+- **RB-2.3 (upper endpoint)** The final bin is `[edges[nbins-1], edges[nbins]]`,
+  including the exact represented `hi` value.
+- **RB-2.4 (excluded values)** Values below `lo`, above `hi`, `NaN`, `+Inf`,
+  and `-Inf` do not contribute to the histogram.
+- **RB-2.5 (finite handling)** All axes must pass the finite-value test,
+  including 1-D and N-D models (historical B8 fixed in PHASE_5 Batch 2A).
+- **RB-2.6 (load selection)** The histogram respects the active selection
+  when the page first loads (historical B2 fixed in PHASE_5 Batch 1).
+- **RB-2.7 (exact internal edge)** At a represented internal edge `edges[i]`,
+  the value belongs in right bin `i`. Its representable predecessor belongs
+  in the left bin if in range; its successor belongs in the right bin. No ULP
+  tolerance may move a value across a represented edge.
+- **RB-2.8 (weighted/profile)** Weighted histograms sum weights in the exact
+  assigned cells. Profiles and live selection/rebin updates must use the same
+  membership. An aggregation-order tolerance is permitted only for floating
+  sums, **not** for deciding bin membership.
+
+**Independent reference:** `numpy.histogram` / `numpy.histogramdd` with the
+*same represented edge vector*, or explicit comparisons with those edges.
+The fast production index estimate may be used only after an edge-membership
+correction. The old `(value * scale +/- origin) | 0` operation is not a
+scientific oracle; it is retained only in labeled negative-control mutants.
+
+**Historical bugs to keep detectable:**
+- **B8:** 1-D NaN incorrectly entered bin 0; assert exclusion and reintroduce
+  the defect by mutation.
+- **B10:** upper-edge predecessor could overflow the final bin and be dropped
+  or spill into an adjacent N-D row; negative control must fail numerically.
+- **RI-HIST-BINEDGE-20261115-01:** interior represented-edge values assigned
+  left by arithmetic rounding; strict edge/nextafter checks must catch it.
+
+**Pending Architect policy (NOT silently resolved by this test migration):**
+invalid/degenerate and single-point live ranges, overflow or non-increasing
+binary64 edges, finite-width limits, cross-project edge transport, and
+unrelated-dashboard survival under invalid updates. The present production
+candidate can throw on those ranges. Neither this rulebook edit nor a green
+histogram regression proves the invalid-live-range gate.

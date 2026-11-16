@@ -10,12 +10,41 @@ from RootInteractive.InteractiveDrawing.bokeh.headless.oracles import filters, h
 pytestmark = [pytest.mark.layer("unit"), pytest.mark.backend("python"), pytest.mark.headless_unit]   # target (4.2c-2c)
 
 
-def test_rb2_bin_formula_is_rootinteractive_not_numpy():
-    """0.3, 0.6, 0.7 on [0, 1] x 10: RootInteractive's (v*scale + origin)|0 gives 3, 6, 7; numpy gives 2, 5, 6."""
+def test_rb2_explicit_edges_agree_with_numpy_not_old_arithmetic():
+    """Existing decimal inputs obey the canonical represented binary64 edges.
+    Historical arithmetic put 0.3, 0.6, 0.7 in bins 3,6,7 (INCORRECT)."""
     v = np.array([0.3, 0.6, 0.7])
-    assert histograms.bin_index_1d(v, 10, 0.0, 1.0).tolist() == [3, 6, 7]
-    numpy_bins = [int(np.histogram([x], bins=10, range=(0, 1))[0].argmax()) for x in v]
-    assert numpy_bins == [2, 5, 6]                       # the reason the oracle must not call numpy.histogram
+    edges = histograms.canonical_edges(10, 0.0, 1.0)
+    want = [int(np.histogram([x], bins=edges)[0].argmax()) for x in v]
+    assert want == [2, 5, 6]
+    assert histograms.bin_index_1d(v, 10, 0.0, 1.0).tolist() == want
+    assert histograms.bin_index_nd([v], [10], [(0.0, 1.0)]).tolist() == want
+    assert int(np.trunc(v[0] * 10)) == 3  # legacy arithmetic is an explicit negative control
+
+
+def test_rb2_canonical_edges_and_nextafter_exact_membership():
+    """Each represented edge belongs on the right; its predecessor on the left."""
+    for lo, hi, nb in ((-10.0, -2.0, 50), (0.025, 0.975, 8), (0.1, 0.9, 7), (-1.0, 1.0, 13)):
+        edges = histograms.canonical_edges(nb, lo, hi)
+        for i in range(1, nb):
+            values = [np.nextafter(edges[i], -np.inf), edges[i], np.nextafter(edges[i], np.inf)]
+            ref = np.histogram(values, bins=edges)[0]
+            got = histograms.counts([values], [nb], [(lo, hi)])
+            np.testing.assert_array_equal(got, ref)
+            assert histograms.bin_index_1d(values, nb, lo, hi)[1] == i
+        assert histograms.bin_index_1d([hi], nb, lo, hi)[0] == nb-1
+
+
+def test_rb2_independent_rule_rejects_arithmetic_misbin():
+    lo, hi, nb = 0.025, 0.975, 8
+    values = np.asarray([histograms.canonical_edges(nb, lo, hi)[1]])
+    lo_bound, hi_bound, total = histograms.rule_bounds([values], [nb], [(lo, hi)])
+    good = histograms.counts([values], [nb], [(lo, hi)])
+    assert not histograms.rule_violations(good, lo_bound, hi_bound, total)
+    wrong = good.copy()
+    wrong[1] -= 1
+    wrong[0] += 1
+    assert histograms.rule_violations(wrong, lo_bound, hi_bound, total)
 
 
 def test_rb2_last_edge_inclusive_and_out_of_range_not_counted():
@@ -30,8 +59,8 @@ def test_rb2_non_finite_not_counted():
 
 
 def test_rb2_nd_flat_index_first_variable_fastest():
-    """x = 0.3 -> bin 3 of 10; y = 2.9 on [-3, 3] x 4: 2.9*(4/6) - (-3*(4/6)) = 3.93 -> bin 3; flat 3 + 3*10 = 33."""
-    assert histograms.bin_index_nd([np.array([0.3]), np.array([2.9])], [10, 4], [(0, 1), (-3, 3)]).tolist() == [33]
+    """x = 0.3 belongs to bin 2 under linspace edges; y = 2.9 belongs to bin 3; flat = 2 + 3*10."""
+    assert histograms.bin_index_nd([np.array([0.3]), np.array([2.9])], [10, 4], [(0, 1), (-3, 3)]).tolist() == [32]
     # one axis out of range drops the row
     assert histograms.bin_index_nd([np.array([0.3]), np.array([3.1])], [10, 4], [(0, 1), (-3, 3)]).tolist() == [-1]
 

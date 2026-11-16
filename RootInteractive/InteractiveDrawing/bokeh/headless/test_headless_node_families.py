@@ -1,25 +1,10 @@
-"""The first Node families (proposal v0.3 §7 items D, E, H, J; stage 4.2c-2a, v0.2 after the review).
+"""The first Node families (stage 4.2c-2a), migrated to the strict RB-2 bin-edge contract.
 
-Histograms (widget-free pages, mass cases by template substitution — erratum V-1). One CASE is one data table put
-into a page with a 1-D, a 2-D and a weighted 1-D histogram; Node builds the page, Python compares every bin.
-  - per configuration: single-row NAMED cases at every bin edge and its rounding neighbours, the range limits,
-    +-Infinity and far values, each with y = 0.5 and with y = 1.0 (the last bin of y); GENERATED cases from the
-    edge-value column kind;
-  - check 1, the implementation: the page equals the oracle that copies RootInteractive's arithmetic, in every cell;
-  - check 2, the RULE (oracles.histograms.rule_bounds, the per-cell rule): every finite value inside the ranges is
-    counted once, in a cell that contains it (interior-edge values may go to either side). PHASE_5 Batch 2A fixed
-    B10: the page must satisfy the rule as it is, the "edge rows" (a value one rounding step below the top edge of x
-    whose bin computes as nbins) included - they are counted in the last bin of x. With B10 put back by the fault
-    B10_REINTRODUCED (configuration claude3_b10_6, the only one with such rows), the rule's violations must be
-    exactly the B10 rows: in 1-D they are dropped, in 2-D they move to bin 0 of x in the NEXT bin of y, or are
-    dropped when y is in its last bin. Each B10 row is classified by its destination, repaired, and the repaired
-    page must satisfy the rule — else FAIL (the classification stays proven, so the fault stays a faithful B10);
-  - the gate of V-1 (substituted documents equal fresh builds as model graphs, references kept); isolation; timings.
-Filters (document cases): B1 with the refined rule (b1_first_changed) swept over 1-200 rows; 2 to 5 filters in every
-  move order; the 20 000 / 20 001-row pair. Every expected B1 step is computed from the rule, every other must PASS.
-  PHASE_5 Batch 1 fixed B1: each filter family runs twice - on the fixed code, where every step must PASS (the
-  intersection of all filters), and with B1 put back by the fault B1_REINTRODUCED, where the refined rule must still
-  predict every step exactly (the rule stays proven, so the fault keeps being a faithful copy of B1).
+Every named and generated case stays in FAST/FULL. Production 1-D, 2-D and
+weighted results are compared per cell to an explicit-binary64-edge oracle,
+with a second rule check using independent edge-comparison predicates.
+B10 fault sessions deliberately reintroduce only the upper-edge spill/drop,
+not all historical interior-edge arithmetic errors. Filter/B1 tests unchanged.
 """
 import json
 import os
@@ -92,8 +77,7 @@ def _page(name, nb, lo, hi):
 
 
 def _named_frames(nb, lo, hi):
-    edges = lo + (hi - lo) * np.arange(nb + 1) / nb
-    edges[-1] = hi
+    edges = ho.canonical_edges(nb, lo, hi)
     values = [np.inf, -np.inf, lo - 1.0, hi + 1.0]
     for e in edges:
         values += [e, np.nextafter(e, -np.inf), np.nextafter(e, np.inf)]
@@ -112,8 +96,8 @@ def _generated_frames(nb, lo, hi, count):
 @dataclass
 class Judgement:
     """The verdict on one case."""
-    implementation_equal: bool          # check 1: page = implementation oracle in every cell (1-D, 2-D, weighted)
-    unexplained: List[str]              # check 2: rule violations (B10 put back: after repairing its rows; must be empty)
+    implementation_equal: bool          # check 1: page = independent binary64-edge oracle, per cell
+    unexplained: List[str]              # check 2: independent explicit-edge predicate rule
     edge_rows: int                      # rows one rounding step below the top edge whose bin computes as nbins
     edge_rows_y_inside: int             # ... of them with y inside its range (the ones the 2-D histogram counts)
     b10_1d_dropped: int                 # B10 put back: B10 rows dropped by the 1-D histogram
@@ -122,8 +106,8 @@ class Judgement:
 
 
 def judge(df, page, nb, lo, hi, b10_live: bool = False) -> Judgement:
-    """The verdict on one case. `b10_live`: the page runs with B10 put back (fault B10_REINTRODUCED); its B10 rows are
-    then classified and repaired before the rule is applied. Without it (the fixed code) nothing is repaired."""
+    """Compare every bin against canonical edges; under B10 mutation repair only
+    known upper-edge-spill rows before applying the second independent rule."""
     x, y, w = (df[c].to_numpy() for c in ("x", "y", "w"))
     p1, p2, pw = (np.asarray(p, dtype=np.float64) for p in page)
     impl_equal = (np.array_equal(p1, ho.counts([x], [nb], [(lo, hi)], b10=b10_live))
@@ -199,13 +183,13 @@ def test_histogram_family(config, size, node_session, headless_out):
         bad_rule = [i for i, v in enumerate(verdicts) if v.unexplained]
         edge = sum(v.edge_rows for v in verdicts)
         failures += [(kind, i) for i in bad_impl + bad_rule]
-        res.add(0, name, f"{kind} cases ({compared}): page = implementation oracle (1-D, 2-D, weighted)",
+        res.add(0, name, f"{kind} cases ({compared}): page = independent explicit-edge oracle (1-D, 2-D, weighted)",
                 "PASS" if not bad_impl and compared == len(frames) else "FAIL",
                 f"{compared - len(bad_impl)} of {len(frames)} cases compared and equal in every cell"
                 + (f"; first failing case {bad_impl[0]}" if bad_impl else ""), feature="HIST.histogram_1d")
         res.add(0, name, f"{kind} cases ({compared}): rule check, edge rows {edge} counted in the last bin of x",
                 "FAIL" if bad_rule else "PASS",
-                "the per-cell rule holds in all three histograms, the edge rows included (B10 fixed, PHASE_5 Batch 2A)"
+                "strict represented-edge membership holds in all three histograms"
                 + (f"; unexplained in case {bad_rule[0]}: {verdicts[bad_rule[0]].unexplained[:2]}" if bad_rule else ""),
                 feature="HIST.histogram_nd")
         timings[kind] = {"cases": len(frames), "compared": compared, "substitution_s": round(t_sub, 3),
@@ -227,10 +211,9 @@ def test_histogram_family(config, size, node_session, headless_out):
 
 @pytest.mark.node_histograms
 def test_histogram_family_with_b10_put_back(b10_back_session, headless_out):
-    """PHASE_5 Batch 2A: the named and the fast generated cases of the configuration with edge rows, with B10 put back
-    (fault B10_REINTRODUCED). The page must equal the implementation oracle with B10 (RB-2.6, `b10=True`) in every
-    cell, every edge row must be a B10 row at its predicted destination (dropped in 1-D; moved, or dropped in the last
-    bin of y, in 2-D), and once repaired the rule must hold: the classification stays proven."""
+    """Retain every named and generated B10 case. The targeted mutation must
+    recreate upper-edge spill/drop exactly without reviving unrelated interior
+    edge defects, and the repaired pages must match strict independent rules."""
     name, nb, lo, hi = B10_CONFIG
     sc = _page(name, nb, lo, hi)
     tpl = sweep.Template(sc, data_mod.generate(sc.data.main), headless_out / f"b10_put_back_{name}_template.json",
@@ -244,6 +227,57 @@ def test_histogram_family_with_b10_put_back(b10_back_session, headless_out):
         edge, edge_y, d1, m2, d2 = (sum(getattr(v, f) for v in verdicts) for f in
                                     ("edge_rows", "edge_rows_y_inside", "b10_1d_dropped", "b10_2d_moved", "b10_2d_dropped"))
         assert edge > 0 and d1 == edge and m2 + d2 == edge_y and m2 > 0 and d2 > 0, (kind, edge, edge_y, d1, m2, d2)
+
+
+@pytest.mark.node_histograms
+def test_mutant_old_arithmetic_is_rejected_by_strict_1d_nd_weighted_checks(node_bundle_root, headless_out):
+    """Fault injection (not a Python-only simulation) must reproduce an
+    internal-edge error in both RootInteractive production histogram models.
+    A healthy page using the same data passes the strict independent oracle.
+    """
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    nb, lo, hi = 8, 0.025, 0.975
+    edge = float(ho.canonical_edges(nb, lo, hi)[1])
+    df = pd.DataFrame({"x": [edge], "y": [0.5], "w": [1.5]})
+    assert ho.bin_index_1d([edge], nb, lo, hi)[0] == 1
+    sc = _page("interior_edge_mutant", nb, lo, hi)
+    tpl = sweep.Template(sc, data_mod.generate(sc.data.main),
+                         headless_out / "old_interior_edge_mutant_template.json", models_only=MODELS)
+    doc, _ = sweep.substitute_all(tpl, [df])
+    healthy = NodeSession(node_bundle_root, fresh_window=False)
+    mutant = NodeSession(node_bundle_root, fault=faults.LEGACY_EDGE_ARITHMETIC, fresh_window=False)
+    try:
+        healthy_pages, _ = sweep.run_batch(healthy, doc, READ)
+        faulty_pages, _ = sweep.run_batch(mutant, doc, READ)
+    finally:
+        healthy.close()
+        mutant.close()
+    good = judge(df, healthy_pages[0], nb, lo, hi)
+    bad = judge(df, faulty_pages[0], nb, lo, hi)
+    assert good.implementation_equal and not good.unexplained, good
+    assert not bad.implementation_equal and bad.unexplained, bad
+    assert np.asarray(faulty_pages[0][0])[0] == 1.0  # erroneous left bin
+    assert np.asarray(healthy_pages[0][0])[1] == 1.0  # canonical right bin
+
+
+@pytest.mark.node_histograms
+def test_mutant_weighted_single_cell_shift_is_detected(node_bundle_root, headless_out):
+    """The weighted histogram must be checked per cell, not merely by total."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import NodeSession
+    nb, lo, hi = 8, 0.025, 0.975
+    df = pd.DataFrame({"x": [0.14375], "y": [0.5], "w": [3.5]})
+    sc = _page("weighted_mutant", nb, lo, hi)
+    tpl = sweep.Template(sc, data_mod.generate(sc.data.main),
+                         headless_out / "weighted_mutant_template.json", models_only=MODELS)
+    docs, _ = sweep.substitute_all(tpl, [df])
+    mutant = NodeSession(node_bundle_root, fault=faults.WEIGHTED_SINGLE_CELL_SHIFT, fresh_window=False)
+    try:
+        pages, _ = sweep.run_batch(mutant, docs, READ)
+    finally:
+        mutant.close()
+    verdict = judge(df, pages[0], nb, lo, hi)
+    assert not verdict.implementation_equal and verdict.unexplained, verdict
+    assert abs(np.asarray(pages[0][2]).sum() - 3.5) < 1e-12  # conservation alone is insufficient
 
 
 # ------------------------------------------------------------------- controls: the reviewers' counterexamples

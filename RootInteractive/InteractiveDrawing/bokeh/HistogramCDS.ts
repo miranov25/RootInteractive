@@ -1,6 +1,7 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
+import {uniformBinEdges, uniformInRangeBin} from "./HistogramBinEdges"
 //import { kth_value, weighted_kth_value } from "./MathUtils"
 
 export namespace HistogramCDS {
@@ -69,6 +70,7 @@ export class HistogramCDS extends ColumnarDataSource {
   private _range_min: number
   private _range_max: number
   private _nbins: number
+  private _bin_edges: Float64Array
 
   public view: number[] | null
 
@@ -143,10 +145,11 @@ export class HistogramCDS extends ColumnarDataSource {
       this._nbins = this.nbins
       this._transform_scale = this._nbins/(this._range_max-this._range_min)
       this._transform_origin = -this._range_min*this._transform_scale
+      this._bin_edges = uniformBinEdges(this._range_min, this._range_max, this._nbins)
       for (let index = 0; index < this._nbins; index++) {
-        bin_left.push(this._range_min+index*(this._range_max-this._range_min)/this._nbins)
+        bin_left.push(this._bin_edges[index])
         bin_center.push(this._range_min+(index+.5)*(this._range_max-this._range_min)/this._nbins)
-        bin_right.push(this._range_min+(index+1)*(this._range_max-this._range_min)/this._nbins)
+        bin_right.push(this._bin_edges[index+1])
       }
       this.data["bin_bottom"] = bin_left
       this.data["bin_top"] = bin_right
@@ -227,8 +230,7 @@ export class HistogramCDS extends ColumnarDataSource {
       if(val === this._range_max) return this._nbins-1
       // Compute the bin in the normal case; PHASE_5 Batch 2A (B10): a value one rounding step below the maximum can
       // compute as nbins - it belongs to the last bin
-      const bin = (val*this._transform_scale+this._transform_origin)|0
-      return bin < this._nbins ? bin : this._nbins-1
+      return uniformInRangeBin(val, this._transform_scale, this._transform_origin, this._bin_edges)
   }
 
   get_length(){

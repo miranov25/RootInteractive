@@ -376,7 +376,7 @@ def _is_b8(state, refs, tracks) -> bool:
 
 @_node(pytest.mark.feature("HIST.histogram_nd"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
 def test_control_b8_the_2d_histogram_skips_the_orphans(node_session, tmp_path):
-    """B8's control (errata C-06): the N-D histogram's finite guard excludes every orphan."""
+    """B8's N-D control: non-finite orphan values are excluded."""
     refs, tracks, state = orphan_state(node_session, tmp_path)
     assert state["h2"] == orphan_oracle(refs, tracks)["h2"]
 
@@ -408,20 +408,15 @@ EDGE_HISTOGRAMS = [{"name": "e1", "variables": ["r"], "nbins": 20, "range": [0, 
 
 
 def intended_counts(columns, nbins, ranges) -> list:
-    """A finite value inside [lo, hi] is counted once, in the bin that contains it; the top edge belongs to the last
-    bin (rulebook RB-2.3 as a rule): RootInteractive's arithmetic, clamped to the last bin."""
-    n = len(columns[0])
-    flat, stride, keep = np.zeros(n, dtype=np.int64), 1, np.ones(n, dtype=bool)
-    for col, nb, (lo, hi) in zip(columns, nbins, ranges):
-        v = np.asarray(col, dtype=np.float64)
-        with np.errstate(invalid="ignore"):
-            inside = np.isfinite(v) & (v >= lo) & (v <= hi)
-        b = np.zeros(n, dtype=np.int64)
-        b[inside] = np.minimum(np.trunc(v[inside] * (nb / (hi - lo)) - lo * (nb / (hi - lo))), nb - 1)
-        flat += b * stride
-        stride *= nb
-        keep &= inside
-    return np.bincount(flat[keep], minlength=stride).astype(float).tolist()
+    """Second independent reference using NumPy histogram/histogramdd with
+    canonical, strictly represented binary64 edges; 1st axis remains fastest."""
+    edges = [ho.canonical_edges(nb, *span) for nb, span in zip(nbins, ranges)]
+    arrays = [np.asarray(c, dtype=np.float64) for c in columns]
+    if len(arrays) == 1:
+        return np.histogram(arrays[0], bins=edges[0])[0].astype(float).tolist()
+    data = np.column_stack(arrays)
+    counts, _ = np.histogramdd(data, bins=edges)
+    return counts.ravel(order="F").astype(float).tolist()
 
 
 def edge_state(node_session, tmp_path, with_edge_rows=True):
@@ -436,9 +431,8 @@ def edge_state(node_session, tmp_path, with_edge_rows=True):
 
 
 def _is_b10(d, state) -> bool:
-    """B10, exact: the page equals RootInteractive's unclamped arithmetic (rulebook oracle RB-2 with B10 put back):
-    the edge rows are dropped in 1-D and moved to bin 0 of the next group in 2-D (dropped in the last group); not the
-    intended counts."""
+    """B10 negative control: only upper-edge-spill rows are dropped in 1-D
+    or carried into the next N-D row; canonical NumPy bins are unchanged elsewhere."""
     model = {"e1": ho.counts([d.r], [20], [(0, 50)], b10=True).tolist(),
              "e2": ho.counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)], b10=True).tolist()}
     want = {"e1": intended_counts([d.r], [20], [(0, 50)]), "e2": intended_counts([d.r, d.g], [20, 5], [(0, 50), (0, 5)])}
@@ -492,16 +486,16 @@ def put_back_sessions(node_session, node_bundle_root):
 
 @_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("DSL.gather_operation"), target=pytest.mark.node_histograms)
 def test_falsifier_b8_put_back_shows_the_signature_its_regression_check_names(put_back_sessions, tmp_path):
-    """With B8 put back (fault b8_reintroduced: getbin's lower test is `val < min` again), the page equals B8's exact
-    signature - the regression check of test_strict_orphans_are_not_counted_in_a_1d_histogram is live."""
+    """With B8 restored as NaN -> first bin, the production-model page
+    must reproduce the exact numerical signature detected by the strict orphan test."""
     refs, tracks, state = orphan_state(put_back_sessions["b8_reintroduced"], tmp_path)
     assert _is_b8(state, refs, tracks), state
 
 
 @_node(pytest.mark.feature("HIST.histogram_1d"), pytest.mark.feature("HIST.histogram_nd"), target=pytest.mark.node_histograms)
 def test_falsifier_b10_put_back_shows_the_signature_its_regression_check_names(put_back_sessions, tmp_path):
-    """With B10 put back in the 1-D and the N-D histogram (fault b10_reintroduced), the page equals B10's exact
-    signature - the regression check of test_strict_edge_rows_are_counted_in_the_last_bin_of_their_group is live."""
+    """The targeted upper-edge mutant must create a numerical B10 discrepancy.
+    A missing text target (FaultNotApplied) is an ERROR, never a PASS."""
     d, state = edge_state(put_back_sessions["b10_reintroduced"], tmp_path)
     assert _is_b10(d, state), state
 

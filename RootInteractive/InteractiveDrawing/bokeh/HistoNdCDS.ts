@@ -1,6 +1,7 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
+import {uniformBinEdges, uniformInRangeBin} from "./HistogramBinEdges"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
@@ -30,6 +31,7 @@ export class HistoNdCDS extends ColumnarDataSource {
     this._transform_scale = []
     this._strides = []
     this._nbins = []
+    this._bin_edges = []
   }
 
   static __name__ = "HistoNdCDS"
@@ -88,6 +90,7 @@ export class HistoNdCDS extends ColumnarDataSource {
   private _range_min: number[]
   private _range_max: number[]
   private _nbins: number[]
+  private _bin_edges: Float64Array[]
   private _transform_origin: number[]
   private _transform_scale: number[]
   private _strides: number[]
@@ -160,12 +163,14 @@ export class HistoNdCDS extends ColumnarDataSource {
       this._nbins.length = dim
       this._transform_scale.length = dim
       this._transform_origin.length = dim
+      this._bin_edges.length = dim
       this._strides.length = dim+1
       this._strides[0] = 1
       for(let i=0; i<dim; i++){
         this._nbins[i] = this.nbins[i]
         this._transform_scale[i] = this._nbins[i]/(this._range_max[i]-this._range_min[i])
         this._transform_origin[i] = this._range_min[i]*this._transform_scale[i]
+        this._bin_edges[i] = uniformBinEdges(this._range_min[i], this._range_max[i], this._nbins[i])
         this._strides[i+1] = this._strides[i]*this._nbins[i]
       }
 
@@ -177,9 +182,9 @@ export class HistoNdCDS extends ColumnarDataSource {
         let inv_scale = 1/this._transform_scale[i]
         for (let index = 0; index < length; index++) {
           let true_index = ((index%this._strides[i+1])/this._strides[i])|0
-          bin_bottom.push(this._range_min[i]+true_index*inv_scale)
+          bin_bottom.push(this._bin_edges[i][true_index])
           bin_center.push(this._range_min[i]+(true_index+.5)*inv_scale)
-          bin_top.push(this._range_min[i]+(true_index+1)*inv_scale)
+          bin_top.push(this._bin_edges[i][true_index+1])
         }
         this.data["bin_bottom_"+i] = bin_bottom
         this.data["bin_center_"+i]  = bin_center
@@ -330,6 +335,7 @@ export class HistoNdCDS extends ColumnarDataSource {
       const nbins = this._nbins[axis_idx]
       const range_min = this._range_min[axis_idx]
       const range_max = this._range_max[axis_idx]
+      const edges = this._bin_edges[axis_idx]
       console.log("HistoNdCDS: compute_bins", this.name, "axis_idx", axis_idx, "nbins", nbins, "range_min", range_min, "range_max", range_max)
       for(let i=0; i<length; i++){
         const val = column[i]
@@ -344,8 +350,8 @@ export class HistoNdCDS extends ColumnarDataSource {
         } else {
           // PHASE_5 Batch 2A (B10): a value one rounding step below the maximum can compute as nbins - it belongs to
           // the last bin of its axis, not to bin 0 of the next row of bins
-          const bin = (val * scale - origin) | 0
-          bins[i] += (bin < nbins ? bin : nbins - 1) * stride
+          const bin = uniformInRangeBin(val, scale, -origin, edges)
+          bins[i] += bin * stride
         }
       }
     }
