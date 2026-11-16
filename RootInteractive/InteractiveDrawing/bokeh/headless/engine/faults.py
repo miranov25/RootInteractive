@@ -98,7 +98,10 @@ B8_REINTRODUCED = Fault(
     description="B8 put back: a 1-D histogram counts a missing NaN sample in bin 0",
     source="HistogramCDS.ts getbin (new edge-aware classifier)",
     search="if (!(val >= this._range_min))",
-    replace=f"if (Number.isNaN(val)) return ({COUNTER}, 0); if (!(val >= this._range_min))",
+    # `val !== val` is true for NaN; `val === undefined` is a row past the end of the table. The old defect counted both
+    # in bin 0 (undefined * scale | 0 is 0), and the check of phantom rows in the selection tests relies on the second.
+    # Number.isNaN(undefined) is false, so it must not be used here (Claude21.RI, 2026-11-16).
+    replace=f"if (val !== val || val === undefined) return ({COUNTER}, 0); if (!(val >= this._range_min))",
 )
 
 # Exact one-line patterns are used only for imports whose module qualifier is

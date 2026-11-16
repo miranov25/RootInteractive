@@ -5,6 +5,7 @@ bundle — never to the stored healthy bundle — and the run proves the mutated
 detected only after the healthy control passed, and only by the check it is meant for; the fault x known-defect
 matrix must never end as an expected failure with the scenario OK (no known defect may hide a new problem).
 """
+import re
 import pytest
 
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine import faults, node_bundle
@@ -63,8 +64,11 @@ def test_each_fault_matches_the_bundle_exactly_once(node_bundle_root):
     text = node_bundle.model_bundle(node_bundle_root).read_text(encoding="utf-8")
     for fid, f in {**faults.FAULTS, **faults.DEFECT_FAULTS}.items():
         for part in f.parts or (f,):                       # a composite fault: each part (PHASE_5 Batch 2A, B10)
-            assert part.search and text.count(part.search) == 1, \
-                f"fault {fid} ({part.id}): found {text.count(part.search)} times in the model bundle"
+            # a part names its place either by an exact text or by a pattern (the histogram bin-edge fix, 2026-11-16:
+            # the helper is called through a module name that the compiler chooses), never by both and never by neither
+            assert bool(part.search) != bool(part.pattern), f"fault {fid} ({part.id}): exactly one of search and pattern"
+            found = len(re.findall(part.pattern, text)) if part.pattern else text.count(part.search)
+            assert found == 1, f"fault {fid} ({part.id}): found {found} times in the model bundle"
 
 
 @pytest.mark.parametrize("scenario,defect", known_defects.VEHICLES, ids=[s.id for s, _ in known_defects.VEHICLES])

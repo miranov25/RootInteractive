@@ -17,6 +17,10 @@ from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
 
+# The test group of this file (added by Claude21.RI, 2026-11-16; nothing else is changed): every test here belongs
+# to the histogram group of the Node tests, so that the run of the test groups selects it.
+pytestmark = pytest.mark.node_histograms
+
 
 GEOMETRIES = [
     pytest.param(-10.0, -2.0, 50, id="negative_offset_50_bins"),
