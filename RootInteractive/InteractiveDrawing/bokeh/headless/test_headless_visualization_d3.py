@@ -20,6 +20,14 @@ Integration (Claude20.RI, 2026-11-11), all test-only. Targets node_d3 (Node) and
            got None of type NoneType").
     G3-D2  when a filter selects no rows, the graph keeps drawing the previous points: the view hands vis.js an empty
            DataSet, vis 4.16.1 ignores empty data (Graph3d._dataInitialize), its dataPoints keep the old count.
+
+PHASE_5 group 2 (Claude21.RI, 2026-11-16), test-only additions:
+- a sequence of selections (nothing, six rows, nothing, all rows) with a check of the canvas itself: an empty step
+  must leave no coloured pixel;
+- a new defect of the same model:
+    G3-D3  when the table is empty at the moment the page loads, the graph is never created: vis 4.16.1 reads the
+           length of a table it did not store, the view's start stops with "Cannot read properties of null (reading
+           'length')", and the view never listens to its table; data that arrive later are not shown.
 """
 from __future__ import annotations
 
@@ -651,3 +659,130 @@ def test_strict_an_empty_selection_leaves_no_points_in_the_3d_graph(headless_ses
     known_defect(_is_g3_d2(before, after, len(df)), "G3-D2: vis.Graph3d still holds the old points")
     assert after["visCount"] in (0, None), after
     assert not res["blocked"] and not res["page_errors"] and not res["console_errors"], res
+
+
+# ---------------------------------------------- PHASE_5 group 2 (Claude21.RI, 2026-11-16): a sequence of selections
+# The points that vis.js really draws: coloured pixels in the left 70 % of the canvas (the colour legend is at the
+# right edge; the axes, the grid and the labels are grey or black).
+DOT_PIXELS_JS = r"""() => {
+  const c=window.__riD3.canvas, w=Math.floor(c.width*0.7), h=c.height;
+  const d=c.getContext('2d').getImageData(0,0,w,h).data;
+  let n=0;
+  for (let i=0;i<d.length;i+=4) {
+    if (d[i+3] < 200) continue;
+    const hi=Math.max(d[i],d[i+1],d[i+2]), lo=Math.min(d[i],d[i+1],d[i+2]);
+    if (hi-lo > 80) n++;
+  }
+  return n;
+}"""
+
+
+def _public_graph_sequence(headless_session, tmp_path, ranges):
+    """Load the public page in Chromium and move the range through `ranges`, one after the other. After each move wait
+    for the view's own setData call with the selected number of rows. Returns the table and one state per step (the
+    first is the state at load): the points the view hands over, the number of points vis.js holds, and the number
+    of coloured pixels on the canvas."""
+    df = _gated()
+    res = {}
+    ctx, page = _open_pinned_browser_page(headless_session, _make_filtered_page(df, tmp_path, html=True), res)
+    try:
+        page.wait_for_function(PUBLIC_VIEW_READY_JS, timeout=20000)
+        assert page.locator('canvas[data-ri-d3-canvas]').count() == 1
+        states = [dict(page.evaluate(VIS_STATE_JS), want=df, dots=page.evaluate(DOT_PIXELS_JS))]
+        page.evaluate(INSTALL_SETDATA_SPY_JS)
+        for step, rng in enumerate(ranges):
+            want = df[df.gate.between(*rng)].reset_index(drop=True)
+            page.evaluate("(r) => { const s=window.__riH.slider('gate'); if (!s) throw Error('gate slider'); s.value=r; }",
+                          list(rng))
+            page.wait_for_function(
+                "(a) => { const c=window.__riD3.setDataCalls; return c.length>a.step && c[c.length-1].length===a.n; }",
+                arg={"step": step, "n": len(want)}, timeout=20000)
+            states.append(dict(page.evaluate(VIS_STATE_JS), want=want, dots=page.evaluate(DOT_PIXELS_JS)))
+        assert not res["blocked"] and not res["page_errors"] and not res["console_errors"], res
+        return df, states
+    finally:
+        ctx.close()
+
+
+SEQUENCE = (EMPTY, PART, EMPTY, (-1.5, 2.))      # nothing, six rows, nothing again, all nine rows
+
+
+@BROWSER
+@pytest.mark.feature("DISPLAY.graph3d")
+@pytest.mark.xfail(**STRICT, reason="G3-D2: an empty selection leaves the previous points in the 3D graph")
+def test_strict_the_3d_graph_follows_a_sequence_of_empty_and_non_empty_selections(headless_session, tmp_path):
+    """Nothing selected, then six rows, then nothing again, then all rows: after every step vis.js holds exactly the
+    selected points, and an empty step leaves no coloured pixel on the canvas."""
+    df, states = _public_graph_sequence(headless_session, tmp_path, SEQUENCE)
+    assert states[0]["visCount"] == len(df) and states[0]["dots"] > 0, states[0]
+    stale = [i for i, s in enumerate(states[1:], 1) if len(s["want"]) == 0 and s["viewPoints"] == [] and s["visCount"]]
+    known_defect(stale == [1, 3] and states[1]["visCount"] == len(df) and states[3]["visCount"] == 6
+                 and states[1]["dots"] > 0 and states[3]["dots"] > 0,
+                 "G3-D2: after each empty selection vis.Graph3d still holds and draws the points of the step before")
+    for i, s in enumerate(states[1:], 1):
+        _assert_points(s["viewPoints"], _mapping_ref(s["want"]))
+        _assert_points(s["last"], _mapping_ref(s["want"]))
+        assert (s["visCount"] or 0) == len(s["want"]), (i, s["visCount"], len(s["want"]))
+        assert (s["dots"] > 0) == (len(s["want"]) > 0), (i, s["dots"], len(s["want"]))
+
+
+# ---------------------------------------------- group 2: a table that is empty when the page loads (new: G3-D3)
+EMPTY_AT_LOAD_ERROR = "Cannot read properties of null (reading 'length')"
+# The view of the direct page and what vis.js holds; null when the view has no vis.Graph3d.
+DIRECT_VIEW_JS = r"""() => {
+  if (!window.vis || typeof window.vis.Graph3d !== 'function' || !window.Bokeh || !Bokeh.index) return null;
+  const models=window.__riH.models().filter(m=>m.type==='BokehVisJSGraph3D' && m.name==='d3_rendered_graph');
+  if (models.length !== 1) throw Error('D3 root model identity: ' + models.length);
+  const idx=Bokeh.index, views=idx instanceof Map ? Array.from(idx.values()) : Object.values(idx);
+  const matches=views.filter(v=>v?.model?.id===models[0].id);
+  if (matches.length !== 1) return null;
+  const g=matches[0]._graph;
+  if (!g) return {graph:false};
+  window.__riD3={graph:models[0], view:matches[0], visGraph:g, canvas:g.frame.canvas, setDataCalls:[]};
+  return {graph:true, visCount: Array.isArray(g.dataPoints) ? g.dataPoints.length : null};
+}"""
+SET_DIRECT_SOURCE_JS = r"""(cols) => {
+  const src=window.__riH.models().filter(m=>m.name==='d3_editable_source')[0];
+  src.data=cols; src.change.emit();
+}"""
+
+
+def _empty_at_load(headless_session, tmp_path):
+    """The direct page with a table of no rows; then the table gets the nine rows, then no rows, no rows once more
+    (two empty tables one after the other), and the nine rows again."""
+    df = _frame()
+    res = {}
+    ctx, page = _open_pinned_browser_page(headless_session, _make_direct_visual_page(df.iloc[0:0], tmp_path), res)
+    try:
+        page.wait_for_function("() => window.vis && typeof window.vis.Graph3d === 'function'", timeout=20000)
+        state = None
+        for _ in range(50):                               # until the view has its graph, or the page reported an error
+            state = page.evaluate(DIRECT_VIEW_JS)
+            if (state and state["graph"]) or res["page_errors"]:
+                break
+            page.wait_for_timeout(100)
+        states = [dict(state or {"graph": False}, errors=list(res["page_errors"]))]
+        if state and state["graph"]:
+            states[0]["dots"] = page.evaluate(DOT_PIXELS_JS)
+            for rows in (df, df.iloc[0:0], df.iloc[0:0], df):
+                page.evaluate(SET_DIRECT_SOURCE_JS, {k: rows[k].tolist() for k in df.columns})
+                states.append(dict(page.evaluate(DIRECT_VIEW_JS), dots=page.evaluate(DOT_PIXELS_JS),
+                                   errors=list(res["page_errors"])))
+        assert not res["blocked"] and not res["console_errors"], res
+        return df, states
+    finally:
+        ctx.close()
+
+
+@BROWSER
+@pytest.mark.feature("DISPLAY.graph3d")
+@pytest.mark.xfail(**STRICT, reason="G3-D3: with an empty table at load the 3D graph is never created")
+def test_strict_a_3d_graph_with_an_empty_table_at_load_is_created_and_shows_later_data(headless_session, tmp_path):
+    df, states = _empty_at_load(headless_session, tmp_path)
+    known_defect(len(states) == 1 and states[0]["graph"] is False and states[0]["errors"] == [EMPTY_AT_LOAD_ERROR],
+                 f"G3-D3: the view has no vis.Graph3d and the page reports '{EMPTY_AT_LOAD_ERROR}'")
+    assert [s["errors"] for s in states] == [[]] * 5, states
+    assert states[0]["graph"] and not states[0]["visCount"] and states[0]["dots"] == 0, states[0]
+    for i, n in ((1, len(df)), (2, 0), (3, 0), (4, len(df))):
+        assert states[i]["visCount"] == n and (states[i]["dots"] > 0) == (n > 0), (i, states[i])
+
