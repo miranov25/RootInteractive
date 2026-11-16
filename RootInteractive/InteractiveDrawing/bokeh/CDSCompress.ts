@@ -103,12 +103,14 @@ export class CDSCompress extends ColumnDataSource {
     if(deps.has("dither")){
       this.invalidateOnDitheringToggle.add(key)
     }
-    this.data[key]=arrOut;
-    this.freshColumns.add(key);
+    // PHASE_5 Group 1 (TR-D2): the length is checked before the column is kept; before, a refused column was kept
+    // and returned without an error on the next read
     if(this._length === -1) this._length = arrOut.length
     if(arrOut.length !== this._length){
       throw Error("Corrupted length of column " + key + ": " + arrOut.length + " expected: " + this._length)
     }
+    this.data[key]=arrOut;
+    this.freshColumns.add(key);
     console.log(key);    
     return arrOut;
   }

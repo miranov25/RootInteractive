@@ -26,14 +26,17 @@ Run on the pinned toolchain: 20 of 31 cases passed as delivered. Changes, each m
            ClientLinearFitter without registering varY/weights as used columns): reading the fitted alias throws
            "Cannot read properties of undefined (reading 'decodeProgram')" in CDSCompress.get_column;
     ST-D2  with two or more predictors the fit is wrong: MathUtils.ts chol updates every off-diagonal element of the
-           packed matrix twice (once in each inner loop); one predictor (2 x 2) is correct;
+           packed matrix twice (once in each inner loop); one predictor (2 x 2) is correct.
+           Fixed in PHASE_5 Group 1: the signature test is removed, the strict tests are ordinary tests, and the exact
+           signature (the fit equals the transcription of the old solver) is a REGRESSION check;
     ST-D3  an alias whose variables are chosen by a parameter fails the page build: bokehTools.py bokehDrawArray reads
            `context` in the function-form alias branch, where it is set only by an earlier expression alias
            (UnboundLocalError). Fixed in PHASE_5 Batch 3 (with A-D3): the signature test is removed, the exact signature
            is a REGRESSION check, and the strict test now waits for ST-D2, which the page shows once it builds;
     ST-D5  (PHASE_5 Group 1, new) the solver treats a diagonal element below the absolute number 1e-6 as zero, so a
-           fit with small predictors is wrong without a message, also with one predictor. Strict expected failures
-           until the fix commit of Group 1.
+           fit with small predictors is wrong without a message, also with one predictor. Fixed in PHASE_5 Group 1
+           with ST-D2: a diagonal element must be positive, there is no threshold, and a system that cannot be solved
+           gives NaN for every coefficient.
     ST-D4  the statistics table computes quantiles in one pass that assumes an ascending list; a list in another order
            (the table keeps the order the histograms request) gives wrong values under the right titles.
            Fixed in PHASE_5 Batch 2B: the signature test is removed, the strict test is an ordinary test, and the exact
@@ -229,9 +232,9 @@ def _is_st_d2(vals, df, predictors, weight=None, alpha=0.) -> bool:
 
 
 def _check_fit(vals, df, predictors, weight=None, alpha=0.):
-    """The oracle (numpy), after the ST-D2 signature."""
-    known_defect(_is_st_d2(vals, df, predictors, weight, alpha),
-                 f"ST-D2: the fit with predictors {list(predictors)} equals the double-update solver prediction")
+    """The oracle (numpy), after the ST-D2 signature (fixed in PHASE_5 Group 1: a regression)."""
+    regression(_is_st_d2(vals, df, predictors, weight, alpha),
+               f"ST-D2: the fit with predictors {list(predictors)} equals the double-update solver prediction")
     _values_equal(vals, _fit_ref(df, predictors, weight=weight, alpha=alpha)[0])
 
 
@@ -673,7 +676,6 @@ FIT_CASES = dict(argnames="weight,alpha", argvalues=[(None,0.),("wA",0.),("wA",.
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize(**FIT_CASES)
-@pytest.mark.xfail(**STRICT, reason="ST-D2: the fit is wrong with two or more predictors (MathUtils.ts chol)")
 def test_stat_client_linear_fit_matches_numpy(node_session,tmp_path,weight,alpha):
     d=_df()
     path=_fit_page(tmp_path,d,["x","z"],weight=weight,alpha=alpha,
@@ -689,21 +691,9 @@ def test_stat_client_linear_fit_matches_numpy(node_session,tmp_path,weight,alpha
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize(**FIT_CASES)
-def test_signature_st_d2_two_predictors_give_the_double_update_solution(node_session,tmp_path,weight,alpha):
-    """ST-D2: the fitted values AND the fitter's parameters equal the transcribed solver's, not numpy's."""
-    d=_df()
-    _node_open(node_session,_fit_page(tmp_path,d,["x","z"],weight=weight,alpha=alpha,suffix=f"fit_sig_{weight}_{alpha}"))
-    vals=_read(node_session,"CDSAlias",["fitted"],name="cdsFull")["data"]["fitted"]
-    assert _is_st_d2(vals,d,["x","z"],weight,alpha), vals
-    got=_read(node_session,"ClientLinearFitter",[])["extra"]
-    _values_equal(got["parameters"],_ri_fit_prediction(d,["x","z"],weight,alpha)[1])
-
-
-@NODE
-@pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.parametrize(**FIT_CASES)
 def test_control_st_d2_one_predictor_fit_equals_numpy(node_session,tmp_path,weight,alpha):
-    """ST-D2's control: with one predictor (a 2 x 2 system) the same page and solver give numpy's fit."""
+    """ST-D2's control (the defect is fixed in PHASE_5 Group 1): with one predictor (a 2 x 2 system) the same page and
+    solver give numpy's fit."""
     d=_df()
     _node_open(node_session,_fit_page(tmp_path,d,["x"],weight=weight,alpha=alpha,suffix=f"fit_one_{weight}_{alpha}"))
     vals=_read(node_session,"CDSAlias",["fitted"],name="cdsFull")["data"]["fitted"]
@@ -773,15 +763,13 @@ GROUP1_FITS = dict(argnames="case,weight", argvalues=[("three", None), ("three",
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize(**GROUP1_FITS)
-@pytest.mark.xfail(**STRICT, reason="ST-D2: wrong fit with two or more predictors; ST-D5: a diagonal element below "
-                                    "the absolute number 1e-6 counts as zero (MathUtils.ts chol)")
 def test_stat_client_fit_group1_cases_equal_numpy_and_the_true_coefficients(node_session, tmp_path, case, weight):
     """Exact data, so the fit must return numpy's fit AND the coefficients the data were made with. The last case has
-    one predictor: it is wrong today only because of the absolute threshold (ST-D5), not because of ST-D2.
+    one predictor: before the fix it was wrong only because of the absolute threshold (ST-D5), not because of ST-D2.
     The cases with small predictors are compared less tightly: the fit solves the normal equations, which lose
     digits when the predictors are much smaller than 1 (the reference, numpy lstsq, does not)."""
     d, predictors, vals, got = _group1_read(node_session, tmp_path, case, weight)
-    known_defect(_is_old_solver(vals, d, predictors, weight), f"ST-D2 / ST-D5: the fit of case {case} is the old solver's")
+    regression(_is_old_solver(vals, d, predictors, weight), f"ST-D2 / ST-D5: the fit of case {case} is the old solver's")
     ref, beta = _fit_ref(d, predictors, weight=weight)
     small = case in ("small", "tiny", "tiny_line")
     np.testing.assert_allclose(vals, ref, rtol=0, atol=1e-7 if small else 1e-10)
@@ -889,8 +877,6 @@ def test_control_st_d3_after_an_expression_alias_the_page_builds_and_follows_the
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="ST-D2: the fit with two predictors is wrong (ST-D3, fixed in PHASE_5 Batch 3, no "
-                                    "longer stops the page before it)")
 def test_stat_client_fit_predictor_count_change_recomputes(node_session,tmp_path):
     d=_df()
     err=_fit_build_error(tmp_path,d,["x"],parameter=True,suffix="varX")
@@ -911,8 +897,7 @@ def test_stat_client_fit_predictor_count_change_recomputes(node_session,tmp_path
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize("predictors",[pytest.param(["x"],id="one_predictor"),
-                                       pytest.param(["x","z"],id="two_predictors",marks=pytest.mark.xfail(
-                                           **STRICT, reason="ST-D2: wrong fit with two or more predictors"))])
+                                       pytest.param(["x","z"],id="two_predictors")])
 def test_stat_client_fit_reacts_to_source_data_change(node_session,tmp_path,predictors):
     """Integration: uncompressed page (the mutation replaces a column of the plain ColumnDataSource cdsOrig)."""
     d=_df()

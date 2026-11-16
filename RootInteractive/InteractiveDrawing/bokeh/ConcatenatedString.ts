@@ -31,7 +31,8 @@ export class ConcatenatedString extends Model {
 
   initialize(){
     super.initialize()
-    this.#is_dirty = false
+    // PHASE_5 Group 1 (CS-D1): the value is computed at the first read; before, it was undefined until the first change
+    this.#is_dirty = true
   }
 
   connect_signals(): void {

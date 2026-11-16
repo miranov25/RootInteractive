@@ -170,17 +170,24 @@ export function quantile(sample:number[], q:number, begin=0, end=-1){
   
   // Cholesky decomposition without pivoting - inplace
 // TODO: Perhaps add a version with pivoting too?
-export function chol(X: number[], nRows: number, eps=1e-6){
+// PHASE_5 Group 1 (ST-D5): a diagonal element that is not positive when its turn comes means that the matrix cannot
+// be solved; it is marked NaN, and solve() then returns NaN. There is no threshold: before, any element below the
+// absolute number 1e-6 counted as zero, so the result depended on the units of the variables.
+export function chol(X: number[], nRows: number){
   let iRow = 0
   let jRow, kRow
   for(let i=0; i < nRows; ++i){
-    const pivotDiag =X[i+iRow] < eps ? 0 : 1/X[i+iRow]
+    if(!(X[i+iRow] > 0)) X[i+iRow] = NaN
+    const pivotDiag = 1/X[i+iRow]
     jRow = iRow+i+1
     for(let j=i+1; j < nRows; ++j) {
       const pivotRow = pivotDiag*X[i+jRow]
       kRow = iRow+i+1
+      // PHASE_5 Group 1 (ST-D2): row j, columns i+1..j-1 were already updated by the second loop, when each of those
+      // columns was the j of an earlier turn; only the diagonal element (j, j) is updated here. Updating them again,
+      // with an already scaled value, made every fit with two or more predictors wrong.
       for(let k=i+1; k <= j; ++k){
-	X[k+jRow] -= pivotRow*X[i+kRow]
+	if(k === j) X[k+jRow] -= pivotRow*X[i+kRow]
 	kRow += k+1
       }
       for(let k=j+1; k < nRows; ++k) {
@@ -199,6 +206,10 @@ export function chol(X: number[], nRows: number, eps=1e-6){
 export function solve(x:number[], y:number[]){
   let nRows = y.length
   chol(x,nRows)
+  // PHASE_5 Group 1 (ST-D5): a matrix that cannot be solved gives NaN for every unknown, not a wrong number
+  for(let i=0, iDiag=0; i < nRows; iDiag += i+2, ++i){
+    if(!(x[iDiag] > 0)) return y.fill(NaN)
+  }
   let iRow = 0
   for(let i=0; i < nRows; ++i){
     for(let j=0; j < i; ++j){

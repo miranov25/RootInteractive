@@ -21,7 +21,9 @@ tests. Defects, each with an exact signature, a strict expected-failure partner 
          logs "TypeError: Function.prototype.apply was called on null" once (the text area's callback sets `func`,
          which recomputes the column before update_func builds the new function); the result is then right;
   CS-D1  an axis label's model value (ConcatenatedString.value) is undefined until its parameter first changes
-         (#is_dirty starts false); the axis text itself is right, set by Python at build;
+         (#is_dirty starts false); the axis text itself is right, set by Python at build.
+         Fixed in PHASE_5 Group 1: the strict mark is off, the signature test is removed, the exact signature is a
+         regression (an ordinary failure), and the value is checked at load, in Node and in Chromium;
   DS-D1  after the selection shrinks, the downsampler's columns keep the old entries at the end (DownsamplerCDS
          get_column grows its arrays but never shrinks them): get_column(c).length > get_length(); the first
          get_length() entries are right and Bokeh paints get_length() rows (A4 observation O-A4-2, now a test);
@@ -619,12 +621,12 @@ def test_node_lazy_tabs_watched_and_catchup_after_hidden_filter_moves(node_sessi
     pytest.param("axis_plain","Spinner",[2,5,1,2],id="plain"),
     pytest.param("axis_options","Select",["A","B","None","A"],id="option-metadata-none"),
 ])
-@pytest.mark.xfail(**STRICT, reason="CS-D1: an axis label's model value is undefined until its parameter changes")
 def test_node_axis_label_parameter_value_and_target(node_session, tmp_path, kind, model, states):
     df = frame()
     page, report = _node_page(node_session,tmp_path,kind,df)
-    known_defect(_is_cs_d1(_axis_state(page), axis_oracle(states[0], option=(kind=="axis_options"))),
-                 "CS-D1: the label's value is undefined at load")
+    regression(_is_cs_d1(_axis_state(page), axis_oracle(states[0], option=(kind=="axis_options"))),
+               "CS-D1: the label's value is undefined at load")
+    _assert_axis(page,axis_oracle(states[0],option=(kind=="axis_options")))      # at load, before any change
     for value in states:
         _node_set(page,model,"value",value,title="scale" if kind=="axis_plain" else "varY")
         _assert_axis(page,axis_oracle(value,option=(kind=="axis_options")))
@@ -675,9 +677,11 @@ def test_browser_real_widget_change_updates_axis_label_and_redraws(headless_sess
     df=frame()
     ctx,page,errors=_browser_page(headless_session,tmp_path,kind,df)
     try:
-        # integration: at load only the axis text is checked - the label's model value is undefined at load (CS-D1,
-        # its own Node tests); after the real input below the full state (value and text) is checked
-        assert _axis_state(page)["axisLabel"] == axis_oracle(2 if kind=="axis_plain" else "A",option=kind=="axis_options")
+        # at load the axis text and the label's model value are checked (the value was undefined at load before the
+        # fix of CS-D1 in PHASE_5 Group 1); after the real input below the full state is checked again
+        at_load = axis_oracle(2 if kind=="axis_plain" else "A",option=kind=="axis_options")
+        assert _axis_state(page)["axisLabel"] == at_load
+        assert _axis_state(page)["modelValue"] == at_load
         # Capturing only the plot's canvas avoids mistaking a changed input for
         # graphical axis redraw. Model value is asserted separately below.
         canvases=page.locator("canvas")
@@ -850,16 +854,6 @@ def test_strict_a_toggleable_text_query_alone_loads_and_selects_every_row(node_s
 def _is_cs_d1(state, expected) -> bool:
     return (state["modelValue"] is None and "".join(map(str, state["components"])) == expected
             and state["axisLabel"] == expected)
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("DISPLAY.axis_label")
-@pytest.mark.parametrize("kind,first", [("axis_plain", 2), ("axis_options", "A")], ids=["plain", "option-metadata"])
-def test_signature_cs_d1_the_label_value_is_undefined_at_load(node_session, tmp_path, kind, first):
-    """CS-D1: at load the label's model value is undefined, while its components and the axis text are right."""
-    page, report = _node_page(node_session, tmp_path, kind, frame())
-    assert _is_cs_d1(_axis_state(page), axis_oracle(first, option=(kind == "axis_options"))), _axis_state(page)
-    _assert_no_errors(report)
 
 
 @pytest.mark.node_display

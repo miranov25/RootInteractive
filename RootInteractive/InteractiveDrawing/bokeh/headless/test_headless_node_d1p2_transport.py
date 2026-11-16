@@ -22,6 +22,8 @@ Target node_transport. Changes to GPT28's v0.1a, all test-only:
   That check found a second defect:
     TR-D2  a column refused for its wrong length is cached before the length check (CDSCompress.ts get_column), so
            the SECOND read returns the 7-entry column without any error.
+           Fixed in PHASE_5 Group 1: the strict mark is off, the signature test is removed, and the exact signature
+           is a regression (an ordinary failure).
 - Review F4: a cold-cache test shows the decoding is lazy (nothing decoded at load in Node, reading x decodes x).
 - Review F3: narrower feature ids instead of ENC.compression.roundtrip, which stays planned: lossless decoding is
   not the whole compression pipeline (no lossy codes here).
@@ -456,17 +458,6 @@ def _corrupt_page(headless_out, stem):
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("ENC.cds_compress.length_guard")
-def test_signature_tr_d2_a_refused_column_is_returned_on_the_second_read(node_session, headless_out):
-    """TR-D2, exact (found by the review-F4 cache check): refused once, then returned with 7 entries, no error."""
-    _open(node_session, _corrupt_page(headless_out, "d1p2_trd2_sig"))
-    got = _eval(node_session, READ_TWICE)
-    assert _is_tr_d2(got), got
-
-
-@pytest.mark.node_transport
-@pytest.mark.backend("node")
-@pytest.mark.layer("integration")
-@pytest.mark.feature("ENC.cds_compress.length_guard")
 def test_control_tr_d2_a_column_of_the_right_length_is_cached_and_reused(node_session, headless_out):
     """TR-D2's control, on the same corrupted page: x (8 rows) is decoded once and the same array comes back."""
     _open(node_session, _corrupt_page(headless_out, "d1p2_trd2_ctl"))
@@ -480,11 +471,12 @@ def test_control_tr_d2_a_column_of_the_right_length_is_cached_and_reused(node_se
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("ENC.cds_compress.length_guard")
-@pytest.mark.xfail(**STRICT, reason="TR-D2: a column refused for its length is returned on the second read")
 def test_strict_a_column_of_the_wrong_length_is_refused_on_every_read(node_session, headless_out):
-    """The guard's contract: every read of the corrupted w is refused with the same error, and w is not cached."""
+    """The guard's contract: every read of the corrupted w is refused with the same error, and w is not cached.
+    (TR-D2, fixed in PHASE_5 Group 1: its exact signature is a regression.)"""
     _open(node_session, _corrupt_page(headless_out, "d1p2_trd2_strict"))
     got = _eval(node_session, READ_TWICE)
-    known_defect(_is_tr_d2(got), "TR-D2: the second read returns the 7-entry w without error")
+    if _is_tr_d2(got):
+        raise AssertionError("REGRESSION, a fixed defect is back: TR-D2: the second read returns the 7-entry w without error")
     assert got["tries"] == [{"rejected": True, "error": LENGTH_ERROR}] * 2, got
     assert "w" not in got["cached"], got

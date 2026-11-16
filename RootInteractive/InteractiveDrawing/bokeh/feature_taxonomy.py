@@ -151,7 +151,8 @@ FEATURE_TAXONOMY = {
     "ENC.cds_compress.length_guard": {
         "name": "Compressed table: a column of the wrong length is refused",
         "description": "Reading a column whose decoded length differs from the table's raises 'Corrupted length of "
-                       "column ...' (known defect TR-D2: refused only on the first read, returned on the second)",
+                       "column ...' on every read (the defect TR-D2, refused only on the first read, is fixed in "
+                       "PHASE_5 Group 1)",
         "priority": "P2",
         "backends": ["node"],
         "layer": "integration",
