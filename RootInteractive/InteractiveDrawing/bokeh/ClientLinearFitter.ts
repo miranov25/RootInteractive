@@ -66,123 +66,127 @@ export class ClientLinearFitter extends Model {
   }
 
   fit(){
+    // The least-squares fit y = beta_0 + sum_i beta_i * x_i, with optional weights w and the ridge term alpha (added,
+    // as before, to every diagonal element of the normal equations of the original predictors, the intercept
+    // included).
+    //
+    // PHASE_5 Group 3 (defect ST-D6): the sums of the normal equations are formed from the centred and scaled
+    // predictors u_i = (x_i - m_i) / s_i, with m_i and s_i the weighted mean and spread of x_i, and the coefficients
+    // are transformed back. Before, the sums were formed from x_i itself: with a large offset (a position far from
+    // 0, a run number, a timestamp) they lost the digits that carry the information, and the fit was silently wrong
+    // (offset 1e6) or meaningless (1e9). This is the standard remedy (numpy.polynomial.Polynomial.fit maps its data
+    // to [-1, 1] for the same reason). It is an exact change of variables: m_i and s_i need not be exact, and the
+    // ridge term is transformed with it, so the fit minimises the same function as before.
+    //
+    // PHASE_5 Group 3 (defect ST-D7): without the ridge term, a fit with fewer rows of positive weight than unknowns
+    // is not determined, and gives no fit (NaN), as a fit that cannot be solved does (MathUtils.solve). Before,
+    // rounding could leave a tiny positive pivot and give finite, meaningless coefficients.
     const {alpha, source, varX, varY, weights} = this
-    let x: number[] = []
-    this.parameters = []
-    if(weights == null){
-    for(let i=0; i < varX.length; ++i){
-      let iField = source.get_column(varX[i])
-      if(iField == null){
-	throw ReferenceError("Column not defined: " + iField)
-      }
-      for(let j=0; j <= i; ++j){
-	let acc = 0
-	let jField = source.get_column(varX[j])
-	if(jField == null) continue
-	// HACK: for some reason ES6 reduce eats too much memory
-	for(let k=0; k < iField.length; ++k){
-	  acc += iField[k]*jField[k]
-	}
-	x.push(acc)
-      }
-    }
+    const nX = varX.length
+    const nUnknowns = nX + 1
     const colY = source.get_column(varY)
     if(colY == null){
-      throw ReferenceError("Column not defined: " + this.varY)
+      throw ReferenceError("Column not defined: " + varY)
     }
-    for(let i=0; i < varX.length; ++i){
-      const iField = varX[i]
-      let col = source.get_column(iField)
+    const cols: ArrayLike<number>[] = []
+    for(const name of varX){
+      const col = source.get_column(name)
       if(col == null){
-	throw ReferenceError("Column not defined: " + iField)
+        throw ReferenceError("Column not defined: " + name)
       }
-      let acc = 0
-      for(let k=0; k < col.length; k++){
-	acc += col[k]
-      }
-      x.push(acc)
-      acc=0
-      for(let k=0; k < col.length; k++){
-	acc += col[k]*colY[k]
-      }
-      this.parameters.push(acc)
+      cols.push(col)
     }
-    let len = source.get_length()
-    if(len == null){
-      x.push(1)
-    } else {
-      x.push(len)
-    }
-    let acc=0
-    for(let k=0; k < colY.length; k++){
-      acc += colY[k]
-    }
-    this.parameters.push(acc)
-    } else {
-      const weightsCol = source.get_column(weights)
-      if(weightsCol == null){
+    let w: ArrayLike<number> | null = null
+    if(weights != null){
+      w = source.get_column(weights)
+      if(w == null){
         throw ReferenceError("Column not defined: " + weights)
       }
-      const colY = source.get_column(varY)
-      if(colY == null) {
-	throw ReferenceError("Column not defined: " + varY)
-      }
-      let len = source.get_length()
-      if(len == null){
-	len = 0
-      }
-      for(let i=0; i < varX.length; ++i){
-	let iField = source.get_column(varX[i])
-	if(iField == null){
-	  throw ReferenceError("Column not defined: " + iField)
-	}
-	for(let j=0; j <= i; ++j){
-	  let jField = source.get_column(varX[j])
-	  if(jField == null) {
-	    break
-	  }
-	  let acc = 0
-	  for(let k=0; k < len; ++k){
-	    acc += iField[k] * jField[k] * weightsCol[k]
-	  }
-	  x.push(acc)
-	}
-      }
-      for(let i=0; i < varX.length; ++i){
-	let col = source.get_column(varX[i])
-	if(col == null){
-	  throw ReferenceError("Column not defined: " + col)
-	}
-        let acc=0
-	for(let k=0; k < len; ++k){
-	  acc += col[k] * weightsCol[k]
-	}
-        x.push(acc)
-	acc = 0
-	for(let k=0; k < len; ++k){
-	  acc += col[k] * colY[k] * weightsCol[k]
-	}
-	this.parameters.push(acc)
-      } 
+    }
+    const len = source.get_length() ?? colY.length
+
+    // 1. the weighted mean and spread of each predictor, and the number of rows with a positive weight
+    let sumW = 0
+    let nPositive = 0
+    for(let k=0; k < len; ++k){
+      const wk = w == null ? 1 : w[k]
+      sumW += wk
+      if(wk > 0) ++nPositive
+    }
+    const mean: number[] = []
+    const scale: number[] = []
+    for(const col of cols){
       let acc = 0
       for(let k=0; k < len; ++k){
-	acc += weightsCol[k]
+        acc += w == null ? col[k] : col[k]*w[k]
       }
-      x.push(acc)
+      const m = acc / sumW
       acc = 0
       for(let k=0; k < len; ++k){
-	acc += colY[k] * weightsCol[k]
+        const d = col[k] - m
+        acc += w == null ? d*d : d*d*w[k]
       }
-      this.parameters.push(acc)      
+      const s = Math.sqrt(acc / sumW)
+      mean.push(m)
+      // a constant predictor stays a column of zeros, so the fit cannot be solved and gives NaN, as before
+      scale.push(s > 0 ? s : 1)
     }
+
+    // 2. the normal equations of u (packed lower triangle, row by row; the intercept is the last unknown)
+    const x: number[] = new Array(nUnknowns*(nUnknowns+1)/2).fill(0)
+    const rhs: number[] = new Array(nUnknowns).fill(0)
+    const u: number[] = new Array(nX).fill(0)
+    const lastRow = nX*(nX+1)/2
+    for(let k=0; k < len; ++k){
+      const wk = w == null ? 1 : w[k]
+      const yk = colY[k]
+      for(let i=0; i < nX; ++i){
+        u[i] = (cols[i][k] - mean[i]) / scale[i]
+      }
+      let iRow = 0
+      for(let i=0; i < nX; ++i){
+        const uw = u[i]*wk
+        for(let j=0; j <= i; ++j){
+          x[iRow+j] += uw*u[j]
+        }
+        x[lastRow+i] += uw
+        rhs[i] += uw*yk
+        iRow += i+1
+      }
+      x[lastRow+nX] += wk
+      rhs[nX] += wk*yk
+    }
+
+    // 3. the ridge term alpha*(sum_i beta_i^2 + beta_0^2) in the new unknowns gamma: beta = T gamma with
+    // beta_i = gamma_i/s_i and beta_0 = gamma_0 - sum_i gamma_i*m_i/s_i, so alpha * T^T T is added
     if(alpha > 0){
       let iRow = 0
-      for(let i=0; i < this.parameters.length; ++i){
-	x[iRow] += alpha
-	iRow += i+2
+      for(let i=0; i < nX; ++i){
+        const ri = mean[i]/scale[i]
+        for(let j=0; j <= i; ++j){
+          x[iRow+j] += alpha*ri*mean[j]/scale[j]
+        }
+        x[iRow+i] += alpha/(scale[i]*scale[i])
+        x[lastRow+i] -= alpha*ri
+        iRow += i+1
       }
+      x[lastRow+nX] += alpha
     }
-    solve(x,this.parameters)
+
+    // 4. solve, and transform back
+    if(!(alpha > 0) && nPositive < nUnknowns){
+      rhs.fill(NaN)
+    } else {
+      solve(x, rhs)
+    }
+    this.parameters = []
+    let intercept = rhs[nX]
+    for(let i=0; i < nX; ++i){
+      const beta = rhs[i]/scale[i]
+      this.parameters.push(beta)
+      intercept -= beta*mean[i]
+    }
+    this.parameters.push(intercept)
     this._is_fresh = true
   }
 

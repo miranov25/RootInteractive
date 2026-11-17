@@ -812,7 +812,8 @@ def test_group1_reference_data_are_exact_and_the_old_solver_prediction_is_wrong_
 # scale) the predictors before the sums are formed and to transform the coefficients back, as
 # numpy.polynomial.Polynomial.fit does. Two more cases from the same review: exactly collinear predictors (a control
 # that holds before and after), and fewer rows than unknowns, which can give finite, meaningless coefficients
-# (register entry ST-D7 proposed).
+# (register entry ST-D7 proposed). Both are FIXED in Group 3: their tests are ordinary tests, and their exact
+# signatures are REGRESSION checks.
 def _coefficient_tolerance(d, predictors, weight=None):
     """100 * cond(A) * eps of the normal matrix A = X^T W X of the case (X with the intercept column), at least 1e-12:
     the standard error bound of a stable solver of the normal equations (the review of Group 1, P2-1)."""
@@ -968,13 +969,12 @@ OFFSET_FITS = dict(argnames="case,weight", argvalues=[("offset_1e3", None), ("of
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize(**OFFSET_FITS)
-@pytest.mark.xfail(**STRICT, reason="ST-D6: a fit on a predictor with a large offset is imprecise or empty")
 def test_stat_client_fit_on_a_predictor_with_a_large_offset_equals_numpy(node_session, tmp_path, case, weight):
     """The fitted values equal numpy's least squares within 1e-12 relative, and the slopes are the ones the data were
-    made with. Before the fix: an offset of 1e3 loses digits, 1e6 gives a wrong slope and intercept without a
+    made with. Before Group 3: an offset of 1e3 lost digits, 1e6 gave a wrong slope and intercept without a
     message, 1e9 a meaningless fit."""
     d, predictors, vals, got = _offset_read(node_session, tmp_path, case, weight)
-    known_defect(_is_st_d6(vals, d, predictors, weight),
+    regression(_is_st_d6(vals, d, predictors, weight),
                  f"ST-D6: the fit of case {case} is the fit on the raw sums: "
                  f"{'no fit (NaN)' if np.isnan(vals).all() else 'slopes ' + str(got[:-1])}")
     _assert_offset_fit(vals, got, d, predictors, weight)
@@ -1054,15 +1054,14 @@ def test_control_fewer_rows_than_unknowns_exact_in_binary_give_no_fit(node_sessi
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="ST-D7: a fit with fewer rows than unknowns can give finite coefficients")
 def test_fewer_rows_than_unknowns_give_no_fit(node_session, tmp_path):
     """Two rows whose values are not exact in binary: the last pivot is a rounding residue that happens to be
-    positive, and before Group 3 the page shows finite, meaningless coefficients. The fit is not determined, so the
+    positive, and before Group 3 the page showed finite, meaningless coefficients. The fit is not determined, so the
     page must show no fit."""
     p0, p1, y = TWO_ROWS["not_exact_in_binary"]
     d = pd.DataFrame({"p0": p0, "p1": p1, "target": y})
     vals, got = _fit_of_rows(node_session, tmp_path, d, ["p0", "p1"], "g3_two_rows_inexact")
-    known_defect(_is_st_d7(vals, got, d), f"ST-D7: two rows give the coefficients {got}")
+    regression(_is_st_d7(vals, got, d), f"ST-D7: two rows give the coefficients {got}")
     assert len(vals) == 2 and np.isnan(vals).all(), vals
     assert np.isnan(got).all(), got
 
