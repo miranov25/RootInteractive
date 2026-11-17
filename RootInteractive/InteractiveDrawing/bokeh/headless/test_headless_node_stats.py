@@ -1126,14 +1126,18 @@ def test_signature_st_d1_a_fit_column_is_not_sent(node_session,tmp_path,send,wei
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="ST-D1: a linear fit does not send its response column")
-def test_strict_a_fit_on_a_page_as_a_user_writes_it_equals_numpy(node_session,tmp_path):
-    """One predictor (no ST-D2), nothing else showing the response column."""
-    d, sent, r = _st_d1_state(node_session, tmp_path, "none", None, "fit_d1_strict")
-    known_defect(_is_st_d1(sent, r, "target"), "ST-D1: the fit's response column is not sent")
+@pytest.mark.parametrize("send,weight,column",[("none",None,"target"),("response","wA","wA")],
+                         ids=["response_column","weight_column"])
+@pytest.mark.xfail(**STRICT, reason="ST-D1: a linear fit does not send its response or weight column")
+def test_strict_a_fit_on_a_page_as_a_user_writes_it_equals_numpy(node_session,tmp_path,send,weight,column):
+    """One predictor (no ST-D2); nothing else on the page shows the response column (or, in the second case, the
+    weight column). PHASE_5 Group 4: the weight column is a case of its own."""
+    d, sent, r = _st_d1_state(node_session, tmp_path, send, weight, f"fit_d1_strict_{column}")
+    known_defect(_is_st_d1(sent, r, column), f"ST-D1: the fit's column {column} is not sent")
+    assert column in sent, sent
     assert r.get("ok"), r
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
-    _values_equal(decode(r["result"])["data"]["fitted"], _fit_ref(d,["x"])[0])
+    _values_equal(decode(r["result"])["data"]["fitted"], _fit_ref(d,["x"],weight=weight)[0])
 
 
 def _fit_build_error(tmp_path, df, predictors, **kw):

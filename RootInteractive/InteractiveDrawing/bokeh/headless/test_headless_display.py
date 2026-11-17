@@ -825,10 +825,13 @@ def test_control_tq_d2_a_toggle_with_the_query_shown_logs_nothing(node_session, 
 @pytest.mark.feature("FILTER.text_query")
 @pytest.mark.xfail(**STRICT, reason="TQ-D2: a cleared query drops its function; the next query logs a TypeError")
 def test_strict_clearing_and_retyping_a_query_logs_nothing(node_session, tmp_path):
+    """PHASE_5 Group 4: an empty query is no condition, so after clearing the text every row is selected."""
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query", df)
     after_clear, recorded = _clear_and_retype(page)
     known_defect(_is_tq_d2(after_clear, recorded, report), "TQ-D2: the logged TypeError")
+    assert all(after_clear) and len(after_clear) == len(df), after_clear
+    assert recorded == [], recorded
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2"))
     _assert_no_errors(report)
 

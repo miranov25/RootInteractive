@@ -571,6 +571,35 @@ def test_strict_a_3d_graph_without_colour_is_built(tmp_path):
     assert error is None, error
 
 
+@BROWSER
+@pytest.mark.feature("DISPLAY.graph3d")
+@pytest.mark.xfail(**STRICT, reason="G3-D1: a 3D graph without a colour variable cannot be built")
+def test_strict_a_3d_graph_without_colour_draws_its_points(headless_session, tmp_path):
+    """PHASE_5 Group 4: G3-D1 in the browser. x, y and z without a colour variable: the page builds and loads without
+    an error, vis.js holds the nine points in its style "dot" (it colours them by z), and the canvas shows them."""
+    figures = [[["x"], ["y"], ["z"], {"name": "graph3d"}]]
+    error = _build_error(figures, tmp_path)
+    known_defect(_is_g3_d1(error), "G3-D1: ValueError on BokehVisJSGraph3D.style = None")
+    df = _gated()
+    res = {}
+    page_file = _make_filtered_page(df, tmp_path, html=True, figures=figures, name="nocolour_page")
+    ctx, page = _open_pinned_browser_page(headless_session, page_file, res)
+    try:
+        page.wait_for_function(PUBLIC_VIEW_READY_JS, timeout=20000)
+        page.wait_for_function("() => Array.isArray(window.__riD3.visGraph.dataPoints)", timeout=20000)
+        state = page.evaluate(VIS_STATE_JS)
+        style = page.evaluate("() => [window.__riD3.visGraph.style, (vis.Graph3d.STYLE || {}).DOT]")
+        dots = page.evaluate(DOT_PIXELS_JS)
+        assert not res["blocked"] and not res["page_errors"] and not res["console_errors"], res
+        assert state["visCount"] == len(df), state
+        assert [(p["x"], p["y"], p["z"]) for p in state["viewPoints"]] == list(zip(df.x, df.y, df.z)), state["viewPoints"]
+        assert all(p["style"] is None for p in state["viewPoints"]), state["viewPoints"]
+        assert style[1] is not None and style[0] == style[1], style
+        assert dots > 0, dots
+    finally:
+        ctx.close()
+
+
 # ---------------------------------------------- G3-D2: an empty selection leaves the old points (Chromium)
 # The 3D view of a public page is a child view: walk Bokeh.index through child_views to find it.
 PUBLIC_VIEW_READY_JS = r"""() => {
