@@ -16,10 +16,13 @@ tests. Defects, each with an exact signature, a strict expected-failure partner 
          built (bokehTools.py passes the variable `customJsArgList` left over from the alias loop), with the values
          at build time, never updated. Without such an alias the query throws "ReferenceError: cut is not defined"
          (logged) and every row stays selected; with it, the query computes once and ignores later changes;
+         Fixed in PHASE_5 Group 4: the query gets every parameter of the page and follows its changes;
   TQ-D2  when a query's text becomes empty (cleared, or a toggleable query enabled while its text area is empty), its
          function is dropped (CustomJSNAryFunction.update_func), the previous selection stays, and the next query
          logs "TypeError: Function.prototype.apply was called on null" once (the text area's callback sets `func`,
-         which recomputes the column before update_func builds the new function); the result is then right;
+         which recomputes the column before update_func builds the new function); the result is then right.
+         Fixed in PHASE_5 Group 4: an empty text is no condition ("return true"), every row is selected.
+         For both, the signature tests are removed, the strict tests are ordinary tests, the signatures REGRESSIONS;
   CS-D1  an axis label's model value (ConcatenatedString.value) is undefined until its parameter first changes
          (#is_dirty starts false); the axis text itself is right, set by Python at build.
          Fixed in PHASE_5 Group 1: the strict mark is off, the signature test is removed, the exact signature is a
@@ -462,12 +465,11 @@ def test_node_textquery_exact_masks_and_weighted_bins(node_session, tmp_path, ex
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="TQ-D1: a text query does not get the page's parameters")
 def test_node_textquery_parameter_changed_after_input(node_session, tmp_path):
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query_parameter", df)
     _node_set(page, "TextAreaInput", "value", "return A > cut")
-    known_defect(_is_tq_d1_unknown(page, report), "TQ-D1: the query does not see the parameter")
+    regression(_is_tq_d1_unknown(page, report), "TQ-D1: the query does not see the parameter")
     assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
     _node_set(page, "Spinner", "value", 3., title="cut")
     assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=3.))
@@ -478,8 +480,6 @@ def test_node_textquery_parameter_changed_after_input(node_session, tmp_path):
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="TQ-D2: enabling the query with an empty text area drops its function; "
-                                    "the next query logs a TypeError")
 def test_node_textquery_toggle_with_second_filter(node_session, tmp_path):
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query_toggle", df)
@@ -490,7 +490,7 @@ def test_node_textquery_toggle_with_second_filter(node_session, tmp_path):
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2") & gate_oracle())
     _node_set(page, "Toggle", "active", True, label="disable")
     assert_histogram(df, _hist_state(page), gate_oracle())
-    known_defect(_one_tq_d2_message(report.console_errors) and not report.page_errors, "TQ-D2: the logged TypeError")
+    regression(_one_tq_d2_message(report.console_errors) and not report.page_errors, "TQ-D2: the logged TypeError")
     _assert_no_errors(report)
 
 
@@ -720,30 +720,6 @@ def _is_tq_d1_unknown(page, report) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-def test_signature_tq_d1_a_query_without_a_matching_alias_cannot_see_the_parameter(node_session, tmp_path):
-    df = frame()
-    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
-    _node_set(page, "TextAreaInput", "value", "return A > cut")
-    assert _is_tq_d1_unknown(page, report), (report.console_errors, _hist_state(page)["mask"])
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("FILTER.text_query")
-def test_signature_tq_d1_the_query_keeps_the_parameter_value_from_build_time(node_session, tmp_path):
-    """With an alias that uses `cut` built last, the query sees cut = 1 (its build-time value) and keeps it: after the
-    spinner moves to 3 the selection is still A > 1."""
-    df = frame()
-    page, report = _node_page(node_session, tmp_path, "query_parameter_alias", df)
-    _node_set(page, "TextAreaInput", "value", "return A > cut")
-    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
-    _node_set(page, "Spinner", "value", 3., title="cut")
-    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))      # not cut = 3
-    assert not np.array_equal(query_oracle("return A > cut", cut=1.), query_oracle("return A > cut", cut=3.))
-    _assert_no_errors(report)
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("FILTER.text_query")
 def test_control_tq_d1_with_the_parameter_in_scope_the_query_computes_it(node_session, tmp_path):
     """TQ-D1's control: the same query with `cut` in the function's scope (the alias page) gives exactly A > 1 and
     its weighted histogram, without any error - the query machinery itself works."""
@@ -756,14 +732,13 @@ def test_control_tq_d1_with_the_parameter_in_scope_the_query_computes_it(node_se
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="TQ-D1: a text query keeps the parameter's build-time value")
 def test_strict_a_query_follows_its_parameter(node_session, tmp_path):
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query_parameter_alias", df)
     _node_set(page, "TextAreaInput", "value", "return A > cut")
     _node_set(page, "Spinner", "value", 3., title="cut")
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > cut", cut=1.).tolist(), "TQ-D1: build-time value kept")
+    regression(state["mask"] == query_oracle("return A > cut", cut=1.).tolist(), "TQ-D1: build-time value kept")
     assert_histogram(df, state, query_oracle("return A > cut", cut=3.))
 
 
@@ -794,18 +769,6 @@ def _is_tq_d2(after_clear, recorded, report) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-def test_signature_tq_d2_after_a_cleared_query_the_next_query_logs_a_type_error(node_session, tmp_path):
-    """TQ-D2: the empty text drops the function and the previous selection (A > 1) stays; the next query logs exactly
-    one TypeError, raised in CustomJSNAryFunction.compute; the final selection is right."""
-    df = frame()
-    page, report = _node_page(node_session, tmp_path, "query", df)
-    after_clear, recorded = _clear_and_retype(page)
-    assert _is_tq_d2(after_clear, recorded, report), (after_clear, recorded, report.console_errors)
-    assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2"))
-
-
-@pytest.mark.node_display
-@pytest.mark.feature("FILTER.text_query")
 def test_control_tq_d2_a_toggle_with_the_query_shown_logs_nothing(node_session, tmp_path):
     """TQ-D2's control: the toggleable query in the template's form (its text shown in the text area): enabling it
     and typing the next query gives the right rows and histograms, and nothing is logged."""
@@ -823,16 +786,34 @@ def test_control_tq_d2_a_toggle_with_the_query_shown_logs_nothing(node_session, 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="TQ-D2: a cleared query drops its function; the next query logs a TypeError")
 def test_strict_clearing_and_retyping_a_query_logs_nothing(node_session, tmp_path):
     """PHASE_5 Group 4: an empty query is no condition, so after clearing the text every row is selected."""
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query", df)
     after_clear, recorded = _clear_and_retype(page)
-    known_defect(_is_tq_d2(after_clear, recorded, report), "TQ-D2: the logged TypeError")
+    regression(_is_tq_d2(after_clear, recorded, report), "TQ-D2: the logged TypeError")
     assert all(after_clear) and len(after_clear) == len(df), after_clear
     assert recorded == [], recorded
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2"))
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_a_parameter_named_like_a_column_does_not_break_a_query(node_session, tmp_path):
+    """PHASE_5 Group 4: since the fix of TQ-D1 a query's function gets every parameter of the page. A parameter with
+    the name of a column that the query reads must not break the function (it is built in strict mode, which refuses
+    two arguments with one name): the column wins. Here the query's function is given a parameter named A by hand,
+    and the query A > 1 must select by the column A, without an error."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate("""() => {
+      const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
+      if (q.length !== 1) throw Error('query function: ' + q.length);
+      q[0].parameters = {...q[0].parameters, A: 100.};
+    }""")
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
     _assert_no_errors(report)
 
 

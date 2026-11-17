@@ -23,7 +23,9 @@ Integration (Claude20.RI, 2026-11-11), all test-only. Targets node_d3 (Node) and
 
 PHASE_5 group 2 (Claude21.RI, 2026-11-16). G3-D2 and G3-D3 are FIXED in bokehVisJS3DGraph.ts: their tests are
 ordinary tests now, the signature test of G3-D2 is removed, and the exact signature of each is a REGRESSION check
-(an ordinary failure that names the defect). G3-D1 is still a known defect (it is in the page builder). Added:
+(an ordinary failure that names the defect). G3-D1 is FIXED in PHASE_5 Group 4 (the colour variable is optional:
+the points are drawn in the style "dot", coloured by z); its signature test is removed, its two strict tests (the
+build, and the points in the browser) are ordinary tests, the signature a REGRESSION. Added in Group 2:
 - a sequence of selections (nothing, six rows, nothing, all rows) with a check of the canvas itself: an empty step
   must leave no coloured pixel;
 - a new defect of the same model:
@@ -548,14 +550,6 @@ def _is_g3_d1(error) -> bool:
 
 @UNIT
 @pytest.mark.feature("DISPLAY.graph3d")
-def test_signature_g3_d1_a_3d_graph_without_colour_cannot_be_built(tmp_path):
-    """G3-D1, exact: x, y and z without a colour variable -> ValueError on BokehVisJSGraph3D.style (None)."""
-    error = _build_error([[["x"], ["y"], ["z"], {"name": "graph3d"}]], tmp_path)
-    assert _is_g3_d1(error), error
-
-
-@UNIT
-@pytest.mark.feature("DISPLAY.graph3d")
 def test_control_g3_d1_the_same_graph_with_a_colour_variable_is_built(tmp_path):
     """G3-D1's control: the same page with the colour variable builds; its graph maps x, y, z and c."""
     assert _build_error([[["x"], ["y"], ["z"], ["c"], {"name": "graph3d"}]], tmp_path) is None
@@ -563,23 +557,21 @@ def test_control_g3_d1_the_same_graph_with_a_colour_variable_is_built(tmp_path):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="G3-D1: a 3D graph without a colour variable cannot be built")
 def test_strict_a_3d_graph_without_colour_is_built(tmp_path):
     """The builder accepts a 3D graph without a colour variable (it handles that case: varNameColor = None)."""
     error = _build_error([[["x"], ["y"], ["z"], {"name": "graph3d"}]], tmp_path)
-    known_defect(_is_g3_d1(error), "G3-D1: ValueError on BokehVisJSGraph3D.style = None")
+    regression(_is_g3_d1(error), "G3-D1: ValueError on BokehVisJSGraph3D.style = None")
     assert error is None, error
 
 
 @BROWSER
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="G3-D1: a 3D graph without a colour variable cannot be built")
 def test_strict_a_3d_graph_without_colour_draws_its_points(headless_session, tmp_path):
     """PHASE_5 Group 4: G3-D1 in the browser. x, y and z without a colour variable: the page builds and loads without
     an error, vis.js holds the nine points in its style "dot" (it colours them by z), and the canvas shows them."""
     figures = [[["x"], ["y"], ["z"], {"name": "graph3d"}]]
     error = _build_error(figures, tmp_path)
-    known_defect(_is_g3_d1(error), "G3-D1: ValueError on BokehVisJSGraph3D.style = None")
+    regression(_is_g3_d1(error), "G3-D1: ValueError on BokehVisJSGraph3D.style = None")
     df = _gated()
     res = {}
     page_file = _make_filtered_page(df, tmp_path, html=True, figures=figures, name="nocolour_page")

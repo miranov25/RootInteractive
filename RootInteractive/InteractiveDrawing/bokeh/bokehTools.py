@@ -405,6 +405,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     cdsDict = makeCDSDict(sourceArray, paramDict, options=options)
 
     jsFunctionDict = {}
+    fitterColumns = []      # PHASE_5 Group 4 (ST-D1): (table, columns) that each linear fit reads itself
     for i in jsFunctionArray:
         customJsArgList = {}
         transformType = i.get("type", "customJS")
@@ -425,6 +426,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             else:
                 varX = i["varX"]
             iFitter.varX = varX
+            # The fitter reads its response, weight and predictor columns from the table itself, so they must be
+            # sent although no figure may show them; with a predictor parameter, every column it can select.
+            fitColumns = [i["varY"]] + list(varX)
+            if i.get("weights", None) is not None:
+                fitColumns.append(i["weights"])
+            if isinstance(i["varX"], str) and i["varX"] in paramDict:
+                fitColumns += [j for j in paramDict[i["varX"]].get("options", []) if isinstance(j, str)]
+            fitterColumns.append((i.get("source", None), list(dict.fromkeys(fitColumns))))
             continue
         if isinstance(i["parameters"], list):
             for j in i["parameters"]:
@@ -806,11 +815,26 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             # By default, uses all named variables from the data source - but they can't be known at this point yet
             localWidget = TextAreaInput(sizing_mode="scale_width", **optionWidget.get("options", {}))
             widgetName = optionWidget.get("name", f"$widget_{len(plotArray)}")
-            transform = CustomJSNAryFunction(parameters=customJsArgList, fields=[], func=optionWidget.get("value", "return true"))
+            # PHASE_5 Group 4 (TQ-D1): the query's function gets every parameter of the page, and follows its changes.
+            # Before, it got the parameter list left over from the last alias, with its values at build time.
+            # (TQ-D2): an empty text is no condition ("return true"); before, it dropped the function, the previous
+            # selection stayed, and the next query logged a TypeError.
+            queryParameters = {j: paramDict[j]["value"] for j in paramDict}
+            queryText = optionWidget.get("value", "return true")
+            transform = CustomJSNAryFunction(parameters=queryParameters, fields=[], func=queryText if queryText.strip() else "return true")
             localWidget.js_on_change("value", CustomJS(args={"mapper":transform}, code="""
-                mapper.func = this.value
+                mapper.func = this.value.trim() === "" ? "return true" : this.value
                 mapper.update_func()
                         """))
+            for j in queryParameters:
+                # a boolean parameter is controlled by a toggle, whose property is "active", not "value"
+                attr = "active" if isinstance(queryParameters[j], bool) else "value"
+                paramDict[j]["subscribed_events"].append([attr, CustomJS(args={"mapper":transform, "param":j, "attr":attr}, code="""
+                mapper.parameters[param] = this[attr]
+                if (mapper.func != null && mapper.func.includes(param)) {
+                    mapper.update_args()
+                }
+                        """)])
             aliasDict[cds_used][widgetName] = {"fields": None, "transform": transform}
             memoized_columns[cds_used][widgetName] = {"type":"alias", "name":widgetName}
             widgetFilter = ColumnFilter(field=widgetName, name=widgetName)
@@ -1213,6 +1237,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         plotArray.append(figureI)
         if "name" in optionLocal:
             plotDict[optionLocal["name"]] = figureI
+    # PHASE_5 Group 4 (ST-D1): the columns the linear fits read are used columns of their tables
+    for fitSource, fitColumns in fitterColumns:
+        _, _, memoized_columns, fit_sources = getOrMakeColumns(fitColumns, fitSource, cdsDict, paramDict, jsFunctionDict, memoized_columns, aliasDict, cdsFullGetter=getOrMakeCdsFull)
+        sources.update(fit_sources)
     histoList = []
     for cdsKey, cdsValue in cdsDict.items():
         # Ignore unused data sources
@@ -1389,7 +1417,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         pAll = processBokehLayoutArray(options['layout'], plotArray, plotDict)
     if options['doDraw']:
         show(pAll)
-    return pAll, makeCdsSel(cdsDict, paramDict, cds_name), plotArray, colorMapperDict, cdsDict[None]["cdsOrig"], histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
+    # PHASE_5 Group 4 (R-4): the main table's model exists only if something on the page uses the main table
+    return pAll, makeCdsSel(cdsDict, paramDict, cds_name), plotArray, colorMapperDict, cdsDict.get(None, {}).get("cdsOrig"), histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict
 
 
 def addHisto2dGlyph(fig, histoHandle, marker, options):

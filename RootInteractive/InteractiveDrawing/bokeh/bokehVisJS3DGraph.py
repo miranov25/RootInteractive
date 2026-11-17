@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, String, Dict, Any
+from bokeh.core.properties import Instance, String, Dict, Any, Nullable
 from bokeh.models import ColumnarDataSource, LayoutDOM
 # see options in https://visjs.github.io/vis-graph3d/docs/graph3d/index.html
 
@@ -33,6 +33,7 @@ class BokehVisJSGraph3D(LayoutDOM):
     x = String()
     y = String()
     z = String()
-    style = String()
+    # the colour variable; None (PHASE_5 Group 4, G3-D1): no colour variable, the points are coloured by z
+    style = Nullable(String)
     options3D = Dict(String, Any)
     print("x", __implementation__)

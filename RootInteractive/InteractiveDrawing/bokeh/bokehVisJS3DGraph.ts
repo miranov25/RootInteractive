@@ -73,13 +73,15 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // An empty table: vis.js 4.16.1 stops with "Cannot read properties of null (reading 'length')" when it is
     // created with an empty data set, and the view was then never connected to its table. Created without data,
     // it draws nothing and takes the first data that arrive.
+    // Without a colour variable (PHASE_5 Group 4, G3-D1) the points are drawn in the style "dot", coloured by z.
     const data = this.get_data()
-    this._graph = new vis.Graph3d(this.shadow_el, data.length > 0 ? data : undefined, OPTIONS)
+    const options = this.model.style == null ? {...OPTIONS, style: 'dot'} : OPTIONS
+    this._graph = new vis.Graph3d(this.shadow_el, data.length > 0 ? data : undefined, options)
     if(this.model.options3D !== null){
       this.model.options3D.xLabel=this.model.x
       this.model.options3D.yLabel=this.model.y
       this.model.options3D.zLabel=this.model.z
-      this.model.options3D.legendLabel=this.model.style
+      this.model.options3D.legendLabel=this.model.style ?? this.model.z
       this._graph.setOptions(this.model.options3D)
     }
 
@@ -110,16 +112,11 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     const x = source.get_column(this.model.x)
     const y = source.get_column(this.model.y)
     const z = source.get_column(this.model.z)
-    const style = source.get_column(this.model.style)
+    const style = this.model.style == null ? null : source.get_column(this.model.style)
     const n = source.get_length()
-    if(x != null && y != null && z != null && style != null && n != null)
+    if(x != null && y != null && z != null && n != null && (style != null || this.model.style == null))
     for (let i = 0; i < n; i++) {
-      data.add({
-        x: x[i],
-        y: y[i],
-        z: z[i],
-        style: style[i],
-      })
+      data.add(style == null ? {x: x[i], y: y[i], z: z[i]} : {x: x[i], y: y[i], z: z[i], style: style[i]})
     }
     return data
   }
@@ -141,7 +138,7 @@ export namespace BokehVisJSGraph3D {
     x: p.Property<string>
     y: p.Property<string>
     z: p.Property<string>
-    style: p.Property<string>
+    style: p.Property<string | null>
     options3D:  p.Property<Record<string, any>>
     data_source: p.Property<ColumnarDataSource>
   }
@@ -173,11 +170,11 @@ export class BokehVisJSGraph3D extends LayoutDOM {
     // types have counterparts, e.g. ``bokeh.core.properties.String`` will be
     // ``p.String`` in the JS implementatin. Where the JS type system is not yet
     // as rich, you can use ``p.Any`` as a "wildcard" property type.
-    this.define<BokehVisJSGraph3D.Props>(({String, Any}) => ({
+    this.define<BokehVisJSGraph3D.Props>(({String, Any, Nullable}) => ({
       x:            [ String   ],
       y:            [ String   ],
       z:            [ String   ],
-      style:        [ String   ],
+      style:        [ Nullable(String), null ],
       options3D:    [ Any ],
       data_source:  [ Any ],
     }))

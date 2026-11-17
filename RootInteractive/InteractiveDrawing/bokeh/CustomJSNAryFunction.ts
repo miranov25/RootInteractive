@@ -59,8 +59,7 @@ export class CustomJSNAryFunction extends Model {
 	    return
     }
     this.compute_effective_fields(this.func)
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
+    this.set_args()
     this.scalar_func = new Function(...this.args_keys, ...this.effective_fields, '"use strict";\n'+this.func)
     this.change.emit()
   }
@@ -75,16 +74,23 @@ export class CustomJSNAryFunction extends Model {
 	    return
     }
     this.compute_effective_fields(this.v_func)
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
+    this.set_args()
     this.vector_func = new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output",'"use strict";\n'+this.v_func)
     this.change.emit()
   }
 
   update_args(){
-    this.args_keys = Object.keys(this.parameters)
-    this.args_values = Object.values(this.parameters)
+    this.set_args()
     this.change.emit()
+  }
+
+  set_args(){
+    // PHASE_5 Group 4 (TQ-D1): a parameter with the name of one of the function's fields is left out: the function
+    // is built in strict mode, which refuses two arguments with one name, and the field (a column) wins. This can
+    // happen since a text query gets every parameter of the page.
+    const fields = new Set(this.effective_fields ?? [])
+    this.args_keys = Object.keys(this.parameters).filter((k) => !fields.has(k))
+    this.args_values = this.args_keys.map((k) => this.parameters[k])
   }
 
   v_compute(xs: any[], data_source: any, output: any[] | null =null){

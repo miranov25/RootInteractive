@@ -24,7 +24,9 @@ Run on the pinned toolchain: 20 of 31 cases passed as delivered. Changes, each m
   * four defects found, each with an exact signature, a strict expected-failure partner and a healthy control:
     ST-D1  a linear fit does not send its response or weight column to the page (bokehTools.py builds the
            ClientLinearFitter without registering varY/weights as used columns): reading the fitted alias throws
-           "Cannot read properties of undefined (reading 'decodeProgram')" in CDSCompress.get_column;
+           "Cannot read properties of undefined (reading 'decodeProgram')" in CDSCompress.get_column.
+           Fixed in PHASE_5 Group 4: the page builder registers every column a fit reads; the signature test is
+           removed, the strict test (response and weight column) is an ordinary test, the signature a REGRESSION;
     ST-D2  with two or more predictors the fit is wrong: MathUtils.ts chol updates every off-diagonal element of the
            packed matrix twice (once in each inner loop); one predictor (2 x 2) is correct.
            Fixed in PHASE_5 Group 1: the signature test is removed, the strict tests are ordinary tests, and the exact
@@ -1116,24 +1118,11 @@ def _is_st_d1(sent, r, column) -> bool:
 @pytest.mark.feature("STAT.linear_fit")
 @pytest.mark.parametrize("send,weight,column",[("none",None,"target"),("response","wA","wA")],
                          ids=["response_column","weight_column"])
-def test_signature_st_d1_a_fit_column_is_not_sent(node_session,tmp_path,send,weight,column):
-    """ST-D1: the column the fitter reads but nothing else shows is absent from the sent table, and reading the fitted
-    alias fails in CDSCompress.get_column with exactly this error."""
-    d, sent, r = _st_d1_state(node_session, tmp_path, send, weight, f"fit_d1_{column}")
-    assert "x" in sent and column not in sent, sent
-    assert _is_st_d1(sent, r, column), r
-
-
-@NODE
-@pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.parametrize("send,weight,column",[("none",None,"target"),("response","wA","wA")],
-                         ids=["response_column","weight_column"])
-@pytest.mark.xfail(**STRICT, reason="ST-D1: a linear fit does not send its response or weight column")
 def test_strict_a_fit_on_a_page_as_a_user_writes_it_equals_numpy(node_session,tmp_path,send,weight,column):
     """One predictor (no ST-D2); nothing else on the page shows the response column (or, in the second case, the
     weight column). PHASE_5 Group 4: the weight column is a case of its own."""
     d, sent, r = _st_d1_state(node_session, tmp_path, send, weight, f"fit_d1_strict_{column}")
-    known_defect(_is_st_d1(sent, r, column), f"ST-D1: the fit's column {column} is not sent")
+    regression(_is_st_d1(sent, r, column), f"ST-D1: the fit's column {column} is not sent")
     assert column in sent, sent
     assert r.get("ok"), r
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode

@@ -39,7 +39,8 @@ Defects (register PHASE_5_0_Defect_Register_v0_3; code at 492c8ff, the 2A/2B cor
   A-D6  a gather is not recomputed when the gathered table changes; nor is an alias that reads it.
 R-4   (new, found while building these pages; not an alias defect, not fixed in Batch 3) a page whose figures all show
         the related table fails the build: KeyError 'cdsOrig' at the end of bokehDrawArray (bokehTools.py), which returns
-        the main table's model although no figure made it. A strict expected failure.
+        the main table's model although no figure made it. Fixed in PHASE_5 Group 4 (decision L-24): the builder
+        returns None for a main table that nothing uses; the test is an ordinary test, the signature a REGRESSION.
 A-D2, A-D7 and A-D9 keep their PHASE_4 tests (test_headless_node_aliases.py). A-D8 (operators that mean something else
 in the browser) waits for the Architect's decision D-B4; its tests are added then.
 
@@ -432,16 +433,13 @@ def verdict_related_table_only(err, reply) -> str:
 
 
 @_node(pytest.mark.feature("ALIAS.context"))
-@pytest.mark.xfail(**STRICT, reason="R-4: a page of related-table figures only does not build")
 def test_strict_a_page_of_related_table_figures_only_builds(node_session, tmp_path):
     """A compiled query that draws only event-level quantities still makes a page. (Control: every other page here has
     a figure of the track table too, and builds.)"""
     err, out = _page(node_session, tmp_path, [[["ev.ex"], ["ev.ex2"]]], [("ex2", "ex*2", "ev")],
                      [read("ev_full", "ex", "ex2")])
     verdict = verdict_related_table_only(err, out[0] if out else None)
-    if verdict == KNOWN:
-        raise KnownDefect("R-4")                         # not fixed in Batch 3: a strict expected failure
-    _strict(verdict, "R-4", err or out)
+    _strict(verdict, "R-4", err or out)                  # fixed in PHASE_5 Group 4: KNOWN is a REGRESSION
 
 
 # ===================================================================================== 6. inputs as a dictionary: A-D11
