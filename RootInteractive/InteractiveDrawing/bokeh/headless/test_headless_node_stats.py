@@ -766,15 +766,17 @@ GROUP1_FITS = dict(argnames="case,weight", argvalues=[("three", None), ("three",
 def test_stat_client_fit_group1_cases_equal_numpy_and_the_true_coefficients(node_session, tmp_path, case, weight):
     """Exact data, so the fit must return numpy's fit AND the coefficients the data were made with. The last case has
     one predictor: before the fix it was wrong only because of the absolute threshold (ST-D5), not because of ST-D2.
-    The cases with small predictors are compared less tightly: the fit solves the normal equations, which lose
-    digits when the predictors are much smaller than 1 (the reference, numpy lstsq, does not)."""
+    The tolerances are those of the review of Group 1 (finding P2-1): see `_coefficient_tolerance`."""
     d, predictors, vals, got = _group1_read(node_session, tmp_path, case, weight)
     regression(_is_old_solver(vals, d, predictors, weight), f"ST-D2 / ST-D5: the fit of case {case} is the old solver's")
     ref, beta = _fit_ref(d, predictors, weight=weight)
-    small = case in ("small", "tiny", "tiny_line")
-    np.testing.assert_allclose(vals, ref, rtol=0, atol=1e-7 if small else 1e-10)
-    np.testing.assert_allclose(got, beta, rtol=1e-4 if small else 1e-9)
-    np.testing.assert_allclose(got, GROUP1_SLOPES[:len(predictors)] + [1.], rtol=1e-4 if small else 1e-9)
+    # Group 3 (the review of Group 1, finding P2-1): the fitted values are well determined in every case, so they are
+    # compared within 1e-12. The coefficients within the standard error bound of a stable solver of the normal
+    # equations, 100 * cond(A) * eps of the case's own matrix, but not looser than needed (at least 1e-12).
+    tol = _coefficient_tolerance(d, predictors, weight)
+    np.testing.assert_allclose(vals, ref, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(got, beta, rtol=tol, atol=tol)
+    np.testing.assert_allclose(got, GROUP1_SLOPES[:len(predictors)] + [1.], rtol=tol, atol=tol)
 
 
 @NODE
@@ -800,6 +802,295 @@ def test_group1_reference_data_are_exact_and_the_old_solver_prediction_is_wrong_
             old = _ri_fit_prediction(d, predictors, weight, 0.)[0]
         assert not np.allclose(old, ref, rtol=1e-6, atol=1e-6, equal_nan=True), case
 
+
+
+# --------- PHASE_5 Group 3 (Claude21.RI, 2026-11-17): a fit on predictors with a large offset, and two more controls
+# In plain words. The fit forms the normal equations from sums over the rows (sum of x*x, sum of x, ...) and solves
+# them. When a predictor has a large offset (a position far from 0, a run number, a timestamp), these sums lose the
+# digits that carry the information: with an offset of 1e6 the fit is silently wrong, with 1e9 it is meaningless.
+# Found by the review of Group 1 (Claude20.RI); register entry ST-D6 proposed. The standard remedy is to centre (and
+# scale) the predictors before the sums are formed and to transform the coefficients back, as
+# numpy.polynomial.Polynomial.fit does. Two more cases from the same review: exactly collinear predictors (a control
+# that holds before and after), and fewer rows than unknowns, which can give finite, meaningless coefficients
+# (register entry ST-D7 proposed).
+def _coefficient_tolerance(d, predictors, weight=None):
+    """100 * cond(A) * eps of the normal matrix A = X^T W X of the case (X with the intercept column), at least 1e-12:
+    the standard error bound of a stable solver of the normal equations (the review of Group 1, P2-1)."""
+    x = np.column_stack([d[c].to_numpy(dtype=float) for c in predictors] + [np.ones(len(d))])
+    w = np.ones(len(d)) if weight is None else d[weight].to_numpy(dtype=float)
+    a = x.T @ (w[:, None] * x)
+    return max(1e-12, 100. * np.linalg.cond(a) * np.finfo(float).eps)
+
+
+def _js_sum(values):
+    """A sum in the order of a JavaScript loop: left to right, one double addition at a time (never numpy's pairwise
+    sum, which rounds differently)."""
+    acc = 0.
+    for v in values:
+        acc += float(v)
+    return acc
+
+
+def _current_fit_prediction(d, predictors, weight=None):
+    """ST-D6 PREDICTION - what the page computes before Group 3, transcribed from ClientLinearFitter.fit (the raw sums,
+    in the same order of operations) and from MathUtils.ts after Group 1 (no threshold: a pivot that is not positive
+    gives NaN). Used only to recognise the defect, never as the oracle. Returns the fitted values and coefficients."""
+    cols = [[float(v) for v in d[c]] for c in predictors]
+    y = [float(v) for v in d["target"]]
+    w = None if weight is None else [float(v) for v in d[weight]]
+    n, rows = len(cols), len(y)
+    x, rhs = [], []
+    for i in range(n):
+        for j in range(i + 1):
+            x.append(_js_sum(cols[i][k] * cols[j][k] if w is None else cols[i][k] * cols[j][k] * w[k]
+                             for k in range(rows)))
+    for i in range(n):
+        x.append(_js_sum(cols[i][k] if w is None else cols[i][k] * w[k] for k in range(rows)))
+        rhs.append(_js_sum(cols[i][k] * y[k] if w is None else cols[i][k] * y[k] * w[k] for k in range(rows)))
+    x.append(float(rows) if w is None else _js_sum(w))
+    rhs.append(_js_sum(y) if w is None else _js_sum(y[k] * w[k] for k in range(rows)))
+    m = len(rhs)
+    i_row = 0                                     # chol, as after Group 1
+    for i in range(m):
+        if not x[i + i_row] > 0:
+            x[i + i_row] = float("nan")
+        pivot_diag = 1. / x[i + i_row]
+        j_row = i_row + i + 1
+        for j in range(i + 1, m):
+            pivot_row = pivot_diag * x[i + j_row]
+            k_row = i_row + i + 1
+            for k in range(i + 1, j + 1):
+                if k == j:
+                    x[k + j_row] -= pivot_row * x[i + k_row]
+                k_row += k + 1
+            for k in range(j + 1, m):
+                x[j + k_row] -= pivot_row * x[i + k_row]
+                k_row += k + 1
+            x[i + j_row] = pivot_row
+            j_row += j + 1
+        i_row += i + 1
+    i_diag = 0                                    # solve, as after Group 1
+    for i in range(m):
+        if not x[i_diag] > 0:
+            rhs = [float("nan")] * m
+            break
+        i_diag += i + 2
+    else:
+        i_row = 0
+        for i in range(m):
+            for j in range(i):
+                rhs[i] -= rhs[j] * x[i_row + j]
+            i_row += i + 1
+        i_diag = 0
+        for i in range(m):
+            rhs[i] /= x[i_diag]
+            i_diag += i + 2
+        for i in range(m - 1, -1, -1):
+            j_row = 1 + ((i * (i + 5)) >> 1)
+            for j in range(i + 1, m):
+                rhs[i] -= rhs[j] * x[j_row]
+                j_row += j + 1
+    beta = np.asarray(rhs)
+    fitted = np.full(rows, beta[-1])              # as v_compute: the intercept, then one predictor after the other
+    for i in range(n):
+        fitted = fitted + np.asarray(cols[i]) * beta[i]
+    return fitted, beta
+
+
+def _centred_fit_ref(d, predictors, weight=None):
+    """The oracle for large offsets: numpy's least squares (LAPACK, not the normal equations) on the centred and
+    scaled predictors, transformed back. Returns the fitted values and the coefficients (predictors, then the
+    intercept)."""
+    x = d[list(predictors)].to_numpy(dtype=float)
+    y = d["target"].to_numpy(dtype=float)
+    w = np.ones(len(d)) if weight is None else d[weight].to_numpy(dtype=float)
+    mean = (w[:, None] * x).sum(axis=0) / w.sum()
+    scale = np.sqrt((w[:, None] * (x - mean) ** 2).sum(axis=0) / w.sum())
+    u = np.column_stack(((x - mean) / scale, np.ones(len(d))))
+    root = np.sqrt(w)
+    gamma = np.linalg.lstsq(root[:, None] * u, root * y, rcond=None)[0]
+    slopes = gamma[:-1] / scale
+    return u @ gamma, np.append(slopes, gamma[-1] - (slopes * mean).sum())
+
+
+OFFSET_SLOPES = [2., -3.]
+
+
+def _offset_frame(case):
+    """200 rows; target = 1 + 2*p0 (- 3*p1), exactly as computed in floating point. p0 = offset + uniform(0, 1);
+    p1, if there is one, is normal around 0. `w` is a weight column."""
+    offset, count = {"offset_1e3": (1e3, 1), "offset_1e6": (1e6, 1), "offset_1e9": (1e9, 1),
+                     "offset_1e6_two": (1e6, 2)}[case]
+    rng = np.random.default_rng(20261117)
+    n = 200
+    cols = {"p0": offset + rng.uniform(0., 1., n)}
+    if count == 2:
+        cols["p1"] = rng.normal(0., 1., n)
+    d = pd.DataFrame(cols)
+    d["target"] = 1. + sum(s * d[c] for s, c in zip(OFFSET_SLOPES, cols))
+    d["w"] = rng.uniform(.5, 2., n)
+    return d, list(cols)
+
+
+def _offset_read(node_session, tmp_path, case, weight):
+    d, predictors = _offset_frame(case)
+    _node_open(node_session, _group1_fit_page(tmp_path, d, predictors, weight=weight, suffix=f"g3_{case}_{weight}"))
+    vals = _read(node_session, "CDSAlias", ["fitted"], name="cdsFull")["data"]["fitted"]
+    got = _read(node_session, "ClientLinearFitter", [])["extra"]["parameters"]
+    return d, predictors, np.asarray(vals, dtype=float), np.asarray(got, dtype=float)
+
+
+def _is_st_d6(vals, d, predictors, weight) -> bool:
+    """ST-D6, exact: the fitted values equal the transcription of today's fit on the raw sums, and that transcription
+    is not the right fit (it is NaN, or it differs from the oracle by more than 1e-12 relative)."""
+    pred = _current_fit_prediction(d, predictors, weight)[0]
+    ref = _centred_fit_ref(d, predictors, weight)[0]
+    return bool(np.allclose(vals, pred, rtol=1e-12, atol=0, equal_nan=True)
+                and not np.allclose(pred, ref, rtol=1e-12, atol=0))
+
+
+def _assert_offset_fit(vals, got, d, predictors, weight):
+    ref, beta = _centred_fit_ref(d, predictors, weight)
+    np.testing.assert_allclose(vals, ref, rtol=1e-12, atol=0)
+    # the slopes: the data are rounded to the last digit of the target, which limits them to about 1e-7 relative
+    # at an offset of 1e9; the intercept is checked through the fitted values
+    np.testing.assert_allclose(got[:-1], beta[:-1], rtol=1e-6, atol=0)
+    np.testing.assert_allclose(got[:-1], OFFSET_SLOPES[:len(predictors)], rtol=1e-6, atol=0)
+
+
+OFFSET_FITS = dict(argnames="case,weight", argvalues=[("offset_1e3", None), ("offset_1e6", None),
+                                                      ("offset_1e6", "w"), ("offset_1e9", None),
+                                                      ("offset_1e6_two", None)],
+                   ids=["offset_1e3", "offset_1e6", "offset_1e6_weighted", "offset_1e9",
+                        "offset_1e6_and_a_second_predictor"])
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.parametrize(**OFFSET_FITS)
+@pytest.mark.xfail(**STRICT, reason="ST-D6: a fit on a predictor with a large offset is imprecise or empty")
+def test_stat_client_fit_on_a_predictor_with_a_large_offset_equals_numpy(node_session, tmp_path, case, weight):
+    """The fitted values equal numpy's least squares within 1e-12 relative, and the slopes are the ones the data were
+    made with. Before the fix: an offset of 1e3 loses digits, 1e6 gives a wrong slope and intercept without a
+    message, 1e9 a meaningless fit."""
+    d, predictors, vals, got = _offset_read(node_session, tmp_path, case, weight)
+    known_defect(_is_st_d6(vals, d, predictors, weight),
+                 f"ST-D6: the fit of case {case} is the fit on the raw sums: "
+                 f"{'no fit (NaN)' if np.isnan(vals).all() else 'slopes ' + str(got[:-1])}")
+    _assert_offset_fit(vals, got, d, predictors, weight)
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_control_st_d6_a_predictor_without_offset_is_fitted_exactly(node_session, tmp_path):
+    """ST-D6's control, right before and after the fix: the same kind of data without the offset."""
+    d, predictors = _offset_frame("offset_1e3")
+    d["p0"] = d["p0"] - 1e3 - .5
+    d["target"] = 1. + 2. * d["p0"]
+    _node_open(node_session, _group1_fit_page(tmp_path, d, predictors, suffix="g3_no_offset"))
+    vals = np.asarray(_read(node_session, "CDSAlias", ["fitted"], name="cdsFull")["data"]["fitted"], dtype=float)
+    got = np.asarray(_read(node_session, "ClientLinearFitter", [])["extra"]["parameters"], dtype=float)
+    _assert_offset_fit(vals, got, d, predictors, None)
+    np.testing.assert_allclose(got, [2., 1.], rtol=1e-12, atol=1e-12)
+
+
+COLLINEAR = {"double": 2., "triple": 3., "tenth": .1}
+
+
+def _fit_of_rows(node_session, tmp_path, d, predictors, suffix):
+    _node_open(node_session, _group1_fit_page(tmp_path, d, predictors, suffix=suffix))
+    vals = np.asarray(_read(node_session, "CDSAlias", ["fitted"], name="cdsFull")["data"]["fitted"], dtype=float)
+    got = np.asarray(_read(node_session, "ClientLinearFitter", [])["extra"]["parameters"], dtype=float)
+    return vals, got
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.parametrize("factor", list(COLLINEAR), ids=[f"predictor_and_its_{k}" for k in COLLINEAR])
+def test_control_exactly_collinear_predictors_give_no_fit_or_the_right_fitted_values(node_session, tmp_path, factor):
+    """The review of Group 1, P2-2: a predictor and a multiple of it cannot be separated, so the coefficients are not
+    determined. In floating point the last pivot is then a rounding residue: zero or negative (no fit: every fitted
+    value and coefficient is NaN) or tiny and positive (one of the many exact solutions). Which of the two happens
+    depends on the rounding, before and after Group 3. What must hold in both: no fit, or fitted values equal to
+    numpy's within 1e-12. The coefficients are not checked: they are not unique."""
+    d, _ = _group1_frame("three")
+    d = d[["p0"]].copy()
+    d["p1"] = COLLINEAR[factor] * d["p0"]
+    d["target"] = 1. + 2. * d["p0"] + 3. * d["p1"]
+    vals, got = _fit_of_rows(node_session, tmp_path, d, ["p0", "p1"], f"g3_collinear_{factor}")
+    assert len(vals) == len(d)
+    if np.isnan(vals).all():
+        assert np.isnan(got).all(), got
+    else:
+        assert np.isfinite(vals).all() and np.isfinite(got).all(), (vals[:5], got)
+        np.testing.assert_allclose(vals, _fit_ref(d, ["p0", "p1"])[0], rtol=1e-12, atol=1e-12)
+
+
+TWO_ROWS = {"exact_in_binary": ([1., 2.], [.5, -1.5], [3., 4.]),
+            "not_exact_in_binary": ([.13, .37], [.71, 1.93], [3.3, 4.1])}
+
+
+def _is_st_d7(vals, got, d) -> bool:
+    """ST-D7, exact: with fewer rows than unknowns the page returns finite coefficients, and they are those of the
+    transcription of the fit before Group 3 (a rounding residue taken as a pivot)."""
+    with np.errstate(all="ignore"):
+        pred_vals, pred = _current_fit_prediction(d, ["p0", "p1"])
+    return bool(np.isfinite(got).all() and np.allclose(got, pred, rtol=1e-12, atol=0)
+                and np.allclose(vals, pred_vals, rtol=1e-12, atol=0))
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_control_fewer_rows_than_unknowns_exact_in_binary_give_no_fit(node_session, tmp_path):
+    """The review of Group 1, P2-2: two rows, two predictors and the intercept (three unknowns). The fit is not
+    determined, so the page shows no fit. With these values the last pivot is exactly zero: no fit before and after
+    Group 3."""
+    p0, p1, y = TWO_ROWS["exact_in_binary"]
+    d = pd.DataFrame({"p0": p0, "p1": p1, "target": y})
+    vals, got = _fit_of_rows(node_session, tmp_path, d, ["p0", "p1"], "g3_two_rows_exact")
+    assert len(vals) == 2 and np.isnan(vals).all(), vals
+    assert np.isnan(got).all(), got
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.xfail(**STRICT, reason="ST-D7: a fit with fewer rows than unknowns can give finite coefficients")
+def test_fewer_rows_than_unknowns_give_no_fit(node_session, tmp_path):
+    """Two rows whose values are not exact in binary: the last pivot is a rounding residue that happens to be
+    positive, and before Group 3 the page shows finite, meaningless coefficients. The fit is not determined, so the
+    page must show no fit."""
+    p0, p1, y = TWO_ROWS["not_exact_in_binary"]
+    d = pd.DataFrame({"p0": p0, "p1": p1, "target": y})
+    vals, got = _fit_of_rows(node_session, tmp_path, d, ["p0", "p1"], "g3_two_rows_inexact")
+    known_defect(_is_st_d7(vals, got, d), f"ST-D7: two rows give the coefficients {got}")
+    assert len(vals) == 2 and np.isnan(vals).all(), vals
+    assert np.isnan(got).all(), got
+
+
+@UNIT
+@pytest.mark.feature("STAT.linear_fit")
+def test_group3_offset_reference_and_prediction():
+    """No page: the oracle returns the slopes the data were made with at every offset, and its fitted values equal
+    those of numpy's plain least squares (the fitted values are well determined; at 1e9 the split between slope and
+    intercept is not, so the intercept is only checked through the fitted values). The transcription of today's fit
+    is wrong on every case (so its signature can be told from the right answer); on data without an offset it is
+    right."""
+    for case, weight in OFFSET_FITS["argvalues"]:
+        d, predictors = _offset_frame(case)
+        ref, beta = _centred_fit_ref(d, predictors, weight)
+        np.testing.assert_allclose(beta[:-1], OFFSET_SLOPES[:len(predictors)], rtol=1e-6)
+        with np.errstate(all="ignore"):
+            pred = _current_fit_prediction(d, predictors, weight)[0]
+        assert not np.allclose(pred, ref, rtol=1e-12, atol=0), case
+        np.testing.assert_allclose(_fit_ref(d, predictors, weight=weight)[0], ref, rtol=1e-12, atol=0)
+    d, predictors = _group1_frame("three")
+    np.testing.assert_allclose(_current_fit_prediction(d, predictors)[0], _fit_ref(d, predictors)[0],
+                               rtol=1e-12, atol=1e-12)
+    with np.errstate(all="ignore"):                # ST-D7: two rows not exact in binary give finite coefficients
+        for key, finite in (("not_exact_in_binary", True), ("exact_in_binary", False)):
+            p0, p1, y = TWO_ROWS[key]
+            beta = _current_fit_prediction(pd.DataFrame({"p0": p0, "p1": p1, "target": y}), ["p0", "p1"])[1]
+            assert np.isfinite(beta).all() if finite else np.isnan(beta).all(), (key, beta)
 
 # ST-D1: the fit's response and weight columns are not sent
 READ_SENT = r"""() => {
