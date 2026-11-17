@@ -124,7 +124,6 @@ export class DownsamplerCDS extends ColumnDataSource {
   update(){
     const {source, nPoints, selected, filter, _indices} = this
     const l = source.length
-    console.log(this.name)
     if(filter == null && (nPoints < 0 || nPoints >= l)){
       this._is_trivial = true
       this._needs_update = false

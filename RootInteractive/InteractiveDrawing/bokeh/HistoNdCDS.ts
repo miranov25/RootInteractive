@@ -205,7 +205,6 @@ export class HistoNdCDS extends ColumnarDataSource {
         return this._unweighted_histogram
       }
     }
-    console.log("Histogram " + this.name + " " + weights)
     if(this._sorted_indices != null && weights != null){
       return this.histogram_sorted(weights, weights_transform)
     }
@@ -216,7 +215,6 @@ export class HistoNdCDS extends ColumnarDataSource {
     }
     for(let i=0; i<this._nbins.length; i++){
       if(Math.abs(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])>1e-6){
-        console.log(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])
         throw Error("Assertion error: Range minimum in histogram" + this.name + "is broken")
       }
       if(Math.abs(this._range_max[i]*this._transform_scale[i]-this._transform_origin[i] - this._nbins[i])>1e-6){
@@ -336,7 +334,6 @@ export class HistoNdCDS extends ColumnarDataSource {
       const range_min = this._range_min[axis_idx]
       const range_max = this._range_max[axis_idx]
       const edges = this._bin_edges[axis_idx]
-      console.log("HistoNdCDS: compute_bins", this.name, "axis_idx", axis_idx, "nbins", nbins, "range_min", range_min, "range_max", range_max)
       for(let i=0; i<length; i++){
         const val = column[i]
         // Overflow bins 

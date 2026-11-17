@@ -41,7 +41,7 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     aliasArray=[
         {"name": "funCustom0",  "func":"funCustomForm0",},
         {"name": "funCustom1",  "func":"funCustomForm1",},
-        {"name": "funCustom2",  "func":"funcCustomForm2",},
+        {"name": "funCustom2",  "func":"funCustomForm2",},
     ]
 
     parameterArray = [

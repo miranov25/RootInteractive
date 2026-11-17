@@ -408,13 +408,13 @@ def test_interactiveTemplateWeights():
             [["bin_center"], ["bin_count"], {"source":"histo1D", "name":"histo1D"}],
             [["bin_center"], ["bin_count"], {"source":"histo1DMulti", "name":"histo1DMulti"}],
             [["bin_center_0"], ["mean"], {"source":"histoNDMultiX_1", "name":"histoNDMultiX_1_Mean", "errY": "std/sqrt(entries)"}],
-            [["bin_center_0"], ["std"], {"source":"histoNDMultiX_1", "name":"histoNDMultiX_1_Median", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["quantile_1"], {"source":"histoNDMultiX_1", "name":"histoNDMultiX_1_Median", "errY": "std/sqrt(entries)"}],
             [["mean"], ["bin_center_1"], {"source":"histoNDMultiX_0", "name":"histoNDMultiX_0_Mean", "errX": "std/sqrt(entries)"}],
-            [["std"], ["bin_center_1"], {"source":"histoNDMultiX_0", "name":"histoNDMultiX_0_Median", "errX": "std/sqrt(entries)"}],
+            [["quantile_1"], ["bin_center_1"], {"source":"histoNDMultiX_0", "name":"histoNDMultiX_0_Median", "errX": "std/sqrt(entries)"}],
             [["bin_center_0"], ["mean"], {"source":"histoNDMultiY_1", "name":"histoNDMultiY_1_Mean", "errY": "std/sqrt(entries)"}],
-            [["bin_center_0"], ["std"], {"source":"histoNDMultiY_1", "name":"histoNDMultiY_1_Median", "errY": "std/sqrt(entries)"}],
+            [["bin_center_0"], ["quantile_1"], {"source":"histoNDMultiY_1", "name":"histoNDMultiY_1_Median", "errY": "std/sqrt(entries)"}],
             [["mean"], ["bin_center_1"], {"source":"histoNDMultiY_0", "name":"histoNDMultiY_0_Mean", "errX": "std/sqrt(entries)"}],
-            [["std"], ["bin_center_1"], {"source":"histoNDMultiY_0", "name":"histoNDMultiY_0_Median", "errX": "std/sqrt(entries)"}],
+            [["quantile_1"], ["bin_center_1"], {"source":"histoNDMultiY_0", "name":"histoNDMultiY_0_Median", "errX": "std/sqrt(entries)"}],
             ]
     figureArray = mergeFigureArrays(figureArray, figureArray1D)
     figureLayoutDesc["Histo1D"] = [["histo1D", "histo1DMulti"], {"plot_height":350}]

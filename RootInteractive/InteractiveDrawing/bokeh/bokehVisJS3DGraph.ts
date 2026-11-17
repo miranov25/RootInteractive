@@ -12,12 +12,13 @@ import * as p from "core/properties"
 
 declare namespace vis {
   class Graph3d {
-    constructor(el: HTMLElement | DocumentFragment, data: object, OPTIONS: object)
+    constructor(el: HTMLElement | DocumentFragment, data: object | undefined, OPTIONS: object)
     setData(data: vis.DataSet): void
     setOptions(options: object): void
   }
 
   class DataSet {
+    length: number
     add(data: unknown): void
   }
 }
@@ -69,7 +70,11 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // Many Bokeh views ignore this default <div>, and instead do things like
     // draw to the HTML canvas. In this case though, we use the <div> to attach
     // a Graph3d to the DOM.
-    this._graph = new vis.Graph3d(this.shadow_el, this.get_data(), OPTIONS)
+    // An empty table: vis.js 4.16.1 stops with "Cannot read properties of null (reading 'length')" when it is
+    // created with an empty data set, and the view was then never connected to its table. Created without data,
+    // it draws nothing and takes the first data that arrive.
+    const data = this.get_data()
+    this._graph = new vis.Graph3d(this.shadow_el, data.length > 0 ? data : undefined, OPTIONS)
     if(this.model.options3D !== null){
       this.model.options3D.xLabel=this.model.x
       this.model.options3D.yLabel=this.model.y
@@ -81,7 +86,17 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // Set a listener so that when the Bokeh data source has a change
     // event, we can process the new data
     this.connect(this.model.data_source.change, () => {
-      this._graph.setData(this.get_data())
+      const data = this.get_data()
+      // vis.js 4.16.1 ignores an empty data set: it keeps the table it had and draws it again, so the points of the
+      // last selection stayed on the screen. With nothing selected, give it an empty table first; it then draws the
+      // empty graph. A graph that never had data (see _init) is left alone until data arrive.
+      const graph = this._graph as unknown as {dataTable?: unknown[] | null}
+      if(data.length > 0 || graph.dataTable != null){
+        if(data.length === 0){
+          graph.dataTable = []
+        }
+        this._graph.setData(data)
+      }
       this._graph.setOptions(this.model.options3D)
     })
 

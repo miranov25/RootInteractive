@@ -21,7 +21,9 @@ Integration (Claude20.RI, 2026-11-11), all test-only. Targets node_d3 (Node) and
     G3-D2  when a filter selects no rows, the graph keeps drawing the previous points: the view hands vis.js an empty
            DataSet, vis 4.16.1 ignores empty data (Graph3d._dataInitialize), its dataPoints keep the old count.
 
-PHASE_5 group 2 (Claude21.RI, 2026-11-16), test-only additions:
+PHASE_5 group 2 (Claude21.RI, 2026-11-16). G3-D2 and G3-D3 are FIXED in bokehVisJS3DGraph.ts: their tests are
+ordinary tests now, the signature test of G3-D2 is removed, and the exact signature of each is a REGRESSION check
+(an ordinary failure that names the defect). G3-D1 is still a known defect (it is in the page builder). Added:
 - a sequence of selections (nothing, six rows, nothing, all rows) with a check of the canvas itself: an empty step
   must leave no coloured pixel;
 - a new defect of the same model:
@@ -54,6 +56,12 @@ def known_defect(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
+
+
+def regression(condition: bool, message: str) -> None:
+    """After the fix: the exact signature of a fixed defect is a regression - an ordinary failure that names it."""
+    if condition:
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 G3_D1_START = "failed to validate BokehVisJSGraph3D(id="
 G3_D1_END = ").style: expected a value of type str, got None of type NoneType"
 
@@ -628,16 +636,6 @@ def _is_g3_d2(before, after, n_before) -> bool:
 
 @BROWSER
 @pytest.mark.feature("DISPLAY.graph3d")
-def test_signature_g3_d2_an_empty_selection_leaves_the_old_points_in_vis(headless_session, tmp_path):
-    df, want, before, after, res = _public_graph_after(headless_session, tmp_path, EMPTY)
-    assert len(want) == 0
-    _assert_points(before["viewPoints"], _mapping_ref(df))
-    assert _is_g3_d2(before, after, len(df)), (before["visCount"], after)
-    assert not res["blocked"] and not res["page_errors"] and not res["console_errors"], res
-
-
-@BROWSER
-@pytest.mark.feature("DISPLAY.graph3d")
 def test_control_g3_d2_a_partial_selection_reaches_vis_exactly(headless_session, tmp_path):
     """G3-D2's control and the public-page check: 9 reference points at load; after the range (-1, 1) the view hands
     vis.js exactly the 6 selected rows, and vis holds 6 points."""
@@ -653,10 +651,9 @@ def test_control_g3_d2_a_partial_selection_reaches_vis_exactly(headless_session,
 
 @BROWSER
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="G3-D2: an empty selection leaves the previous points in the 3D graph")
 def test_strict_an_empty_selection_leaves_no_points_in_the_3d_graph(headless_session, tmp_path):
     df, want, before, after, res = _public_graph_after(headless_session, tmp_path, EMPTY)
-    known_defect(_is_g3_d2(before, after, len(df)), "G3-D2: vis.Graph3d still holds the old points")
+    regression(_is_g3_d2(before, after, len(df)), "G3-D2: vis.Graph3d still holds the old points")
     assert after["visCount"] in (0, None), after
     assert not res["blocked"] and not res["page_errors"] and not res["console_errors"], res
 
@@ -709,14 +706,13 @@ SEQUENCE = (EMPTY, PART, EMPTY, (-1.5, 2.))      # nothing, six rows, nothing ag
 
 @BROWSER
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="G3-D2: an empty selection leaves the previous points in the 3D graph")
 def test_strict_the_3d_graph_follows_a_sequence_of_empty_and_non_empty_selections(headless_session, tmp_path):
     """Nothing selected, then six rows, then nothing again, then all rows: after every step vis.js holds exactly the
     selected points, and an empty step leaves no coloured pixel on the canvas."""
     df, states = _public_graph_sequence(headless_session, tmp_path, SEQUENCE)
     assert states[0]["visCount"] == len(df) and states[0]["dots"] > 0, states[0]
     stale = [i for i, s in enumerate(states[1:], 1) if len(s["want"]) == 0 and s["viewPoints"] == [] and s["visCount"]]
-    known_defect(stale == [1, 3] and states[1]["visCount"] == len(df) and states[3]["visCount"] == 6
+    regression(stale == [1, 3] and states[1]["visCount"] == len(df) and states[3]["visCount"] == 6
                  and states[1]["dots"] > 0 and states[3]["dots"] > 0,
                  "G3-D2: after each empty selection vis.Graph3d still holds and draws the points of the step before")
     for i, s in enumerate(states[1:], 1):
@@ -776,10 +772,9 @@ def _empty_at_load(headless_session, tmp_path):
 
 @BROWSER
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="G3-D3: with an empty table at load the 3D graph is never created")
 def test_strict_a_3d_graph_with_an_empty_table_at_load_is_created_and_shows_later_data(headless_session, tmp_path):
     df, states = _empty_at_load(headless_session, tmp_path)
-    known_defect(len(states) == 1 and states[0]["graph"] is False and states[0]["errors"] == [EMPTY_AT_LOAD_ERROR],
+    regression(len(states) == 1 and states[0]["graph"] is False and states[0]["errors"] == [EMPTY_AT_LOAD_ERROR],
                  f"G3-D3: the view has no vis.Graph3d and the page reports '{EMPTY_AT_LOAD_ERROR}'")
     assert [s["errors"] for s in states] == [[]] * 5, states
     assert states[0]["graph"] and not states[0]["visCount"] and states[0]["dots"] == 0, states[0]

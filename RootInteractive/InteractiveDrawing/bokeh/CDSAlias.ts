@@ -327,7 +327,6 @@ export class CDSAlias extends ColumnarDataSource {
       watched_changed = watched_changed || did_change
     }
     if(watched_changed && emit_change){
-      console.log(keys)
       this.change.emit()
     }
   }
@@ -360,7 +359,6 @@ export class CDSAlias extends ColumnarDataSource {
       }
     }
     if(emit_change){
-      console.log(key)
       this.change.emit()
     }
     return true

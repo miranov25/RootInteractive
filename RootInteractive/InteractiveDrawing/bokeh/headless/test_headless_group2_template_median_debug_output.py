@@ -1,9 +1,9 @@
 """PHASE_5 group 2 - three small defects outside the page builder (Claude21.RI, 2026-11-16).
 
-In plain words. Each defect has a test of the wanted behaviour, an exact description of today's wrong behaviour (its
-"signature") and a control that works today, so no test is empty. Before the fix the test of the wanted behaviour is
-a strict expected failure; after the fix it is an ordinary test, and the signature becomes a REGRESSION check (an
-ordinary failure that names the defect).
+In plain words. Each defect has a test of the wanted behaviour, an exact description of the wrong behaviour before
+the fix (its "signature") and a control that also worked before, so no test is empty. The three defects are FIXED
+(the fix commit of group 2): the tests of the wanted behaviour are ordinary tests, and each signature is a REGRESSION
+check (an ordinary failure that names the defect).
 
   1. The third custom function of the interactive template (register entry "funCustom2"). The template
      `getDefaultVars` (used as getDefaultVarsDiff and getDefaultVarsRatio) offers three text boxes, funCustomForm0,
@@ -47,16 +47,10 @@ BOKEH_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = BOKEH_DIR.parents[2]
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """After the fix: the exact signature of a fixed defect is a regression - an ordinary failure that names it."""
     if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
 # ================================================================== 1. the third custom function of the template
@@ -103,10 +97,9 @@ def test_control_the_templates_have_three_custom_functions_each_and_the_first_tw
 
 @UNIT
 @pytest.mark.feature("DSL.custom_js_func")
-@pytest.mark.xfail(**STRICT, reason="funCustom2: the third custom function of the template names a text box that does not exist")
 def test_every_custom_function_of_a_template_names_one_of_its_text_boxes():
     wrong = _function_names_without_a_text_box()
-    known_defect(wrong == FUN_CUSTOM2_SIGNATURE, "funCustom2: getDefaultVars (Diff and Ratio) gives funCustom2 the "
+    regression(wrong == FUN_CUSTOM2_SIGNATURE, "funCustom2: getDefaultVars (Diff and Ratio) gives funCustom2 the "
                                                  "function name 'funcCustomForm2'; the text box is 'funCustomForm2'")
     assert wrong == [], wrong
 
@@ -185,14 +178,13 @@ def test_control_the_first_two_custom_functions_follow_their_text_boxes(node_ses
 
 @NODE
 @pytest.mark.feature("DSL.custom_js_func")
-@pytest.mark.xfail(**STRICT, reason="funCustom2: the third custom function of the template does not follow its text box")
 def test_the_third_custom_function_follows_its_text_box(node_session, tmp_path):
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.node_session import decode
     n, reply = _type_functions(node_session, tmp_path, [("funCustomForm2", "return 7")])
     assert reply.get("ok") is True, reply
     got = decode(reply["result"])
     errors = reply.get("console_errors") or []
-    known_defect(_constant(got["before"]["funCustom2"], 0, n) and _constant(got["after"]["funCustom2"], 0, n)
+    regression(_constant(got["before"]["funCustom2"], 0, n) and _constant(got["after"]["funCustom2"], 0, n)
                  and bool(errors) and set(errors) == {"ReferenceError: funcCustomForm2 is not defined"}
                  and not reply.get("page_errors"),
                  "funCustom2: the column is 0 in every row before and after typing, and the console says "
@@ -250,10 +242,9 @@ def test_control_the_search_for_debug_printing_finds_a_call_and_skips_comments(t
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT, reason="R-2: browser models print debug values with console.log")
 def test_no_browser_model_prints_debug_values():
     found = _debug_prints()
-    known_defect(found == DEBUG_PRINT_SIGNATURE, f"R-2: console.log calls in the models: {found}")
+    regression(found == DEBUG_PRINT_SIGNATURE, f"R-2: console.log calls in the models: {found}")
     assert found == {}, found
 
 
@@ -306,11 +297,10 @@ def _page_prints(headless_session, tmp_path):
 
 
 @BROWSER
-@pytest.mark.xfail(**STRICT, reason="R-2: browser models print debug values with console.log")
 def test_a_page_prints_nothing_while_it_loads_and_while_its_range_is_moved(headless_session, tmp_path):
     printed = _page_prints(headless_session, tmp_path)
     known = sorted(t for t in printed if t in PAGE_PRINT_SIGNATURE)
-    known_defect(known == PAGE_PRINT_SIGNATURE and len(printed) == len(known) + 2,
+    regression(known == PAGE_PRINT_SIGNATURE and len(printed) == len(known) + 2,
                  f"R-2: the page printed {len(printed)} lines: {printed}")
     assert printed == [], printed
 
@@ -378,13 +368,12 @@ def _statistic(plot):
 
 @UNIT
 @pytest.mark.feature("HIST.profile")
-@pytest.mark.xfail(**STRICT, reason="DEC-23: the plots named Median of the weights dashboard draw the standard deviation")
 def test_the_plots_named_median_of_the_weights_dashboard_draw_the_median():
     d = _weights_dashboard()
     assert sorted(p[0] for p in d["median_plots"]) == sorted(MEDIAN_PLOTS), d["median_plots"]
     assert [_statistic(p)[0] for p in d["mean_plots"]] == ["mean"] * 4, d["mean_plots"]          # the control
     drawn = {p[0]: _statistic(p)[0] for p in d["median_plots"]}
-    known_defect(set(drawn.values()) == {"std"}, f"DEC-23: the four plots named Median draw 'std': {drawn}")
+    regression(set(drawn.values()) == {"std"}, f"DEC-23: the four plots named Median draw 'std': {drawn}")
     for plot in d["median_plots"]:
         stat, histogram = _statistic(plot)
         assert stat == f"quantile_{d['quantiles'][histogram].index(0.5)}", (plot, d["quantiles"][histogram])
@@ -417,7 +406,6 @@ PROFILE_FIELDS_JS = r"""(a) => {
 
 @NODE
 @pytest.mark.feature("HIST.profile")
-@pytest.mark.xfail(**STRICT, reason="DEC-23: the plots named Median of the weights dashboard draw the standard deviation")
 def test_the_weights_dashboard_page_reads_the_median_column_for_its_median_plots(node_session, tmp_path):
     """The real page of the dashboard (400 rows): it loads without an error, and from each of the four profile tables
     behind the Mean and Median plots the page's lines read the mean and the median column, not the std."""
@@ -436,7 +424,7 @@ def test_the_weights_dashboard_page_reads_the_median_column_for_its_median_plots
         assert r.get("ok") is True and not r.get("page_errors") and not unexpected, (op, r.get("page_errors"), unexpected[:3])
     got = decode(reply["result"])
     read = {t: set(got["fields"].get(t, [])) - {"bin_center_0", "bin_center_1"} for t in tables}
-    known_defect(all(r == {"mean", "std"} for r in read.values()), f"DEC-23: the page reads {read}")
+    regression(all(r == {"mean", "std"} for r in read.values()), f"DEC-23: the page reads {read}")
     for t in tables:
         assert read[t] == {"mean", "quantile_1"}, (t, read[t])
         std, median = np.asarray(got["columns"][t]["std"], float), np.asarray(got["columns"][t]["quantile_1"], float)

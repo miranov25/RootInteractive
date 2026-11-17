@@ -114,7 +114,6 @@ export class MultiSelectFilter extends RIFilter {
     }
     if (how == "whitelist"){
         const accepted_codes = selected.map((a: string) => mapping[a])
-        let count=0
         for(let i=0; i <col.length; i++){
             const x = col[i]
             let isOK = false
@@ -126,7 +125,6 @@ export class MultiSelectFilter extends RIFilter {
             }
             new_vector[i] = isOK
         }        
-        console.log(count)
         this.dirty_source = false
         this.dirty_widget = false
         this.cached_vector = new_vector

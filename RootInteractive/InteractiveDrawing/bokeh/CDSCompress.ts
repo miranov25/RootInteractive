@@ -111,7 +111,6 @@ export class CDSCompress extends ColumnDataSource {
     }
     this.data[key]=arrOut;
     this.freshColumns.add(key);
-    console.log(key);    
     return arrOut;
   }
 

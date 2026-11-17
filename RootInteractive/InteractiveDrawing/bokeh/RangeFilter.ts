@@ -56,7 +56,6 @@ export class RangeFilter extends RIFilter {
 
   mark_dirty_widget(){
     this.dirty_widget = true
-    console.log(this.properties.range)
 //    this.change.emit()
   }
 
