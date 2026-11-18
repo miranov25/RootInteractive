@@ -1072,8 +1072,9 @@ def test_fewer_rows_than_unknowns_give_no_fit(node_session, tmp_path):
 @pytest.mark.feature("STAT.linear_fit")
 def test_group3_offset_reference_and_prediction():
     """No page: the oracle returns the slopes the data were made with at every offset, and its fitted values equal
-    those of numpy's plain least squares (the fitted values are well determined; at 1e9 the split between slope and
-    intercept is not, so the intercept is only checked through the fitted values). The transcription of today's fit
+    those of numpy's plain least squares. At 1e9 the stored numbers determine the intercept, but it is very
+    sensitive to their rounding: a change of the target in its last digit can move it by tens. So the intercept is only
+    checked through the fitted values, which are not sensitive (the review of Groups 3 and 4, G3-P2-C). The transcription of today's fit
     is wrong on every case (so its signature can be told from the right answer); on data without an offset it is
     right."""
     for case, weight in OFFSET_FITS["argvalues"]:
@@ -1355,13 +1356,12 @@ def _no_positive_weight_fit(node_session, tmp_path, case, alpha):
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="G3-P1-A: with the ridge term and no row of positive weight, the fit gives NaN")
 @pytest.mark.parametrize(**NO_POSITIVE_WEIGHT)
 def test_ridge_fit_without_a_row_of_positive_weight_gives_zero_coefficients(node_session, tmp_path, case):
     """With the ridge term and no row of positive weight, only the penalty is left, and its only minimum is every
-    coefficient 0. Before Group 3 the page gave 0; after Group 3 it gives NaN (the mean of the predictor is 0/0)."""
+    coefficient 0. Before Group 3 the page gave 0; after Group 3 it gave NaN (the mean of the predictor was 0/0)."""
     d, got = _no_positive_weight_fit(node_session, tmp_path, case, GPT27_ALPHA)
-    known_defect(len(got) == 2 and np.isnan(got).all(), f"G3-P1-A: the {case} fit gives {got}")
+    regression(len(got) == 2 and np.isnan(got).all(), f"G3-P1-A: the {case} fit gives {got}")
     np.testing.assert_array_equal(got, [0., 0.])
 
 
@@ -1377,14 +1377,13 @@ def test_control_no_row_of_positive_weight_without_ridge_gives_no_fit(node_sessi
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="G3-P1-B: GPT27.RI's ridge case near 1e9 gives no fit")
 @pytest.mark.parametrize("weight", [None, "w"], ids=["unweighted", "weighted"])
 def test_ridge_fit_of_two_predictors_near_1e9_equals_the_exact_answer(node_session, tmp_path, weight):
     """GPT27.RI's case: 8 rows, two predictors near 1e9, alpha 0.25. The exact answer is finite (slopes about 1.97
-    and 1.03: the penalty moves the intercept to almost 0). After Group 3 the page gives no fit."""
+    and 1.03: the penalty moves the intercept to almost 0). After Group 3 the page gave no fit."""
     d, predictors = _gpt27_frame()
     vals, got = _ridge_read(node_session, tmp_path, d, predictors, weight, GPT27_ALPHA, f"g5_gpt27_{weight}")
-    known_defect(_is_g3_p1_b([(vals, d, predictors, weight, GPT27_ALPHA, 1e9)]),
+    regression(_is_g3_p1_b([(vals, d, predictors, weight, GPT27_ALPHA, 1e9)]),
                  f"G3-P1-B: GPT27.RI's case ({weight}) gives {got}")
     beta = _exact_ridge(d, predictors, weight, GPT27_ALPHA)[0]
     assert _ridge_error(vals, d, predictors, weight, GPT27_ALPHA) <= _ridge_tolerance(1e9), (got, beta)
@@ -1393,7 +1392,6 @@ def test_ridge_fit_of_two_predictors_near_1e9_equals_the_exact_answer(node_sessi
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="G3-P1-B: with the ridge term, predictors far from 0 give no fit or a wrong fit")
 @pytest.mark.parametrize("offset", RIDGE_OFFSETS, ids=[f"offset_{o:.0e}" for o in RIDGE_OFFSETS])
 def test_ridge_fit_of_predictors_far_from_zero_equals_the_exact_answer(node_session, tmp_path, offset):
     """Two and three predictors at the offset, 60 rows, alpha 1e-3, 0.25 and 10, with and without weights (12 pages).
@@ -1409,8 +1407,8 @@ def test_ridge_fit_of_predictors_far_from_zero_equals_the_exact_answer(node_sess
                                         f"g5_{offset:.0e}_{count}_{alpha}_{weight}")
                 cases.append((vals, d, predictors, weight, alpha, offset))
                 errors.append((count, alpha, weight, _ridge_error(vals, d, predictors, weight, alpha)))
-    known_defect(_is_g3_p1_b(cases), f"G3-P1-B at offset {offset:g}: the worst error is "
-                                     f"{max(e[-1] for e in errors):.3g} of the spread")
+    regression(_is_g3_p1_b(cases), f"G3-P1-B at offset {offset:g}: the worst error is "
+                                   f"{max(e[-1] for e in errors):.3g} of the spread")
     bad = [e for e in errors if not e[-1] <= _ridge_tolerance(offset)]
     assert not bad, (offset, _ridge_tolerance(offset), bad)
 

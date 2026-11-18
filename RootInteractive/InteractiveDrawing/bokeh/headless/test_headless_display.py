@@ -817,16 +817,15 @@ REFUSED_A = 'the name "A" is both a column and a parameter'
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G4-P1-A: an unused parameter named default breaks the page")
 def test_parameters_whose_names_cannot_be_variables_do_not_break_a_query(node_session, tmp_path):
     """Since Group 4 a text query's function gets every parameter of the page. Parameters named default, static,
     eval, class and n-bins, which the query does not use and which cannot be variables of strict-mode JavaScript, must
     not stop the page: it loads, `return A > cut` selects by the parameter cut and follows it, and nothing is logged.
-    After Group 4 the page does not load (SyntaxError when the query's function is built)."""
+    After Group 4 the page did not load (SyntaxError when the query's function was built)."""
     df = frame()
     failure = _load_failure(node_session, _build_doc(tmp_path, "query_odd_names", df))
-    known_defect(failure is not None and failure[:2] == ODD_NAMES_FAILURE,
-                 f"G4-P1-A: the page does not load: {failure}")
+    regression(failure is not None and failure[:2] == ODD_NAMES_FAILURE,
+               f"G4-P1-A: the page does not load: {failure}")
     assert failure is None, failure
     page, report = _node_page(node_session, tmp_path, "query_odd_names", df)
     _node_set(page, "TextAreaInput", "value", "return A > cut")
@@ -838,8 +837,6 @@ def test_parameters_whose_names_cannot_be_variables_do_not_break_a_query(node_se
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G4-POL-1 (decision N1): a query using a name that is both a column and a "
-                                    "parameter takes the column without a message")
 def test_a_query_using_a_name_that_is_both_a_column_and_a_parameter_is_refused(node_session, tmp_path):
     """The Architect's decision N1: such a name is forbidden. The query `return A > 1`, whose function is given a
     parameter A by hand next to the column A, is refused by name: it selects no row, and one error names A. After
@@ -849,8 +846,8 @@ def test_a_query_using_a_name_that_is_both_a_column_and_a_parameter_is_refused(n
     page.evaluate(INJECT, {"name": "A"})
     _node_set(page, "TextAreaInput", "value", "return A > 1")
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors
-                 and not report.page_errors, "G4-POL-1: the column A won without a message")
+    regression(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors
+               and not report.page_errors, "G4-POL-1: the column A won without a message")
     assert state["mask"] == [False] * N, state["mask"]
     assert not report.page_errors, report.page_errors
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
