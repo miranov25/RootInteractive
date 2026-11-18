@@ -728,9 +728,9 @@ def _group1_frame(case):
     return d, list(cols)
 
 
-def _group1_fit_page(tmp_path, df, predictors, *, weight=None, suffix="g1"):
+def _group1_fit_page(tmp_path, df, predictors, *, weight=None, suffix="g1", alpha=0.):
     """A fit page for any predictor names; a second figure shows the fit's own columns (the ST-D1 workaround)."""
-    fit = {"name": "C1fit", "type": "linearFit", "varX": list(predictors), "varY": "target", "alpha": 0.,
+    fit = {"name": "C1fit", "type": "linearFit", "varX": list(predictors), "varY": "target", "alpha": alpha,
            "weights": weight}
     figures = [[[predictors[0]], ["fitted"]], [["target"], list(predictors) + ([weight] if weight else [])]]
     aliases = [{"name": "fitted", "variables": list(predictors), "transform": "C1fit"}]
@@ -1092,6 +1092,328 @@ def test_group3_offset_reference_and_prediction():
             p0, p1, y = TWO_ROWS[key]
             beta = _current_fit_prediction(pd.DataFrame({"p0": p0, "p1": p1, "target": y}), ["p0", "p1"])[1]
             assert np.isfinite(beta).all() if finite else np.isnan(beta).all(), (key, beta)
+
+# ==========================================================================
+# PHASE_5 Group 5: the linear fit WITH the ridge term (review of Groups 3 and 4, findings G3-P1-A and G3-P1-B)
+# ==========================================================================
+# The ridge term alpha penalises every coefficient, the intercept included (today's definition, kept):
+#     sum_k w_k (y_k - b0 - sum_i b_i x_ki)^2 + alpha (b0^2 + sum_i b_i^2).
+# The oracle is the exact minimiser of that function for the stored numbers, in rational arithmetic (no rounding).
+RIDGE_ALPHAS = [1e-3, .25, 10.]
+RIDGE_OFFSETS = [1e6, 1e7, 1e8, 1e9]
+GPT27_ALPHA = .25
+
+FIT_NOW = """() => {
+  const f = window.__riH.models().filter(m => m.type === 'ClientLinearFitter');
+  if (f.length !== 1) throw Error('linear fitters on the page: ' + f.length);
+  f[0].fit();
+  return Array.from(f[0].parameters, v => Number.isNaN(v) ? 'NaN' : v);
+}"""
+
+
+def _exact_ridge(d, predictors, weight=None, alpha=0.):
+    """The exact minimiser (predictors..., intercept) and the exact fitted values, both rounded once to doubles at
+    the end; None if the minimiser is not unique."""
+    from fractions import Fraction
+    names = list(predictors)
+    cols = [[Fraction(float(v)) for v in d[c]] for c in names]
+    rows = [[col[k] for col in cols] + [Fraction(1)] for k in range(len(d))]
+    y = [Fraction(float(v)) for v in d["target"]]
+    w = [Fraction(1)] * len(d) if weight is None else [Fraction(float(v)) for v in d[weight]]
+    p = len(names) + 1
+    m = [[Fraction(0)] * (p + 1) for _ in range(p)]
+    for k, row in enumerate(rows):
+        if w[k] == 0:
+            continue
+        for i in range(p):
+            m[i][p] += w[k] * row[i] * y[k]
+            for j in range(p):
+                m[i][j] += w[k] * row[i] * row[j]
+    for i in range(p):
+        m[i][i] += Fraction(alpha)
+    for c in range(p):
+        pivot = next((r for r in range(c, p) if m[r][c] != 0), None)
+        if pivot is None:
+            return None
+        m[c], m[pivot] = m[pivot], m[c]
+        for r in range(p):
+            if r != c and m[r][c] != 0:
+                f = m[r][c] / m[c][c]
+                m[r] = [m[r][k] - f * m[c][k] for k in range(p + 1)]
+    beta = [m[i][p] / m[i][i] for i in range(p)]
+    fitted = [sum(row[i] * beta[i] for i in range(p)) for row in rows]
+    return np.array([float(b) for b in beta]), np.array([float(f) for f in fitted])
+
+
+def _ridge_tolerance(offset):
+    """The fitted values must equal the exact ones within this fraction of the target's spread. The predictors near
+    the offset are stored with an error of up to 1.1e-16 * offset, and no solver in double precision can do much
+    better than a few of these units: the bound is 1e-12 plus 36 of them (4e-15 * offset). The new fit's worst case
+    on a reviewer's 360 cases was 7.3e-16 * offset."""
+    return 1e-12 + 4e-15 * offset
+
+
+def _group3_ridge_prediction(d, predictors, weight, alpha):
+    """G3-P1-A/B PREDICTION - what the page computes with the ridge term after Group 3, transcribed from
+    ClientLinearFitter.fit at 7aa4423 (centred and scaled sums in the same order of operations, the penalty
+    alpha * T^T T added to them) and from MathUtils.solve. Used only to recognise the defect, never as the oracle.
+    Returns the fitted values and the coefficients (predictors, then the intercept)."""
+    cols = [[float(v) for v in d[c]] for c in predictors]
+    y = [float(v) for v in d["target"]]
+    w = None if weight is None else [float(v) for v in d[weight]]
+    nx, rows = len(cols), len(y)
+    sum_w = 0.
+    for k in range(rows):
+        sum_w += 1. if w is None else w[k]
+    mean, scale = [], []
+    for col in cols:
+        acc = 0.
+        for k in range(rows):
+            acc += col[k] if w is None else col[k] * w[k]
+        m = acc / sum_w if sum_w != 0 else float("nan")
+        acc = 0.
+        for k in range(rows):
+            dk = col[k] - m
+            acc += dk * dk if w is None else dk * dk * w[k]
+        s = np.sqrt(acc / sum_w) if sum_w != 0 else float("nan")
+        mean.append(m)
+        scale.append(s if s > 0 else 1.)
+    x = [0.] * ((nx + 1) * (nx + 2) // 2)
+    rhs = [0.] * (nx + 1)
+    last = nx * (nx + 1) // 2
+    for k in range(rows):
+        wk = 1. if w is None else w[k]
+        u = [(cols[i][k] - mean[i]) / scale[i] for i in range(nx)]
+        i_row = 0
+        for i in range(nx):
+            uw = u[i] * wk
+            for j in range(i + 1):
+                x[i_row + j] += uw * u[j]
+            x[last + i] += uw
+            rhs[i] += uw * y[k]
+            i_row += i + 1
+        x[last + nx] += wk
+        rhs[nx] += wk * y[k]
+    i_row = 0
+    for i in range(nx):
+        ri = mean[i] / scale[i]
+        for j in range(i + 1):
+            x[i_row + j] += alpha * ri * mean[j] / scale[j]
+        x[i_row + i] += alpha / (scale[i] * scale[i])
+        x[last + i] -= alpha * ri
+        i_row += i + 1
+    x[last + nx] += alpha
+    gamma = _js_solve_packed(x, rhs)
+    beta, intercept = [], gamma[nx]
+    for i in range(nx):
+        b = gamma[i] / scale[i]
+        beta.append(b)
+        intercept -= b * mean[i]
+    beta = np.asarray(beta + [intercept])
+    fitted = np.full(rows, beta[-1])              # as v_compute: the intercept, then one predictor after the other
+    for i in range(nx):
+        fitted = fitted + np.asarray(cols[i]) * beta[i]
+    return fitted, beta
+
+
+def _js_solve_packed(x, rhs):
+    """MathUtils.solve after Group 1, transcribed (chol of the packed lower triangle, then the substitutions); a
+    pivot that is not positive gives NaN for every unknown. Works on copies."""
+    x, rhs = list(x), list(rhs)
+    m = len(rhs)
+    i_row = 0
+    for i in range(m):
+        if not x[i + i_row] > 0:
+            x[i + i_row] = float("nan")
+        pivot_diag = 1. / x[i + i_row]
+        j_row = i_row + i + 1
+        for j in range(i + 1, m):
+            pivot_row = pivot_diag * x[i + j_row]
+            k_row = i_row + i + 1
+            for k in range(i + 1, j + 1):
+                if k == j:
+                    x[k + j_row] -= pivot_row * x[i + k_row]
+                k_row += k + 1
+            for k in range(j + 1, m):
+                x[j + k_row] -= pivot_row * x[i + k_row]
+                k_row += k + 1
+            x[i + j_row] = pivot_row
+            j_row += j + 1
+        i_row += i + 1
+    i_diag = 0
+    for i in range(m):
+        if not x[i_diag] > 0:
+            return [float("nan")] * m
+        i_diag += i + 2
+    i_row = 0
+    for i in range(m):
+        for j in range(i):
+            rhs[i] -= rhs[j] * x[i_row + j]
+        i_row += i + 1
+    i_diag = 0
+    for i in range(m):
+        rhs[i] /= x[i_diag]
+        i_diag += i + 2
+    for i in range(m - 1, -1, -1):
+        j_row = 1 + ((i * (i + 5)) >> 1)
+        for j in range(i + 1, m):
+            rhs[i] -= rhs[j] * x[j_row]
+            j_row += j + 1
+    return rhs
+
+
+def _ridge_frame(offset, count, n=60, seed=20261118):
+    """n rows; every predictor is the offset plus a uniform number in [-1, 1]; target = 1 + 2 p0 + p1 - 3 p2 (as many
+    terms as predictors), as computed in floating point; `w` is a weight column."""
+    rng = np.random.default_rng(seed)
+    d = pd.DataFrame({c: offset + rng.uniform(-1., 1., n) for c in ("p0", "p1", "p2")})
+    predictors = ["p0", "p1", "p2"][:count]
+    d["target"] = 1. + d[predictors].to_numpy() @ np.array([2., 1., -3.][:count])
+    d["w"] = rng.uniform(.5, 2., n)
+    return d, predictors
+
+
+def _gpt27_frame():
+    """GPT27.RI's case: 8 rows, two predictors near 1e9."""
+    t = np.linspace(-1., 1., 8)
+    d = pd.DataFrame({"p0": 1e9 + t, "p1": 1e9 + np.sin(6. * t), "w": np.linspace(.5, 2., 8)})
+    d["target"] = 1. + 2. * d["p0"] + d["p1"]
+    return d, ["p0", "p1"]
+
+
+def _ridge_read(node_session, tmp_path, d, predictors, weight, alpha, suffix):
+    _node_open(node_session, _group1_fit_page(tmp_path, d, predictors, weight=weight, alpha=alpha, suffix=suffix))
+    vals = np.asarray(_read(node_session, "CDSAlias", ["fitted"], name="cdsFull")["data"]["fitted"], dtype=float)
+    got = np.asarray(_read(node_session, "ClientLinearFitter", [])["extra"]["parameters"], dtype=float)
+    return vals, got
+
+
+def _ridge_error(vals, d, predictors, weight, alpha):
+    """The largest deviation of the fitted values from the exact ones, as a fraction of the target's spread (inf for
+    no fit)."""
+    exact = _exact_ridge(d, predictors, weight, alpha)[1]
+    if not np.isfinite(vals).all():
+        return float("inf")
+    return float(np.max(np.abs(vals - exact)) / np.ptp(d["target"].to_numpy()))
+
+
+def _is_g3_p1_b(cases) -> bool:
+    """G3-P1-B, exact: on every case the page's fitted values are those of the transcription of the fit after
+    Group 3, and on at least one case that transcription is outside the tolerance (no fit, or wrong)."""
+    same, wrong = True, False
+    for vals, d, predictors, weight, alpha, offset in cases:
+        with np.errstate(all="ignore"):
+            pred = _group3_ridge_prediction(d, predictors, weight, alpha)[0]
+        same = same and bool(np.allclose(vals, pred, rtol=1e-12, atol=0, equal_nan=True))
+        wrong = wrong or _ridge_error(pred, d, predictors, weight, alpha) > _ridge_tolerance(offset)
+    return same and wrong
+
+
+@UNIT
+@pytest.mark.feature("STAT.linear_fit")
+def test_group5_exact_ridge_reference_and_prediction():
+    """No page: the exact reference equals numpy's least squares of the augmented rows [sqrt(w) X; sqrt(alpha) I] on
+    a well-conditioned case; with no row of positive weight its minimum is every coefficient 0 (and with alpha = 0
+    there is none). The transcription of the fit after Group 3 is right on that well-conditioned case, and gives no
+    fit on GPT27.RI's case (so the signature of the defect can be told from the right answer)."""
+    d, predictors = _ridge_frame(0., 2)
+    w = d["w"].to_numpy()
+    x = np.column_stack([d[predictors].to_numpy(), np.ones(len(d))])
+    aug = np.vstack([np.sqrt(w)[:, None] * x, np.sqrt(GPT27_ALPHA) * np.eye(3)])
+    target = np.concatenate([np.sqrt(w) * d["target"].to_numpy(), np.zeros(3)])
+    beta, fitted = _exact_ridge(d, predictors, "w", GPT27_ALPHA)
+    np.testing.assert_allclose(beta, np.linalg.lstsq(aug, target, rcond=None)[0], rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(fitted, x @ beta, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(_group3_ridge_prediction(d, predictors, "w", GPT27_ALPHA)[0], fitted,
+                               rtol=1e-12, atol=1e-12)
+    d0 = d.assign(w=0.)
+    np.testing.assert_array_equal(_exact_ridge(d0, predictors, "w", GPT27_ALPHA)[0], [0., 0., 0.])
+    assert _exact_ridge(d0, predictors, "w", 0.) is None
+    d, predictors = _gpt27_frame()
+    for weight in (None, "w"):
+        with np.errstate(all="ignore"):
+            assert np.isnan(_group3_ridge_prediction(d, predictors, weight, GPT27_ALPHA)[1]).all(), weight
+
+
+NO_POSITIVE_WEIGHT = dict(argnames="case", argvalues=["all_weights_zero", "no_row"])
+
+
+def _no_positive_weight_fit(node_session, tmp_path, case, alpha):
+    """The fit's coefficients with every weight 0 (8 rows) or without any row. Without rows the page computes no
+    fitted value and never runs the fit, so the fit is run directly."""
+    if case == "all_weights_zero":
+        d = pd.DataFrame({"p0": np.arange(8.), "target": 1. + 2. * np.arange(8.), "w": np.zeros(8)})
+        weight = "w"
+    else:
+        d = pd.DataFrame({"p0": np.zeros(0), "target": np.zeros(0)})
+        weight = None
+    _node_open(node_session, _group1_fit_page(tmp_path, d, ["p0"], weight=weight, alpha=alpha,
+                                              suffix=f"g5_{case}_{alpha}"))
+    got = np.asarray([float(v) for v in _eval(node_session, FIT_NOW)])
+    return d, got
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.xfail(**STRICT, reason="G3-P1-A: with the ridge term and no row of positive weight, the fit gives NaN")
+@pytest.mark.parametrize(**NO_POSITIVE_WEIGHT)
+def test_ridge_fit_without_a_row_of_positive_weight_gives_zero_coefficients(node_session, tmp_path, case):
+    """With the ridge term and no row of positive weight, only the penalty is left, and its only minimum is every
+    coefficient 0. Before Group 3 the page gave 0; after Group 3 it gives NaN (the mean of the predictor is 0/0)."""
+    d, got = _no_positive_weight_fit(node_session, tmp_path, case, GPT27_ALPHA)
+    known_defect(len(got) == 2 and np.isnan(got).all(), f"G3-P1-A: the {case} fit gives {got}")
+    np.testing.assert_array_equal(got, [0., 0.])
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.parametrize(**NO_POSITIVE_WEIGHT)
+def test_control_no_row_of_positive_weight_without_ridge_gives_no_fit(node_session, tmp_path, case):
+    """G3-P1-A's control, right before and after the fix: without the ridge term every coefficient minimises the
+    function equally, so there is no fit."""
+    d, got = _no_positive_weight_fit(node_session, tmp_path, case, 0.)
+    assert len(got) == 2 and np.isnan(got).all(), got
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.xfail(**STRICT, reason="G3-P1-B: GPT27.RI's ridge case near 1e9 gives no fit")
+@pytest.mark.parametrize("weight", [None, "w"], ids=["unweighted", "weighted"])
+def test_ridge_fit_of_two_predictors_near_1e9_equals_the_exact_answer(node_session, tmp_path, weight):
+    """GPT27.RI's case: 8 rows, two predictors near 1e9, alpha 0.25. The exact answer is finite (slopes about 1.97
+    and 1.03: the penalty moves the intercept to almost 0). After Group 3 the page gives no fit."""
+    d, predictors = _gpt27_frame()
+    vals, got = _ridge_read(node_session, tmp_path, d, predictors, weight, GPT27_ALPHA, f"g5_gpt27_{weight}")
+    known_defect(_is_g3_p1_b([(vals, d, predictors, weight, GPT27_ALPHA, 1e9)]),
+                 f"G3-P1-B: GPT27.RI's case ({weight}) gives {got}")
+    beta = _exact_ridge(d, predictors, weight, GPT27_ALPHA)[0]
+    assert _ridge_error(vals, d, predictors, weight, GPT27_ALPHA) <= _ridge_tolerance(1e9), (got, beta)
+    np.testing.assert_allclose(got[:-1], beta[:-1], rtol=1e-6, atol=0)
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.xfail(**STRICT, reason="G3-P1-B: with the ridge term, predictors far from 0 give no fit or a wrong fit")
+@pytest.mark.parametrize("offset", RIDGE_OFFSETS, ids=[f"offset_{o:.0e}" for o in RIDGE_OFFSETS])
+def test_ridge_fit_of_predictors_far_from_zero_equals_the_exact_answer(node_session, tmp_path, offset):
+    """Two and three predictors at the offset, 60 rows, alpha 1e-3, 0.25 and 10, with and without weights (12 pages).
+    The fitted values must equal the exact ones within _ridge_tolerance(offset) of the target's spread. After Group 3
+    the penalty of the intercept swamped the data: a wrong fit without a message from 1e6 on (a reviewer measured
+    0.5 % of the spread at 1e7 and more than the spread at 1e8 and 1e9), or no fit."""
+    cases, errors = [], []
+    for count in (2, 3):
+        d, predictors = _ridge_frame(offset, count)
+        for alpha in RIDGE_ALPHAS:
+            for weight in (None, "w"):
+                vals, got = _ridge_read(node_session, tmp_path, d, predictors, weight, alpha,
+                                        f"g5_{offset:.0e}_{count}_{alpha}_{weight}")
+                cases.append((vals, d, predictors, weight, alpha, offset))
+                errors.append((count, alpha, weight, _ridge_error(vals, d, predictors, weight, alpha)))
+    known_defect(_is_g3_p1_b(cases), f"G3-P1-B at offset {offset:g}: the worst error is "
+                                     f"{max(e[-1] for e in errors):.3g} of the spread")
+    bad = [e for e in errors if not e[-1] <= _ridge_tolerance(offset)]
+    assert not bad, (offset, _ridge_tolerance(offset), bad)
+
 
 # ST-D1: the fit's response and weight columns are not sent
 READ_SENT = r"""() => {

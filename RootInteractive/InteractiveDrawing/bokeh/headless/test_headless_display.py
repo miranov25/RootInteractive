@@ -86,6 +86,9 @@ W = np.array([1., 2., 1.5, .5, 3., 2.5, 4., 1.25, 2.25, 3.5, .75, 1.75])
 BINS = (4, 3)
 RANGES = ((0., 4.), (0., 3.))
 HIST_PROBES = [["h", "bin_count", ["HistoNdCDS"]]]
+# PHASE_5 Group 5 (G4-P1-A): parameter names that cannot be variables of strict-mode JavaScript
+ODD_NAMES = ["default", "static", "eval", "class", "n-bins"]
+CLASH_CUT = np.array([0., 5.] * (N // 2))   # the column named like the parameter `cut` (G4-POL-1, decision N1)
 
 
 def frame():
@@ -176,7 +179,7 @@ def _from_array(kind, df, **settings):
     extra = {}
     aliases = []
     if kind in {"query", "query_toggle", "query_parameter", "query_parameter_alias", "query_toggle_shown",
-                "query_alone"}:
+                "query_alone", "query_odd_names", "query_clash"}:
         widgets = [["textQuery", {"source": None, "name": "text_query", "value": "return true",
                                   **({"toggleable": True} if kind in ("query_toggle", "query_toggle_shown",
                                                                        "query_alone") else {})}]]
@@ -188,16 +191,19 @@ def _from_array(kind, df, **settings):
         if kind in ("query_toggle", "query_toggle_shown"):
             # WG-D1's healthy page requires a second active filter.
             widgets.append(["range", ["gate", -2., 2.]])
-        if kind in ("query_parameter", "query_parameter_alias"):
+        if kind in ("query_parameter", "query_parameter_alias", "query_odd_names", "query_clash"):
             widgets.append(["spinner", ["cut"]])
             params = [{"name": "cut", "value": 1., "range": [0., 4.], "step": 1.}]
+        if kind == "query_odd_names":
+            # PHASE_5 Group 5 (G4-P1-A): parameters the query does not use, whose names cannot be JavaScript variables
+            params += [{"name": name, "value": 2.} for name in ODD_NAMES]
         if kind == "query_parameter_alias":
             aliases = [("acut", "A > cut")]                # TQ-D1 control: an alias that uses the parameter
         plots = [
             [["bin_center_0"], ["bin_count"], {"source": "h"}],
             # Request both query-only columns through the real source graph;
             # a query typed later cannot itself inform initial column loading.
-            [["A"], ["B"], {"visualization_type": "scatter"}],
+            [["A"], ["B"] + (["cut"] if kind == "query_clash" else []), {"visualization_type": "scatter"}],
         ]
         extra["layout"] = [[0, 1]]
         extra["sourceArray"] = [{"name": "h", "variables": ["x", "y"],
@@ -798,20 +804,66 @@ def test_strict_clearing_and_retyping_a_query_logs_nothing(node_session, tmp_pat
     _assert_no_errors(report)
 
 
+# PHASE_5 Group 5 (review of Groups 3 and 4): G4-P1-A, unusual parameter names; G4-POL-1, a name that is both a column
+# and a parameter, which the Architect's decision N1 (2026-11-18) forbids.
+ODD_NAMES_FAILURE = ("SyntaxError", "Unexpected token 'default'")
+INJECT = """a => {
+  const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
+  if (q.length !== 1) throw Error('query function: ' + q.length);
+  q[0].parameters = {...q[0].parameters, [a.name]: 100.};
+}"""
+REFUSED_A = 'the name "A" is both a column and a parameter'
+
+
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-def test_a_parameter_named_like_a_column_does_not_break_a_query(node_session, tmp_path):
-    """PHASE_5 Group 4: since the fix of TQ-D1 a query's function gets every parameter of the page. A parameter with
-    the name of a column that the query reads must not break the function (it is built in strict mode, which refuses
-    two arguments with one name): the column wins. Here the query's function is given a parameter named A by hand,
-    and the query A > 1 must select by the column A, without an error."""
+@pytest.mark.xfail(**STRICT, reason="G4-P1-A: an unused parameter named default breaks the page")
+def test_parameters_whose_names_cannot_be_variables_do_not_break_a_query(node_session, tmp_path):
+    """Since Group 4 a text query's function gets every parameter of the page. Parameters named default, static,
+    eval, class and n-bins, which the query does not use and which cannot be variables of strict-mode JavaScript, must
+    not stop the page: it loads, `return A > cut` selects by the parameter cut and follows it, and nothing is logged.
+    After Group 4 the page does not load (SyntaxError when the query's function is built)."""
+    df = frame()
+    failure = _load_failure(node_session, _build_doc(tmp_path, "query_odd_names", df))
+    known_defect(failure is not None and failure[:2] == ODD_NAMES_FAILURE,
+                 f"G4-P1-A: the page does not load: {failure}")
+    assert failure is None, failure
+    page, report = _node_page(node_session, tmp_path, "query_odd_names", df)
+    _node_set(page, "TextAreaInput", "value", "return A > cut")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
+    _node_set(page, "Spinner", "value", 3., title="cut")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=3.))
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G4-POL-1 (decision N1): a query using a name that is both a column and a "
+                                    "parameter takes the column without a message")
+def test_a_query_using_a_name_that_is_both_a_column_and_a_parameter_is_refused(node_session, tmp_path):
+    """The Architect's decision N1: such a name is forbidden. The query `return A > 1`, whose function is given a
+    parameter A by hand next to the column A, is refused by name: it selects no row, and one error names A. After
+    Group 4 the column won without a message (every row with A > 1 was selected)."""
     df = frame()
     page, report = _node_page(node_session, tmp_path, "query_parameter", df)
-    page.evaluate("""() => {
-      const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
-      if (q.length !== 1) throw Error('query function: ' + q.length);
-      q[0].parameters = {...q[0].parameters, A: 100.};
-    }""")
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    state = _hist_state(page)
+    known_defect(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors
+                 and not report.page_errors, "G4-POL-1: the column A won without a message")
+    assert state["mask"] == [False] * N, state["mask"]
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_control_a_parameter_named_like_a_column_the_query_does_not_use_changes_nothing(node_session, tmp_path):
+    """N1's control, right before and after the fix: a parameter B next to the column B, and the query `return A > 1`
+    that does not use B. The query selects by A, and nothing is logged."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "B"})
     _node_set(page, "TextAreaInput", "value", "return A > 1")
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
     _assert_no_errors(report)
