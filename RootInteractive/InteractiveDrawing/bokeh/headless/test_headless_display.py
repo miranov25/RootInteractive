@@ -88,6 +88,7 @@ RANGES = ((0., 4.), (0., 3.))
 HIST_PROBES = [["h", "bin_count", ["HistoNdCDS"]]]
 # PHASE_5 Group 5 (G4-P1-A): parameter names that cannot be variables of strict-mode JavaScript
 ODD_NAMES = ["default", "static", "eval", "class", "n-bins"]
+NON_ASCII = "\u03c3cut"   # sigma-cut: not plain ASCII (Group 5a, F1)
 CLASH_CUT = np.array([0., 5.] * (N // 2))   # the column named like the parameter `cut` (G4-POL-1, decision N1)
 
 
@@ -179,7 +180,7 @@ def _from_array(kind, df, **settings):
     extra = {}
     aliases = []
     if kind in {"query", "query_toggle", "query_parameter", "query_parameter_alias", "query_toggle_shown",
-                "query_alone", "query_odd_names", "query_clash"}:
+                "query_alone", "query_odd_names", "query_clash", "query_non_ascii"}:
         widgets = [["textQuery", {"source": None, "name": "text_query", "value": "return true",
                                   **({"toggleable": True} if kind in ("query_toggle", "query_toggle_shown",
                                                                        "query_alone") else {})}]]
@@ -197,6 +198,9 @@ def _from_array(kind, df, **settings):
         if kind == "query_odd_names":
             # PHASE_5 Group 5 (G4-P1-A): parameters the query does not use, whose names cannot be JavaScript variables
             params += [{"name": name, "value": 2.} for name in ODD_NAMES]
+        if kind == "query_non_ascii":
+            # PHASE_5 Group 5a (review finding F1): a parameter name that is not plain ASCII
+            params = [{"name": NON_ASCII, "value": 2.}]
         if kind == "query_parameter_alias":
             aliases = [("acut", "A > cut")]                # TQ-D1 control: an alias that uses the parameter
         plots = [
@@ -864,6 +868,112 @@ def test_control_a_parameter_named_like_a_column_the_query_does_not_use_changes_
     _node_set(page, "TextAreaInput", "value", "return A > 1")
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
     _assert_no_errors(report)
+
+
+# PHASE_5 Group 5a (the review of group 5): F1, a parameter name that is not plain ASCII (the Architect's rule of
+# 2026-11-18: parameter names are plain ASCII); F2, a name only mentioned in a comment, a string or after a dot is not
+# a use of it (decision N1 is about names the function uses); F3, a change of the parameters after the function is
+# built is checked again.
+MENTIONS = {"comment": "return B > 1 // A", "string": 'return B > 1 && "A" === "A"',
+            "property": "return B > 1 && [0].A === undefined", "escaped_quote": "return B > 1 && 'it\\'s A' !== ''",
+            "template_text": "return B > 1 && `A` === 'A'", "longer_name": "const \u03c3A = 0; return B > 1 || \u03c3A > 0"}
+USES = {"template_expression": "return B > 1 && `${A}` !== ''", "spread": "return Math.max(...[A]) > 1",
+        "after_a_string": "return 'x' + A !== 'x1'", "block_comment_before": "/* A */ return A > 1"}
+REFUSED_NON_ASCII = 'the parameter "' + NON_ASCII + '" cannot be used'
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="F1: a parameter name that is not plain ASCII is accepted when the page is built")
+def test_a_parameter_name_that_is_not_plain_ascii_is_refused_when_the_page_is_built(tmp_path):
+    """The Architect's rule: parameter names are plain ASCII. The page builder refuses such a name by name. After
+    Group 5 the page was built, and a query that used the name failed in the browser without naming the cause."""
+    error = None
+    try:
+        _build_doc(tmp_path, "query_non_ascii", frame())
+    except ValueError as e:
+        error = str(e)
+    known_defect(error is None, "F1: the page is built with a parameter name that is not plain ASCII")
+    assert NON_ASCII in error and "ASCII" in error, error
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="F1: a function using a parameter that cannot be passed fails without naming it")
+def test_a_function_that_uses_a_parameter_that_cannot_be_passed_is_refused(node_session, tmp_path):
+    """A parameter that cannot be passed to the function (here a name that is not plain ASCII, given by hand, as the
+    page builder now refuses it) and that the function uses: the function is refused by name, selects no row and
+    logs one error naming it. After Group 5 the name was left out and the query failed with a ReferenceError."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": NON_ASCII})
+    _node_set(page, "TextAreaInput", "value", "return A > " + NON_ASCII)
+    state = _hist_state(page)
+    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+                 and NON_ASCII + " is not defined" in report.console_errors[0],
+                 f"F1: the query fails with {report.console_errors}")
+    assert state["mask"] == [False] * N, state["mask"]
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_NON_ASCII in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="F2: a name only mentioned in a comment, a string or after a dot is refused")
+@pytest.mark.parametrize("case", list(MENTIONS))
+def test_a_name_only_mentioned_is_not_used_and_is_not_refused(node_session, tmp_path, case):
+    """Decision N1 refuses a name that is both a column and a parameter when the function USES it. A parameter A next
+    to the column A, mentioned only in a comment, a string or after a dot, is not used: the query `return B > 1 ...`
+    selects by B, and nothing is logged. After Group 5 the text was searched as it is, and the query was refused."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", MENTIONS[case])
+    state = _hist_state(page)
+    known_defect(state["mask"] == [False] * N and len(report.console_errors) == 1
+                 and REFUSED_A in report.console_errors[0], f"F2: the {case} mention is refused")
+    assert_histogram(df, state, B > 1)
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.parametrize("case", list(USES))
+def test_control_a_name_used_in_other_forms_is_refused(node_session, tmp_path, case):
+    """F2's control, right before and after the fix: a parameter A next to the column A, USED by the query in other
+    forms (inside ${...} of a template literal, after a spread, after a string, after a comment). The query is refused
+    by name: no row, one error naming A."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", USES[case])
+    assert _hist_state(page)["mask"] == [False] * N
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="F3: a parameter added after the function is built is not checked again")
+def test_a_change_of_the_parameters_after_the_function_is_built_is_checked_again(node_session, tmp_path):
+    """The query `return A > 1` is built first, with the column A. Then a parameter A is added and the arguments are
+    updated: the function now uses a name that is both a column and a parameter, and is refused by name (no row,
+    one error naming A). After Group 5 an update of the arguments did not check again, and the column was used."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+    page.evaluate("""() => {
+      const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return A > 1');
+      if (q.length !== 1) throw Error('query function: ' + q.length);
+      q[0].parameters = {...q[0].parameters, A: 100.};
+      q[0].update_args();
+    }""")
+    _settle(page, HIST_PROBES)
+    state = _hist_state(page)
+    known_defect(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors,
+                 "F3: the column A is used without a check")
+    assert state["mask"] == [False] * N, state["mask"]
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
 
 
 def _alone_doc(tmp_path):

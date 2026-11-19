@@ -1151,7 +1151,7 @@ def _ridge_tolerance(offset):
     the offset are stored with an error of up to 1.1e-16 * offset, and no solver in double precision can do much
     better than a few of these units: the bound is 1e-12 plus 36 of them (4e-15 * offset). The new fit's worst case
     on a reviewer's 360 cases was 7.3e-16 * offset."""
-    return 1e-12 + 4e-15 * offset
+    return 1e-12 + 4e-15 * abs(offset)
 
 
 def _group3_ridge_prediction(d, predictors, weight, alpha):
@@ -1334,6 +1334,7 @@ def test_group5_exact_ridge_reference_and_prediction():
     for weight in (None, "w"):
         with np.errstate(all="ignore"):
             assert np.isnan(_group3_ridge_prediction(d, predictors, weight, GPT27_ALPHA)[1]).all(), weight
+    assert _ridge_tolerance(-1e9) == _ridge_tolerance(1e9) > 0      # Group 5a (review finding F6)
 
 
 NO_POSITIVE_WEIGHT = dict(argnames="case", argvalues=["all_weights_zero", "no_row"])
@@ -1411,6 +1412,38 @@ def test_ridge_fit_of_predictors_far_from_zero_equals_the_exact_answer(node_sess
                                    f"{max(e[-1] for e in errors):.3g} of the spread")
     bad = [e for e in errors if not e[-1] <= _ridge_tolerance(offset)]
     assert not bad, (offset, _ridge_tolerance(offset), bad)
+
+
+def _negative_weight_frame():
+    """20 rows, one predictor; one weight is negative (-0.3), as signed weights such as sWeights can be."""
+    rng = np.random.default_rng(20261118)
+    d = pd.DataFrame({"p0": np.linspace(0., 3., 20) + 0.01 * rng.normal(size=20)})
+    d["target"] = 1. + 2. * d["p0"] + 0.1 * rng.normal(size=20)
+    d["w"] = rng.uniform(.5, 2., 20)
+    d.loc[7, "w"] = -0.3
+    return d, ["p0"]
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+@pytest.mark.xfail(**STRICT, reason="F4: with the ridge term, one negative weight gives no fit")
+def test_ridge_fit_with_a_negative_weight_equals_the_exact_answer(node_session, tmp_path):
+    """The Architect's decision of 2026-11-18 (G2 a): with the ridge term and a negative weight, the fit falls back to
+    the sums of Group 3, which give the exact answer of the function for such data near 0, as before Group 5. After
+    Group 5 the rotations took the square root of the negative weight, and the page gave no fit."""
+    d, predictors = _negative_weight_frame()
+    vals, got = _ridge_read(node_session, tmp_path, d, predictors, "w", GPT27_ALPHA, "g5a_negative")
+    known_defect(np.isnan(got).all() and np.isnan(vals).all(), f"F4: the fit with a negative weight gives {got}")
+    assert _ridge_error(vals, d, predictors, "w", GPT27_ALPHA) <= _ridge_tolerance(0.), (got,)
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_control_fit_with_a_negative_weight_without_ridge_equals_the_exact_answer(node_session, tmp_path):
+    """F4's control, right before and after the fix: without the ridge term the sums are used, as always."""
+    d, predictors = _negative_weight_frame()
+    vals, got = _ridge_read(node_session, tmp_path, d, predictors, "w", 0., "g5a_negative_no_ridge")
+    assert _ridge_error(vals, d, predictors, "w", 0.) <= _ridge_tolerance(0.), (got,)
 
 
 # ST-D1: the fit's response and weight columns are not sent
