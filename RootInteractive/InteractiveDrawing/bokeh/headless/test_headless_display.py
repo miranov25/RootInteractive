@@ -1027,7 +1027,6 @@ BOTH_BODIES = """() => {
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5a-F2: a use of A hidden from group 5a's reading is not found")
 @pytest.mark.parametrize("case", list(HIDDEN_USES))
 def test_a_use_that_a_simple_reading_misses_is_found_and_the_query_is_refused(node_session, tmp_path, case):
     """A parameter A next to the column A, and a query that really uses A, in a form that group 5a's reading of the
@@ -1040,8 +1039,8 @@ def test_a_use_that_a_simple_reading_misses_is_found_and_the_query_is_refused(no
     _node_set(page, "TextAreaInput", "value", code)
     state = _hist_state(page)
     computed = [True] * N if used == "parameter" else query_oracle("return A > 1").tolist()
-    known_defect(state["mask"] == computed and not report.console_errors and not report.page_errors,
-                 f"G5a-F2: the {case} query is computed with the {used} A without a message")
+    regression(state["mask"] == computed and not report.console_errors and not report.page_errors,
+               f"G5a-F2: the {case} query is computed with the {used} A without a message")
     assert state["mask"] == [False] * N, state["mask"]
     assert not report.page_errors, report.page_errors
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
@@ -1049,7 +1048,6 @@ def test_a_use_that_a_simple_reading_misses_is_found_and_the_query_is_refused(no
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5a-F2: a vector function hiding its use of A is computed with the column A")
 @pytest.mark.parametrize("case", list(HIDDEN_USES))
 def test_a_vector_function_that_hides_its_use_of_a_name_is_refused(node_session, tmp_path, case):
     """The same forms in a vector function (one call for a whole column), built directly with the fields A and B and a
@@ -1058,8 +1056,8 @@ def test_a_vector_function_that_hides_its_use_of_a_name_is_refused(node_session,
     _, code, _ = HIDDEN_USES[case]
     page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
     out = page.evaluate(BUILD_VECTOR, {"code": code, "A": VECTOR_A, "B": VECTOR_B})
-    known_defect(out == [True, False] and not report.console_errors,
-                 f"G5a-F2: the {case} vector function gives {out} without a message")
+    regression(out == [True, False] and not report.console_errors,
+               f"G5a-F2: the {case} vector function gives {out} without a message")
     assert out == ["NaN", "NaN"], out
     assert not report.page_errors, report.page_errors
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
@@ -1067,7 +1065,6 @@ def test_a_vector_function_that_hides_its_use_of_a_name_is_refused(node_session,
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5a-F2: a name inside a regular expression is counted as a use")
 def test_a_name_only_inside_a_regular_expression_is_not_used_and_is_not_refused(node_session, tmp_path):
     """The text of a regular expression is not a use, as the text of a string is not. A parameter A next to the column
     A, and the query `return B > 1 && /A/.test("x") === false`: it selects by B, and nothing is logged. After Group 5a
@@ -1077,8 +1074,8 @@ def test_a_name_only_inside_a_regular_expression_is_not_used_and_is_not_refused(
     page.evaluate(INJECT, {"name": "A"})
     _node_set(page, "TextAreaInput", "value", 'return B > 1 && /A/.test("x") === false')
     state = _hist_state(page)
-    known_defect(state["mask"] == [False] * N and len(report.console_errors) == 1
-                 and REFUSED_A in report.console_errors[0], "G5a-F2: the A inside /A/ is counted as a use")
+    regression(state["mask"] == [False] * N and len(report.console_errors) == 1
+               and REFUSED_A in report.console_errors[0], "G5a-F2: the A inside /A/ is counted as a use")
     assert_histogram(df, state, B > 1)
     _assert_no_errors(report)
 
@@ -1099,7 +1096,6 @@ def test_control_divisions_are_not_read_as_regular_expressions(node_session, tmp
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5a-F3-P2: the scalar function is called with the fields of the vector function")
 def test_a_model_with_a_scalar_and_a_vector_function_uses_the_same_fields_for_both(node_session, tmp_path):
     """One model with both a scalar function (`return A + 1`) and a vector function (`return B.map(b => 2 * b)`) and
     automatic fields A, B and x. The fields it asks for must serve both functions: A and B; with A = 3 and B = 5 the
@@ -1108,7 +1104,7 @@ def test_a_model_with_a_scalar_and_a_vector_function_uses_the_same_fields_for_bo
     test is of the model alone."""
     page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
     got = page.evaluate(BOTH_BODIES)
-    known_defect(got["fields"] == ["B"] and got["scalar"] == 6, f"G5a-F3-P2: the model gives {got}")
+    regression(got["fields"] == ["B"] and got["scalar"] == 6, f"G5a-F3-P2: the model gives {got}")
     assert got == {"fields": ["A", "B"], "scalar": 4, "vector": [10]}, got
     _assert_no_errors(report)
 

@@ -23,100 +23,260 @@ function is_bindable(name: string): boolean {
   return ok
 }
 
-// PHASE_5 Group 5a (review finding F2): the names that a function's code uses as variables. The text of comments, of
-// strings and of template literals is not a use, nor is a name after a dot (a property, as in data.cut); the code
-// inside ${...} of a template literal is. Names are read with Unicode's identifier classes, so that a name such as
-// "σcut" is not mistaken for "cut". Two known limits, both on the safe side (the name counts as used, and a function
-// may be refused by name, never computed wrongly): a name written as an object key ({cut: 1}), and a name inside a
-// regular-expression literal (/cut/).
+// PHASE_5 Group 5b (review findings G5a-F2-A and G5a-F2-B): the names that a function's code uses as variables, read
+// with the lexical rules of JavaScript. Not a use: the text of comments, of strings, of template literals and of
+// regular expressions, and a name after a dot (a property, as in data.cut). A use: a name in the code, also inside
+// ${...} of a template literal, also written with escapes (\u0041 and \u{41} are the name A). A "/" starts a
+// regular expression where a value is expected (after an operator, "(", ",", a word such as return, or the ")" of
+// if, while, for and with), and is a division after a value. Where JavaScript's rules cannot be decided from the
+// text alone (a "/" after "}", or after the words of, await and yield) or the code is not valid, the reading is not
+// sure, and every name anywhere in the text counts as used: the function may then be refused by name, never computed
+// with a name that was missed. Known extra uses, all on the safe side: object keys ({cut: 1}), labels, and the
+// names that a function declares itself.
 const ID_START = /[\p{ID_Start}$_]/u
-const ID_PART = /[\p{ID_Continue}$‌‍]/u
+const ID_PART = /[\p{ID_Continue}$\u200C\u200D]/u
+const ESCAPE = /\\u(?:([0-9A-Fa-f]{4})|\{([0-9A-Fa-f]+)\})/y
+const ANY_NAME = /(?:[\p{ID_Start}$_]|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})(?:[\p{ID_Continue}$\u200C\u200D]|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})*/gu
+const REGEX_AFTER_WORD = new Set(["return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case",
+                                  "do", "else", "extends"])
+const UNSURE_AFTER_WORD = new Set(["of", "await", "yield"])
+const REGEX_AFTER_PAREN_OF = new Set(["if", "while", "for", "with"])
+type Next = "regex" | "division" | "unsure"     // what a "/" means at this point of the code
+
+function is_line_end(c: string): boolean {
+  return c === "\n" || c === "\r" || c === "\u2028" || c === "\u2029"
+}
+
+function decode_escapes(name: string): string {
+  return name.replace(/\\u(?:([0-9A-Fa-f]{4})|\{([0-9A-Fa-f]+)\})/g, (_m, four, braced) => {
+    const cp = parseInt(four ?? braced, 16)
+    return cp <= 0x10FFFF ? String.fromCodePoint(cp) : ""
+  })
+}
+
 export function used_names(code: string): Set<string> {
   const names = new Set<string>()
   const n = code.length
   let i = 0
+  let unsure = false
   const char_at = (k: number) => String.fromCodePoint(code.codePointAt(k)!)
-  const scan = (in_template: boolean): void => {
+
+  // a name at i, with its escapes decoded; null (i unchanged) if an escape is not valid there
+  const read_name = (): string | null => {
+    let name = ""
+    while(i < n){
+      let ch: string
+      let len: number
+      if(code[i] === "\\"){
+        ESCAPE.lastIndex = i
+        const m = ESCAPE.exec(code)
+        const cp = m == null ? -1 : parseInt(m[1] ?? m[2], 16)
+        if(m == null || cp > 0x10FFFF) return name === "" ? null : name
+        ch = String.fromCodePoint(cp)
+        len = m[0].length
+        if(!(name === "" ? ID_START : ID_PART).test(ch)) return name === "" ? null : name
+      } else {
+        ch = char_at(i)
+        len = ch.length
+        if(!(name === "" ? ID_START : ID_PART).test(ch)) break
+      }
+      name += ch
+      i += len
+    }
+    return name
+  }
+
+  // a string literal from its opening quote at i
+  const read_string = (quote: string): void => {
+    for(++i; i < n; ++i){
+      const c = code[i]
+      if(c === "\\"){
+        ++i
+        if(code[i] === "\r" && code[i+1] === "\n") ++i
+      } else if(c === quote){
+        ++i
+        return
+      } else if(c === "\n" || c === "\r"){
+        break
+      }
+    }
+    unsure = true
+  }
+
+  // a regular-expression literal from its "/" at i, then its flags
+  const read_regex = (): void => {
+    let in_class = false
+    for(++i; ; ++i){
+      if(i >= n || is_line_end(code[i])){
+        unsure = true
+        return
+      }
+      const c = code[i]
+      if(c === "\\"){
+        ++i
+        if(i >= n || is_line_end(code[i])){
+          unsure = true
+          return
+        }
+      } else if(c === "["){
+        in_class = true
+      } else if(c === "]"){
+        in_class = false
+      } else if(c === "/" && !in_class){
+        ++i
+        break
+      }
+    }
+    while(i < n){
+      const ch = char_at(i)
+      if(!ID_PART.test(ch)) break
+      i += ch.length
+    }
+  }
+
+  // a template literal from its "`" at i; the code inside ${...} is read as code
+  const read_template = (): void => {
+    for(++i; i < n;){
+      const c = code[i]
+      if(c === "\\"){
+        i += 2
+      } else if(c === "`"){
+        ++i
+        return
+      } else if(c === "$" && code[i+1] === "{"){
+        i += 2
+        if(!scan(true)) return
+      } else {
+        ++i
+      }
+    }
+    unsure = true
+  }
+
+  // code up to the end, or (in_template) up to the "}" that closes ${; false if that "}" is missing
+  const scan = (in_template: boolean): boolean => {
+    let next: Next = "regex"
     let depth = 0
     let after_dot = false
+    let word = ""                       // the word just read, for the "(" of if, while, for and with
+    const parens: Next[] = []           // for each open "(": what a "/" after its ")" means
     while(i < n){
       const c = code[i]
+      if(/\s/.test(c)){
+        ++i
+        continue
+      }
       if(c === "/" && code[i+1] === "/"){
-        const end = code.indexOf("\n", i)
-        i = end < 0 ? n : end
+        for(i += 2; i < n && !is_line_end(code[i]); ++i);
         continue
       }
       if(c === "/" && code[i+1] === "*"){
         const end = code.indexOf("*/", i+2)
+        if(end < 0) unsure = true
         i = end < 0 ? n : end+2
         continue
       }
-      if(c === "'" || c === '"'){
-        for(++i; i < n && code[i] !== c; ++i){
-          if(code[i] === "\\") ++i
+      const was_word = word
+      word = ""
+      if(c === "/"){
+        if(next === "regex"){
+          read_regex()
+          next = "division"
+        } else {
+          if(next === "unsure") unsure = true
+          ++i
+          next = "regex"
         }
-        ++i
+        after_dot = false
+        continue
+      }
+      if(c === "'" || c === '"'){
+        read_string(c)
+        next = "division"
         after_dot = false
         continue
       }
       if(c === "`"){
-        for(++i; i < n && code[i] !== "`";){
-          if(code[i] === "\\"){
-            i += 2
-          } else if(code[i] === "$" && code[i+1] === "{"){
-            i += 2
-            scan(true)
-          } else {
-            ++i
-          }
-        }
-        ++i
+        read_template()
+        next = "division"
         after_dot = false
         continue
       }
-      if(in_template && c === "{"){
-        ++depth
-      } else if(in_template && c === "}"){
-        if(depth === 0){
-          ++i
-          return
-        }
-        --depth
-      }
       if(c === "." && code.startsWith("...", i)){
         i += 3
+        next = "regex"
         after_dot = false
         continue
       }
       if((c >= "0" && c <= "9") || (c === "." && code[i+1] >= "0" && code[i+1] <= "9")){
-        // a number with its letters and point (1e5, 0x1f, 1n, .5)
+        // a number with its letters and points (1e5, 0x1f, 1n, 1_000, .5, and 1..p, whose p is a property)
         while(i < n && /[0-9A-Za-z_.]/.test(code[i])) ++i
+        next = "division"
         after_dot = false
         continue
       }
       if(c === "."){
-        after_dot = true
         ++i
+        after_dot = true
+        next = "regex"
         continue
       }
-      const ch = char_at(i)
-      if(ID_START.test(ch)){
-        let j = i + ch.length
-        while(j < n){
-          const next = char_at(j)
-          if(!ID_PART.test(next)) break
-          j += next.length
+      if(c === "\\" || ID_START.test(char_at(i))){
+        const name = read_name()
+        if(name == null){
+          unsure = true
+          ++i
+          next = "regex"
+          after_dot = false
+          continue
         }
-        if(!after_dot) names.add(code.slice(i, j))
-        i = j
+        if(after_dot){
+          next = "division"
+        } else {
+          names.add(name)
+          word = name
+          next = REGEX_AFTER_WORD.has(name) ? "regex" : UNSURE_AFTER_WORD.has(name) ? "unsure" : "division"
+        }
         after_dot = false
         continue
       }
-      if(!/\s/.test(ch)) after_dot = false
-      i += ch.length
+      after_dot = false
+      if(c === "("){
+        parens.push(REGEX_AFTER_PAREN_OF.has(was_word) ? "regex" : was_word === "await" ? "unsure" : "division")
+        next = "regex"
+      } else if(c === ")"){
+        const after = parens.pop()
+        if(after === undefined) unsure = true
+        next = after ?? "unsure"
+      } else if(c === "]"){
+        next = "division"
+      } else if(c === "{"){
+        ++depth
+        next = "regex"
+      } else if(c === "}"){
+        if(in_template && depth === 0){
+          ++i
+          return true
+        }
+        --depth
+        next = "unsure"                 // the end of a block (a "/" then starts a regular expression) or of a value
+      } else if((c === "+" || c === "-") && code[i+1] === c){
+        i += 2
+        next = "division"               // a "/" after x++ divides; a regular expression cannot follow a prefix ++
+        continue
+      } else {
+        next = "regex"                  // an operator or a punctuator: , ; : ? = ! ~ & | ^ < > * % + - # @
+      }
+      ++i
     }
+    if(in_template) unsure = true
+    return false
   }
+
   scan(false)
+  if(unsure){
+    for(const m of code.matchAll(ANY_NAME)) names.add(decode_escapes(m[0]))
+  }
   return names
 }
 
@@ -156,8 +316,7 @@ export class CustomJSNAryFunction extends Model {
 
   initialize(){
     super.initialize()
-    this.update_func()
-    this.update_vfunc()
+    this.build()
   }
 
   args_keys: Array<string>
@@ -167,7 +326,7 @@ export class CustomJSNAryFunction extends Model {
   refused_func: string | null
   refused_vfunc: string | null
 
-  // the names of the parameters when the functions were last built (Group 5a, F3)
+  // the names of the parameters when the functions were last built (Group 5a, F3; Group 5b: built together)
   parameter_keys: string
 
   effective_fields: Array<string>
@@ -180,20 +339,27 @@ export class CustomJSNAryFunction extends Model {
   }
 
   update_func(){
+    this.build()
+  }
+
+  update_vfunc(){
+    this.build()
+  }
+
+  build(){
+    // PHASE_5 Group 5b (review finding G5a-F3-P2): the scalar and the vector function are built together, with one
+    // list of fields and one list of arguments, chosen for both bodies; before, the function built last chose them,
+    // and with automatic fields the other function could then be called with the columns of the wrong names.
     this.parameter_keys = Object.keys(this.parameters).join("\u0000")
-    if(!this.func){
-	    this.scalar_func = null
-	    this.refused_func = null
-	    return
-    }
-    this.compute_effective_fields(this.func)
+    this.compute_effective_fields([this.func, this.v_func].filter((body) => body).join("\n"))
     this.set_args()
-    this.refused_func = this.refusal(this.func)
-    if(this.refused_func != null){
-      this.scalar_func = null
-    } else {
-      this.scalar_func = new Function(...this.args_keys, ...this.effective_fields, '"use strict";\n'+this.func)
-    }
+    this.refused_func = this.func ? this.refusal(this.func) : null
+    this.scalar_func = this.func && this.refused_func == null
+      ? new Function(...this.args_keys, ...this.effective_fields, '"use strict";\n'+this.func) : null
+    this.refused_vfunc = this.v_func ? this.refusal(this.v_func) : null
+    this.vector_func = this.v_func && this.refused_vfunc == null
+      ? new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output", '"use strict";\n'+this.v_func)
+      : null
     this.change.emit()
   }
 
@@ -204,30 +370,11 @@ export class CustomJSNAryFunction extends Model {
     return this.scalar_func!(...this.args_values, ...x)
   }
 
-  update_vfunc(){
-    this.parameter_keys = Object.keys(this.parameters).join("\u0000")
-    if(!this.v_func){
-	    this.vector_func = null
-	    this.refused_vfunc = null
-	    return
-    }
-    this.compute_effective_fields(this.v_func)
-    this.set_args()
-    this.refused_vfunc = this.refusal(this.v_func)
-    if(this.refused_vfunc != null){
-      this.vector_func = null
-    } else {
-      this.vector_func = new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output",'"use strict";\n'+this.v_func)
-    }
-    this.change.emit()
-  }
-
   update_args(){
     // PHASE_5 Group 5a (review finding F3): when the parameters have other names than when the functions were built,
     // the functions are built again, which checks the refusals again; otherwise only the values change.
     if(Object.keys(this.parameters).join("\u0000") !== this.parameter_keys){
-      this.update_func()
-      this.update_vfunc()
+      this.build()
       return
     }
     this.set_args()
@@ -249,9 +396,11 @@ export class CustomJSNAryFunction extends Model {
     // both a column (a field) and a parameter of the function is refused by name. Group 5a (F1): so is a function that
     // uses a parameter that cannot be passed to it (a name that is not a plain ASCII JavaScript name). A refused
     // function gives NaN for every row (a query then selects nothing), and one error names the function and the
-    // name. A name that is not used (Group 5a, F2: see used_names) changes nothing.
+    // name. A name that is not used (Group 5a, F2: see used_names) changes nothing. Group 5b (G5a-F2-A): the columns
+    // are all the fields the function may get, also those that automatic fields leave out because the code writes
+    // the name with escapes (\u0041 for A).
     const used = used_names(code)
-    const fields = new Set(this.effective_fields ?? [])
+    const fields = new Set([...(this.fields ?? []), ...(this.effective_fields ?? [])])
     for(const k of Object.keys(this.parameters)){
       if(!used.has(k)) continue
       if(fields.has(k)){
