@@ -972,6 +972,146 @@ def test_a_change_of_the_parameters_after_the_function_is_built_is_checked_again
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
 
 
+
+# PHASE_5 Group 5b (the review of group 5a): the names that a function uses must be read as JavaScript reads them.
+# G5a-F2-A, a name written with escapes (\u0041 and \u{41} are A); G5a-F2-B, a regular expression whose text
+# looks like the start of a comment or the end of ${...}; and more forms of the same kind found by the coder: a
+# regular expression with // or a quote or a backtick or an escaped or bracketed "/", a line comment that ends at a
+# line separator (U+2028), and the ")" of if or the "}" of a block before a regular expression. Each hides a real
+# use of A from group 5a's reading, and the function is computed with A without a message. "parameter": the
+# parameter A is used (the column A is not passed, as the code does not write its name); "column": the column A is
+# used. G5a-F3-P2: the scalar and the vector function of one model must agree on the fields.
+HIDDEN_USES = {
+    "escape_four_digits": ("return \\u0041 > 1", "return B.map((b, i) => \\u0041[i] > 1)", "parameter"),
+    "escape_braces": ("return \\u{41} > 1", "return B.map((b, i) => \\u{41}[i] > 1)", "parameter"),
+    "regex_with_comment_start": ('return /[/*]/.test("/") && A > 1',
+                                 'return B.map((b, i) => /[/*]/.test("/") && A[i] > 1)', "column"),
+    "regex_with_line_comment": ('return /[//]/.test("/") && A > 1',
+                                'return B.map((b, i) => /[//]/.test("/") && A[i] > 1)', "column"),
+    "regex_with_quote": ('return /"/.test("x") ? false : A > 1',
+                         'return B.map((b, i) => /"/.test("x") ? false : A[i] > 1)', "column"),
+    "regex_with_backtick": ('return /`/.test("x") ? false : A > 1',
+                            'return B.map((b, i) => /`/.test("x") ? false : A[i] > 1)', "column"),
+    "regex_with_slash_in_class": ('return /[/"]/.test("x") ? false : A > 1 // "',
+                                  'return B.map((b, i) => /[/"]/.test("x") ? false : A[i] > 1) // "', "column"),
+    "regex_with_escaped_slash": ('return /\\/"/.test("x") ? false : A > 1 // "',
+                                 'return B.map((b, i) => /\\/"/.test("x") ? false : A[i] > 1) // "', "column"),
+    "regex_with_brace_in_template": ('return `${ /}/.test("}") ? A : 0 }` > 1',
+                                     'return B.map((b, i) => `${ /}/.test("}") ? A[i] : 0 }` > 1)', "column"),
+    "line_separator_ends_comment": ("return false // x  || A > 1",
+                                    "return B.map((b, i) => false // x  || A[i] > 1)", "column"),
+    "regex_after_if": ('if (B > 99) /[/*]/.test(" */ "); return A > 1 // "',
+                       'if (B[0] > 99) /[/*]/.test(" */ "); return B.map((b, i) => A[i] > 1) // "', "column"),
+    "regex_after_block": ('{} /[/*]/.test(""); return A > 1',
+                          '{} /[/*]/.test(""); return B.map((b, i) => A[i] > 1)', "column"),
+}
+VECTOR_A, VECTOR_B = [3., .5], [2., 2.]
+BUILD_VECTOR = """a => {
+  const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
+  if (q.length !== 1) throw Error('query function: ' + q.length);
+  const m = new q[0].constructor({parameters: {A: 100.}, fields: ["A", "B"], v_func: a.code});
+  const out = m.v_compute([a.A, a.B], null);
+  return Array.isArray(out) ? out.map(v => Number.isNaN(v) ? "NaN" : v) : String(out);
+}"""
+BOTH_BODIES = """() => {
+  const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
+  if (q.length !== 1) throw Error('query function: ' + q.length);
+  const m = new q[0].constructor({parameters: {}, fields: ["A", "B", "x"], auto_fields: true,
+                                  func: "return A + 1", v_func: "return B.map(b => 2 * b)"});
+  const fields = m.get_fields();
+  const row = {A: 3., B: 5., x: 7.};
+  return {fields, scalar: m.compute(fields.map(f => row[f])),
+          vector: Array.from(m.v_compute(fields.map(f => [row[f]]), null))};
+}"""
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5a-F2: a use of A hidden from group 5a's reading is not found")
+@pytest.mark.parametrize("case", list(HIDDEN_USES))
+def test_a_use_that_a_simple_reading_misses_is_found_and_the_query_is_refused(node_session, tmp_path, case):
+    """A parameter A next to the column A, and a query that really uses A, in a form that group 5a's reading of the
+    code missed (see HIDDEN_USES). Decision N1: the query is refused by name, selects no row, and one error names A.
+    After Group 5a the query was computed without a message, with the parameter A (escapes) or the column A."""
+    code, _, used = HIDDEN_USES[case]
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", code)
+    state = _hist_state(page)
+    computed = [True] * N if used == "parameter" else query_oracle("return A > 1").tolist()
+    known_defect(state["mask"] == computed and not report.console_errors and not report.page_errors,
+                 f"G5a-F2: the {case} query is computed with the {used} A without a message")
+    assert state["mask"] == [False] * N, state["mask"]
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5a-F2: a vector function hiding its use of A is computed with the column A")
+@pytest.mark.parametrize("case", list(HIDDEN_USES))
+def test_a_vector_function_that_hides_its_use_of_a_name_is_refused(node_session, tmp_path, case):
+    """The same forms in a vector function (one call for a whole column), built directly with the fields A and B and a
+    parameter A: refused by name, NaN for every row, one error naming A. After Group 5a the function was computed
+    with the column A ([true, false] for A = [3, 0.5]) without a message."""
+    _, code, _ = HIDDEN_USES[case]
+    page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
+    out = page.evaluate(BUILD_VECTOR, {"code": code, "A": VECTOR_A, "B": VECTOR_B})
+    known_defect(out == [True, False] and not report.console_errors,
+                 f"G5a-F2: the {case} vector function gives {out} without a message")
+    assert out == ["NaN", "NaN"], out
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5a-F2: a name inside a regular expression is counted as a use")
+def test_a_name_only_inside_a_regular_expression_is_not_used_and_is_not_refused(node_session, tmp_path):
+    """The text of a regular expression is not a use, as the text of a string is not. A parameter A next to the column
+    A, and the query `return B > 1 && /A/.test("x") === false`: it selects by B, and nothing is logged. After Group 5a
+    the A inside /A/ counted as a use, and the query was refused (on the safe side)."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", 'return B > 1 && /A/.test("x") === false')
+    state = _hist_state(page)
+    known_defect(state["mask"] == [False] * N and len(report.console_errors) == 1
+                 and REFUSED_A in report.console_errors[0], "G5a-F2: the A inside /A/ is counted as a use")
+    assert_histogram(df, state, B > 1)
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_control_divisions_are_not_read_as_regular_expressions(node_session, tmp_path):
+    """The control of group 5b's reading, right before and after the fix: a "/" after a name or a number divides.
+    The query `return B / 2 / 1 > 0.5 // A`, with a parameter A next to the column A, selects by B (B > 1), and the A
+    of its comment is not a use: nothing is logged."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", "return B / 2 / 1 > 0.5 // A")
+    assert_histogram(df, _hist_state(page), B > 1)
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5a-F3-P2: the scalar function is called with the fields of the vector function")
+def test_a_model_with_a_scalar_and_a_vector_function_uses_the_same_fields_for_both(node_session, tmp_path):
+    """One model with both a scalar function (`return A + 1`) and a vector function (`return B.map(b => 2 * b)`) and
+    automatic fields A, B and x. The fields it asks for must serve both functions: A and B; with A = 3 and B = 5 the
+    scalar function gives 4 and the vector function [10]. After Group 5a the function built last chose the fields
+    (only B), and the scalar function was given B's value as A (6). The page builder never makes such a model; the
+    test is of the model alone."""
+    page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
+    got = page.evaluate(BOTH_BODIES)
+    known_defect(got["fields"] == ["B"] and got["scalar"] == 6, f"G5a-F3-P2: the model gives {got}")
+    assert got == {"fields": ["A", "B"], "scalar": 4, "vector": [10]}, got
+    _assert_no_errors(report)
+
 def _alone_doc(tmp_path):
     return _build_doc(tmp_path, "query_alone", frame())
 

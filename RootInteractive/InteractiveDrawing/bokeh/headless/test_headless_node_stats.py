@@ -1445,6 +1445,29 @@ def test_control_fit_with_a_negative_weight_without_ridge_equals_the_exact_answe
     assert _ridge_error(vals, d, predictors, "w", 0.) <= _ridge_tolerance(0.), (got,)
 
 
+
+def _tiny_predictor_frame():
+    """20 rows, one predictor of size about 1e-170 (its spread too). The penalty row of the ridge term is then about
+    0.5 / 1e-170 = 5e169, and the square of such a number (1e339) is beyond the largest double (1.8e308)."""
+    rng = np.random.default_rng(20261120)
+    t = np.linspace(0., 3., 20) + 0.01 * rng.normal(size=20)
+    d = pd.DataFrame({"p0": 1e-170 * t})
+    d["target"] = 1. + 2. * t + 0.1 * rng.normal(size=20)
+    return d, ["p0"]
+
+
+@NODE
+@pytest.mark.feature("STAT.linear_fit")
+def test_ridge_fit_whose_rotation_squares_overflow_equals_the_exact_answer(node_session, tmp_path):
+    """PHASE_5 Group 5b (review finding G5a-F6-P2, a permanent test for Group 5a's fix F6): with a predictor of about
+    1e-170 the rotations of the ridge fit meet numbers whose squares overflow; the length of the rotated pair is then
+    computed with Math.hypot. The fit must be finite and equal the exact answer within the usual tolerance. Without
+    that fallback the rotation divides by infinity and the fit is lost."""
+    d, predictors = _tiny_predictor_frame()
+    vals, got = _ridge_read(node_session, tmp_path, d, predictors, None, GPT27_ALPHA, "g5b_overflow")
+    assert np.isfinite(got).all() and np.isfinite(vals).all(), (got,)
+    assert _ridge_error(vals, d, predictors, None, GPT27_ALPHA) <= _ridge_tolerance(0.), (got,)
+
 # ST-D1: the fit's response and weight columns are not sent
 READ_SENT = r"""() => {
   const t = window.__riH.models().filter(m => m.type === 'CDSCompress' && m.name === 'cdsOrig');
