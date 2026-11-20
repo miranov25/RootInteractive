@@ -406,6 +406,17 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_display.py",
     },
+    "DISPLAY.legend": {
+        "name": "Legend on a column (legend_field)",
+        "description": "The legend of a profile of several weights, of a stacked histogram and of a figure with the "
+                       "option legend_field: built and loaded without a Bokeh validation error, the entries follow "
+                       "the selection with the colours of their series, a weight's display text from its column's "
+                       "metadata (AxisTitle)",
+        "priority": "P2",
+        "backends": ["node"],
+        "layer": "integration",
+        "proof": "headless/test_headless_legend_computed_columns.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
