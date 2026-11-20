@@ -19,7 +19,8 @@ The two defects and the missing feature:
            bokehDrawArray (that branch never sets the axis titles).
     LG-F1  the legend of a profile of several weights shows the weight columns' names; a weight column's display text
            in its table's metadata (<column>.AxisTitle, the same text that axis titles use) is not used.
-Each has an exact signature of today's result (a strict expected failure until the fix) and a healthy control.
+Each has the exact signature of the result before the fix (now a regression check that names it) and a healthy
+control. Fixed in the legend group's fix commit; LG-F1 is a new, optional feature.
 Author: Claude20.RI, 2026-11-20 (the review of GPT36.RI's legend request found the cause).
 """
 from __future__ import annotations
@@ -34,16 +35,11 @@ import pandas as pd
 import pytest
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
-        raise KnownDefect(message)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
-
-STRICT = dict(strict=True, raises=KnownDefect)
 UNIT = pytest.mark.headless_unit
 NODE = [pytest.mark.node_display, pytest.mark.backend("node"), pytest.mark.layer("integration"),
         pytest.mark.feature("DISPLAY.legend")]
@@ -268,41 +264,38 @@ def test_lg_d1_control_a_legend_with_a_fixed_text_is_valid():
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT, reason="LG-D1: E-1001 for the legend on a computed column")
 @pytest.mark.parametrize("kind,field", [("profile", "weights"), ("stack", "_source_index")])
 def test_lg_d1_the_legend_column_is_known_when_the_page_is_built(kind, field):
     errors = _validation_errors(kind, _table())
-    known_defect(_is_lg_d1_python(errors, field), f"LG-D1: Bokeh reports E-1001 for the legend on '{field}'")
+    regression(_is_lg_d1_python(errors, field), f"LG-D1: Bokeh reports E-1001 for the legend on '{field}'")
     assert errors == [], errors
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT, reason="LG-D2: a figure with the option legend_field cannot be built")
 def test_lg_d2_a_figure_with_the_legend_option_is_built_and_valid():
     error = _build_error("option", _table())
-    known_defect(_is_lg_d2(error), "LG-D2: UnboundLocalError for x_label in bokehTools.py bokehDrawArray")
+    regression(_is_lg_d2(error), "LG-D2: UnboundLocalError for x_label in bokehTools.py bokehDrawArray")
     assert error is None, error
     assert _validation_errors("option", _table()) == []
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT, reason="LG-D1: the test harness allows Bokeh's legend message")
 def test_lg_d1_the_harness_allows_no_legend_message():
     """After the fix no console message of the legend is allowed, so every test that opens a weighted or stacked page
     fails by name if the message comes back."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import CONSOLE_ALLOWED
     allowed = [p for p, _ in CONSOLE_ALLOWED if re.search(p, LEGEND_MESSAGE)]
-    known_defect(len(allowed) == 1, "LG-D1: engine/runner.py CONSOLE_ALLOWED allows the legend message")
+    regression(len(allowed) == 1, "LG-D1: engine/runner.py CONSOLE_ALLOWED allows the legend message")
     assert allowed == [], allowed
 
 
 # ------------------------------------------------------------------ Node: LG-D1 when the page loads
-@_node(pytest.mark.xfail(**STRICT, reason="LG-D1: the console error of the legend on a computed column"))
+@_node()
 @pytest.mark.parametrize("kind", ["profile", "stack"])
 def test_lg_d1_no_console_error_when_the_page_loads(node_session, tmp_path, kind):
     r = _open_raw(node_session, _page(tmp_path, kind, _table(), "_load"))
     console = list(r.get("console_errors") or [])
-    known_defect(_is_lg_d1_console(console), f"LG-D1: '{LEGEND_MESSAGE}' when the {kind} page loads")
+    regression(_is_lg_d1_console(console), f"LG-D1: '{LEGEND_MESSAGE}' when the {kind} page loads")
     assert console == [], console
 
 
@@ -333,10 +326,10 @@ def test_lg_control_the_stack_legend_lists_the_selected_parts(node_session, tmp_
 
 
 # ------------------------------------------------------------------ Node: LG-D2, the legend option on a page
-@_node(pytest.mark.xfail(**STRICT, reason="LG-D2: a figure with the option legend_field cannot be built"))
+@_node()
 def test_lg_d2_the_legend_option_lists_the_column_values(node_session, tmp_path):
     error = _build_error("option", _table())
-    known_defect(_is_lg_d2(error), "LG-D2: UnboundLocalError for x_label in bokehTools.py bokehDrawArray")
+    regression(_is_lg_d2(error), "LG-D2: UnboundLocalError for x_label in bokehTools.py bokehDrawArray")
     r = _open_raw(node_session, _page(tmp_path, "option", _table(), "_load"))
     assert list(r.get("console_errors") or []) == []
     legend, _ = _legend(node_session)
@@ -352,7 +345,7 @@ def test_lg_f1_control_without_titles_the_legend_shows_the_column_names(node_ses
     assert legend["labels"] == ["w0", "w1"] and _pairs_exactly(legend, {}), legend
 
 
-@_node(pytest.mark.xfail(**STRICT, reason="LG-F1: the legend ignores the weights' display texts"))
+@_node()
 @pytest.mark.parametrize("titles", [TITLES, {"w1": "K±"}], ids=["all", "only_w1"])
 def test_lg_f1_the_legend_shows_the_weights_display_texts(node_session, tmp_path, titles):
     """The legend shows each weight's display text, follows the weight selection, pairs each text with its own series,
@@ -361,7 +354,7 @@ def test_lg_f1_the_legend_shows_the_weights_display_texts(node_session, tmp_path
     plain, _ = _legend(node_session)
     _open_raw(node_session, _page(tmp_path, "profile", _table(titles), f"_titles_{len(titles)}"))
     legend, _ = _legend(node_session)
-    known_defect(_is_lg_f1(legend["entries"], ["w0", "w1"]), "LG-F1: the legend shows the column names w0, w1")
+    regression(_is_lg_f1(legend["entries"], ["w0", "w1"]), "LG-F1: the legend shows the column names w0, w1")
     assert legend["labels"] == [titles.get(w, w) for w in ("w0", "w1")], legend["labels"]
     assert _pairs_exactly(legend, titles), legend
     assert [e["colour"] for e in legend["entries"]] == [e["colour"] for e in plain["entries"]]

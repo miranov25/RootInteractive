@@ -19,6 +19,8 @@ class DownsamplerCDS(ColumnarDataSource):
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
     watched = Bool()
     filter = Nullable(Instance(RIFilter))
-    #HACK: Added to bypass a validation bug in bokeh with legend field
+    # Columns that the chain behind this source computes only when the page draws, for example a profile's "weights"
+    # or a stack's "_source_index". The page builder declares a legend's column here, so that Bokeh's legend checks
+    # find it: in Python (LegendItem reads source.column_names) and when the page loads (DownsamplerCDS.ts columns()).
     column_names = List(String)
     print("Import ", __implementation__)

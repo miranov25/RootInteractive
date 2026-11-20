@@ -56,11 +56,10 @@ INVENTORY_TYPES = ["HistogramCDS", "HistoNdCDS", "HistoNdProfile", "CDSStack", "
                    "ClientLinearFitter", "CustomJSNAryFunction", "OrtFunction"]
 
 # Console-error policy (stage 4.2b): every console error is an ERROR unless it is listed here, with its reason.
-CONSOLE_ALLOWED = (
-    (r"^\[bokeh\] Bad column name on label",
-     "Bokeh legend validation on the weights-stacked profile figure (factor_cmap on 'weights', bokehTools.py 960); "
-     "cosmetic, the figure renders; seen only in chain/deep_widget_filter_alias_stack_profile"),
-)
+# Console errors a test may see without failing, each as (pattern, reason). Empty since the PHASE_5 legend group: the
+# only entry was Bokeh's "Bad column name on label" of a legend on a computed column (defect LG-D1, the register's
+# observation O-1), and the page builder now declares that column (DownsamplerCDS.column_names).
+CONSOLE_ALLOWED = ()
 
 HELPER_JS = r"""
 window.__riH = {

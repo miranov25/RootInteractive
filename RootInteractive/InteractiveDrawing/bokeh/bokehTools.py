@@ -1106,6 +1106,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     dataSpecX = {"field":varNameX, "transform":x_transform_modified} if x_transform else varNameX
                     dataSpecY = {"field":varNameY, "transform":y_transform_modified} if y_transform else varNameY
                     if optionLocal["legend_field"] is not None:
+                        x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                        if x_transform:
+                            x_label = f"{{{x_transform}}} {x_label}"
+                        y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                        if y_transform:
+                            y_label = f"{{{y_transform}}} {y_label}"
+                        declareLegendColumn(cds_used, optionLocal["legend_field"])
                         drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field=optionLocal["legend_field"])
                     elif isinstance(cdsDict[cds_name]["cdsOrig"], CDSStack):
@@ -1116,6 +1123,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
                         if y_transform:
                             y_label = f"{{{y_transform}}} {y_label}"
+                        declareLegendColumn(cds_used, "_source_index")
                         drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
                                     color=color, marker=marker, legend_field="_source_index")
                     elif isinstance(cdsDict[cds_name]["cdsOrig"], HistoNdProfile) and isinstance(cdsDict[cds_name]["cdsOrig"].weights, list):
@@ -1125,8 +1133,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
                         if y_transform:
                             y_label = f"{{{y_transform}}} {y_label}"
+                        legendColumn = "weights_label" if cdsDict[cds_name]["cdsOrig"].weights_labels else "weights"
+                        declareLegendColumn(cds_used, legendColumn)
                         drawnGlyph = figureI.scatter(x=dataSpecX, y=dataSpecY, fill_alpha=1, source=cds_used, size=markerSize,
-                                    color=color, marker=marker, legend_field="weights")                                        
+                                    color=color, marker=marker, legend_field=legendColumn)
                     else:
                         x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
                         if x_transform:
@@ -2052,8 +2062,10 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                 # Query optimizer - eliminate join if not needed
                 if weightsOrig in paramDict and isinstance(paramDict[weightsOrig]["value"], list):
                     weightsValue = paramDict[weightsOrig]["value"]
+                    weightsLabels = getWeightsLabels(cdsDict, cdsDict[source].get("source", None),
+                                                     paramDict[weightsOrig].get("options", weightsValue))
                     cdsProfile = HistoNdProfile(source=cdsOrig.sources[0], axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
-                            sum_range=sum_range, name=cdsName, unbinned=unbinned)
+                            sum_range=sum_range, name=cdsName, unbinned=unbinned, weights_labels=weightsLabels)
                     paramDict[weightsOrig]["subscribed_events"].append(["value", CustomJS(args={"cds":cdsProfile}, code="""
                         cds.weights=this.value.map(x => x === "None" ? null : x)
                                                                                           """)])
@@ -2385,6 +2397,23 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
         transform_new.args["options"] = options_new
         transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
         return transform_new
+
+def declareLegendColumn(cds, column):
+    """A legend on a column that the page computes only when it draws (a profile's "weights", a stack's
+    "_source_index") is declared to the downsampler that the glyph draws from, so that Bokeh's legend checks find it
+    when the page is built and when it loads (DownsamplerCDS.column_names)."""
+    if isinstance(cds, DownsamplerCDS) and column not in cds.column_names:
+        cds.column_names = [*cds.column_names, column]
+
+
+def getWeightsLabels(cdsDict, table, weights):
+    """The display text of each weight column that has one in its table's metadata (<column>.AxisTitle, the text that
+    axis titles use too), as {column: text}; None when no weight column has one, so that the legend shows the column
+    names as before."""
+    meta = (cdsDict.get(table) or {}).get("meta") or {}
+    labels = {str(w): str(meta[f"{w}.AxisTitle"]) for w in weights if w is not None and f"{w}.AxisTitle" in meta}
+    return labels or None
+
 
 def makeCdsSel(cdsDict, paramDict, key, filter=None):
     cds_used = cdsDict[key]

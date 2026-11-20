@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, List, Float, Int, Bool, String, Either
+from bokeh.core.properties import Instance, List, Float, Int, Bool, String, Either, Dict
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 
@@ -27,5 +27,8 @@ class HistoNdProfile(ColumnarDataSource):
     unbinned = Bool(default=False)
     if nullable_available:
         weights = Nullable(Either(List(Nullable(String())), String()), default=None)
+        # the display text of a weight column, {column: text}; the legend shows it instead of the column's name
+        weights_labels = Nullable(Dict(String, String), default=None)
     else:
         weights = Either(List(String), String(), default=None)
+        weights_labels = Dict(String, String)

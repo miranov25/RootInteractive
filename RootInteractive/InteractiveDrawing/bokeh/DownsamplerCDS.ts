@@ -10,6 +10,7 @@ export namespace DownsamplerCDS {
     nPoints: p.Property<number>
     watched: p.Property<boolean>
     filter: p.Property<any>
+    column_names: p.Property<string[]>
   }
 }
 
@@ -66,11 +67,12 @@ export class DownsamplerCDS extends ColumnDataSource {
   static __name__ = "DownsamplerCDS"
 
   static {
-    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean, Nullable})=>({
+    this.define<DownsamplerCDS.Props>(({Ref, Int, Boolean, Nullable, Array, String})=>({
       source:  [Ref(Model)],
       nPoints:    [ Int, 300 ],
       watched: [Boolean, true],
-      filter: [Nullable(Ref(Model)), null]
+      filter: [Nullable(Ref(Model)), null],
+      column_names: [Array(String), []]
     }))
   }
 
@@ -99,6 +101,14 @@ export class DownsamplerCDS extends ColumnDataSource {
     this._needs_update = true
     this._is_trivial = this.nPoints < 0 && this.filter == null
     this._cached_columns = new Set()
+  }
+
+  // The columns the page builder declared (column_names) are listed too, before they are computed: a legend on a
+  // column that the chain computes later (a profile's "weights", a stack's "_source_index") is checked by BokehJS
+  // when the page loads, while this.data is still empty.
+  columns(): string[] {
+    const known = super.columns()
+    return known.concat(this.column_names.filter((name: string) => !known.includes(name)))
   }
 
   shuffle_indices(){

@@ -13,6 +13,7 @@ export namespace HistoNdProfile {
     sum_range: p.Property<number[][]>
     unbinned: p.Property<boolean>
     weights: p.Property<(string | null)[] | string | null>
+    weights_labels: p.Property<{[key: string]: string} | null>
   }
 }
 
@@ -31,13 +32,14 @@ export class HistoNdProfile extends ColumnarDataSource {
 
   static {
 
-    this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int, Boolean, String, Nullable, Or})=>({
+    this.define<HistoNdProfile.Props>(({Ref, Array, Number, Int, Boolean, String, Nullable, Or, Dict})=>({
       source:  [Ref(Model)],
       axis_idx: [Int, 0],
       quantiles: [Array(Number), []], // This is the list of all quantiles to compute, length is NOT equal to CDS length
       sum_range: [Array(Array(Number)), []],
       unbinned: [Boolean, false],
-      weights: [Nullable(Or(Array(Nullable(String)), String)), null]
+      weights: [Nullable(Or(Array(Nullable(String)), String)), null],
+      weights_labels: [Nullable(Dict(String)), null] // the display text of a weight column, for the legend
     }))
   }
 
@@ -371,6 +373,15 @@ export class HistoNdProfile extends ColumnarDataSource {
   get_column(key: string){
     if(key == "weights"){
       return this.get_weights_label()
+    }
+    if(key == "weights_label"){
+      // the same rows as "weights", each with its weight's display text where one is given
+      const labels: any = this.weights_labels
+      const text = (w: string): string => {
+        const t = labels == null ? undefined : (labels instanceof Map ? labels.get(w) : labels[w])
+        return t ?? w
+      }
+      return this.get_weights_label().map(text)
     }
     if(this._stale){
       this.update()
