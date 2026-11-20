@@ -1108,6 +1108,167 @@ def test_a_model_with_a_scalar_and_a_vector_function_uses_the_same_fields_for_bo
     assert got == {"fields": ["A", "B"], "scalar": 4, "vector": [10]}, got
     _assert_no_errors(report)
 
+# PHASE_5 Group 5c (the review of group 5b): more forms that hide a real use of A from group 5b's reading, each valid
+# strict-mode JavaScript that the browser accepts. Claude10.RI F1: HTML-like comments, <!-- anywhere and --> at the
+# start of a line, which the browser reads as line comments (group 5b read a /* after them as a block comment and
+# skipped the code up to its */). Claude10.RI F2 and F3: eval, which reads the function's own variables from a string
+# (the name may even be built at run time), and arguments, which reads them by position. GPT32.RI and GPT33.RI
+# (G5b-F1): a regular expression on the line after debugger, break or continue (group 5b read its "/" as a division,
+# and the // inside the expression as a comment). Each was computed without a message. "Before" = group 5b.
+HIDDEN_USES_5C = {
+    "html_open_comment": ("const t = 1 <!-- /*\nreturn A > 1 // */",
+                          "const t = 1 <!-- /*\nreturn B.map((b, i) => A[i] > 1) // */"),
+    "html_close_comment": ("const t = 1\n--> /*\nreturn A > 1 // */",
+                           "const t = 1\n--> /*\nreturn B.map((b, i) => A[i] > 1) // */"),
+    "eval": ('return eval("A > 1")', 'return B.map((b, i) => eval("A[i] > 1"))'),
+    "eval_name_built_at_run_time": ('return eval(String.fromCharCode(65) + " > 1")',
+                                    'return B.map((b, i) => eval(String.fromCharCode(65) + "[i] > 1"))'),
+    "eval_written_with_escapes": ('return \\u0065val("A > 1")', 'return B.map((b, i) => \\u0065val("A[i] > 1"))'),
+    "arguments": ("return arguments[0] > 1", "return B.map((b, i) => arguments[0][i] > 1)"),
+    "regex_after_debugger": ('debugger\n/[//]/.test("/"); const r = A > 1\nreturn r',
+                             'debugger\n/[//]/.test("/"); const r = B.map((b, i) => A[i] > 1)\nreturn r'),
+    "regex_after_break": ('let r = false\nfor (let k = 0; k < 2; k++) { if (k === 1) break\n/[//]/.test("/"); r = A > 1 }\nreturn r',
+                          'let r = null\nfor (let k = 0; k < 2; k++) { if (k === 1) break\n/[//]/.test("/"); r = B.map((b, i) => A[i] > 1) }\nreturn r'),
+    "regex_after_continue": ('let r = false\nfor (let k = 0; k < 2; k++) { if (k === 1) continue\n/[//]/.test("/"); r = A > 1 }\nreturn r',
+                             'let r = null\nfor (let k = 0; k < 2; k++) { if (k === 1) continue\n/[//]/.test("/"); r = B.map((b, i) => A[i] > 1) }\nreturn r'),
+    "regex_after_break_with_label": ('let r = false\nouter: for (let k = 0; k < 2; k++) { if (k === 1) break outer\n/[//]/.test("/"); r = A > 1 }\nreturn r',
+                                     'let r = null\nouter: for (let k = 0; k < 2; k++) { if (k === 1) break outer\n/[//]/.test("/"); r = B.map((b, i) => A[i] > 1) }\nreturn r'),
+}
+# The same forms without a name that is both a column and a parameter (the query uses B, the page has the parameter
+# cut): computed as before, nothing logged. eval and arguments refuse only where some name is both.
+COMPUTED_5C = {
+    "html_open_comment": "const t = 1 <!-- /*\nreturn B > 1 // */",
+    "eval": 'return eval("B > 1")',
+    "arguments": "return arguments[0] > 0",
+    "regex_after_debugger": 'debugger\n/[//]/.test("/"); const r = B > 1\nreturn r',
+    "regex_after_break": 'let r = false\nfor (let k = 0; k < 2; k++) { if (k === 1) break\n/[//]/.test("/"); r = B > 1 }\nreturn r',
+}
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5b review: a use hidden from group 5b's reading is computed without a message")
+@pytest.mark.parametrize("case", list(HIDDEN_USES_5C))
+def test_a_use_hidden_from_group_5b_reading_is_refused(node_session, tmp_path, case):
+    """A parameter A next to the column A, and a query that really uses A in a form of HIDDEN_USES_5C. Decision N1:
+    the query is refused by name, selects no row, and one error names A. Group 5b computed it without a message."""
+    code = HIDDEN_USES_5C[case][0]
+    page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", code)
+    state = _hist_state(page)
+    known_defect(not report.console_errors and not report.page_errors,
+                 f"G5b review: the {case} query is computed without a message")
+    assert state["mask"] == [False] * N, state["mask"]
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5b review: a vector function hiding a use is computed without a message")
+@pytest.mark.parametrize("case", list(HIDDEN_USES_5C))
+def test_a_vector_function_hiding_a_use_from_group_5b_reading_is_refused(node_session, tmp_path, case):
+    """The same forms in a vector function, built with the fields A and B and a parameter A: refused by name, NaN for
+    every row, one error naming A. Group 5b computed it with the column A ([true, false]) without a message."""
+    code = HIDDEN_USES_5C[case][1]
+    page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
+    out = page.evaluate(BUILD_VECTOR, {"code": code, "A": VECTOR_A, "B": VECTOR_B})
+    known_defect(out == [True, False] and not report.console_errors,
+                 f"G5b review: the {case} vector function gives {out} without a message")
+    assert out == ["NaN", "NaN"], out
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.parametrize("case", list(COMPUTED_5C))
+def test_control_the_same_forms_without_a_shared_name_are_computed(node_session, tmp_path, case):
+    """The control, right before and after the fix: the forms of HIDDEN_USES_5C with B and no name that is both a
+    column and a parameter (eval's string reads B; arguments[0] is the parameter cut = 1). The query is computed as
+    JavaScript computes it, and nothing is logged."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", COMPUTED_5C[case])
+    assert_histogram(df, _hist_state(page), np.ones(N, bool) if case == "arguments" else B > 1)
+    _assert_no_errors(report)
+
+
+ESCAPED_A_FAILURE = "A is not defined"
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5b review (GPT32.RI, GPT33.RI): a column written with escapes is not given")
+def test_a_column_written_with_escapes_is_given_to_the_query(node_session, tmp_path):
+    """The query `return \u0041 > 1` (\u0041 is A) and no parameter A: the column A must be given to the function, and
+    the query selects the rows with A > 1. Group 5b chose the columns by a plain search of the text, did not give A,
+    and the query failed with a ReferenceError for A."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return \\u0041 > 1")
+    state = _hist_state(page)
+    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+                 and ESCAPED_A_FAILURE in report.console_errors[0],
+                 f"G5b review: the column A is not given: {report.console_errors}")
+    assert_histogram(df, state, query_oracle("return A > 1"))
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5b review (GPT32.RI): a query that writes its parameter with escapes is stale")
+def test_a_query_that_writes_its_parameter_with_escapes_follows_it(node_session, tmp_path):
+    """The query `return A > \u0063ut` (\u0063ut is cut) uses the parameter cut. When the spinner sets cut from 1 to
+    3, the query must follow: the rows with A > 3. The page builder decided by a plain search of the text whether a
+    parameter change concerns the query, did not find cut, and the old selection stayed without a message."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > \\u0063ut")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
+    _node_set(page, "Spinner", "value", 3., title="cut")
+    state = _hist_state(page)
+    known_defect(state["mask"] == query_oracle("return A > cut", cut=1.).tolist() and not report.console_errors,
+                 "G5b review: the query keeps the selection of cut = 1 without a message")
+    assert_histogram(df, state, query_oracle("return A > cut", cut=3.))
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="G5c: eval cannot reach a column whose name is built at run time")
+def test_eval_reads_a_column_whose_name_is_built_at_run_time(node_session, tmp_path):
+    """The query `return eval(String.fromCharCode(66) + " > 1")` reads the column B through a name built at run time
+    (66 is B), with no name that is both a column and a parameter: the column B must be given to the function, and the
+    query selects the rows with B > 1. Group 5b gave only the columns whose name is in the text, not B, and the query
+    failed with a ReferenceError for B. Group 5c gives every column to a function that uses eval or arguments."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", 'return eval(String.fromCharCode(66) + " > 1")')
+    state = _hist_state(page)
+    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+                 and "B is not defined" in report.console_errors[0],
+                 f"G5c: the column B is not given: {report.console_errors}")
+    assert_histogram(df, state, B > 1)
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_control_a_query_reading_its_parameter_through_eval_follows_it(node_session, tmp_path):
+    """The control, right before and after the fix: the query `return eval("A > cut")` reads the parameter cut through
+    eval. When the spinner sets cut from 1 to 3, the query follows (the rows with A > 3). Group 5c decides by
+    reading the names (uses_parameter); a function that uses eval may read any name, so every change concerns it."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", 'return eval("A > cut")')
+    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
+    _node_set(page, "Spinner", "value", 3., title="cut")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=3.))
+    _assert_no_errors(report)
+
+
 def _alone_doc(tmp_path):
     return _build_doc(tmp_path, "query_alone", frame())
 
