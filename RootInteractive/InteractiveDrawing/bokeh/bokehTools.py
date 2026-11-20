@@ -393,6 +393,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
 
     paramDict = {}
     for param in parameterArray:
+        if not str(param["name"]).isascii():
+            # PHASE_5 Group 5a (review finding F1): the Architect's rule of 2026-11-18, parameter names are plain ASCII
+            raise ValueError(f"The parameter name {param['name']!r} is not plain ASCII; parameter names must be plain "
+                             f"ASCII")
         paramDict[param["name"]] = param.copy()
         paramDict[param["name"]]["subscribed_events"] = []
 

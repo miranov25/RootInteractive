@@ -97,6 +97,11 @@ export class ClientLinearFitter extends Model {
     // PHASE_5 Group 5 (review finding G3-P1-A): with no row of positive weight (all weights 0, or no row), the mean
     // and spread are not defined; they are taken as 0 and 1. With the ridge term the fit then gives the only
     // minimum of its function, every coefficient 0 (as before Group 3); without it, no fit.
+    //
+    // PHASE_5 Group 5a (review finding F4; the Architect's decision of 2026-11-18): the rotations need the square root
+    // of each weight. With a negative weight (signed weights such as sWeights), the fit with the ridge term uses the
+    // sums of Group 3 instead, with the penalty added to them: their result for such data is the one before Group 5
+    // (exact near 0, with Group 3's limits far from 0).
     const {alpha, source, varX, varY, weights} = this
     const nX = varX.length
     const colY = source.get_column(varY)
@@ -123,10 +128,12 @@ export class ClientLinearFitter extends Model {
     // 1. the weighted mean and spread of each predictor, and the number of rows with a positive weight
     let sumW = 0
     let nPositive = 0
+    let negative = false
     for(let k=0; k < len; ++k){
       const wk = w == null ? 1 : w[k]
       sumW += wk
       if(wk > 0) ++nPositive
+      if(wk < 0) negative = true
     }
     const mean: number[] = []
     const scale: number[] = []
@@ -154,8 +161,8 @@ export class ClientLinearFitter extends Model {
     }
 
     // 2. the coefficients gamma of u (the intercept is the last unknown)
-    const gamma = alpha > 0 ? this._ridge_by_rotations(cols, colY, w, len, mean, scale)
-                            : this._normal_equations(cols, colY, w, len, mean, scale, nPositive)
+    const gamma = alpha > 0 && !negative ? this._ridge_by_rotations(cols, colY, w, len, mean, scale)
+                                         : this._normal_equations(cols, colY, w, len, mean, scale, nPositive)
 
     // 3. transform back: beta_i = gamma_i / s_i, beta_0 = gamma_0 - sum_i beta_i * m_i
     this.parameters = []
@@ -171,7 +178,9 @@ export class ClientLinearFitter extends Model {
 
   _normal_equations(cols: ArrayLike<number>[], colY: ArrayLike<number>, w: ArrayLike<number> | null, len: number,
                     mean: number[], scale: number[], nPositive: number): number[]{
-    // Without the ridge term: the normal equations of u (packed lower triangle, row by row), as in Group 3
+    // The normal equations of u (packed lower triangle, row by row), as in Group 3: without the ridge term, and with
+    // it when a weight is negative (Group 5a)
+    const {alpha} = this
     const nX = cols.length
     const nUnknowns = nX + 1
     const x: number[] = new Array(nUnknowns*(nUnknowns+1)/2).fill(0)
@@ -197,7 +206,20 @@ export class ClientLinearFitter extends Model {
       x[lastRow+nX] += wk
       rhs[nX] += wk*yk
     }
-    if(nPositive < nUnknowns){
+    if(alpha > 0){
+      // the ridge term alpha * T^T T of Group 3 (beta = T gamma)
+      let iRow = 0
+      for(let i=0; i < nX; ++i){
+        const ri = mean[i]/scale[i]
+        for(let j=0; j <= i; ++j){
+          x[iRow+j] += alpha*ri*mean[j]/scale[j]
+        }
+        x[iRow+i] += alpha/(scale[i]*scale[i])
+        x[lastRow+i] -= alpha*ri
+        iRow += i+1
+      }
+      x[lastRow+nX] += alpha
+    } else if(nPositive < nUnknowns){
       return rhs.fill(NaN)
     }
     return solve(x, rhs)
@@ -219,7 +241,10 @@ export class ClientLinearFitter extends Model {
         const ai = row[i]
         if(ai === 0) continue
         const ii = i*n + i
-        const r = Math.sqrt(R[ii]*R[ii] + ai*ai)
+        let r = Math.sqrt(R[ii]*R[ii] + ai*ai)
+        if(!(r > 0 && r < Infinity)){
+          r = Math.hypot(R[ii], ai)     // the squares overflowed or underflowed (Group 5a, review finding F6)
+        }
         const c = R[ii]/r
         const sn = ai/r
         for(let j=i; j < n; ++j){

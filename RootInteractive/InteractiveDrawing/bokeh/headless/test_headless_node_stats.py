@@ -1426,14 +1426,13 @@ def _negative_weight_frame():
 
 @NODE
 @pytest.mark.feature("STAT.linear_fit")
-@pytest.mark.xfail(**STRICT, reason="F4: with the ridge term, one negative weight gives no fit")
 def test_ridge_fit_with_a_negative_weight_equals_the_exact_answer(node_session, tmp_path):
     """The Architect's decision of 2026-11-18 (G2 a): with the ridge term and a negative weight, the fit falls back to
     the sums of Group 3, which give the exact answer of the function for such data near 0, as before Group 5. After
     Group 5 the rotations took the square root of the negative weight, and the page gave no fit."""
     d, predictors = _negative_weight_frame()
     vals, got = _ridge_read(node_session, tmp_path, d, predictors, "w", GPT27_ALPHA, "g5a_negative")
-    known_defect(np.isnan(got).all() and np.isnan(vals).all(), f"F4: the fit with a negative weight gives {got}")
+    regression(np.isnan(got).all() and np.isnan(vals).all(), f"F4: the fit with a negative weight gives {got}")
     assert _ridge_error(vals, d, predictors, "w", GPT27_ALPHA) <= _ridge_tolerance(0.), (got,)
 
 

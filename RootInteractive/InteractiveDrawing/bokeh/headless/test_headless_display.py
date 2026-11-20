@@ -884,7 +884,6 @@ REFUSED_NON_ASCII = 'the parameter "' + NON_ASCII + '" cannot be used'
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="F1: a parameter name that is not plain ASCII is accepted when the page is built")
 def test_a_parameter_name_that_is_not_plain_ascii_is_refused_when_the_page_is_built(tmp_path):
     """The Architect's rule: parameter names are plain ASCII. The page builder refuses such a name by name. After
     Group 5 the page was built, and a query that used the name failed in the browser without naming the cause."""
@@ -893,13 +892,12 @@ def test_a_parameter_name_that_is_not_plain_ascii_is_refused_when_the_page_is_bu
         _build_doc(tmp_path, "query_non_ascii", frame())
     except ValueError as e:
         error = str(e)
-    known_defect(error is None, "F1: the page is built with a parameter name that is not plain ASCII")
+    regression(error is None, "F1: the page is built with a parameter name that is not plain ASCII")
     assert NON_ASCII in error and "ASCII" in error, error
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="F1: a function using a parameter that cannot be passed fails without naming it")
 def test_a_function_that_uses_a_parameter_that_cannot_be_passed_is_refused(node_session, tmp_path):
     """A parameter that cannot be passed to the function (here a name that is not plain ASCII, given by hand, as the
     page builder now refuses it) and that the function uses: the function is refused by name, selects no row and
@@ -909,9 +907,9 @@ def test_a_function_that_uses_a_parameter_that_cannot_be_passed_is_refused(node_
     page.evaluate(INJECT, {"name": NON_ASCII})
     _node_set(page, "TextAreaInput", "value", "return A > " + NON_ASCII)
     state = _hist_state(page)
-    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
-                 and NON_ASCII + " is not defined" in report.console_errors[0],
-                 f"F1: the query fails with {report.console_errors}")
+    regression(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+               and NON_ASCII + " is not defined" in report.console_errors[0],
+               f"F1: the query fails with {report.console_errors}")
     assert state["mask"] == [False] * N, state["mask"]
     assert not report.page_errors, report.page_errors
     assert len(report.console_errors) == 1 and REFUSED_NON_ASCII in report.console_errors[0], report.console_errors
@@ -919,7 +917,6 @@ def test_a_function_that_uses_a_parameter_that_cannot_be_passed_is_refused(node_
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="F2: a name only mentioned in a comment, a string or after a dot is refused")
 @pytest.mark.parametrize("case", list(MENTIONS))
 def test_a_name_only_mentioned_is_not_used_and_is_not_refused(node_session, tmp_path, case):
     """Decision N1 refuses a name that is both a column and a parameter when the function USES it. A parameter A next
@@ -930,8 +927,8 @@ def test_a_name_only_mentioned_is_not_used_and_is_not_refused(node_session, tmp_
     page.evaluate(INJECT, {"name": "A"})
     _node_set(page, "TextAreaInput", "value", MENTIONS[case])
     state = _hist_state(page)
-    known_defect(state["mask"] == [False] * N and len(report.console_errors) == 1
-                 and REFUSED_A in report.console_errors[0], f"F2: the {case} mention is refused")
+    regression(state["mask"] == [False] * N and len(report.console_errors) == 1
+               and REFUSED_A in report.console_errors[0], f"F2: the {case} mention is refused")
     assert_histogram(df, state, B > 1)
     _assert_no_errors(report)
 
@@ -953,7 +950,6 @@ def test_control_a_name_used_in_other_forms_is_refused(node_session, tmp_path, c
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="F3: a parameter added after the function is built is not checked again")
 def test_a_change_of_the_parameters_after_the_function_is_built_is_checked_again(node_session, tmp_path):
     """The query `return A > 1` is built first, with the column A. Then a parameter A is added and the arguments are
     updated: the function now uses a name that is both a column and a parameter, and is refused by name (no row,
@@ -970,8 +966,8 @@ def test_a_change_of_the_parameters_after_the_function_is_built_is_checked_again
     }""")
     _settle(page, HIST_PROBES)
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors,
-                 "F3: the column A is used without a check")
+    regression(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors,
+               "F3: the column A is used without a check")
     assert state["mask"] == [False] * N, state["mask"]
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
 
