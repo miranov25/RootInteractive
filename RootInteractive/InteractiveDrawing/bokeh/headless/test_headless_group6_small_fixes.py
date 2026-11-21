@@ -20,6 +20,10 @@ the items "settled without your answer" of the same document):
             is off by default (window.RootInteractiveDebug = true turns them on for performance work).
   PRINTS    two Python modules printed "x <file>.ts" when imported (bokehVisJS3DGraph.py, HistogramCDS.py), and the
             page builder printed "compressCDSPipe" for every compressed table.
+  PRINTS-2  (the group 6b commits, Claude21.RI) five more modules printed "Import  <file>.ts" when imported (CDSAlias.py,
+            CDSCompress.py, CDSJoin.py, CDSStack.py, DownsamplerCDS.py), and the page builder printed the number of
+            options of a selection widget (a select widget, and a multi-select widget with 31 options or more).
+            This one is not fixed yet: its test is a strict expected failure.
   LENGTH    the length of a compressed table came from whichever column was decoded first, so a corrupted first
             column made every good column be refused. The length is now the table's own row count, sent with the page.
   G5        a table without rows and an automatic slider stopped the page build with an unnamed NumPy error. Answer
@@ -52,6 +56,18 @@ def regression(condition: bool, message: str) -> None:
     """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
         raise AssertionError("REGRESSION, a fixed defect is back: " + message)
+
+
+class KnownDefect(AssertionError):
+    """Raised only when production shows the exact signature of a registered defect (PRINTS-2, not fixed yet)."""
+
+
+def known_defect(condition: bool, message: str) -> None:
+    if condition:
+        raise KnownDefect(message)
+
+
+STRICT = dict(strict=True, raises=KnownDefect)
 
 UNIT = pytest.mark.headless_unit
 BOKEH_DIR = Path(__file__).resolve().parent.parent
@@ -390,6 +406,37 @@ def test_prints_no_debug_line_at_import_or_when_a_compressed_page_is_built():
     debug = [s for s in lines if re.fullmatch(r"x \S+\.ts", s) or s == "compressCDSPipe"]
     regression(sorted(debug) == ["compressCDSPipe", "x HistogramCDS.ts", "x bokehVisJS3DGraph.ts"],
                  f"PRINTS: the debug lines {debug}")
+    assert debug == [], debug
+
+
+PRINT_SCRIPT_2 = r"""
+import numpy as np, pandas as pd
+import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
+sa.show = lambda *a, **k: None
+print("=== build")
+n = 80
+df = pd.DataFrame({"A": np.linspace(0, 1, n), "B": np.linspace(1, 2, n),
+                   "k": np.arange(n) % 3, "m": np.arange(n) % 40})
+sa.bokehDrawSA.fromArray(df, None, [[["A"], ["B"]]], [["select", ["k"]], ["multiSelect", ["m"]]],
+                         layout=[[0]], widgetLayout=[[0, 1]])
+"""
+
+
+@UNIT
+@pytest.mark.xfail(**STRICT)
+def test_prints_no_import_line_and_no_number_of_options_when_a_page_is_built():
+    """PRINTS-2: importing the page builder and building a page with a select widget (3 options) and a multi-select
+    widget (40 options) prints nothing but the marker "=== build". Before, five modules printed "Import  <file>.ts" at
+    import, and the page builder printed 3 and 40. The control is the build itself, which must still succeed."""
+    r = subprocess.run([sys.executable, "-c", PRINT_SCRIPT_2], capture_output=True, text=True, cwd=REPO_ROOT,
+                       timeout=300)
+    assert r.returncode == 0, r.stderr[-2000:]
+    lines = r.stdout.splitlines()
+    assert "=== build" in lines
+    debug = [s for s in lines if re.fullmatch(r"Import\s+\S+\.ts|\d+", s)]
+    known_defect(sorted(debug) == ["3", "40", "Import  CDSAlias.ts", "Import  CDSCompress.ts", "Import  CDSJoin.ts",
+                                   "Import  CDSStack.ts", "Import  DownsamplerCDS.ts"],
+                 f"PRINTS-2: the debug lines {debug}")
     assert debug == [], debug
 
 
