@@ -1,5 +1,6 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import * as p from "core/properties"
+import {ri_debug} from "./RIDebug"
 
 export namespace CDSAlias {
   export type Attrs = p.AttrsOf<Props>
@@ -131,7 +132,7 @@ export class CDSAlias extends ColumnarDataSource {
             data[key] = this.get_column(column.field) as any[]
         }
     } else if(column.hasOwnProperty("fields")){
-        console.time(key)
+        if(ri_debug()) console.time(key)   // PHASE_5 group 6: behind the debug switch (G4 b)
         if(_locked_columns.has(key)){
           return
         }
@@ -196,7 +197,7 @@ export class CDSAlias extends ColumnarDataSource {
                   this.invalidate_column(new_key, false)
                 }
               }
-              console.timeEnd(key)
+              if(ri_debug()) console.timeEnd(key)
             this.change.emit()
           })
           return
@@ -234,7 +235,7 @@ export class CDSAlias extends ColumnarDataSource {
 	    }
             data[key] = new_column
         }
-        console.timeEnd(key)
+        if(ri_debug()) console.timeEnd(key)
     } else if(Object.prototype.toString.call(column) === '[object String]'){
       let new_column = this.get_column(column)
       if(new_column == null){

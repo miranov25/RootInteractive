@@ -24,6 +24,9 @@ Target node_transport. Changes to GPT28's v0.1a, all test-only:
            the SECOND read returns the 7-entry column without any error.
            Fixed in PHASE_5 Group 1: the strict mark is off, the signature test is removed, and the exact signature
            is a regression (an ordinary failure).
+- PHASE_5 group 6 (answer G8 a): TR-D1 is FIXED. Replacing inputData drops every decoded column (CDSCompress.ts
+  replace_data), so all columns and the histogram come from the new data. The strict mark is off; the signature test
+  is now a regression check of the same page (the histogram decodes x and w first).
 - Review F4: a cold-cache test shows the decoding is lazy (nothing decoded at load in Node, reading x decodes x).
 - Review F3: narrower feature ids instead of ENC.compression.roundtrip, which stays planned: lossless decoding is
   not the whole compression pipeline (no lossy codes here).
@@ -326,7 +329,6 @@ def test_d1p2_real_compressed_source_histogram_filter_restoration(node_session, 
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("ENC.cds_compress.data_replace")
-@pytest.mark.xfail(**STRICT, reason="TR-D1: decoded columns keep their old values after inputData is replaced")
 def test_d1p2_real_compressed_source_inputdata_replacement_invalidates_cache(node_session, headless_out):
     """Deliberately red if CDSCompress retains stale decoded columns after replacement.
 
@@ -344,8 +346,9 @@ def test_d1p2_real_compressed_source_inputdata_replacement_invalidates_cache(nod
     result = _eval(node_session, REPLACE, payload)
     assert result["updated"] is True
     observed = _eval(node_session, READ)
-    known_defect(_is_tr_d1(result, observed, d, replacement, ["w", "x", "y"]),
-                 "TR-D1: x, y and w were decoded before the replacement and keep their old values")
+    if _is_tr_d1(result, observed, d, replacement, ["w", "x", "y"]):
+        raise AssertionError("REGRESSION, a fixed defect is back: "
+                             "TR-D1: x, y and w were decoded before the replacement and keep their old values")
     _num_equal(observed["x"], replacement.x)
     _num_equal(observed["w"], replacement.w)
     _num_equal(observed["bins"], _hist_ref(replacement))
@@ -355,9 +358,9 @@ def test_d1p2_real_compressed_source_inputdata_replacement_invalidates_cache(nod
 @pytest.mark.backend("node")
 @pytest.mark.layer("integration")
 @pytest.mark.feature("ENC.cds_compress.data_replace")
-def test_signature_tr_d1_decoded_columns_stay_old_undecoded_columns_come_out_new(node_session, headless_out):
-    """TR-D1, exact: the histogram decodes x and w (not y); after the replacement x and w are still the old columns,
-    y (decoded only afterwards) is the new one, and the histogram keeps the old bins: the table mixes old and new."""
+def test_tr_d1_columns_decoded_before_a_replacement_come_out_new(node_session, headless_out):
+    """TR-D1 (fixed in PHASE_5 group 6): the histogram decodes x and w (not y); after the replacement every column and
+    the histogram are the new ones. Its exact signature - x and w old, y new, the old bins - is a regression."""
     d = _frame()
     replacement = _replacement(d)
     replacement["y"] = d.y.to_numpy()[::-1].copy()
@@ -369,7 +372,12 @@ def test_signature_tr_d1_decoded_columns_stay_old_undecoded_columns_come_out_new
     assert first["cached"] == ["w", "x"], first
     result = _eval(node_session, REPLACE, payload)
     observed = _eval(node_session, READ)
-    assert _is_tr_d1(result, observed, d, replacement, ["w", "x"]), (result, observed)
+    if _is_tr_d1(result, observed, d, replacement, ["w", "x"]):
+        raise AssertionError("REGRESSION, a fixed defect is back: TR-D1: x and w keep their old values, y is new")
+    assert result["cachedBefore"] == ["w", "x"] and result["cachedAfter"] == [], result
+    for col in ("x", "y", "w"):
+        _num_equal(observed[col], replacement[col])
+    _num_equal(observed["bins"], _hist_ref(replacement))
 
 
 @pytest.mark.node_transport

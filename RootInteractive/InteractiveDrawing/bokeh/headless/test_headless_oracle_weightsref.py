@@ -37,6 +37,9 @@ the analysis side equal numpy exactly (they have no defect), and live faults inj
 PHASE_5 Batch 1 fixed WT-D6 (bokehTools.py: a range widget at its automatic full range keeps every exported row). The
 page now shows WR-D1 and WT-D14 only (PRESENT); the model keeps all three (MODEL_DEFECTS) as the record of master
 f1cbe0f. A checkpoint equal to the master model (WT-D6 back) is reported as a regression.
+PHASE_5 group 6 fixed WR-D1 (answer G7 a: bokehInteractiveTemplate.py getDefaultVarsRefWeights, the reference
+projections are unbinned, from the values, as the analysis side). The page now shows WT-D14 only; a checkpoint equal
+to the page before group 6 (WR-D1 back) is reported as a regression.
 """
 from __future__ import annotations
 
@@ -66,10 +69,10 @@ K_LOW = 8
 NBINS = (100, 120)
 RTOL_SUM, RTOL_MOMENT, RTOL_ERR = 1e-12, 1e-10, 1e-9
 MODEL_DEFECTS = tuple(W.DEFECTS)                         # the model: master f1cbe0f
-PRESENT = ("WR-D1", "WT-D14")                             # on the page after PHASE_5 Batch 1 (WT-D6 fixed)
+PRESENT = ("WT-D14",)                                     # on the page after PHASE_5 group 6 (WR-D1 fixed)
+BEFORE_GROUP6 = ("WR-D1", "WT-D14")                       # on the page from Batch 1 to group 6
 WR_XFAIL = dict(strict=DEFAULT_TABLE, raises=KnownDefect)
-WR_DEFECTS = ("WR-D1, WT-D14 at every checkpoint: the reference side is binned; the error bar of a weighted mean is "
-              "std/sqrt(sum w), not s/sqrt(N_eff)")
+WR_DEFECTS = ("WT-D14 at every checkpoint: the error bar of a weighted mean is std/sqrt(sum w), not s/sqrt(N_eff)")
 JOIN = "histoXYData_1_join"
 # (data source, drawn y field) -> what it must equal; x is the X bin centre (profiles) or the 2-D bin's X centre
 SERIES = {
@@ -245,10 +248,12 @@ def _detail(t, state, defects=PRESENT) -> dict:
     out = {}
     if "WT-D6" in defects:
         out["WT-D6"] = {"lost_rows": np.flatnonzero(desired["selected_rows"] & ~shown["selected_rows"]).tolist()}
-    d_ref = np.nanmax(np.abs(shown["reference"]["mean"] - without("WR-D1")["reference"]["mean"]))
-    ratio = shown["errors"]["analysis"]["mean"] / without("WT-D14")["errors"]["analysis"]["mean"]
-    out["WR-D1"] = {"reference_mean_binned_minus_unbinned_max": round(float(d_ref), 9)}
-    out["WT-D14"] = {"analysis_mean_error_drawn_over_proper_max": round(float(np.nanmax(ratio)), 6)}
+    if "WR-D1" in defects:
+        d_ref = np.nanmax(np.abs(shown["reference"]["mean"] - without("WR-D1")["reference"]["mean"]))
+        out["WR-D1"] = {"reference_mean_binned_minus_unbinned_max": round(float(d_ref), 9)}
+    if "WT-D14" in defects:
+        ratio = shown["errors"]["analysis"]["mean"] / without("WT-D14")["errors"]["analysis"]["mean"]
+        out["WT-D14"] = {"analysis_mean_error_drawn_over_proper_max": round(float(np.nanmax(ratio)), 6)}
     return out
 
 
@@ -553,10 +558,10 @@ def test_wr1_page_is_the_original_dashboard_on_the_reproducible_table(wr_page):
 @pytest.mark.xfail(**WR_XFAIL, reason=WR_DEFECTS)
 def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_range_and_restores(wr_page,
                                                                                              headless_session):
-    """The whole WR1 workflow, seven checkpoints. It is the strict partner of WR-D1 and WT-D14 (and was of WT-D6 until
-    PHASE_5 Batch 1): KnownDefect is raised only after every checkpoint was compared, and only when each one equals
-    the AS-SHOWN oracle exactly and differs from DESIRED by exactly these two defects. A checkpoint equal to the master
-    model (WT-D6 back) is a regression."""
+    """The whole WR1 workflow, seven checkpoints. It is the strict partner of WT-D14 (and was of WT-D6 until PHASE_5
+    Batch 1, of WR-D1 until PHASE_5 group 6): KnownDefect is raised only after every checkpoint was compared, and only
+    when each one equals the AS-SHOWN oracle exactly and differs from DESIRED by exactly the defects still present. A
+    checkpoint equal to the master model (WT-D6 back) or to the page before group 6 (WR-D1 back) is a regression."""
     out, m = wr_page["dir"], wr_page["manifest"]
     t = oracle.regenerate_table(ROWS, SEED)
     assert oracle.table_sha256(t) == m["table_sha256"]
@@ -564,6 +569,7 @@ def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_rang
     desired = {cid: W.expected(t, s) for cid, _, _, s in steps}
     shown = {cid: W.expected(t, s, PRESENT) for cid, _, _, s in steps}
     master = {cid: W.expected(t, s, MODEL_DEFECTS) for cid, _, _, s in steps}
+    before_group6 = {cid: W.expected(t, s, BEFORE_GROUP6) for cid, _, _, s in steps}
     blame = {cid: _attribute(t, s) for cid, _, _, s in steps}
     detail = {cid: _detail(t, s) for cid, _, _, s in steps}
     page = _Page(headless_session, wr_page["html"])
@@ -605,6 +611,10 @@ def test_wr1_weights_reference_dashboard_follows_weights_transform_bins_and_rang
     back = [cid for cid in failed if not wr_compare(master[cid], actual[cid])]
     if back:
         raise AssertionError(f"REGRESSION, a fixed defect is back: WT-D6 - checkpoints {back} equal the master model")
+    binned = [cid for cid in failed if not wr_compare(before_group6[cid], actual[cid])]
+    if binned:
+        raise AssertionError(f"REGRESSION, a fixed defect is back: WR-D1 - checkpoints {binned} show the binned "
+                             f"reference side of the page before group 6")
     assert not failed, json.dumps(failed, indent=1)[:6000]
     assert wr_compare(desired["C1"], actual["C2"], sections=("comparison",)), "the weight change did not change the page"
     assert not errors, errors

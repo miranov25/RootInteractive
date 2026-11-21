@@ -1,7 +1,7 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
-import {uniformBinEdges, uniformInRangeBin} from "./HistogramBinEdges"
+import {uniformBinEdges, uniformInRangeBin, numpyRange, binCentres} from "./HistogramBinEdges"
 //import { kth_value, weighted_kth_value } from "./MathUtils"
 
 export namespace HistogramCDS {
@@ -96,10 +96,6 @@ export class HistogramCDS extends ColumnarDataSource {
               range_max = Math.max(range_max, sample_arr[x])
             }
           }
-          if(range_min == range_max){
-            range_min -= 1
-            range_max += 1
-          }
           if(!isFinite(range_min)){
             range_min = 0
             range_max = 1
@@ -127,10 +123,6 @@ export class HistogramCDS extends ColumnarDataSource {
               range_max = Math.max(range_max, sample_arr[y])
             }
           }
-          if(range_min == range_max){
-            range_min -= 1
-            range_max += 1
-          }
           if(!isFinite(range_min)){
             range_min = 0
             range_max = 1
@@ -142,13 +134,18 @@ export class HistogramCDS extends ColumnarDataSource {
           this._range_max = this.range[1]
         }
       }
+      // PHASE_5 group 6 (answer G3 a): a range with two equal ends, from a slider or from a column with one value,
+      // becomes NumPy's [v - 0.5, v + 0.5]; before, an explicit one made every read throw, an automatic one was [v - 1, v + 1]
+      ;[this._range_min, this._range_max] = numpyRange(this._range_min, this._range_max)
       this._nbins = this.nbins
       this._transform_scale = this._nbins/(this._range_max-this._range_min)
       this._transform_origin = -this._range_min*this._transform_scale
-      this._bin_edges = uniformBinEdges(this._range_min, this._range_max, this._nbins)
+      this._bin_edges = uniformBinEdges(this._range_min, this._range_max, this._nbins, `Histogram "${this.name}"`)
+      // PHASE_5 group 6 (L-46): the centre of a bin is the middle of its edges
+      const centres = binCentres(this._bin_edges)
       for (let index = 0; index < this._nbins; index++) {
         bin_left.push(this._bin_edges[index])
-        bin_center.push(this._range_min+(index+.5)*(this._range_max-this._range_min)/this._nbins)
+        bin_center.push(centres[index])
         bin_right.push(this._bin_edges[index+1])
       }
       this.data["bin_bottom"] = bin_left

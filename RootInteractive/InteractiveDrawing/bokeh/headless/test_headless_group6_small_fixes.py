@@ -1,8 +1,8 @@
 """PHASE_5 group 6 - small defects whose fix is clear (Claude10.RI at the Architect's request, 2026-11-20).
 
 In plain words. Each defect has a test of the wanted behaviour, an exact description of the wrong behaviour before
-the fix (its "signature") and a healthy control, so no test is empty. Before the fix the tests of the wanted behaviour
-are strict expected failures: they must fail, and only with the described wrong result.
+the fix (its "signature") and a healthy control, so no test is empty. The defects are FIXED (the fix commit of group 6):
+the tests of the wanted behaviour are ordinary tests, and each signature is a REGRESSION check that names the defect.
 
 The defects (closure plan of 2026-11-18, section 1; the Architect's answers to the group 6 questions G3 and G4, and
 the items "settled without your answer" of the same document):
@@ -48,16 +48,11 @@ import pandas as pd
 import pytest
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect."""
-
-
-def known_defect(condition: bool, message: str) -> None:
+def regression(condition: bool, message: str) -> None:
+    """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
-        raise KnownDefect(message)
+        raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
-
-STRICT = dict(strict=True, raises=KnownDefect)
 UNIT = pytest.mark.headless_unit
 BOKEH_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = BOKEH_DIR.parents[2]
@@ -193,7 +188,6 @@ def test_control_h_range_an_ordinary_slider_range_gives_numpy_histograms(node_se
 @_node(pytest.mark.node_histograms)
 @pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="H-RANGE: a slider range with two equal ends makes the histograms throw")
 def test_a_slider_range_with_two_equal_ends_gives_the_numpy_histogram(node_session, tmp_path):
     """The slider pulled to one value, [2, 2]: the histograms are NumPy's for range (2, 2), whose edges are
     1.5 ... 2.5, and nothing throws. Before the fix every read of either histogram threw RangeError."""
@@ -201,7 +195,7 @@ def test_a_slider_range_with_two_equal_ends_gives_the_numpy_histogram(node_sessi
     _eval(node_session, SET_WIDGET, {"name": "rX", "value": [2, 2]})
     h1, console1 = _columns(node_session, "h1", ["bin_count", "bin_bottom", "bin_top"])
     h2, console2 = _columns(node_session, "h2", ["bin_count", "bin_bottom_0", "bin_top_0"])
-    known_defect(all(v == RANGE_ERROR for v in list(h1.values()) + list(h2.values())),
+    regression(all(v == RANGE_ERROR for v in list(h1.values()) + list(h2.values())),
                  "H-RANGE: every read of the 1-D and the 2-D histogram throws " + RANGE_ERROR[6:])
     counts, edges = _numpy_1d(X, (2, 2))
     assert edges == [1.5, 1.75, 2.0, 2.25, 2.5]
@@ -215,13 +209,12 @@ def test_a_slider_range_with_two_equal_ends_gives_the_numpy_histogram(node_sessi
 @_node(pytest.mark.node_histograms)
 @pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="H-RANGE: the automatic range of a column with one value is [v - 1, v + 1]")
 def test_the_automatic_range_of_a_column_with_one_value_is_numpys(node_session, tmp_path):
     """The column c has one value, 2.0. NumPy's automatic range is (1.5, 2.5); before the fix it was (1, 3)."""
     _open(node_session, _range_page(tmp_path, "range_auto"))
     hc, _ = _columns(node_session, "hc", ["bin_count", "bin_bottom", "bin_top"])
     hc2, _ = _columns(node_session, "hc2", ["bin_count", "bin_bottom_0", "bin_top_0"])
-    known_defect(hc["bin_bottom"] == [1.0, 1.5, 2.0, 2.5] and hc2["bin_bottom_0"][:4] == [1.0, 1.5, 2.0, 2.5],
+    regression(hc["bin_bottom"] == [1.0, 1.5, 2.0, 2.5] and hc2["bin_bottom_0"][:4] == [1.0, 1.5, 2.0, 2.5],
                  "H-RANGE: the automatic range of the one-valued column is (1, 3), not NumPy's (1.5, 2.5)")
     counts, edges = np.histogram(np.full(6, 2.0), bins=4)
     assert edges.tolist() == [1.5, 1.75, 2.0, 2.25, 2.5]
@@ -246,14 +239,13 @@ BREAK_TRANSFORM = r"""() => {
 
 @_node(pytest.mark.node_histograms)
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="H-ERROR: the range check names neither the axis, the range, the value nor the tolerance")
 def test_the_range_check_of_a_histogram_names_axis_range_value_and_tolerance(node_session, tmp_path):
     """A histogram whose bin transform no longer maps its range onto its bins (forced here by moving the transform
     of axis 0 by half a bin) refuses with an error that names the histogram, the axis, the range, the value and the
     tolerance."""
     _open(node_session, _range_page(tmp_path, "range_error"))
     message, _ = _eval(node_session, BREAK_TRANSFORM)
-    known_defect(message == OLD_RANGE_CHECK, "H-ERROR: the error says only '" + OLD_RANGE_CHECK + "'")
+    regression(message == OLD_RANGE_CHECK, "H-ERROR: the error says only '" + OLD_RANGE_CHECK + "'")
     assert message is not None
     for part in ('"h2"', "axis 0", "[0, 4]", "-0.5", "1e-6"):
         assert part in message, (part, message)
@@ -294,12 +286,11 @@ def test_control_h_centre_the_two_formulas_differ_for_these_ranges():
 @_node(pytest.mark.node_histograms)
 @pytest.mark.feature("HIST.histogram_1d")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="H-CENTRE: the bin centre is not the middle of the bin's edges")
 def test_the_bin_centre_is_the_middle_of_the_numpy_edges(node_session, tmp_path):
     _open(node_session, _centre_page(tmp_path, "centre"))
     k1, _ = _columns(node_session, "k1", ["bin_center", "bin_bottom", "bin_top"])
     k2, _ = _columns(node_session, "k2", ["bin_center_0", "bin_bottom_0", "bin_top_0", "bin_center_1"])
-    known_defect(k1["bin_center"] == _old_centres(0, 1, 3) and k2["bin_center_0"][:10] == _old_centres_nd(0, 1, 10),
+    regression(k1["bin_center"] == _old_centres(0, 1, 3) and k2["bin_center_0"][:10] == _old_centres_nd(0, 1, 10),
                  "H-CENTRE: the bin centres are min + (i + 0.5) * width / n, not the middle of the edges")
     assert k1["bin_center"] == [(a + b) / 2 for a, b in zip(k1["bin_bottom"], k1["bin_top"])], k1
     assert k1["bin_center"] == _mid_centres(0, 1, 3), k1
@@ -361,11 +352,10 @@ def test_control_debug_with_the_switch_on_the_timing_calls_are_made(node_session
 @_node(pytest.mark.node_display)
 @pytest.mark.feature("ALIAS.cdsalias")
 @pytest.mark.feature("HIST.histogram_nd")
-@pytest.mark.xfail(**STRICT, reason="DEBUG: the models print timings and debug text without being asked")
 def test_debug_the_models_print_nothing_unless_the_switch_is_on(node_session, tmp_path):
     _open(node_session, _debug_page(tmp_path, "debug_off"))
     counts, _ = _eval(node_session, DEBUG_CALLS, {"on": False, "alias": "AB"})
-    known_defect(counts["time"] >= 2 and counts["timeEnd"] >= 2 and counts["info"] == 1 and counts["debug"] == 1,
+    regression(counts["time"] >= 2 and counts["timeEnd"] >= 2 and counts["info"] == 1 and counts["debug"] == 1,
                  f"DEBUG: console.time, timeEnd, debug and info are called without the switch: {counts}")
     assert counts == {"time": 0, "timeEnd": 0, "debug": 0, "info": 0}, counts
 
@@ -392,14 +382,13 @@ def _printed():
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT, reason="PRINTS: debug lines at import and at build time")
 def test_prints_no_debug_line_at_import_or_when_a_compressed_page_is_built():
     """"x <file>.ts" at import and "compressCDSPipe" at build time are gone. The control is the build itself, which
     must still succeed (and the "=== build" marker is printed)."""
     lines = _printed()
     assert "=== build" in lines
     debug = [s for s in lines if re.fullmatch(r"x \S+\.ts", s) or s == "compressCDSPipe"]
-    known_defect(sorted(debug) == ["compressCDSPipe", "x HistogramCDS.ts", "x bokehVisJS3DGraph.ts"],
+    regression(sorted(debug) == ["compressCDSPipe", "x HistogramCDS.ts", "x bokehVisJS3DGraph.ts"],
                  f"PRINTS: the debug lines {debug}")
     assert debug == [], debug
 
@@ -420,7 +409,6 @@ READ_CORRUPT_FIRST = r"""() => {
 
 @_node(pytest.mark.node_transport)
 @pytest.mark.feature("ENC.cds_compress.length_guard")
-@pytest.mark.xfail(**STRICT, reason="LENGTH: a corrupted first column sets the table's length")
 def test_length_a_corrupted_first_column_is_refused_and_the_good_columns_are_read(node_session, headless_out):
     """The 8-row table whose column w was replaced by a 7-row payload; w is read FIRST. The corrupted w is refused,
     x is read with its 8 rows, and the table has 8 rows. Before the fix, w set the length to 7: w was accepted and
@@ -428,7 +416,7 @@ def test_length_a_corrupted_first_column_is_refused_and_the_good_columns_are_rea
     r = node_session.request("new_doc", path=str(_length_page(headless_out, "group6_length")))
     assert r.get("ok"), r
     got, _ = _eval(node_session, READ_CORRUPT_FIRST)
-    known_defect(got == {"w": {"length": 7}, "x": {"error": "Corrupted length of column x: 8 expected: 7"}, "n": 7},
+    regression(got == {"w": {"length": 7}, "x": {"error": "Corrupted length of column x: 8 expected: 7"}, "n": 7},
                  "LENGTH: the corrupted w (7 rows) is accepted and sets the length; the good x (8 rows) is refused")
     assert got == {"w": {"error": "Corrupted length of column w: 7 expected: 8"}, "x": {"length": 8}, "n": 8}, got
 
@@ -465,14 +453,13 @@ def test_control_g5_the_automatic_sliders_of_a_table_with_rows_span_its_values()
 
 @UNIT
 @pytest.mark.feature("FILTER.range")
-@pytest.mark.xfail(**STRICT, reason="G5: a table without rows stops the page build with an unnamed NumPy error")
 def test_g5_a_table_without_rows_and_automatic_sliders_is_built_with_a_neutral_range():
     """Answer G5 a: an empty selection is a normal state of an analysis; the automatic sliders get the range 0 to 1."""
     df = pd.DataFrame({"A": np.array([], float), "B": np.array([], float)})
     try:
         got = _sliders(_empty_table_page(df))
     except ValueError as e:
-        known_defect((type(e).__name__, str(e)) == EMPTY_TABLE_ERROR, "G5: " + str(e))
+        regression((type(e).__name__, str(e)) == EMPTY_TABLE_ERROR, "G5: " + str(e))
         raise
     assert got["A"] == ("RangeSlider", 0, 1, (0, 1)), got
     assert got["B"][:3] == ("Slider", 0, 1), got
@@ -510,14 +497,13 @@ def test_control_g6_the_template_with_a_normalization_keeps_its_figures_and_layo
 
 @UNIT
 @pytest.mark.feature("DASHBOARD.histogram_only")
-@pytest.mark.xfail(**STRICT, reason="G6: the template without a normalization stops with KeyError: None")
 def test_g6_the_template_without_a_normalization_has_no_normalized_plots_and_builds_a_page():
     """Answer G6 a: no normalization means a dashboard without the normalized plots. Every layout index names one
     of its figures, no figure reads a normalized histogram, and the public builder makes the page."""
     try:
         out = _template(None)
     except KeyError as e:
-        known_defect(e.args == (None,), "G6: getDefaultVars(normalization=None) stops with KeyError: None")
+        regression(e.args == (None,), "G6: getDefaultVars(normalization=None) stops with KeyError: None")
         raise
     aliases, variables, parameters, widgets, widget_layout, histograms, figures, layout = out
     assert not any("Norm" in str(s) for s in _figure_sources(figures)), _figure_sources(figures)
@@ -572,13 +558,12 @@ def test_control_g11_an_alias_of_two_columns_is_computed(node_session, tmp_path)
 
 @_node(pytest.mark.node_display)
 @pytest.mark.feature("ALIAS.parameter")
-@pytest.mark.xfail(**STRICT, reason="G11: a parameter among an alias's variables gives an unnamed TypeError")
 def test_g11_a_parameter_among_the_variables_of_an_alias_takes_its_value_and_follows_its_widget(node_session, tmp_path):
     """Answer G11 a: the variable cut takes the parameter's value (0.5), and the alias follows the slider (0.8)."""
     r = node_session.request("new_doc", path=str(_alias_page(tmp_path, "g11", ["A", "cut"], "return A > cut")))
     assert r.get("ok") and not r.get("page_errors"), r
     got, console = _eval(node_session, ALIAS_COLUMN)
-    known_defect(got == [0.0] * 11 and console == [G11_ERROR],
+    regression(got == [0.0] * 11 and console == [G11_ERROR],
                  f"G11: the alias is all 0 and the page logs '{G11_ERROR}'")
     assert got == _expected(0.5) and console == [] and not r.get("console_errors"), (got, console, r)
     _eval(node_session, SET_WIDGET, {"name": "cut", "value": 0.8})
@@ -611,7 +596,6 @@ def _drag_and_wheel(page, box):
 
 @pytest.mark.browser_d3
 @pytest.mark.feature("DISPLAY.graph3d")
-@pytest.mark.xfail(**STRICT, reason="3D: dragging or scrolling a graph that has no data throws at every mouse event")
 def test_3d_a_graph_without_data_can_be_dragged_and_shows_the_rows_that_arrive_later(headless_session, tmp_path):
     """The 3D graph of a table that is empty when the page loads (group 2 review G2-S1). A drag and a wheel step over
     it raise no error; when the nine rows arrive the graph draws them, and a drag still raises no error. Before the
@@ -626,7 +610,7 @@ def test_3d_a_graph_without_data_can_be_dragged_and_shows_the_rows_that_arrive_l
         box = page.evaluate(GRAPH_VIEW)
         _drag_and_wheel(page, box)
         errors_empty = list(res["page_errors"])
-        known_defect(len(errors_empty) > 0 and set(errors_empty) == {DRAG_ERROR},
+        regression(len(errors_empty) > 0 and set(errors_empty) == {DRAG_ERROR},
                      f"3D: {len(errors_empty)} errors '{DRAG_ERROR}' while dragging the empty graph")
         assert errors_empty == [], errors_empty
         page.evaluate(D.SET_DIRECT_SOURCE_JS, {k: df[k].tolist() for k in df.columns})

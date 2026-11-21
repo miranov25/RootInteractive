@@ -1,7 +1,8 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
-import {uniformBinEdges, uniformInRangeBin} from "./HistogramBinEdges"
+import {uniformBinEdges, uniformInRangeBin, numpyRange, binCentres} from "./HistogramBinEdges"
+import {ri_debug} from "./RIDebug"
 
 export namespace HistoNdCDS {
   export type Attrs = p.AttrsOf<Props>
@@ -168,9 +169,12 @@ export class HistoNdCDS extends ColumnarDataSource {
       this._strides[0] = 1
       for(let i=0; i<dim; i++){
         this._nbins[i] = this.nbins[i]
+        // PHASE_5 group 6 (answer G3 a): a range with two equal ends becomes NumPy's [v - 0.5, v + 0.5]
+        ;[this._range_min[i], this._range_max[i]] = numpyRange(this._range_min[i], this._range_max[i])
         this._transform_scale[i] = this._nbins[i]/(this._range_max[i]-this._range_min[i])
         this._transform_origin[i] = this._range_min[i]*this._transform_scale[i]
-        this._bin_edges[i] = uniformBinEdges(this._range_min[i], this._range_max[i], this._nbins[i])
+        this._bin_edges[i] = uniformBinEdges(this._range_min[i], this._range_max[i], this._nbins[i],
+                                             `Histogram "${this.name}", axis ${i}`)
         this._strides[i+1] = this._strides[i]*this._nbins[i]
       }
 
@@ -179,11 +183,12 @@ export class HistoNdCDS extends ColumnarDataSource {
         let bin_bottom = []
         let bin_center = []
         let bin_top = []
-        let inv_scale = 1/this._transform_scale[i]
+        // PHASE_5 group 6 (L-46): the centre of a bin is the middle of its edges
+        const centres = binCentres(this._bin_edges[i])
         for (let index = 0; index < length; index++) {
           let true_index = ((index%this._strides[i+1])/this._strides[i])|0
           bin_bottom.push(this._bin_edges[i][true_index])
-          bin_center.push(this._range_min[i]+(true_index+.5)*inv_scale)
+          bin_center.push(centres[true_index])
           bin_top.push(this._bin_edges[i][true_index+1])
         }
         this.data["bin_bottom_"+i] = bin_bottom
@@ -213,12 +218,20 @@ export class HistoNdCDS extends ColumnarDataSource {
     for (const column_name of this.sample_variables) {
       sample_array.push(this.source.get_column(column_name)!)
     }
+    // PHASE_5 group 6 (group 2 review G2-S5): the range check names the histogram, the axis, the range, the value
+    // and the tolerance; the bin transform must map the range minimum to bin 0 and the maximum to bin nbins
+    const tolerance = 1e-6
     for(let i=0; i<this._nbins.length; i++){
-      if(Math.abs(this._range_min[i]*this._transform_scale[i]-this._transform_origin[i])>1e-6){
-        throw Error("Assertion error: Range minimum in histogram" + this.name + "is broken")
+      const at_min = this._range_min[i]*this._transform_scale[i]-this._transform_origin[i]
+      const at_max = this._range_max[i]*this._transform_scale[i]-this._transform_origin[i]
+      const range = `[${this._range_min[i]}, ${this._range_max[i]}]`
+      if(!(Math.abs(at_min) <= tolerance)){
+        throw Error(`Histogram "${this.name}", axis ${i}: the range ${range} is broken: its minimum maps to bin ` +
+                    `${at_min}, expected 0 (tolerance 1e-6)`)
       }
-      if(Math.abs(this._range_max[i]*this._transform_scale[i]-this._transform_origin[i] - this._nbins[i])>1e-6){
-        throw Error("Assertion error: Range maximum in histogram" + this.name + "is broken")
+      if(!(Math.abs(at_max - this._nbins[i]) <= tolerance)){
+        throw Error(`Histogram "${this.name}", axis ${i}: the range ${range} is broken: its maximum maps to bin ` +
+                    `${at_max}, expected ${this._nbins[i]} (tolerance 1e-6)`)
       }
     }
     let bincount: number[] = Array(length)
@@ -385,9 +398,9 @@ export class HistoNdCDS extends ColumnarDataSource {
   compute_function(key: string){
     const {histograms, data} = this 
     if(key == "bin_count"){
-      console.time("HistoNdCDS compute_function bin_count")
+      if(ri_debug()) console.time("HistoNdCDS compute_function bin_count")   // PHASE_5 group 6 (G4 b)
       data[key] = this.histogram(this.weights)
-      console.timeEnd("HistoNdCDS compute_function bin_count")
+      if(ri_debug()) console.timeEnd("HistoNdCDS compute_function bin_count")
     } else if(key == "errorbar_high"){
       const bincount = this.get_column("bin_count")!
       const l = this.get_length()
@@ -405,13 +418,13 @@ export class HistoNdCDS extends ColumnarDataSource {
       }
       data[key] = errorbar_edge
     } else if(histograms != null){
-      console.time("HistoNdCDS compute_function " + key)
+      if(ri_debug()) console.time("HistoNdCDS compute_function " + key)
       if(histograms[key] == null){
         data[key] = this.histogram(null)
       } else {
         data[key] = this.histogram(histograms[key].weights)
       }
-      console.timeEnd("HistoNdCDS compute_function " + key)
+      if(ri_debug()) console.timeEnd("HistoNdCDS compute_function " + key)
     }
    this.cached_columns.add(key) 
   }
@@ -426,10 +439,6 @@ export class HistoNdCDS extends ColumnarDataSource {
         if (v < range_min) range_min = v
         if (v > range_max) range_max = v
       }
-    }
-    if(range_min == range_max){
-      range_min -= 1
-      range_max += 1
     }
     if(!isFinite(range_min)){
       range_min = 0
@@ -450,10 +459,6 @@ export class HistoNdCDS extends ColumnarDataSource {
         if (v < range_min) range_min = v
         if (v > range_max) range_max = v
       }
-    }
-    if(range_min == range_max){
-      range_min -= 1
-      range_max += 1
     }
     if(!isFinite(range_min)){
       range_min = 0

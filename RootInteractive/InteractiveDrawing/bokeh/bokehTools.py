@@ -336,6 +336,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             * source
             * plotArray
 
+        PHASE_5 group 6: the full return value is (pAll, the selection source of the last figure's table, plotArray,
+        colorMapperDict, the main table's source, histoList, cdsHistoSummary, [], paramDict, aliasDict, plotDict).
+        The main table's source is None when the page builds no source for the main table (for example a page
+        that only shows other tables of sourceArray, register R-4); callers must not assume it exists.
+
     See example test:
         RootInteractive/InteractiveDrawing/bokeh/test_bokehDrawSA.py
     """
@@ -456,9 +461,20 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
     aliasDict = {None:{}}
     aliasSet = set()
     for i in aliasArray:
+        customJsArgList = {}
+        variableParameters = []
         if isinstance(i, dict):
             variables = i.get("variables", [])
-        customJsArgList = {}
+            # PHASE_5 group 6 (answer G11 a): a variable of a function alias that is a parameter (not a column of the
+            # alias's table, not an alias, not a column selector) takes the parameter's value and follows its widget,
+            # as in an expression alias; before, it was looked up as a column and the page failed with a TypeError
+            if isinstance(variables, list) and ("func" in i or "v_func" in i):
+                variableParameters = [v for v in variables if isinstance(v, str) and v in paramDict
+                                      and "options" not in paramDict[v] and v not in aliasSet
+                                      and not _isTableColumn(cdsDict, i.get("context", None), v)]
+                variables = [v for v in variables if v not in variableParameters]
+                for j in variableParameters:
+                    customJsArgList[j] = paramDict[j]["value"]
         transform = None
         out = None
         if not isinstance(i, dict):
@@ -528,6 +544,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         else:
             parameters = i.get("parameters", None)
             fields = i.get("variables", None)
+            if variableParameters:
+                fields = variables          # PHASE_5 group 6 (G11 a): the parameters are arguments, not columns
             if isinstance(fields, str):
                 if fields in paramDict:
                     # PHASE_5 Batch 3 (A-D3): the alias's own table (before: `context` left over from an earlier alias)
@@ -548,6 +566,14 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform, "param":j}, code="""
             mapper.parameters[param] = this.value
             mapper.update_args()
+                    """)])
+        # PHASE_5 group 6 (G11 a): a parameter among the variables follows its widget; the alias is computed again
+        for j in variableParameters:
+            paramDict[j]["subscribed_events"].append(["value", CustomJS(args={"mapper": transform, "param": j,
+                "table": getOrMakeCdsFull(cdsDict, paramDict, i.get("context", None)), "column_name": i["name"]}, code="""
+            mapper.parameters[param] = this.value
+            mapper.update_args()
+            table.invalidate_column(column_name)
                     """)])
 
     plotArray = []
@@ -1273,7 +1299,6 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             for i, iColumn in sent_data.items():   # PHASE_5 v0.2 (review F2): beyond 2^53 refused, compressed or not
                 checkSafeIntegers(np.asarray(iColumn), i)
             if cdsValue['arrayCompression'] is not None:
-                print("compressCDSPipe")
                 # PHASE_5 Batch 2A (B7, TR-D3): integer columns are never rounded; beyond 2^53 they are refused
                 integerColumns = {i for i, iColumn in sent_data.items() if np.asarray(iColumn).dtype.kind in "iu"}
                 sent_data = {i:removeInt64(iColumn, i) for i, iColumn in sent_data.items()}
@@ -1285,6 +1310,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         cdsCompress0[keyCompressed]["decodeProgram"].insert(0,"base64_decode")
                 cdsOrig.inputData = cdsCompress0
                 cdsOrig.sizeMap = sizeMap
+                # PHASE_5 group 6: the table's own row count; before, the first decoded column set the length, so a
+                # corrupted first column made the good columns be refused
+                cdsOrig.nRows = _tableRowCount(sent_data, cdsValue["data"])
             else:
                 cdsOrig.data = sent_data
         elif cdsValue["type"] in ["histogram", "histo2d", "histoNd"]:
@@ -1586,6 +1614,12 @@ def makeSliderParameters(df: pd.DataFrame, params: list, **kwargs):
             step = (end-start) / options["bins"]
         else:
             step = params[3]
+    elif df is not None and name in df and not _hasFiniteValue(df[name]):
+        # PHASE_5 group 6 (answer G5 a): a table without rows (or a column without a finite value) is a normal state
+        # of an analysis; the automatic slider gets the neutral range 0 to 1. Before, NumPy stopped the page build
+        # with "zero-size array to reduction operation minimum which has no identity".
+        start, end = 0, 1
+        step = (end - start) / options['bins']
     elif (options['type'] == 'auto') or (options['type'] == 'minmax'):
         if df is not None and name in df:
             start = np.nanmin(df[name])
@@ -2397,6 +2431,36 @@ def modify_2d_transform(transform_orig_parsed, transform_orig_js, varY, data_sou
         transform_new.args["options"] = options_new
         transform_orig_js.js_on_change("change", CustomJS(args={"mapper_new": transform_new}, code="mapper_new.args.current = this.args.current; mapper_new.change.emit()"))
         return transform_new
+
+def _hasFiniteValue(column):
+    """True if a numeric column has at least one finite value; columns of other kinds are left to the caller."""
+    values = np.asarray(column)
+    if values.dtype.kind not in "fiub":
+        return values.size > 0
+    return bool(np.isfinite(values).any())
+
+
+def _isTableColumn(cdsDict, table, name):
+    """True if `name` is a column of the table's data (a DataFrame or a dict of columns) - PHASE_5 group 6."""
+    data = (cdsDict.get(table) or {}).get("data", None)
+    if data is None:
+        return False
+    try:
+        return name in data
+    except TypeError:
+        return False
+
+
+def _tableRowCount(sent_data, data):
+    """The number of rows of a table sent with the page (PHASE_5 group 6): the length of its sent columns, which must
+    agree, or the length of the table itself when no column is sent."""
+    lengths = {len(np.asarray(column)) for column in sent_data.values()}
+    if len(lengths) > 1:
+        raise ValueError(f"the columns sent with the page have different lengths: {sorted(lengths)}")
+    if lengths:
+        return lengths.pop()
+    return len(data) if isinstance(data, pd.DataFrame) else 0
+
 
 def declareLegendColumn(cds, column):
     """A legend on a column that the page computes only when it draws (a profile's "weights", a stack's

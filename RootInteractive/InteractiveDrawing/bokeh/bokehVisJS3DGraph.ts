@@ -48,7 +48,7 @@ const OPTIONS = {
 export class BokehVisJSGraph3DView extends LayoutDOMView {
   model: BokehVisJSGraph3D
 
-  private _graph: vis.Graph3d
+  private _graph: vis.Graph3d | null = null
 
   initialize(): void {
     super.initialize()
@@ -71,12 +71,41 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
     // draw to the HTML canvas. In this case though, we use the <div> to attach
     // a Graph3d to the DOM.
     // An empty table: vis.js 4.16.1 stops with "Cannot read properties of null (reading 'length')" when it is
-    // created with an empty data set, and the view was then never connected to its table. Created without data,
-    // it draws nothing and takes the first data that arrive.
-    // Without a colour variable (PHASE_5 Group 4, G3-D1) the points are drawn in the style "dot", coloured by z.
+    // created with an empty data set, and a graph created without data throws "Cannot read properties of undefined
+    // (reading 'x')" at every mouse move or wheel step over it. PHASE_5 group 6 (group 2 review G2-S1): the view is
+    // connected to its table at once, and the vis.js graph is created when the first rows arrive.
     const data = this.get_data()
+    if(data.length > 0){
+      this._create_graph(data)
+    }
+
+    // Set a listener so that when the Bokeh data source has a change
+    // event, we can process the new data
+    this.connect(this.model.data_source.change, () => {
+      const data = this.get_data()
+      if(this._graph == null){
+        if(data.length > 0){
+          this._create_graph(data)
+        }
+        return
+      }
+      // vis.js 4.16.1 ignores an empty data set: it keeps the table it had and draws it again, so the points of the
+      // last selection stayed on the screen. With nothing selected, give it an empty table first; it then draws the
+      // empty graph.
+      const graph = this._graph as unknown as {dataTable?: unknown[] | null}
+      if(data.length === 0){
+        graph.dataTable = []
+      }
+      this._graph.setData(data)
+      this._graph.setOptions(this.model.options3D)
+    })
+
+  }
+
+  private _create_graph(data: vis.DataSet): void {
+    // Without a colour variable (PHASE_5 Group 4, G3-D1) the points are drawn in the style "dot", coloured by z.
     const options = this.model.style == null ? {...OPTIONS, style: 'dot'} : OPTIONS
-    this._graph = new vis.Graph3d(this.shadow_el, data.length > 0 ? data : undefined, options)
+    this._graph = new vis.Graph3d(this.shadow_el, data, options)
     if(this.model.options3D !== null){
       this.model.options3D.xLabel=this.model.x
       this.model.options3D.yLabel=this.model.y
@@ -84,24 +113,6 @@ export class BokehVisJSGraph3DView extends LayoutDOMView {
       this.model.options3D.legendLabel=this.model.style ?? this.model.z
       this._graph.setOptions(this.model.options3D)
     }
-
-    // Set a listener so that when the Bokeh data source has a change
-    // event, we can process the new data
-    this.connect(this.model.data_source.change, () => {
-      const data = this.get_data()
-      // vis.js 4.16.1 ignores an empty data set: it keeps the table it had and draws it again, so the points of the
-      // last selection stayed on the screen. With nothing selected, give it an empty table first; it then draws the
-      // empty graph. A graph that never had data (see _init) is left alone until data arrive.
-      const graph = this._graph as unknown as {dataTable?: unknown[] | null}
-      if(data.length > 0 || graph.dataTable != null){
-        if(data.length === 0){
-          graph.dataTable = []
-        }
-        this._graph.setData(data)
-      }
-      this._graph.setOptions(this.model.options3D)
-    })
-
   }
 
   // This is the callback executed when the Bokeh data has an change. Its basic

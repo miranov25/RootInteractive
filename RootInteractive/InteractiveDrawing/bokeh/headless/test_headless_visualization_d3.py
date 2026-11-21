@@ -32,6 +32,9 @@ build, and the points in the browser) are ordinary tests, the signature a REGRES
     G3-D3  when the table is empty at the moment the page loads, the graph is never created: vis 4.16.1 reads the
            length of a table it did not store, the view's start stops with "Cannot read properties of null (reading
            'length')", and the view never listens to its table; data that arrive later are not shown.
+PHASE_5 group 6 (group 2 review G2-S1): the vis.js graph of such a table is created when its first rows arrive, not
+at load (a graph created without data threw at every mouse move over it). The G3-D3 test below checks that: no graph
+and no error at load, the graph with the rows when they arrive. The drag test is in test_headless_group6_small_fixes.py.
 """
 from __future__ import annotations
 
@@ -772,15 +775,16 @@ def _empty_at_load(headless_session, tmp_path):
     ctx, page = _open_pinned_browser_page(headless_session, _make_direct_visual_page(df.iloc[0:0], tmp_path), res)
     try:
         page.wait_for_function("() => window.vis && typeof window.vis.Graph3d === 'function'", timeout=20000)
-        state = None
-        for _ in range(50):                               # until the view has its graph, or the page reported an error
-            state = page.evaluate(DIRECT_VIEW_JS)
-            if (state and state["graph"]) or res["page_errors"]:
-                break
-            page.wait_for_timeout(100)
+        # PHASE_5 group 6: the view has no vis.js graph until rows arrive; wait until the view exists
+        page.wait_for_function("() => window.__riH && window.Bokeh && Bokeh.index && "
+                               "(Bokeh.index instanceof Map ? Bokeh.index.size : Object.keys(Bokeh.index).length) > 0",
+                               timeout=20000)
+        page.wait_for_timeout(300)
+        state = page.evaluate(DIRECT_VIEW_JS)
         states = [dict(state or {"graph": False}, errors=list(res["page_errors"]))]
-        if state and state["graph"]:
-            states[0]["dots"] = page.evaluate(DOT_PIXELS_JS)
+        if state is not None and not res["page_errors"]:
+            if state["graph"]:
+                states[0]["dots"] = page.evaluate(DOT_PIXELS_JS)
             for rows in (df, df.iloc[0:0], df.iloc[0:0], df):
                 page.evaluate(SET_DIRECT_SOURCE_JS, {k: rows[k].tolist() for k in df.columns})
                 states.append(dict(page.evaluate(DIRECT_VIEW_JS), dots=page.evaluate(DOT_PIXELS_JS),
@@ -798,7 +802,8 @@ def test_strict_a_3d_graph_with_an_empty_table_at_load_is_created_and_shows_late
     regression(len(states) == 1 and states[0]["graph"] is False and states[0]["errors"] == [EMPTY_AT_LOAD_ERROR],
                  f"G3-D3: the view has no vis.Graph3d and the page reports '{EMPTY_AT_LOAD_ERROR}'")
     assert [s["errors"] for s in states] == [[]] * 5, states
-    assert states[0]["graph"] and not states[0]["visCount"] and states[0]["dots"] == 0, states[0]
+    # PHASE_5 group 6 (G2-S1): no vis.js graph at load; it is created when the nine rows arrive
+    assert states[0]["graph"] is False, states[0]
     for i, n in ((1, len(df)), (2, 0), (3, 0), (4, len(df))):
         assert states[i]["visCount"] == n and (states[i]["dots"] > 0) == (n > 0), (i, states[i])
 

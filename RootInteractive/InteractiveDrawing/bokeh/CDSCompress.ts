@@ -2,6 +2,7 @@ import {ColumnDataSource} from "models/sources/column_data_source"
 import * as p from "core/properties"
 
 import {decodeArray} from "./SerializationUtils"
+import {ri_debug} from "./RIDebug"
 declare const  pako : any
 
 export namespace CDSCompress {
@@ -11,6 +12,7 @@ export namespace CDSCompress {
       inputData :    p.Property<any>
       sizeMap :    p.Property<any>
       enableDithering : p.Property<boolean>
+      nRows : p.Property<number>
   }
 }
 
@@ -25,7 +27,7 @@ function collect_column_deps(actionArray: any[]){
     action = action[0]
     if(action === "linear" || action === "sinh"){
       if(actionParams.dither == null || actionParams.dither === "toggle"){
-        console.debug("adding dither toggle dependency")
+        if(ri_debug()) console.debug("adding dither toggle dependency")   // PHASE_5 group 6 (G4 b)
         deps.add("dither")
       }
     }
@@ -46,10 +48,11 @@ export class CDSCompress extends ColumnDataSource {
 
   static {
 
-    this.define<CDSCompress.Props>(({Any, Boolean})=>({
+    this.define<CDSCompress.Props>(({Any, Boolean, Int})=>({
         inputData:    [ Any, {} ],
         sizeMap:    [ Any, {} ],
-        enableDithering: [ Boolean, false ]
+        enableDithering: [ Boolean, false ],
+        nRows: [ Int, -1 ]    // PHASE_5 group 6: the table's own row count, sent by the page builder; -1: unknown
     }))
   }
 
@@ -60,17 +63,34 @@ export class CDSCompress extends ColumnDataSource {
 
   initialize(): void {
     super.initialize()
-    console.info("CDSCompress::initialize")
+    if(ri_debug()) console.info("CDSCompress::initialize")
     this.intermediateData = {}
     this.data = {}
     this.freshColumns = new Set<string>()
     this.invalidateOnDitheringToggle = new Set<string>()
-    this._length = -1
+    // PHASE_5 group 6: the length is the table's own row count when the page builder sends it; before, the first
+    // decoded column set it, so a corrupted first column made every good column be refused
+    this._length = this.nRows >= 0 ? this.nRows : -1
   }
 
   connect_signals(): void {
     super.connect_signals()
     this.connect(this.properties.enableDithering.change, () => this.toggle_dithering())
+    // PHASE_5 group 6 (answer G8 a, register TR-D1): new data replace the old. Every decoded column is dropped, so
+    // it is decoded again from the new data, and the models that read the table recompute on the change signal.
+    // Before, the columns decoded before the replacement kept their old values without a message. New data of
+    // another length must come with their row count (nRows); otherwise every column is refused by its length.
+    this.connect(this.properties.inputData.change, () => this.replace_data())
+    this.connect(this.properties.nRows.change, () => this.replace_data())
+  }
+
+  replace_data() {
+    this.intermediateData = {}
+    this.data = {}
+    this.freshColumns.clear()
+    this.invalidateOnDitheringToggle.clear()
+    this._length = this.nRows >= 0 ? this.nRows : -1
+    this.change.emit()
   }
 
   encode_number_to_column(_key: string, value: number) {

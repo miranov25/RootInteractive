@@ -36,4 +36,3 @@ class BokehVisJSGraph3D(LayoutDOM):
     # the colour variable; None (PHASE_5 Group 4, G3-D1): no colour variable, the points are coloured by z
     style = Nullable(String)
     options3D = Dict(String, Any)
-    print("x", __implementation__)

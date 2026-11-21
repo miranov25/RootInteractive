@@ -40,4 +40,3 @@ class HistogramCDS(ColumnarDataSource):
         """)
     nbins = Int()
 
-    print("x", __implementation__)

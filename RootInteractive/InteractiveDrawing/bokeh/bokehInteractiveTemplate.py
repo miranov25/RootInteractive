@@ -110,17 +110,21 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
     figureGlobalOption["y_transform"]="yAxisTransform"
     figureGlobalOption["z_transform"]="zAxisTransform"
 
+    # PHASE_5 group 6 (answer G6 a): without a normalization the dashboard has no normalized plots; before, the
+    # template stopped with "KeyError: None" here
+    if normalization not in (None, "diff", "ratio", "logRatio"):
+        raise ValueError(f"getDefaultVars: unknown normalization {normalization!r}; use None, 'diff', 'ratio' or 'logRatio'")
     formulaYNorm = {
             "diff":"varY-varYNorm",
             "ratio":"varY/varYNorm",
             "logRatio":"log(varY)-log(varYNorm)"
-            }[normalization]
+            }.get(normalization)
     
     formulaZNorm = {
             "diff":"varZ-varZNorm",
             "ratio":"varZ/varZNorm",
             "logRatio":"log(varZ)-log(varZNorm)"
-            }[normalization]
+            }.get(normalization)
 
     histoArray=[
         {
@@ -242,49 +246,57 @@ def getDefaultVars(normalization=None, variables=None, defaultVariables={}, weig
             "diff":"{varY}-{varYNorm}",
             "ratio":"{varY}/{varYNorm}",
             "logRatio":"log({varY})-log({varYNorm})"
-            }[normalization]
+            }.get(normalization)
 
-    figureArray=[
-        # histo XY
+    # PHASE_5 group 6 (G6 a): the figures are added group by group, so that the layout follows when the normalized
+    # groups are left out; with a normalization the figures and the layout are exactly as before
+    figureArray = []
+    figureLayoutDesc = {}
+
+    def addFigureGroup(layoutName, figures, rows, height):
+        first = len(figureArray)
+        figureArray.extend(figures)
+        figureLayoutDesc[layoutName] = [[first + k for k in row] for row in rows] + [{"plot_height": height}]
+
+    normalized = normalization is not None
+    addFigureGroup("histoXY", [
         [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYData"}],
         [["bin_center_1"], ["bin_count"], { "source":"histoXYData", "colorZvar": "bin_center_0"}],
         [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYData_1","errY":"std/sqrt(entries)"}],
-        # histoXYNorm
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        # histoXYZ
+    ], [[0, 1], [2, 3]], 250)
+    if normalized:
+        addFigureGroup("histoXYNorm", [
+            [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "bin_count", "source":"histoXYNormData","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_1"], ["bin_count"], { "source":"histoXYNormData", "colorZvar": "bin_center_0","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_0"], ["mean","quantile_1",], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_0"], ["std"], { "source":"histoXYNormData_1","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        ], [[0, 1], [2, 3]], 250)
+    addFigureGroup("histoXYZ", [
         [["bin_center_0"], ["mean"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
         [["bin_center_0"], ["entries"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)"}],
         [["bin_center_0"], ["quantile_1"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)"}],
         [["bin_center_0"], ["std"], { "source":"histoXYZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)"}],
-        # histoXYNormZ
-        [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["entries"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
-        # histoXYZNormMedian
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZData_2"}],
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "quantile_1", "source":"histoXYZNormData_2"}],
-        # histoXYZNormMean
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZData_2"}],
-        [[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": "mean", "source":"histoXYZNormData_2"}],
-        #
+    ], [[0, 1], [2, 3]], 250)
+    if normalized:
+        addFigureGroup("histoXYNormZ", [
+            [["bin_center_0"], ["mean"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_0"], ["entries"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"2*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_0"], ["quantile_1"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"3*std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+            [["bin_center_0"], ["std"], { "source":"histoXYNormZData_1","colorZvar":"bin_center_2","errY":"std/sqrt(entries)","yAxisTitle":yAxisTitleNorm}],
+        ], [[0, 1], [2, 3]], 250)
+    # histoXYZNormMedian and histoXYZNormMean: the plain map, and the normalized map next to it
+    for layoutName, statistic in (("histoXYNormZMedian", "quantile_1"), ("histoXYNormZMean", "mean")):
+        maps = [[[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": statistic, "source":"histoXYZData_2"}]]
+        if normalized:
+            maps.append([[("bin_bottom_0", "bin_top_0")], [("bin_bottom_1", "bin_top_1")], {"colorZvar": statistic, "source":"histoXYZNormData_2"}])
+        addFigureGroup(layoutName, maps, [list(range(len(maps)))], 350)
+    figureArray.extend([
         ['descriptionTable', {"name":"description"}],
         ['selectionTable', {"name":"selection"}],
         [['bin_center_0'], ['bin_count'], {"source":"histoXYData", "name":"tex_hack", "xAxisTitle": "$$X_0$$"}],
         figureGlobalOption
-    ]
-    figureLayoutDesc={
-        "histoXY":[[0,1],[2,3],{"plot_height":250}],
-        "histoXYNorm":[[4,5],[6,7],{"plot_height":250}],
-        "histoXYZ":[[8,9],[10,11],{"plot_height":250}],
-        "histoXYNormZ":[[12,13],[14,15],{"plot_height":250}],
-        "histoXYNormZMedian":[[16,17],{"plot_height":350}],
-        "histoXYNormZMean":[[18,19],{"plot_height":350}],
-    }
+    ])
     figureLayoutDesc["selection"] = ["selection", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["description"] = ["description", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
     figureLayoutDesc["ignoreme"] = ["tex_hack", {'plot_height': 200, 'sizing_mode': 'scale_width'}]
@@ -873,7 +885,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "weights": "weightsRef",
             "source": "histoXYData",
             "axis_idx": 1,
-            "quantiles": [0.35,0.5],
+            "quantiles": [0.35,0.5],"unbinned":True,    # PHASE_5 group 6 (G7 a, WR-D1): from the values, as the analysis side
         })
     histoArray.append({
             "name": "projXYNormRef_1",
@@ -881,7 +893,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "weights": "weightsRef",
             "source": "histoXYNormData",
             "axis_idx": 1,
-            "quantiles": [0.35,0.5],
+            "quantiles": [0.35,0.5],"unbinned":True,    # PHASE_5 group 6 (G7 a, WR-D1): from the values, as the analysis side
         })
     histoArray.append({
             "name": "projXYZRef_1",
@@ -889,7 +901,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "weights": "weightsRef",
             "source": "histoXYZData",
             "axis_idx": 1,
-            "quantiles": [0.35,0.5],
+            "quantiles": [0.35,0.5],"unbinned":True,    # PHASE_5 group 6 (G7 a, WR-D1): from the values, as the analysis side
         })
     histoArray.append({
             "name": "projXYNormZRef_1",
@@ -897,7 +909,7 @@ def getDefaultVarsRefWeights(variables=None, defaultVariables={}, weights=None, 
             "weights": "weightsRef",
             "source": "histoXYNormZData",
             "axis_idx": 1,
-            "quantiles": [0.35,0.5],
+            "quantiles": [0.35,0.5],"unbinned":True,    # PHASE_5 group 6 (G7 a, WR-D1): from the values, as the analysis side
         })
     histoArray.append({
             "name": "histoXYData_1_join",

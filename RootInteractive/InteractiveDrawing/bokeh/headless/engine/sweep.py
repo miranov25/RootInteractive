@@ -102,22 +102,30 @@ class Template:
             raise ValueError(f"expected one CDSCompress source in the page, found {len(nodes)}")
         self.columns = [k for k, _ in nodes[0]["attributes"]["inputData"]["entries"]]
         self.compression = [(pat, list(a)) for pat, a in scenario.transport.array_compression]
-        # the template serialised once, split around the two values that change per case (no deep copy per case)
+        # the template serialised once, split around the values that change per case (no deep copy per case):
+        # the compressed columns, their sizes and (PHASE_5 group 6) the table's row count nRows
         marked = copy.deepcopy(self.doc)
         node = _cds_nodes(marked, [])[0]
         node["attributes"]["inputData"], node["attributes"]["sizeMap"] = "@@RI_INPUT@@", "@@RI_SIZE@@"
+        if "nRows" in node["attributes"]:
+            node["attributes"]["nRows"] = "@@RI_NROWS@@"
         text = json.dumps(marked)
-        a, rest = text.split('"@@RI_INPUT@@"')
-        b, c = rest.split('"@@RI_SIZE@@"')
-        self._parts = (a, b, c)
+        marks = sorted((text.index(f'"{m}"'), m) for m in ("@@RI_INPUT@@", "@@RI_SIZE@@", "@@RI_NROWS@@")
+                       if f'"{m}"' in text)
+        parts, start = [], 0
+        for at, m in marks:
+            parts.append((text[start:at], m))
+            start = at + len(m) + 2
+        self._parts, self._tail = parts, text[start:]
 
     def document(self, df: pd.DataFrame) -> str:
         from bokeh.core.serialization import Serializer
         from RootInteractive.Tools.compressArray import compressCDSPipe
         data, size_map = compressCDSPipe(df[self.columns], self.compression, 0)
         enc = Serializer().encode
-        a, b, c = self._parts
-        return a + json.dumps(enc(data)) + b + json.dumps(enc(size_map)) + c
+        values = {"@@RI_INPUT@@": json.dumps(enc(data)), "@@RI_SIZE@@": json.dumps(enc(size_map)),
+                  "@@RI_NROWS@@": json.dumps(len(df))}
+        return "".join(text + values[m] for text, m in self._parts) + self._tail
 
     def equivalent(self, df: pd.DataFrame, path: Path) -> bool:
         """The gate of erratum V-1: the substituted document equals a fresh Python build for the same data."""
