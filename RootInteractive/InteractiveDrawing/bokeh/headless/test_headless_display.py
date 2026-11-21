@@ -1316,7 +1316,6 @@ def _query_not_built(report, state) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="P1-G5c-01: eval with a column named like a word of JavaScript is a SyntaxError")
 @pytest.mark.parametrize("name", ODD_COLUMNS)
 def test_eval_works_on_a_page_with_a_column_named_like_a_word_of_javascript(node_session, tmp_path, name):
     """A page that shows a column named default, static, let or arguments, and the query `return eval("A > 1")`, with
@@ -1327,7 +1326,7 @@ def test_eval_works_on_a_page_with_a_column_named_like_a_word_of_javascript(node
     page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
     _node_set(page, "TextAreaInput", "value", 'return eval("A > 1")')
     state = _hist_state(page)
-    known_defect(_query_not_built(report, state), f"P1-G5c-01: the column {name} breaks the query: {report.page_errors}")
+    regression(_query_not_built(report, state), f"P1-G5c-01: the column {name} breaks the query: {report.page_errors}")
     assert_histogram(df, state, query_oracle("return A > 1"))
     _assert_no_errors(report)
 
@@ -1340,7 +1339,6 @@ TEXT_WITH_ODD_COLUMN = {
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="older: the columns are chosen by a plain search of the text")
 @pytest.mark.parametrize("case", list(TEXT_WITH_ODD_COLUMN))
 def test_a_query_whose_text_contains_the_name_of_such_a_column_works(node_session, tmp_path, case):
     """A page that shows a column named default (or let), and the query `return A > 1 // the default cut` (or
@@ -1353,14 +1351,13 @@ def test_a_query_whose_text_contains_the_name_of_such_a_column_works(node_sessio
     page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
     _node_set(page, "TextAreaInput", "value", text)
     state = _hist_state(page)
-    known_defect(_query_not_built(report, state), f"the column {name} breaks the query {text!r}: {report.page_errors}")
+    regression(_query_not_built(report, state), f"the column {name} breaks the query {text!r}: {report.page_errors}")
     assert_histogram(df, state, query_oracle("return A > 1"))
     _assert_no_errors(report)
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="P1-G5c-01: a function built with such a column is a SyntaxError")
 @pytest.mark.parametrize("name", ODD_COLUMNS + ["n-bins"])
 def test_a_function_using_eval_built_with_such_a_column_works(node_session, tmp_path, name):
     """The model alone, as an alias written in JavaScript may build it: automatic fields A, B and the column `name`,
@@ -1370,7 +1367,7 @@ def test_a_function_using_eval_built_with_such_a_column_works(node_session, tmp_
     failed with a SyntaxError. A name such as n-bins reaches the model only this way; the page builder leaves it out."""
     page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
     got = page.evaluate(BUILD_WITH_ODD_COLUMN, {"name": name})
-    known_defect(got.get("error", "").startswith(ODD_COLUMN_FAILURE), f"P1-G5c-01: the model with {name}: {got}")
+    regression(got.get("error", "").startswith(ODD_COLUMN_FAILURE), f"P1-G5c-01: the model with {name}: {got}")
     assert got == {"fields": ["A", "B"], "scalar": True, "vector": [True, False]}, got
     _assert_no_errors(report)
 

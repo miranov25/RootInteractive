@@ -33,6 +33,7 @@ function is_bindable(name: string): boolean {
 // group 5c: code with the marks <!-- or --> of HTML-like comments) or the code is not valid, the reading is not sure,
 // and every name anywhere in the text counts as used: the function may then be refused by name, never computed with
 // a name that was missed. A function that uses eval or arguments may read any name (group 5c, reads_any_name).
+// Group 5d: such a function gets every column whose name can be a variable (compute_effective_fields).
 // Known extra uses, all on the safe side: object keys ({cut: 1}), labels, and the names that a function declares
 // itself.
 const ID_START = /[\p{ID_Start}$_]/u
@@ -455,12 +456,19 @@ export class CustomJSNAryFunction extends Model {
     // Group 5c (review of group 5b, GPT32.RI and GPT33.RI): a field is given when a body's text contains its name, as
     // before, or when a body uses it written with escapes (\u0041 for A); every field is given to a body that may
     // read any name (eval, arguments). Before, a column written with escapes was not given (ReferenceError).
+    // Group 5d (review of group 5c, P1-G5c-01): a field is given only if its name can be a variable of the function,
+    // by the rule for parameters (is_bindable: a plain ASCII name of strict-mode JavaScript). The page builder gives
+    // automatic fields only such names anyway (RE_VALID_NAME in bokehTools.py), except the words of JavaScript, such
+    // as default, static, let or arguments. A function cannot read such a field as a variable, and building the
+    // function with it failed with a SyntaxError: with every field for eval and arguments (group 5c), and before with
+    // a name merely found in the text, for example the column default and a comment that says default. The refusal
+    // still looks at every field.
     if(!this.auto_fields){
       this.effective_fields = this.fields
       return
     }
     const used = bodies.map((body) => used_names(body))
-    this.effective_fields = this.fields.filter((field) => bodies.some((body, k) =>
+    this.effective_fields = this.fields.filter((field) => is_bindable(field) && bodies.some((body, k) =>
       body.includes(field) || used[k].has(field) || reads_any_name(used[k])))
   }
 
