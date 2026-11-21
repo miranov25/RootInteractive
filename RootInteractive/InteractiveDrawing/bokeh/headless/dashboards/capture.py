@@ -96,6 +96,10 @@ def widget_state(root) -> dict:
 
 
 def main(function: str, rows: int, seed: int, outdir: str, html: bool = True) -> None:
+    # the disk cache of the compiled TypeScript models (compile cache plan v0.1): this child builds the page, so it
+    # must reuse the compilation too; the folder comes from RI_HEADLESS_BUNDLE, inherited from the test
+    from ..engine import compile_cache
+    compile_cache.install()
     out = Path(outdir).resolve()
     out.mkdir(parents=True, exist_ok=True)
     os.chdir(out)                                    # the example's own output_file(...) lands here, not in the repo

@@ -134,6 +134,10 @@ def pytest_configure(config):
     # GPT22) — and inherited by its xdist workers (started after this hook); reports of another session are stale.
     # A test may fix the id only through the explicitly test-only RI_HEADLESS_TEST_SESSION_ID.
     import uuid
+    # the disk cache of the compiled TypeScript models, in this process and every xdist worker (compile cache plan
+    # v0.1): every page build of the run reuses one compilation per unchanged file. RI_COMPILE_CACHE=0 turns it off.
+    from .engine import compile_cache
+    compile_cache.install()
     if not hasattr(config, "workerinput"):
         os.environ["RI_HEADLESS_SESSION"] = os.environ.get("RI_HEADLESS_TEST_SESSION_ID") or uuid.uuid4().hex
     # backend selectors (4.2c-2b v0.2; kept as the approved specification says — their future is a later consensus)

@@ -413,6 +413,13 @@ if [[ ${#TARGETS[@]} -gt 0 ]]; then
             printf "%-22s %8s %6s %6s %7s %8s %11s %7s %4s  %s\n" target selected passed failed skipped test-err collect-err wall_s exit log
         } | tee "$TARGET_SUMMARY"
         all0=$(date +%s.%N)
+        # the disk cache of the compiled TypeScript models (compile cache plan v0.1): fill it once, so no worker of
+        # any target compiles; a failure here only costs time, every process still compiles what it misses
+        if [[ $DRY_RUN -eq 0 && "${RI_COMPILE_CACHE:-1}" != "0" ]]; then
+            RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/$HEADLESS_DIR/_out}" \
+                python3 -m RootInteractive.InteractiveDrawing.bokeh.headless.engine.compile_cache warm 2>&1 \
+                | grep -v '^LOG' | tail -1
+        fi
         for t in "${TARGETS[@]}"; do run_target "$t"; done
         echo "total wall time: $(python3 -c "print(f'{$(date +%s.%N) - $all0:.1f}')") s" | tee -a "$TARGET_SUMMARY"
         if [[ ${#TARGETS[@]} -gt 1 && $DRY_RUN -eq 0 ]]; then                  # tests selected by several targets
