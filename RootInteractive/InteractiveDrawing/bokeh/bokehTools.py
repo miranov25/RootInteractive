@@ -835,7 +835,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 attr = "active" if isinstance(queryParameters[j], bool) else "value"
                 paramDict[j]["subscribed_events"].append([attr, CustomJS(args={"mapper":transform, "param":j, "attr":attr}, code="""
                 mapper.parameters[param] = this[attr]
-                if (mapper.func != null && mapper.func.includes(param)) {
+                if (mapper.uses_parameter(param)) {    // PHASE_5 Group 5c: read as the function reads it
                     mapper.update_args()
                 }
                         """)])

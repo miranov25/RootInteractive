@@ -1147,7 +1147,6 @@ COMPUTED_5C = {
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5b review: a use hidden from group 5b's reading is computed without a message")
 @pytest.mark.parametrize("case", list(HIDDEN_USES_5C))
 def test_a_use_hidden_from_group_5b_reading_is_refused(node_session, tmp_path, case):
     """A parameter A next to the column A, and a query that really uses A in a form of HIDDEN_USES_5C. Decision N1:
@@ -1157,7 +1156,7 @@ def test_a_use_hidden_from_group_5b_reading_is_refused(node_session, tmp_path, c
     page.evaluate(INJECT, {"name": "A"})
     _node_set(page, "TextAreaInput", "value", code)
     state = _hist_state(page)
-    known_defect(not report.console_errors and not report.page_errors,
+    regression(not report.console_errors and not report.page_errors,
                  f"G5b review: the {case} query is computed without a message")
     assert state["mask"] == [False] * N, state["mask"]
     assert not report.page_errors, report.page_errors
@@ -1166,7 +1165,6 @@ def test_a_use_hidden_from_group_5b_reading_is_refused(node_session, tmp_path, c
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5b review: a vector function hiding a use is computed without a message")
 @pytest.mark.parametrize("case", list(HIDDEN_USES_5C))
 def test_a_vector_function_hiding_a_use_from_group_5b_reading_is_refused(node_session, tmp_path, case):
     """The same forms in a vector function, built with the fields A and B and a parameter A: refused by name, NaN for
@@ -1174,7 +1172,7 @@ def test_a_vector_function_hiding_a_use_from_group_5b_reading_is_refused(node_se
     code = HIDDEN_USES_5C[case][1]
     page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
     out = page.evaluate(BUILD_VECTOR, {"code": code, "A": VECTOR_A, "B": VECTOR_B})
-    known_defect(out == [True, False] and not report.console_errors,
+    regression(out == [True, False] and not report.console_errors,
                  f"G5b review: the {case} vector function gives {out} without a message")
     assert out == ["NaN", "NaN"], out
     assert not report.page_errors, report.page_errors
@@ -1200,7 +1198,6 @@ ESCAPED_A_FAILURE = "A is not defined"
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5b review (GPT32.RI, GPT33.RI): a column written with escapes is not given")
 def test_a_column_written_with_escapes_is_given_to_the_query(node_session, tmp_path):
     """The query `return \u0041 > 1` (\u0041 is A) and no parameter A: the column A must be given to the function, and
     the query selects the rows with A > 1. Group 5b chose the columns by a plain search of the text, did not give A,
@@ -1209,7 +1206,7 @@ def test_a_column_written_with_escapes_is_given_to_the_query(node_session, tmp_p
     page, report = _node_page(node_session, tmp_path, "query_parameter", df)
     _node_set(page, "TextAreaInput", "value", "return \\u0041 > 1")
     state = _hist_state(page)
-    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+    regression(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
                  and ESCAPED_A_FAILURE in report.console_errors[0],
                  f"G5b review: the column A is not given: {report.console_errors}")
     assert_histogram(df, state, query_oracle("return A > 1"))
@@ -1218,7 +1215,6 @@ def test_a_column_written_with_escapes_is_given_to_the_query(node_session, tmp_p
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5b review (GPT32.RI): a query that writes its parameter with escapes is stale")
 def test_a_query_that_writes_its_parameter_with_escapes_follows_it(node_session, tmp_path):
     """The query `return A > \u0063ut` (\u0063ut is cut) uses the parameter cut. When the spinner sets cut from 1 to
     3, the query must follow: the rows with A > 3. The page builder decided by a plain search of the text whether a
@@ -1229,7 +1225,7 @@ def test_a_query_that_writes_its_parameter_with_escapes_follows_it(node_session,
     assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=1.))
     _node_set(page, "Spinner", "value", 3., title="cut")
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > cut", cut=1.).tolist() and not report.console_errors,
+    regression(state["mask"] == query_oracle("return A > cut", cut=1.).tolist() and not report.console_errors,
                  "G5b review: the query keeps the selection of cut = 1 without a message")
     assert_histogram(df, state, query_oracle("return A > cut", cut=3.))
     _assert_no_errors(report)
@@ -1237,7 +1233,6 @@ def test_a_query_that_writes_its_parameter_with_escapes_follows_it(node_session,
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT, reason="G5c: eval cannot reach a column whose name is built at run time")
 def test_eval_reads_a_column_whose_name_is_built_at_run_time(node_session, tmp_path):
     """The query `return eval(String.fromCharCode(66) + " > 1")` reads the column B through a name built at run time
     (66 is B), with no name that is both a column and a parameter: the column B must be given to the function, and the
@@ -1247,7 +1242,7 @@ def test_eval_reads_a_column_whose_name_is_built_at_run_time(node_session, tmp_p
     page, report = _node_page(node_session, tmp_path, "query_parameter", df)
     _node_set(page, "TextAreaInput", "value", 'return eval(String.fromCharCode(66) + " > 1")')
     state = _hist_state(page)
-    known_defect(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
+    regression(len(report.console_errors) == 1 and "ReferenceError" in report.console_errors[0]
                  and "B is not defined" in report.console_errors[0],
                  f"G5c: the column B is not given: {report.console_errors}")
     assert_histogram(df, state, B > 1)

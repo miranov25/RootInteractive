@@ -29,17 +29,25 @@ function is_bindable(name: string): boolean {
 // ${...} of a template literal, also written with escapes (\u0041 and \u{41} are the name A). A "/" starts a
 // regular expression where a value is expected (after an operator, "(", ",", a word such as return, or the ")" of
 // if, while, for and with), and is a division after a value. Where JavaScript's rules cannot be decided from the
-// text alone (a "/" after "}", or after the words of, await and yield) or the code is not valid, the reading is not
-// sure, and every name anywhere in the text counts as used: the function may then be refused by name, never computed
-// with a name that was missed. Known extra uses, all on the safe side: object keys ({cut: 1}), labels, and the
-// names that a function declares itself.
+// text alone (a "/" after "}", after the words of, await, yield, break and continue or the label after these two;
+// group 5c: code with the marks <!-- or --> of HTML-like comments) or the code is not valid, the reading is not sure,
+// and every name anywhere in the text counts as used: the function may then be refused by name, never computed with
+// a name that was missed. A function that uses eval or arguments may read any name (group 5c, reads_any_name).
+// Known extra uses, all on the safe side: object keys ({cut: 1}), labels, and the names that a function declares
+// itself.
 const ID_START = /[\p{ID_Start}$_]/u
 const ID_PART = /[\p{ID_Continue}$\u200C\u200D]/u
 const ESCAPE = /\\u(?:([0-9A-Fa-f]{4})|\{([0-9A-Fa-f]+)\})/y
 const ANY_NAME = /(?:[\p{ID_Start}$_]|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})(?:[\p{ID_Continue}$\u200C\u200D]|\\u[0-9A-Fa-f]{4}|\\u\{[0-9A-Fa-f]+\})*/gu
 const REGEX_AFTER_WORD = new Set(["return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case",
-                                  "do", "else", "extends"])
-const UNSURE_AFTER_WORD = new Set(["of", "await", "yield"])
+                                  "do", "else", "extends", "debugger"])
+// Group 5c: after break and continue, and after their label, a "/" on the next line starts a regular expression and
+// on the same line is not valid; the reading is then not sure, on the safe side.
+const UNSURE_AFTER_WORD = new Set(["of", "await", "yield", "break", "continue"])
+// Group 5c (review of group 5b, Claude10.RI F2 and F3): eval reads the function's own variables from a string, whose
+// names may even be built at run time, and arguments reads them by position. A function that uses one of them may
+// read any name: see reads_any_name.
+const READS_ANY_NAME = ["eval", "arguments"]
 const REGEX_AFTER_PAREN_OF = new Set(["if", "while", "for", "with"])
 type Next = "regex" | "division" | "unsure"     // what a "/" means at this point of the code
 
@@ -235,7 +243,8 @@ export function used_names(code: string): Set<string> {
         } else {
           names.add(name)
           word = name
-          next = REGEX_AFTER_WORD.has(name) ? "regex" : UNSURE_AFTER_WORD.has(name) ? "unsure" : "division"
+          next = REGEX_AFTER_WORD.has(name) ? "regex"
+            : UNSURE_AFTER_WORD.has(name) || was_word === "break" || was_word === "continue" ? "unsure" : "division"
         }
         after_dot = false
         continue
@@ -273,11 +282,18 @@ export function used_names(code: string): Set<string> {
     return false
   }
 
+  // Group 5c (review of group 5b, Claude10.RI F1): <!-- anywhere and --> at the start of a line are line comments in
+  // a browser (HTML-like comments of JavaScript); where they may occur, the reading is not sure, on the safe side.
+  if(code.includes("<!--") || code.includes("-->")) unsure = true
   scan(false)
   if(unsure){
     for(const m of code.matchAll(ANY_NAME)) names.add(decode_escapes(m[0]))
   }
   return names
+}
+
+export function reads_any_name(used: Set<string>): boolean {
+  return READS_ANY_NAME.some((name) => used.has(name))
 }
 
 export namespace CustomJSNAryFunction {
@@ -351,7 +367,7 @@ export class CustomJSNAryFunction extends Model {
     // list of fields and one list of arguments, chosen for both bodies; before, the function built last chose them,
     // and with automatic fields the other function could then be called with the columns of the wrong names.
     this.parameter_keys = Object.keys(this.parameters).join("\u0000")
-    this.compute_effective_fields([this.func, this.v_func].filter((body) => body).join("\n"))
+    this.compute_effective_fields([this.func, this.v_func].filter((body): body is string => !!body))
     this.set_args()
     this.refused_func = this.func ? this.refusal(this.func) : null
     this.scalar_func = this.func && this.refused_func == null
@@ -399,10 +415,13 @@ export class CustomJSNAryFunction extends Model {
     // name. A name that is not used (Group 5a, F2: see used_names) changes nothing. Group 5b (G5a-F2-A): the columns
     // are all the fields the function may get, also those that automatic fields leave out because the code writes
     // the name with escapes (\u0041 for A).
+    // Group 5c (review of group 5b): a function that uses eval or arguments may read any name, so every name that is
+    // both a column and a parameter counts as used by it.
     const used = used_names(code)
+    const any = reads_any_name(used)
     const fields = new Set([...(this.fields ?? []), ...(this.effective_fields ?? [])])
     for(const k of Object.keys(this.parameters)){
-      if(!used.has(k)) continue
+      if(!used.has(k) && !(any && fields.has(k))) continue
       if(fields.has(k)){
         console.error(new Error(`CustomJSNAryFunction: the name "${k}" is both a column and a parameter of the ` +
           `function "${code}"; the function is refused and gives NaN; rename the column or the parameter`))
@@ -432,17 +451,29 @@ export class CustomJSNAryFunction extends Model {
       }
   }
 
-  compute_effective_fields(search:string){
+  compute_effective_fields(bodies: string[]){
+    // Group 5c (review of group 5b, GPT32.RI and GPT33.RI): a field is given when a body's text contains its name, as
+    // before, or when a body uses it written with escapes (\u0041 for A); every field is given to a body that may
+    // read any name (eval, arguments). Before, a column written with escapes was not given (ReferenceError).
     if(!this.auto_fields){
       this.effective_fields = this.fields
       return
     }
-    this.effective_fields = []
-    for (const field of this.fields) {
-      if(search.includes(field)){
-        this.effective_fields.push(field)
-      }
-    }
+    const used = bodies.map((body) => used_names(body))
+    this.effective_fields = this.fields.filter((field) => bodies.some((body, k) =>
+      body.includes(field) || used[k].has(field) || reads_any_name(used[k])))
+  }
+
+  uses_parameter(name: string): boolean {
+    // Group 5c (review of group 5b, GPT32.RI): whether a change of the parameter "name" concerns the functions, read
+    // as the refusal reads them (also written with escapes; every name for eval and arguments). The page builder asks
+    // this when a parameter changes; before, it searched the text of the function, and a parameter written with
+    // escapes left the old result in place without a message.
+    return [this.func, this.v_func].some((body) => {
+      if(!body) return false
+      const used = used_names(body)
+      return used.has(name) || reads_any_name(used)
+    })
   }
 
   get_fields():string[]{
