@@ -1334,9 +1334,15 @@ def _unhandled(error) -> str:
 def _query_not_built(report, state, error) -> bool:
     """The signature on a page: the previous selection ("return true": every row) stays, no console error, and one
     page error, the unhandled rejection of exactly `error`, the SyntaxError of building the function (_engine_error).
-    PHASE_5 Group 6 (the review of group 5d, F3): before, any unhandled rejection matched."""
-    return (state["mask"] == [True] * N and not report.console_errors
-            and report.page_errors == [_unhandled(error)])
+    PHASE_5 Group 6 (the review of group 5d, F3): before, any unhandled rejection matched. Since group 6 one console
+    error says that a function cannot be built, with exactly `error`, so the same fault shows in that form: the
+    previous selection stays and the message says that the previous function is kept (F4), or, with no function in
+    force before, no row is selected and the message says that the function is refused."""
+    if (state["mask"] == [True] * N and not report.console_errors
+            and report.page_errors == [_unhandled(error)]):
+        return True
+    return ((state["mask"] == [True] * N and _said_not_built(report, error, KEPT))
+            or (state["mask"] == [False] * N and _refused_not_built(report, error)))
 
 
 @pytest.mark.node_display
@@ -1398,7 +1404,10 @@ def test_a_function_using_eval_built_with_such_a_column_works(node_session, tmp_
     failed with a SyntaxError. A name such as n-bins reaches the model only this way; the page builder leaves it out."""
     page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
     got = page.evaluate(BUILD_WITH_ODD_COLUMN, {"name": name})
-    regression(got.get("error", "").startswith(ODD_COLUMN_FAILURE), f"P1-G5c-01: the model with {name}: {got}")
+    # Group 6: one console error says that a function cannot be built, so the same fault now shows in that form
+    regression(got.get("error", "").startswith(ODD_COLUMN_FAILURE)
+               or any(NOT_BUILT in e and ODD_COLUMN_FAILURE in e for e in report.console_errors),
+               f"P1-G5c-01: the model with {name}: {got} {report.console_errors}")
     assert got == {"fields": ["A", "B"], "scalar": True, "vector": [True, False]}, got
     _assert_no_errors(report)
 
@@ -1473,7 +1482,6 @@ def _refused_not_ascii(report) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 @pytest.mark.parametrize("case", list(TYPING_ERRORS))
 def test_a_query_with_a_typing_error_keeps_the_previous_selection_and_says_why(node_session, tmp_path, case):
     """The user types `return A > 1`, then a query with a typing error (`return A >`, or `return ((A > 1`). The
@@ -1490,9 +1498,9 @@ def test_a_query_with_a_typing_error_keeps_the_previous_selection_and_says_why(n
     assert error is not None and error["name"] == "SyntaxError", error
     _node_set(page, "TextAreaInput", "value", text)
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors
-                 and report.page_errors == [_unhandled(error)],
-                 f"F4: the query {text!r} keeps the previous selection silently: {report.page_errors}")
+    regression(state["mask"] == query_oracle("return A > 1").tolist() and not report.console_errors
+               and report.page_errors == [_unhandled(error)],
+               f"F4: the query {text!r} keeps the previous selection silently: {report.page_errors}")
     assert_histogram(df, state, query_oracle("return A > 1"))
     assert _said_not_built(report, error, KEPT), (report.page_errors, report.console_errors)
 
@@ -1533,7 +1541,6 @@ def test_control_a_valid_query_after_a_typing_error_selects_again(node_session, 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_after_a_typing_error_that_removes_the_parameter_the_kept_query_follows_it(node_session, tmp_path):
     """The page with the parameter cut (a spinner, 1 at load) and the query `return A > cut`; then the user deletes
     the parameter's name, and the text `return A >` cannot be built. The kept query must follow its parameter: with
@@ -1547,16 +1554,15 @@ def test_after_a_typing_error_that_removes_the_parameter_the_kept_query_follows_
     error = _engine_error(page, [], "return A >")
     _node_set(page, "Spinner", "value", 3., title="cut")
     state = _hist_state(page)
-    known_defect(state["mask"] == query_oracle("return A > cut", cut=1.).tolist() and not report.console_errors
-                 and report.page_errors == [_unhandled(error)],
-                 f"F4: the kept query does not follow its parameter: {report.page_errors}")
+    regression(state["mask"] == query_oracle("return A > cut", cut=1.).tolist() and not report.console_errors
+               and report.page_errors == [_unhandled(error)],
+               f"F4: the kept query does not follow its parameter: {report.page_errors}")
     assert_histogram(df, state, query_oracle("return A > cut", cut=3.))
     assert _said_not_built(report, error, KEPT), (report.page_errors, report.console_errors)
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 @pytest.mark.parametrize("name", ["data_source", "$output"])
 def test_a_column_named_like_an_argument_of_the_vector_function_is_refused_by_name(node_session, tmp_path, name):
     """The model alone: automatic columns A and `name` (data_source or $output, the names of the vector function's
@@ -1568,15 +1574,14 @@ def test_a_column_named_like_an_argument_of_the_vector_function_is_refused_by_na
     attrs = {"parameters": {}, "fields": ["A", name], "auto_fields": True,
              "func": 'return eval("A > 1")', "v_func": 'return A.map((a) => eval("a > 1"))'}
     got = page.evaluate(BUILD_MODEL, {"attrs": attrs, "columns": {"A": [3., .5], name: [7., 7.]}})
-    known_defect(got.get("error", "").startswith("SyntaxError") and not report.console_errors,
-                 f"F2: building the model with the column {name} fails: {got}")
+    regression(got.get("error", "").startswith("SyntaxError") and not report.console_errors,
+               f"F2: building the model with the column {name} fails: {got}")
     assert got == {"fields": ["A", name], "scalar": "true", "vector": ["NaN", "NaN"]}, got
     assert _refused_not_built(report, f'the name "{name}" is given to it twice'), report.console_errors
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 @pytest.mark.parametrize("name", ["default", "n-bins"])
 def test_columns_listed_by_hand_whose_names_cannot_be_variables_are_refused_by_name(node_session, tmp_path, name):
     """The model alone, with its columns listed by hand (no automatic columns): A and `name`, and the function
@@ -1588,15 +1593,14 @@ def test_columns_listed_by_hand_whose_names_cannot_be_variables_are_refused_by_n
     assert error is not None and error["name"] == "SyntaxError", error
     attrs = {"parameters": {}, "fields": ["A", name], "auto_fields": False, "func": "return A > 1"}
     got = page.evaluate(BUILD_MODEL, {"attrs": attrs, "columns": {"A": [3., .5], name: [7., 7.]}})
-    known_defect(got == {"error": f"{error['name']}: {error['message']}"} and not report.console_errors,
-                 f"F5: building the model with the column {name} listed by hand fails: {got}")
+    regression(got == {"error": f"{error['name']}: {error['message']}"} and not report.console_errors,
+               f"F5: building the model with the column {name} listed by hand fails: {got}")
     assert got == {"fields": ["A", name], "scalar": "NaN"}, got
     assert _refused_not_built(report, error), report.console_errors
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 @pytest.mark.parametrize("auto_fields", [True, False], ids=["automatic", "by_hand"])
 def test_a_function_that_uses_a_column_whose_name_is_not_plain_ascii_is_refused_by_name(node_session, tmp_path,
                                                                                          auto_fields):
@@ -1611,15 +1615,14 @@ def test_a_function_that_uses_a_column_whose_name_is_not_plain_ascii_is_refused_
     got = page.evaluate(BUILD_MODEL, {"attrs": attrs, "columns": {"A": [3., .5], NON_ASCII: [2., .5]}})
     before = ({"error": f"ReferenceError: {NON_ASCII} is not defined"} if auto_fields
               else {"fields": ["A", NON_ASCII], "scalar": "true"})
-    known_defect(got == before and not report.console_errors,
-                 f"F1: the column {NON_ASCII} is used without a refusal: {got}")
+    regression(got == before and not report.console_errors,
+               f"F1: the column {NON_ASCII} is used without a refusal: {got}")
     assert got == {"fields": ["A"] if auto_fields else ["A", NON_ASCII], "scalar": "NaN"}, got
     assert _refused_not_ascii(report), report.console_errors
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_query_that_uses_a_column_whose_name_is_not_plain_ascii_is_refused_on_a_page(node_session, tmp_path):
     """A page that shows the column sigma-cut, and the query `return sigma-cut > 1`. The query must be refused by
     name: it selects no row, there is no page error, and one console error names the column and the rule. Before, the
@@ -1629,9 +1632,9 @@ def test_a_query_that_uses_a_column_whose_name_is_not_plain_ascii_is_refused_on_
     page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
     _node_set(page, "TextAreaInput", "value", f"return {NON_ASCII} > 1")
     state = _hist_state(page)
-    known_defect(state["mask"] == [True] * N and not report.page_errors
-                 and report.console_errors == [f"ReferenceError: {NON_ASCII} is not defined"],
-                 f"F1: the query uses the column {NON_ASCII} without a refusal: {report.console_errors}")
+    regression(state["mask"] == [True] * N and not report.page_errors
+               and report.console_errors == [f"ReferenceError: {NON_ASCII} is not defined"],
+               f"F1: the query uses the column {NON_ASCII} without a refusal: {report.console_errors}")
     assert_histogram(df, state, [False] * N)
     assert _refused_not_ascii(report), (report.page_errors, report.console_errors)
 

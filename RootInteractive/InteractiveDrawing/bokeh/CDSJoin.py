@@ -20,4 +20,3 @@ class CDSJoin(ColumnarDataSource):
     prefix_right = String(help="Prefix to use for columns in the right column data source")
     how = String(default="inner")
     tolerance = Float(default=1e-5)
-    print("Import ", __implementation__)

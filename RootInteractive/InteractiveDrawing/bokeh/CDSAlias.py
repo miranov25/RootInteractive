@@ -18,4 +18,3 @@ class CDSAlias(ColumnarDataSource):
     includeOrigColumns=Bool()
     columnDependencies=List(Instance(Model), help="Hacky way of improving performance and fixing a weird serialization bug")
     wasmModule=String()
-    print("Import ", __implementation__)

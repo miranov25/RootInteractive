@@ -23,4 +23,3 @@ class DownsamplerCDS(ColumnarDataSource):
     # or a stack's "_source_index". The page builder declares a legend's column here, so that Bokeh's legend checks
     # find it: in Python (LegendItem reads source.column_names) and when the page loads (DownsamplerCDS.ts columns()).
     column_names = List(String)
-    print("Import ", __implementation__)

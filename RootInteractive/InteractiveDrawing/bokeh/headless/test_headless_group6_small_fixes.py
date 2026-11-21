@@ -23,7 +23,6 @@ the items "settled without your answer" of the same document):
   PRINTS-2  (the group 6b commits, Claude21.RI) five more modules printed "Import  <file>.ts" when imported (CDSAlias.py,
             CDSCompress.py, CDSJoin.py, CDSStack.py, DownsamplerCDS.py), and the page builder printed the number of
             options of a selection widget (a select widget, and a multi-select widget with 31 options or more).
-            This one is not fixed yet: its test is a strict expected failure.
   LENGTH    the length of a compressed table came from whichever column was decoded first, so a corrupted first
             column made every good column be refused. The length is now the table's own row count, sent with the page.
   G5        a table without rows and an automatic slider stopped the page build with an unnamed NumPy error. Answer
@@ -56,18 +55,6 @@ def regression(condition: bool, message: str) -> None:
     """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
         raise AssertionError("REGRESSION, a fixed defect is back: " + message)
-
-
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect (PRINTS-2, not fixed yet)."""
-
-
-def known_defect(condition: bool, message: str) -> None:
-    if condition:
-        raise KnownDefect(message)
-
-
-STRICT = dict(strict=True, raises=KnownDefect)
 
 UNIT = pytest.mark.headless_unit
 BOKEH_DIR = Path(__file__).resolve().parent.parent
@@ -423,7 +410,6 @@ sa.bokehDrawSA.fromArray(df, None, [[["A"], ["B"]]], [["select", ["k"]], ["multi
 
 
 @UNIT
-@pytest.mark.xfail(**STRICT)
 def test_prints_no_import_line_and_no_number_of_options_when_a_page_is_built():
     """PRINTS-2: importing the page builder and building a page with a select widget (3 options) and a multi-select
     widget (40 options) prints nothing but the marker "=== build". Before, five modules printed "Import  <file>.ts" at
@@ -434,9 +420,9 @@ def test_prints_no_import_line_and_no_number_of_options_when_a_page_is_built():
     lines = r.stdout.splitlines()
     assert "=== build" in lines
     debug = [s for s in lines if re.fullmatch(r"Import\s+\S+\.ts|\d+", s)]
-    known_defect(sorted(debug) == ["3", "40", "Import  CDSAlias.ts", "Import  CDSCompress.ts", "Import  CDSJoin.ts",
-                                   "Import  CDSStack.ts", "Import  DownsamplerCDS.ts"],
-                 f"PRINTS-2: the debug lines {debug}")
+    regression(sorted(debug) == ["3", "40", "Import  CDSAlias.ts", "Import  CDSCompress.ts", "Import  CDSJoin.ts",
+                                 "Import  CDSStack.ts", "Import  DownsamplerCDS.ts"],
+               f"PRINTS-2: the debug lines {debug}")
     assert debug == [], debug
 
 

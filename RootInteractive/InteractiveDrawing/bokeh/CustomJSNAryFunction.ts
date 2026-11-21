@@ -6,11 +6,16 @@ import * as p from "core/properties"
 // Before, every such name of the page broke the text query, even when the query did not use it. A name must be plain
 // ASCII (the Architect's rule of 2026-11-18; the page builder refuses other parameter names), and the JavaScript
 // engine itself decides, once per name. A function that uses such a name is refused by name (refusal, Group 5a).
+// PHASE_5 Group 6 (the review of group 5d, F1; the Architect, 2026-11-21: "Column names has to be plain ascii. We
+// should force it."): the same rule holds for columns, and a function that uses a column whose name is not plain
+// ASCII, such as σcut, is refused by name (refusal). Before, such a column was left out, and the function failed with
+// a ReferenceError.
+const ASCII_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 const bindable_names = new Map<string, boolean>()
 function is_bindable(name: string): boolean {
   let ok = bindable_names.get(name)
   if(ok === undefined){
-    ok = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)
+    ok = ASCII_NAME.test(name)
     if(ok){
       try {
         new Function(name, '"use strict";')
@@ -22,6 +27,34 @@ function is_bindable(name: string): boolean {
   }
   return ok
 }
+
+// PHASE_5 Group 6 (the review of group 5d: Claude10.RI F1; GPT33.RI's summary F2, F4 and F5): a function that
+// JavaScript cannot build. The causes: a typing error in the code (a text query typed by the user); a name given twice
+// (a column or a parameter named data_source or $output, the arguments of the vector function, or a column listed
+// twice); a column listed by hand whose name cannot be a variable. Before, the error left build() and the only sign
+// was an unhandled rejection in the page. Now one console error says why, and build() decides what happens: the
+// functions in force before stay in force (F4, a text query keeps its previous selection), or, when there are none,
+// the function is refused and gives NaN. Returns the function, or the cause as a text.
+function build_function(names: string[], body: string): Function | string {
+  const twice = names.find((name, k) => names.indexOf(name) !== k)
+  let cause: string
+  if(twice !== undefined){
+    cause = `the name "${twice}" is given to it twice (a column or a parameter named data_source or $output, ` +
+      `the arguments of the vector function, or a column listed twice)`
+  } else {
+    try {
+      return new Function(...names, '"use strict";\n' + body)
+    } catch(error) {
+      cause = String(error)
+    }
+  }
+  return cause
+}
+
+// Group 6 (F4): what build() made from the bodies func and v_func, kept while a later body cannot be built
+type InForce = {func: string | null, v_func: string | null, parameter_keys: string, effective_fields: Array<string>,
+                scalar_func: Function | null, vector_func: Function | null,
+                refused_func: string | null, refused_vfunc: string | null}
 
 // PHASE_5 Group 5b (review findings G5a-F2-A and G5a-F2-B): the names that a function's code uses as variables, read
 // with the lexical rules of JavaScript. Not a use: the text of comments, of strings, of template literals and of
@@ -339,9 +372,14 @@ export class CustomJSNAryFunction extends Model {
   args_keys: Array<string>
   args_values: Array<any>
 
-  // the name for which the scalar or the vector function is refused (PHASE_5 Groups 5 and 5a), or null
+  // the name for which the scalar or the vector function is refused (PHASE_5 Groups 5 and 5a), or why it cannot be
+  // built (Group 6), or null
   refused_func: string | null
   refused_vfunc: string | null
+
+  // Group 6 (F4): the functions in force, or undefined before a build in which every function could be built. Declared
+  // only, with no value here: Bokeh builds the model from its constructor, before a class field would be set.
+  in_force: InForce | undefined
 
   // the names of the parameters when the functions were last built (Group 5a, F3; Group 5b: built together)
   parameter_keys: string
@@ -370,13 +408,54 @@ export class CustomJSNAryFunction extends Model {
     this.parameter_keys = Object.keys(this.parameters).join("\u0000")
     this.compute_effective_fields([this.func, this.v_func].filter((body): body is string => !!body))
     this.set_args()
+    // Group 6: a function that JavaScript cannot build (build_function)
+    const kept = this.in_force
+    const names = [...this.args_keys, ...this.effective_fields]
+    const not_built: Array<[string, string]> = []       // the body, and why it cannot be built
     this.refused_func = this.func ? this.refusal(this.func) : null
-    this.scalar_func = this.func && this.refused_func == null
-      ? new Function(...this.args_keys, ...this.effective_fields, '"use strict";\n'+this.func) : null
+    this.scalar_func = null
+    if(this.func && this.refused_func == null){
+      const built = build_function(names, this.func)
+      if(typeof built === "string"){
+        this.refused_func = built
+        not_built.push([this.func, built])
+      } else this.scalar_func = built
+    }
     this.refused_vfunc = this.v_func ? this.refusal(this.v_func) : null
-    this.vector_func = this.v_func && this.refused_vfunc == null
-      ? new Function(...this.args_keys, ...this.effective_fields, "data_source", "$output", '"use strict";\n'+this.v_func)
-      : null
+    this.vector_func = null
+    if(this.v_func && this.refused_vfunc == null){
+      const built = build_function([...names, "data_source", "$output"], this.v_func)
+      if(typeof built === "string"){
+        this.refused_vfunc = built
+        not_built.push([this.v_func, built])
+      } else this.vector_func = built
+    }
+    // Group 6 (F4, the Architect, 2026-11-21: "Keep the previous selections."): when a body cannot be built, the
+    // functions in force before stay in force, with their columns, and follow their parameters; a text query keeps its
+    // previous selection. One console error says why. With no functions in force before (a model whose first build
+    // fails), or with parameters of other names, the function is refused by name, as rule N1 refuses a shared name:
+    // NaN for every row (a query then selects nothing). A function refused by N1 is built as before, and is in force.
+    if(not_built.length > 0 && kept !== undefined && kept.parameter_keys === this.parameter_keys){
+      this.effective_fields = kept.effective_fields
+      this.scalar_func = kept.scalar_func
+      this.vector_func = kept.vector_func
+      this.refused_func = kept.refused_func
+      this.refused_vfunc = kept.refused_vfunc
+      this.set_args()
+      for(const [body, cause] of not_built)
+        console.error(new Error(`CustomJSNAryFunction: a function cannot be built: ${cause}; the previous function ` +
+          `is kept, and the result does not change; the function: "${body}"; the previous: ` +
+          `"${body === this.v_func ? kept.v_func : kept.func}"`))
+      return
+    }
+    for(const [body, cause] of not_built)
+      console.error(new Error(`CustomJSNAryFunction: a function cannot be built: ${cause}; it is refused and gives ` +
+        `NaN; the function: "${body}"`))
+    if(not_built.length === 0)
+      this.in_force = {func: this.func, v_func: this.v_func, parameter_keys: this.parameter_keys,
+                       effective_fields: this.effective_fields, scalar_func: this.scalar_func,
+                       vector_func: this.vector_func, refused_func: this.refused_func,
+                       refused_vfunc: this.refused_vfunc}
     this.change.emit()
   }
 
@@ -435,6 +514,17 @@ export class CustomJSNAryFunction extends Model {
         return k
       }
     }
+    // Group 6 (F1, the Architect, 2026-11-21: column names are plain ASCII, and this is enforced): a function that
+    // uses a column whose name is not plain ASCII, such as σcut, is refused by name. The page builder lists such a
+    // column for a function with automatic columns only for this check (bokehTools.py); it is never given to it.
+    for(const field of this.fields ?? []){
+      if(used.has(field) && !ASCII_NAME.test(field)){
+        console.error(new Error(`CustomJSNAryFunction: the column "${field}" cannot be used in the function ` +
+          `"${code}": a column used in a function needs a plain ASCII name; the function is refused and gives NaN; ` +
+          `rename the column`))
+        return field
+      }
+    }
     return null
   }
 
@@ -463,6 +553,9 @@ export class CustomJSNAryFunction extends Model {
     // function with it failed with a SyntaxError: with every field for eval and arguments (group 5c), and before with
     // a name merely found in the text, for example the column default and a comment that says default. The refusal
     // still looks at every field.
+    // Group 6: fields listed by hand are all given, by position, and a function that cannot then be built is refused
+    // by name (build_function). An automatic field whose name is not plain ASCII is never given; a function that uses
+    // such a column, automatic or listed by hand, is refused by name (refusal, F1).
     if(!this.auto_fields){
       this.effective_fields = this.fields
       return
@@ -477,7 +570,9 @@ export class CustomJSNAryFunction extends Model {
     // as the refusal reads them (also written with escapes; every name for eval and arguments). The page builder asks
     // this when a parameter changes; before, it searched the text of the function, and a parameter written with
     // escapes left the old result in place without a message.
-    return [this.func, this.v_func].some((body) => {
+    // Group 6 (F4): the bodies of the functions in force, which are kept while a later body cannot be built
+    const bodies = this.in_force !== undefined ? [this.in_force.func, this.in_force.v_func] : [this.func, this.v_func]
+    return bodies.some((body) => {
       if(!body) return false
       const used = used_names(body)
       return used.has(name) || reads_any_name(used)

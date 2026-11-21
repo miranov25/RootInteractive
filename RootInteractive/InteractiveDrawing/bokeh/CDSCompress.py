@@ -17,4 +17,3 @@ class CDSCompress(ColumnDataSource):
     sizeMap=Dict(String, Any)
     enableDithering=Bool(False, help="Enable dithering for the compressed data. False = no dithering, True = dithering enabled")
     nRows=Int(-1, help="The number of rows of the table (PHASE_5 group 6); -1: unknown, the first decoded column sets it")
-    print("Import ", __implementation__)

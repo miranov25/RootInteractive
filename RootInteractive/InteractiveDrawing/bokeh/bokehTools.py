@@ -1332,7 +1332,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         weakAll = []
         for key, value in memoized_columns[cdsKey].items():
             columnKey = value["name"]
-            if re.match(RE_VALID_NAME, columnKey):
+            # PHASE_5 Group 6 (F1, the Architect, 2026-11-21: column names are plain ASCII, and this is enforced): a
+            # column whose name is a variable name but not plain ASCII, such as sigma-cut, is listed too, so that a
+            # function which uses it is refused by name (CustomJSNAryFunction); the function never gets it. Before, it
+            # was left out, and such a function failed with a ReferenceError. Pages without such columns are unchanged.
+            if re.match(RE_VALID_NAME, columnKey) or (columnKey.isidentifier() and not columnKey.isascii()):
                 if (cdsKey, columnKey) in sources:
                     weakAll.append(columnKey)
                 elif cdsKey in aliasDict and columnKey in aliasDict[cdsKey] and aliasDict[cdsKey][columnKey].get("fields", []) is not None:
@@ -1696,7 +1700,6 @@ def makeBokehSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, defau
     mapping = {}
     for i, val in enumerate(optionsPlot):
         mapping[val] = i
-    print(len(optionsPlot))
     filterLocal = MultiSelectFilter(selected=[optionsPlot[default_value]], field=params[0]+".factor()", how="whitelist", mapping=mapping)
     widget_local.js_on_change("value", CustomJS(args={"target":filterLocal}, code=js_callback_code))
     newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}
@@ -1741,7 +1744,6 @@ def makeBokehMultiSelectWidget(df: pd.DataFrame, params: list, paramDict: dict, 
         mapping = {}
         for i, val in enumerate(optionsPlot):
             mapping[val] = i
-        print(len(optionsPlot))
         filterLocal = MultiSelectFilter(selected=optionsPlot, field=params[0]+".factor()", how="whitelist", mapping=mapping)
         widget_local.js_link("value", filterLocal, "selected")
         newColumn = {"name": params[0]+".factor()", "type": "server_derived_column", "value": codes.astype(np.int32)}

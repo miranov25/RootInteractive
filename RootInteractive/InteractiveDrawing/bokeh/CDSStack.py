@@ -14,4 +14,3 @@ class CDSStack(ColumnarDataSource):
     sources = List(Instance(ColumnarDataSource))
     mapping = Dict(String, Int)
     activeSources = List(String, help="selected data sources")
-    print("Import ", __implementation__)
