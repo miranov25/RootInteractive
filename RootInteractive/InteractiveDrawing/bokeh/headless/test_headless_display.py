@@ -88,6 +88,9 @@ RANGES = ((0., 4.), (0., 3.))
 HIST_PROBES = [["h", "bin_count", ["HistoNdCDS"]]]
 # PHASE_5 Group 5 (G4-P1-A): parameter names that cannot be variables of strict-mode JavaScript
 ODD_NAMES = ["default", "static", "eval", "class", "n-bins"]
+# PHASE_5 Group 5d (review of group 5c, P1-G5c-01): column names that cannot be variables of strict-mode JavaScript.
+# The page builder gives a query only the columns with a plain name, so on a page they are words of JavaScript.
+ODD_COLUMNS = ["default", "static", "let", "arguments"]
 NON_ASCII = "\u03c3cut"   # sigma-cut: not plain ASCII (Group 5a, F1)
 CLASH_CUT = np.array([0., 5.] * (N // 2))   # the column named like the parameter `cut` (G4-POL-1, decision N1)
 
@@ -180,7 +183,7 @@ def _from_array(kind, df, **settings):
     extra = {}
     aliases = []
     if kind in {"query", "query_toggle", "query_parameter", "query_parameter_alias", "query_toggle_shown",
-                "query_alone", "query_odd_names", "query_clash", "query_non_ascii"}:
+                "query_alone", "query_odd_names", "query_clash", "query_non_ascii", "query_odd_column"}:
         widgets = [["textQuery", {"source": None, "name": "text_query", "value": "return true",
                                   **({"toggleable": True} if kind in ("query_toggle", "query_toggle_shown",
                                                                        "query_alone") else {})}]]
@@ -192,7 +195,7 @@ def _from_array(kind, df, **settings):
         if kind in ("query_toggle", "query_toggle_shown"):
             # WG-D1's healthy page requires a second active filter.
             widgets.append(["range", ["gate", -2., 2.]])
-        if kind in ("query_parameter", "query_parameter_alias", "query_odd_names", "query_clash"):
+        if kind in ("query_parameter", "query_parameter_alias", "query_odd_names", "query_clash", "query_odd_column"):
             widgets.append(["spinner", ["cut"]])
             params = [{"name": "cut", "value": 1., "range": [0., 4.], "step": 1.}]
         if kind == "query_odd_names":
@@ -207,7 +210,10 @@ def _from_array(kind, df, **settings):
             [["bin_center_0"], ["bin_count"], {"source": "h"}],
             # Request both query-only columns through the real source graph;
             # a query typed later cannot itself inform initial column loading.
-            [["A"], ["B"] + (["cut"] if kind == "query_clash" else []), {"visualization_type": "scatter"}],
+            [["A"], ["B"] + (["cut"] if kind == "query_clash" else [])
+             # PHASE_5 Group 5d: the page shows the column with a name of ODD_COLUMNS, so the query is given it
+             + ([c for c in df.columns if c in ODD_COLUMNS] if kind == "query_odd_column" else []),
+             {"visualization_type": "scatter"}],
         ]
         extra["layout"] = [[0, 1]]
         extra["sourceArray"] = [{"name": "h", "variables": ["x", "y"],
@@ -1136,6 +1142,12 @@ HIDDEN_USES_5C = {
 }
 # The same forms without a name that is both a column and a parameter (the query uses B, the page has the parameter
 # cut): computed as before, nothing logged. eval and arguments refuse only where some name is both.
+# PHASE_5 Group 5d (GPT32.RI, P2-G5c-03): the selection that group 5b computed for each form, without a message,
+# measured with group 5b's reader: with the column A (A > 1); for the name built at run time with the parameter A
+# (100 > 1, every row); for arguments[0] with the first parameter, cut (1 > 1, no row).
+GROUP_5B_SELECTION = {case: query_oracle("return A > 1").tolist() for case in HIDDEN_USES_5C}
+GROUP_5B_SELECTION["eval_name_built_at_run_time"] = [True] * N
+GROUP_5B_SELECTION["arguments"] = [False] * N
 COMPUTED_5C = {
     "html_open_comment": "const t = 1 <!-- /*\nreturn B > 1 // */",
     "eval": 'return eval("B > 1")',
@@ -1156,8 +1168,8 @@ def test_a_use_hidden_from_group_5b_reading_is_refused(node_session, tmp_path, c
     page.evaluate(INJECT, {"name": "A"})
     _node_set(page, "TextAreaInput", "value", code)
     state = _hist_state(page)
-    regression(not report.console_errors and not report.page_errors,
-                 f"G5b review: the {case} query is computed without a message")
+    regression(state["mask"] == GROUP_5B_SELECTION[case] and not report.console_errors and not report.page_errors,
+                 f"G5b review: the {case} query selects as group 5b did, without a message")
     assert state["mask"] == [False] * N, state["mask"]
     assert not report.page_errors, report.page_errors
     assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
@@ -1262,6 +1274,120 @@ def test_control_a_query_reading_its_parameter_through_eval_follows_it(node_sess
     _node_set(page, "Spinner", "value", 3., title="cut")
     assert_histogram(df, _hist_state(page), query_oracle("return A > cut", cut=3.))
     _assert_no_errors(report)
+
+
+# PHASE_5 Group 5d (the review of group 5c, finding P1-G5c-01 of GPT32.RI, reproduced by GPT33.RI): a column whose
+# name cannot be a variable of strict-mode JavaScript, such as default, static, let, arguments or n-bins. Group 5c
+# gives every column to a function that uses eval or arguments, so it built the function with such a column as a
+# variable, and JavaScript refused to build it with a SyntaxError. On a page the query then kept its previous
+# selection; the only sign was an unhandled rejection of the error in the page (its text depends on the name and on
+# the JavaScript engine). Before group 5c the same happened to any function whose text merely contains such a name,
+# for example in a comment, because the columns were chosen by a plain search of the text. "Before" = group 5c.
+ODD_COLUMN_FAILURE = "SyntaxError"
+UNHANDLED = "unhandled rejection"
+BUILD_WITH_ODD_COLUMN = """a => {
+  const q = window.__riH.models().filter(m => m.type === 'CustomJSNAryFunction' && m.func === 'return true');
+  if (q.length !== 1) throw Error('query function: ' + q.length);
+  try {
+    const m = new q[0].constructor({parameters: {}, fields: ["A", "B", a.name], auto_fields: true,
+                                    func: 'return eval("A > 1")', v_func: 'return B.map((b, i) => eval("A[i] > 1"))'});
+    const fields = m.get_fields();
+    const column = {A: [3., .5], B: [2., 2.], [a.name]: [7., 7.]};
+    return {fields, scalar: m.compute(fields.map(f => column[f][0])),
+            vector: Array.from(m.v_compute(fields.map(f => column[f]), null))};
+  } catch (error) {
+    return {error: String(error)};
+  }
+}"""
+
+
+def _odd_column_frame(name):
+    df = frame()
+    df[name] = B * 1.
+    return df
+
+
+def _query_not_built(report, state) -> bool:
+    """The signature on a page: the previous selection ("return true": every row) stays, no console error, and one
+    page error, the unhandled rejection of the SyntaxError."""
+    return (state["mask"] == [True] * N and not report.console_errors and len(report.page_errors) == 1
+            and report.page_errors[0].startswith(UNHANDLED))
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="P1-G5c-01: eval with a column named like a word of JavaScript is a SyntaxError")
+@pytest.mark.parametrize("name", ODD_COLUMNS)
+def test_eval_works_on_a_page_with_a_column_named_like_a_word_of_javascript(node_session, tmp_path, name):
+    """A page that shows a column named default, static, let or arguments, and the query `return eval("A > 1")`, with
+    no name that is both a column and a parameter. The query must select the rows with A > 1, and nothing is logged.
+    Group 5c gave the function every column of the page, also that one, and the function could not be built: the
+    previous selection (every row) stayed, with no console error and one page error, the unhandled SyntaxError."""
+    df = _odd_column_frame(name)
+    page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
+    _node_set(page, "TextAreaInput", "value", 'return eval("A > 1")')
+    state = _hist_state(page)
+    known_defect(_query_not_built(report, state), f"P1-G5c-01: the column {name} breaks the query: {report.page_errors}")
+    assert_histogram(df, state, query_oracle("return A > 1"))
+    _assert_no_errors(report)
+
+
+TEXT_WITH_ODD_COLUMN = {
+    "default_in_a_comment": ("default", "return A > 1 // the default cut"),
+    "let_inside_a_word": ("let", "return A > 1 // a complete selection"),
+}
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="older: the columns are chosen by a plain search of the text")
+@pytest.mark.parametrize("case", list(TEXT_WITH_ODD_COLUMN))
+def test_a_query_whose_text_contains_the_name_of_such_a_column_works(node_session, tmp_path, case):
+    """A page that shows a column named default (or let), and the query `return A > 1 // the default cut` (or
+    `// a complete selection`, which contains "let"). The query does not use the column; it must select the rows with
+    A > 1, and nothing is logged. Since the columns were chosen by a plain search of the text (before group 5c, and in
+    group 5c too), the function was given that column, and could not be built: the previous selection (every row)
+    stayed, with no console error and one page error, the unhandled SyntaxError."""
+    name, text = TEXT_WITH_ODD_COLUMN[case]
+    df = _odd_column_frame(name)
+    page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
+    _node_set(page, "TextAreaInput", "value", text)
+    state = _hist_state(page)
+    known_defect(_query_not_built(report, state), f"the column {name} breaks the query {text!r}: {report.page_errors}")
+    assert_histogram(df, state, query_oracle("return A > 1"))
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT, reason="P1-G5c-01: a function built with such a column is a SyntaxError")
+@pytest.mark.parametrize("name", ODD_COLUMNS + ["n-bins"])
+def test_a_function_using_eval_built_with_such_a_column_works(node_session, tmp_path, name):
+    """The model alone, as an alias written in JavaScript may build it: automatic fields A, B and the column `name`,
+    the scalar function `return eval("A > 1")` and the vector function `return B.map((b, i) => eval("A[i] > 1"))`. It
+    must be built and get the fields A and B; with A = 3 the scalar function gives true, and with A = [3, 0.5] the
+    vector function gives [true, false]. Group 5c gave both functions the column `name` too, and building the model
+    failed with a SyntaxError. A name such as n-bins reaches the model only this way; the page builder leaves it out."""
+    page, report = _node_page(node_session, tmp_path, "query_parameter", frame())
+    got = page.evaluate(BUILD_WITH_ODD_COLUMN, {"name": name})
+    known_defect(got.get("error", "").startswith(ODD_COLUMN_FAILURE), f"P1-G5c-01: the model with {name}: {got}")
+    assert got == {"fields": ["A", "B"], "scalar": True, "vector": [True, False]}, got
+    _assert_no_errors(report)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_control_a_shared_name_is_refused_on_a_page_with_such_a_column(node_session, tmp_path):
+    """The control, right before and after the fix: a page that shows a column named default, a parameter A next to
+    the column A, and the query `return eval("A > 1")`. Decision N1: the query is refused by name, selects no row, and
+    one error names A. The refusal looks at every column, also those the function is not given."""
+    page, report = _node_page(node_session, tmp_path, "query_odd_column", _odd_column_frame("default"))
+    page.evaluate(INJECT, {"name": "A"})
+    _node_set(page, "TextAreaInput", "value", 'return eval("A > 1")')
+    state = _hist_state(page)
+    assert state["mask"] == [False] * N, state["mask"]
+    assert not report.page_errors, report.page_errors
+    assert len(report.console_errors) == 1 and REFUSED_A in report.console_errors[0], report.console_errors
 
 
 def _alone_doc(tmp_path):
