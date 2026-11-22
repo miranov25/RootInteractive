@@ -15,7 +15,7 @@ from bokeh.layouts import row, column, gridplot
 import logging
 from IPython import get_ipython
 from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner
-from bokeh.models import CustomJS, ColumnDataSource, InlineStyleSheet
+from bokeh.models import CustomJS, ColumnDataSource, InlineStyleSheet, CategoricalColorMapper
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
@@ -70,7 +70,7 @@ LINE_TYPES = ("line", "scatter+line")
 FIGURE_TYPES = ("scatter", "heatmap") + LINE_TYPES
 HISTOGRAM_1D_TYPES = ("points", "bars")
 HISTOGRAM_2D_TYPES = ("heatmap", "colZ")
-LINE_STYLE_DEFAULTS = {"dash": "solid", "width": 1, "color": None, "alpha": 1.0}
+LINE_STYLE_DEFAULTS = {"dash": "solid", "width": 1, "color": None, "alpha": 1.0, "legend_label": None}
 LINE_DASHES = ("solid", "dashed", "dotted", "dotdash", "dashdot")      # Bokeh 3.3.2 DashPattern
 
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
@@ -1183,9 +1183,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if visualization_type == "line" and varColor is not None:
                         raise ValueError("visualization_type 'line': a line has one colour; colorZvar is not supported, "
                                          "use 'scatter+line' for markers coloured by a column")
-                    if visualization_type == "line" and optionLocal["legend_field"] is not None:
-                        raise ValueError("visualization_type 'line': legend_field is not supported, "
-                                         "use 'scatter+line' for a legend of the markers")
+                    checkLineSeries(cdsDict, cds_name, visualization_type, optionLocal["legend_field"], lineStyleChecked)
                 if visualization_type == "heatmap":
                     left = variables_dict["X"][0]["name"]
                     right = variables_dict["X"][1]["name"]
@@ -1290,9 +1288,11 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         lineLegend = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
                         if not isinstance(lineLegend, str):
                             lineLegend = ''.join(lineLegend.components)
+                    if lineStyleChecked["legend_label"] is not None:
+                        lineLegend = lineStyleChecked["legend_label"]
                     lineRenderers = addLines(figureI, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY,
                                              lineStyleChecked, color if isinstance(color, str) else colorAll[max(length, 4)][i],
-                                             list(colorAll[10]), lineLegend)
+                                             list(colorAll[10]), lineLegend, optionLocal.get("color"))
                     if drawnGlyph is None:
                         drawnGlyph = lineRenderers[0]
                 if varColor is not None and varColor["name"] in paramDict:
@@ -2659,7 +2659,30 @@ def checkLineStyle(style):
         raise ValueError(f"line_style: the alpha must be a number from 0 to 1; got {alpha!r}")
     if out["color"] is not None and not isinstance(out["color"], str):
         raise ValueError(f"line_style: the color must be a colour name or code; got {out['color']!r}")
+    if out["legend_label"] is not None and not isinstance(out["legend_label"], str):
+        raise ValueError(f"line_style: the legend_label must be a text; got {out['legend_label']!r}")
     return out
+
+
+def isWeightSeries(cdsDict, cds_name):
+    """True for a profile of several weights: its series are row blocks told apart by the column "weights"."""
+    cdsOrig = (cdsDict.get(cds_name) or {}).get("cdsOrig")
+    return isinstance(cdsOrig, HistoNdProfile) and isinstance(cdsOrig.weights, list)
+
+
+def checkLineSeries(cdsDict, cds_name, visualization_type, legend_field, style):
+    """PHASE_5_2 stage 1b (FR-RI-1 item 2): a line is split into series only by the weights of a profile (the way
+    the compiler gives its groups). Groups told apart by another legend_field column would be joined by one line, so
+    they are refused by name; a legend label of one's own is for a single line (the series take their weights'
+    labels)."""
+    series = isWeightSeries(cdsDict, cds_name)
+    if legend_field is not None and not (series and legend_field in ("weights", "weights_label")):
+        raise ValueError(f"visualization_type {visualization_type!r}: the groups of legend_field {legend_field!r} "
+                         f"would be joined by one line; lines are split only by the weights of a profile "
+                         f"(give each group as a weight), or use 'scatter' for markers alone")
+    if series and style["legend_label"] is not None:
+        raise ValueError(f"visualization_type {visualization_type!r}: line_style legend_label is for a single line; "
+                         f"each weight series takes its weight's label (the weight column's AxisTitle)")
 
 
 def checkLineSource(cdsDict, cds_name, visualization_type):
@@ -2674,16 +2697,20 @@ def checkLineSource(cdsDict, cds_name, visualization_type):
                          f"whose rows are downsampled when drawn, so a line through them would skip rows")
 
 
-def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label):
+def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label,
+             figure_color=None):
     """PHASE_5_2 stage 1 (FR-RI-1): the line(s) of a figure entry, through the rows of `cds_used` in row order.
 
     A profile of several weights holds its series as consecutive row blocks in one source; Bokeh 3.3.2 refuses a
     filtered view on a line (validation error 1024), so each weight option gets its own small source: a
     DownsamplerCDS that keeps all rows of `cds_used` (already filtered by the figure's filter) whose "weights" column
     is that option (ColumnFilter with a value). The lines follow the weight selection: a line is shown while its
-    weight is selected, in the colour its markers get (the factor_cmap order: the k-th selected weight takes the k-th
-    colour of the palette), unless line_style gives a colour; a line-only figure lists the shown lines in its legend.
-    `legend_label` is None when the figure has markers too: the markers' legend stands. Returns the renderers."""
+    weight is selected, in the colour its markers get, unless line_style gives a colour:
+    - with the figure option color given as a colour mapper on "weights" (the compiler's fixed factor_cmap), the
+      weight's colour in that mapper, the same whatever is selected (stage 1b);
+    - otherwise RootInteractive's own order: the k-th selected weight takes the k-th colour of the palette.
+    A line-only figure lists the shown lines in its legend. `legend_label` is None when the figure has markers too:
+    the markers' legend stands. Returns the renderers."""
     kw = {"line_dash": style["dash"], "line_width": style["width"], "line_alpha": style["alpha"]}
     fixed = style["color"]
     cdsOrig = cdsDict[cds_name]["cdsOrig"]
@@ -2695,13 +2722,26 @@ def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, 
     selected = [str(w) for w in param["value"]]
     labels = cdsOrig.weights_labels or {}
     nan_color = "gray"                                           # factor_cmap's colour of a factor beyond the palette
+    mapper = None                                                # the figure's own fixed colour mapper on "weights"
+    try:                                                         # a dict or Bokeh's Field (what factor_cmap returns)
+        field, transform = figure_color["field"], figure_color["transform"]
+    except (TypeError, KeyError, IndexError):
+        field, transform = None, None
+    if field == "weights" and isinstance(transform, CategoricalColorMapper):
+        mapper = transform
+        nan_color = mapper.nan_color
     renderers = []
     for w in series:
         k = selected.index(w) if w in selected else -1
         source = DownsamplerCDS(source=cds_used, nPoints=-1, name=f"{cds_used.name}#line {w}",
                                 filter=ColumnFilter(source=cds_used, field="weights", value=w))
         legend = {} if legend_label is None else {"legend_label": labels.get(w, w)}
-        line_color = fixed or (palette[k] if 0 <= k < len(palette) else nan_color)
+        if mapper is not None:
+            factors = [str(f) for f in mapper.factors]
+            j = factors.index(w) if w in factors else -1
+            line_color = fixed or (mapper.palette[j] if 0 <= j < len(mapper.palette) else nan_color)
+        else:
+            line_color = fixed or (palette[k] if 0 <= k < len(palette) else nan_color)
         renderers.append(fig.line(x=dataSpecX, y=dataSpecY, source=source, line_color=line_color, visible=k >= 0,
                                   **kw, **legend))
     items = [None] * len(renderers)
@@ -2715,14 +2755,14 @@ def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, 
             item.visible = any(r.visible for r in item.renderers)
     param["subscribed_events"].append(["value", CustomJS(
         args={"renderers": renderers, "series": series, "palette": palette, "fixed": fixed, "nan_color": nan_color,
-              "items": items}, code="""
-        // PHASE_5_2 stage 1: the line of each weight series follows the weight selection
+              "items": items, "mapper": mapper}, code="""
+        // PHASE_5_2 stage 1: the line of each weight series follows the weight selection, in its markers' colour
         const selected = this.value.map(String)
         const shown = new Map()
         for (let k = 0; k < renderers.length; k++) {
             const j = selected.indexOf(series[k])
             renderers[k].visible = j >= 0
-            if (fixed == null && j >= 0) renderers[k].glyph.line_color = j < palette.length ? palette[j] : nan_color
+            if (fixed == null && j >= 0 && mapper == null) renderers[k].glyph.line_color = j < palette.length ? palette[j] : nan_color
             const item = items[k]
             if (item != null) shown.set(item, (shown.get(item) ?? false) || j >= 0)
         }
