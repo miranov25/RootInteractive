@@ -187,7 +187,8 @@ def _from_array(kind, df, **settings):
     extra = {}
     aliases = []
     if kind in {"query", "query_toggle", "query_parameter", "query_parameter_alias", "query_toggle_shown",
-                "query_alone", "query_odd_names", "query_clash", "query_non_ascii", "query_odd_column"}:
+                "query_alone", "query_odd_names", "query_clash", "query_non_ascii", "query_odd_column",
+                "query_broken_at_load"}:
         widgets = [["textQuery", {"source": None, "name": "text_query", "value": "return true",
                                   **({"toggleable": True} if kind in ("query_toggle", "query_toggle_shown",
                                                                        "query_alone") else {})}]]
@@ -196,6 +197,10 @@ def _from_array(kind, df, **settings):
             widgets[0][1]["options"] = {"value": "return true"}
         if kind == "query_alone":
             widgets = widgets[:1]                         # WG-D1: the toggleable query is the table's only filter
+        if kind == "query_broken_at_load":
+            # PHASE_5 Group 6c v0.3 (TQ-D6): the page is saved with a query text that cannot be built
+            widgets[0][1]["value"] = BROKEN_AT_LOAD
+            widgets[0][1]["options"] = {"value": BROKEN_AT_LOAD}
         if kind in ("query_toggle", "query_toggle_shown"):
             # WG-D1's healthy page requires a second active filter.
             widgets.append(["range", ["gate", -2., 2.]])
@@ -294,13 +299,19 @@ def _build_doc(tmp_path, kind, df, *, mute_text=False):
     return p
 
 
-def _node_page(node_session, tmp_path, kind, df, *, mute_text=False):
+def _node_page(node_session, tmp_path, kind, df, *, mute_text=False, expected_error=None):
+    """`expected_error`: a text that the one console error of the page's load must contain (PHASE_5 Group 6c v0.3:
+    a page saved with a query that cannot be built logs it once at load); any other error fails, as before."""
     from RootInteractive.InteractiveDrawing.bokeh.headless.engine.report import ScenarioResult
     result = ScenarioResult(id=f"display/{kind}/{'muted' if mute_text else 'healthy'} [node]", outdir=str(tmp_path))
     page = node_session.new_page(result)
     page.goto(_build_doc(tmp_path, kind, df, mute_text=mute_text))
     page.wait_for_function(page.load_condition)
     _settle(page, HIST_PROBES if kind.startswith("query") and kind != "query_alone" else [])
+    if expected_error is not None:
+        assert not result.page_errors and len(result.console_errors) == 1, (result.page_errors, result.console_errors)
+        assert expected_error in result.console_errors[0], result.console_errors
+        result.console_errors.clear()
     _assert_no_errors(result)
     return page, result
 
@@ -2153,9 +2164,7 @@ def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(h
 TEMPLATE_SELECTED = """() => {
   const hs = window.__riH.models().filter(m => m.type === 'HistoNdCDS' && m.filter);
   if (!hs.length) throw Error('no histogram with a selection');
-  const raw = hs[0].filter.v_compute();
-  let k = 0; for (let i = 0; i < raw.length; i++) if (raw[i]) k++;
-  return k }"""
+  return Array.from(hs[0].filter.v_compute(), Boolean) }"""
 
 VIEW_OF = """([type, title]) => {
   const m = window.__riH.models().find(m => m.type === type && m.title === title);
@@ -2172,23 +2181,30 @@ def test_browser_the_dashboard_template_selects_with_a_slider_categories_and_a_q
     """The default dashboard template as a user's page, in Chromium, with the mouse and the keys. Its tab "Select"
     has a range slider for every float column (A to D) and a multi-select for every category column (cat, DDC). At
     load all rows are selected. The lower end of slider A is dragged with the mouse to about the middle; then the
-    categories A1 and A2 of DDC are picked; then, in the tab "Custom", the first query is switched on with its
-    "disable" toggle and `return B < 0.5` is applied with Enter; then a text that cannot be built is applied. After
-    each step the rows selected are those that pandas selects with the same conditions together (the last text
-    keeps the selection). Screenshots of the tab "Select" are saved."""
+    categories A1 and A2 of DDC are picked; then the values 0, 1 and 3 of cat; then, in the tab "Custom", the first
+    query is switched on with its "disable" toggle and `return B < 0.5` is applied with Enter; then a text that
+    cannot be built is applied. After each step the selection is, row by row, the one that pandas computes with the
+    same conditions together (the last text keeps it). Screenshots of the tab "Select" are saved."""
     df = _template_frame()
     ctx, page, errors = _template_page(headless_session, template_page_file)
 
-    def selected():
+    def check(keep, step):
+        """Row by row (PHASE_5 Group 6c v0.3, review finding G6c-P2-D; before, only the number of rows); the
+        numbers are in the message."""
         _settle(page)
-        return page.evaluate(TEMPLATE_SELECTED)
+        mask = page.evaluate(TEMPLATE_SELECTED)          # whole words of 32 rows; the rows of the table come first
+        assert len(mask) >= len(df), (step, len(mask))
+        mask = mask[:len(df)]
+        wrong = [i for i in range(len(df)) if mask[i] != bool(keep.iloc[i])]
+        assert not wrong, (step, f"the page selects {sum(mask)} rows, pandas {int(keep.sum())}; "
+                                 f"{len(wrong)} rows differ, the first: {wrong[:10]}")
 
     try:
         sliders = page.evaluate("() => window.__riH.models().filter(m => m.type === 'RangeSlider').map(m => m.title)")
         multi = page.evaluate("() => window.__riH.models().filter(m => m.type === 'MultiSelect').map(m => m.title)")
         assert sorted(sliders) == ["A", "B", "C", "D"], sliders
         assert sorted(multi) == ["DDC", "cat"], multi
-        assert selected() == len(df)
+        check(pd.Series(True, index=df.index), "at load")
         box = page.evaluate(f"""a => {{ const v = ({VIEW_OF})(a);
           const r = v.shadow_el.querySelector('.noUi-handle-lower').getBoundingClientRect();
           const t = v.shadow_el.querySelector('.noUi-base').getBoundingClientRect();
@@ -2200,11 +2216,15 @@ def test_browser_the_dashboard_template_selects_with_a_slider_categories_and_a_q
         lo, hi = page.evaluate("() => window.__riH.models().find(m => m.type === 'RangeSlider' && m.title === 'A').value")
         assert 0.3 < lo < 0.7 and hi > 0.99, (lo, hi)
         keep = (df.A >= lo) & (df.A <= hi)
-        assert selected() == int(keep.sum()), ("slider A", lo, hi)
+        check(keep, ("slider A", lo, hi))
         ddc = page.evaluate_handle(f"a => ({VIEW_OF})(a).input_el", ["MultiSelect", "DDC"]).as_element()
         ddc.select_option(["A1", "A2"])
         keep &= df.DDC.isin(["A1", "A2"])
-        assert selected() == int(keep.sum()), "slider A and DDC in A1, A2"
+        check(keep, "slider A and DDC in A1, A2")
+        cat = page.evaluate_handle(f"a => ({VIEW_OF})(a).input_el", ["MultiSelect", "cat"]).as_element()
+        cat.select_option(["0", "1", "3"])
+        keep &= df.cat.isin([0, 1, 3])
+        check(keep, "and cat in 0, 1, 3")
         page.screenshot(path=str(_states_dir() / "template_6_select_tab_slider_and_categories.png"))
         page.locator(".bk-tab", has_text="Custom").click()
         page.locator("button:has-text('disable')").first.click()
@@ -2214,14 +2234,186 @@ def test_browser_the_dashboard_template_selects_with_a_slider_categories_and_a_q
         query.type("return B < 0.5")
         query.press("Enter")
         keep &= df.B < 0.5
-        assert selected() == int(keep.sum()), "slider A, DDC in A1, A2 and the query B < 0.5"
+        check(keep, "and the query B < 0.5")
         query.press("Control+A")
         query.type("return B <")
         query.press("Enter")
-        assert selected() == int(keep.sum()), "a text that cannot be built keeps the selection"
+        check(keep, "a text that cannot be built keeps the selection")
         assert 0 < int(keep.sum()) < len(df)
         page.locator(".bk-tab").filter(has_text=re.compile("^Select$")).click()
         page.screenshot(path=str(_states_dir() / "template_7_select_tab_after_the_query.png"))
         assert [e for e in errors if "cannot be built" not in e] == [], errors
+    finally:
+        ctx.close()
+
+
+# ========================================== PHASE_5 Group 6c v0.3: the findings of the review of 2026-11-22 (TQ-D5, TQ-D6)
+# TQ-D5: a field that has no title of its own (the three text queries of the dashboard template) turned red, but the
+# reason was not shown: Bokeh hides the title line of a field whose title is empty when the page is drawn, and a later
+# title only changes the line's text. The reason must be shown while the field is red, and hidden again after.
+# TQ-D6: a page saved with a query text that cannot be built gave no result (NaN) and one console error at load, but
+# the field was not marked until the text was changed. It must be red at load, with the reason shown.
+# In this commit the tests of the two defects are strict expected failures, each with today's exact result.
+BROKEN_AT_LOAD = "return A >"
+REASON_LINE = r"""(i) => {
+  const m = window.__riH.models().filter(m => m.type === 'TextAreaInput')[i];
+  const v = [...Bokeh.index.query(v => v.model === m)][0];
+  const l = v.shadow_el.querySelector('label'), r = l.getBoundingClientRect(), s = getComputedStyle(l);
+  const a = v.input_el.getBoundingClientRect();
+  return {title: m.title, text: l.textContent, display: s.display, visibility: s.visibility, colour: s.color,
+          box: {x: r.x, y: r.y, width: r.width, height: r.height}, area: {x: a.x, y: a.y, width: a.width, height: a.height},
+          classes: [...m.css_classes]};
+}"""
+TEXT_PIXELS = r"""async (a) => {
+  const bytes = Uint8Array.from(atob(a.png), (c) => c.charCodeAt(0));
+  const bmp = await createImageBitmap(new Blob([bytes], {type: 'image/png'}));
+  const canvas = new OffscreenCanvas(bmp.width, bmp.height), g = canvas.getContext('2d');
+  g.drawImage(bmp, 0, 0);
+  const d = g.getImageData(0, 0, bmp.width, bmp.height).data;
+  let hit = 0;
+  for (let i = 0; i < d.length; i += 4)
+    if (d[i] - d[i + 1] > 80 && d[i] - d[i + 2] > 80 && d[i] > 150) hit++;      // strongly red: the red text
+  return hit;
+}"""
+
+
+def _reason_line(page, index):
+    """The title line of the index-th text field, as the browser computes it and draws it: its style, its box, and
+    the number of strongly red pixels inside its box (the red text)."""
+    import base64
+    line = page.evaluate(REASON_LINE, index)
+    box = line["box"]
+    line["red_pixels"] = 0
+    if box["width"] > 0 and box["height"] > 0:
+        png = page.screenshot(clip=box)
+        line["red_pixels"] = page.evaluate(TEXT_PIXELS, {"png": base64.b64encode(png).decode()})
+    return line
+
+
+def _reason_shown(line) -> bool:
+    """The reason is shown: the line is laid out with a size, holds the field's title, and is drawn in red."""
+    return (line["display"] != "none" and line["visibility"] == "visible" and line["box"]["width"] > 0
+            and line["box"]["height"] > 0 and line["text"] == line["title"] and line["red_pixels"] >= 20)
+
+
+def _reason_hidden(line) -> bool:
+    return line["display"] == "none" or line["box"]["height"] == 0
+
+
+def _shot_with_reason(page, line, name):
+    """A screenshot of the field together with its title line (for people)."""
+    a, b = line["area"], line["box"]
+    top = min(a["y"], b["y"] if b["height"] else a["y"]) - 4
+    page.screenshot(path=str(_states_dir() / f"{name}.png"),
+                    clip={"x": max(0, a["x"] - 4), "y": max(0, top), "width": a["width"] + 8,
+                          "height": a["y"] + a["height"] + 4 - max(0, top)})
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_browser_a_red_field_without_a_title_shows_its_reason(headless_session, tmp_path):
+    """TQ-D5, in Chromium with real keys: a text query without a title of its own. At load its title line is hidden.
+    A text that cannot be built, applied with Enter: the field is red, and the reason is shown above it, in red, with
+    a real size. A valid text: the field is normal, and the line is hidden again."""
+    df = frame()
+    ctx, page, errors = _browser_page(headless_session, tmp_path, "query", df)
+    try:
+        assert _reason_hidden(_reason_line(page, 0)), "at load a field without a title shows no title line"
+        area = _area(page)
+        area.click()
+        area.press("Control+A")
+        area.type("return A >")
+        area.press("Enter")
+        page.wait_for_function("() => window.__riH.models().find(m => m.type === 'TextAreaInput').css_classes.includes('ri-problem')")
+        line = _reason_line(page, 0)
+        _shot_with_reason(page, line, "query_7_red_with_its_reason")
+        assert line["title"].startswith("not used: SyntaxError") and line["classes"] == ["ri-problem"], line
+        known_defect(_reason_hidden(line), f"TQ-D5: the reason is not shown: {line}")
+        assert _reason_shown(line), line
+        area.press("Control+A")
+        area.type("return A > 1")
+        area.press("Enter")
+        page.wait_for_function("() => window.__riH.models().find(m => m.type === 'TextAreaInput').title === ''")
+        _settle(page, HIST_PROBES)
+        assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+        assert _reason_hidden(_reason_line(page, 0)), "after a valid text the line is hidden again"
+    finally:
+        ctx.close()
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_browser_the_template_query_shows_its_reason_and_hides_it_when_switched_off(headless_session,
+                                                                                   template_page_file):
+    """TQ-D5 on the dashboard template, in Chromium: its first text query (no title of its own) is switched on with
+    its "disable" toggle, and `return B <` is applied with Enter. The field is red and the reason is shown above it.
+    Switched off again: no colour and no reason. The function field funCustomForm0, which has a title, keeps it."""
+    ctx, page, errors = _template_page(headless_session, template_page_file)
+    try:
+        page.locator(".bk-tab", has_text="Custom").click()
+        names = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').map(m => m.name)")
+        page.locator("button:has-text('disable')").first.click()
+        page.wait_for_function("() => window.__riH.models().filter(m => m.type === 'TextAreaInput' && !m.disabled).length === 4")
+        on = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').findIndex(m => !m.disabled && !(m.name || '').startsWith('funCustomForm'))")
+        assert _reason_hidden(_reason_line(page, on))
+        query = _area(page, index=on)
+        query.click()
+        query.press("Control+A")
+        query.type("return B <")
+        query.press("Enter")
+        page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].css_classes.includes('ri-problem')", arg=on)
+        line = _reason_line(page, on)
+        _shot_with_reason(page, line, "template_8_query_red_with_its_reason")
+        known_defect(_reason_hidden(line), f"TQ-D5: the template's query does not show its reason: {line}")
+        assert _reason_shown(line), line
+        form = _reason_line(page, names.index("funCustomForm0"))
+        assert form["text"] == "funCustomForm0" and form["display"] != "none", form
+        page.locator("button:has-text('disable')").first.click()
+        page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].disabled", arg=on)
+        assert _reason_hidden(_reason_line(page, on)), "a query switched off shows no reason"
+        assert _plain(_seen(page, query)), "and no colour"
+        assert [e for e in errors if "cannot be built" not in e] == [], errors
+    finally:
+        ctx.close()
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_a_query_that_cannot_be_built_when_the_page_loads_is_red_at_load(node_session, tmp_path):
+    """TQ-D6: a page saved with the query `return A >`. At load it selects no row (no result, NaN) and logs one
+    console error, as before; the field must be red at load, with the reason in its title: "not used: SyntaxError:
+    ...; no result (NaN)". A valid query then selects, and the field is normal."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_broken_at_load", df, expected_error="cannot be built")
+    state = _field(page)
+    assert _hist_state(page)["mask"] == [False] * N
+    assert state["problem"].startswith("not used: SyntaxError"), state
+    known_defect(state["classes"] == [] and state["title"] == "", f"TQ-D6: not marked at load: {state}")
+    assert _is_red(state, "not used: SyntaxError", "; no result (NaN)"), state
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+    state = _field(page)
+    assert state["classes"] == [] and state["title"] == "" and state["problem"] in ("", None), state
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_browser_a_query_that_cannot_be_built_when_the_page_loads_shows_red_and_its_reason(headless_session, tmp_path):
+    """TQ-D6 in Chromium: the page saved with the query `return A >` shows the field red at load (frame and
+    background, as drawn), and the reason above it."""
+    ctx, page, errors = _browser_page(headless_session, tmp_path, "query_broken_at_load", frame())
+    try:
+        area = _area(page)
+        seen = _seen(page, area)
+        line = _reason_line(page, 0)
+        _shot_with_reason(page, line, "query_8_red_at_load_with_its_reason")
+        known_defect(_plain(seen), f"TQ-D6: not marked at load: {seen}, {line}")
+        assert _drawn(seen, "red"), seen
+        assert line["title"].startswith("not used: SyntaxError") and _reason_shown(line), line
+        assert len(errors) == 1 and "cannot be built" in errors[0], errors
     finally:
         ctx.close()
