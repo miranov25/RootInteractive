@@ -1,4 +1,4 @@
-from bokeh.core.properties import Enum, Float, Instance, List, Nullable, String
+from bokeh.core.properties import Bool, Enum, Float, Instance, List, Nullable, String
 from bokeh.model import Model
 from bokeh.models import ColumnarDataSource
 
@@ -18,3 +18,5 @@ class HistogramQuantiles(ColumnarDataSource):
     # the computed columns, declared for Bokeh's legend check (the legend is on the column "label")
     column_names = List(String, default=["x", "level", "label", "dash", "text", "edge"])
     edge_range = Nullable(Instance(Model), default=None, help="The other axis' range: the texts stand at its far end")
+    prefix = String(default="", help="Stage 6: the curve of a histogram of several curves, starting labels and texts")
+    active = Bool(default=True, help="Stage 6: False while the curve is not selected (no row)")

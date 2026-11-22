@@ -12,6 +12,7 @@ class LegendRows(ColumnarDataSource):
 
     sources = List(Instance(Model), help="The cell renderers' sources (for a legend on a column)")
     field = Nullable(String, default=None, help="The legend's column")
-    names = List(String, help="The other columns the glyph reads (all NaN)")
+    names = List(String, help="The position columns the glyph reads (all NaN)")
+    copied = List(String, help="The visual columns the glyph reads (colour, dash, marker), from the first row of a value")
     # declared for Bokeh's legend check, which reads column_names
     column_names = List(String)

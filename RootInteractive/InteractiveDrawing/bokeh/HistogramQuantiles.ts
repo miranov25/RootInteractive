@@ -10,6 +10,8 @@ import {sorted_with_weights, quantile_of_sorted} from "./MathUtils"
 // default, "linear" as an option. An empty selection, a negative weight or no positive weight gives no row.
 // Columns: x (the value), level, label ("median", "q=10%"), dash (the median solid, the others dashed), text, edge (the
 // far end of the other axis' shown range, where the text stands: the top, or the right with flipped axes).
+// Stage 6 (FR-RI-3 (c)): one per curve of a histogram of several curves; `prefix` (the curve) starts its labels and
+// texts ("wa, median", "wa, 10%: 0.2899"); while not `active` (the curve is not selected) it has no row.
 
 export namespace HistogramQuantiles {
   export type Attrs = p.AttrsOf<Props>
@@ -21,6 +23,8 @@ export namespace HistogramQuantiles {
     text: p.Property<string>
     x_range: p.Property<any>
     edge_range: p.Property<any>
+    prefix: p.Property<string>
+    active: p.Property<boolean>
     column_names: p.Property<string[]>
   }
 }
@@ -40,7 +44,9 @@ export class HistogramQuantiles extends ColumnDataSource {
   static __name__ = "HistogramQuantiles"
 
   static {
-    this.define<HistogramQuantiles.Props>(({Ref, Array, Number, String, Nullable})=>({
+    this.define<HistogramQuantiles.Props>(({Ref, Array, Number, String, Nullable, Boolean})=>({
+      active: [Boolean, true],
+      prefix: [String, ""],
       column_names: [Array(String), ["x", "level", "label", "dash", "text", "edge"]],  // for Bokeh's legend check
       edge_range: [Nullable(Ref(Model)), null],   // the other axis' range: the texts stand at its far end
       histogram: [Ref(Model)],
@@ -62,6 +68,7 @@ export class HistogramQuantiles extends ColumnDataSource {
     super.connect_signals()
     const stale = () => { this._stale = true; this.change.emit() }
     this.connect(this.histogram.change, stale)
+    this.connect(this.properties.active.change, stale)
     for (const range of [this.x_range, this.edge_range]) {
       if (range != null) {
         this.connect(range.properties.start.change, stale)
@@ -89,6 +96,11 @@ export class HistogramQuantiles extends ColumnDataSource {
     const indices = h.view                    // the histogram's selected rows (null: all), as the histogram uses them
     const method = this.method === "default" ? (weights != null ? "inverted_cdf" : "linear") : this.method
     this.values = new Map()
+    if (!this.active) {                       // a curve not selected: no row, and no sort
+      for (const key of ["x", "level", "label", "dash", "text", "edge"]) (this.data as any)[key] = []
+      this._stale = false
+      return
+    }
     // one sort of the selected finite rows (with positive weight): 10^6 rows about 0.3 s without weights and 0.7 s with
     // them, 10^7 rows 3 s and 9 s (measured in Node, PHASE_5_2 stage 4); 8 or 20 bytes per row
     const sorted = sorted_with_weights(values, weights, indices)
@@ -110,7 +122,8 @@ export class HistogramQuantiles extends ColumnDataSource {
       done.add(q)
       const v = this.values.get(q)!
       if (!known || !isFinite(v) || !(v >= low && v <= high)) continue
-      const label = HistogramQuantiles.label(q)
+      const named = (s: string) => this.prefix !== "" ? `${this.prefix}, ${s}` : s
+      const label = named(HistogramQuantiles.label(q))
       data.x.push(v)
       data.level.push(q)
       data.label.push(label)
@@ -118,8 +131,8 @@ export class HistogramQuantiles extends ColumnDataSource {
       data.edge.push(edge)
       const number = HistogramQuantiles.number(v)
       const shown = q === 0.5 ? "median" : `${+(q * 100).toPrecision(6)}%`
-      data.text.push(this.text === "both" ? `${shown}: ${number}` : this.text === "level" ? shown :
-                     this.text === "value" ? number : "")
+      data.text.push(this.text === "both" ? named(`${shown}: ${number}`) : this.text === "level" ? named(shown) :
+                     this.text === "value" ? named(number) : "")
     }
     for (const key of Object.keys(data)) (this.data as any)[key] = data[key]
     this._stale = false

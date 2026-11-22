@@ -292,18 +292,25 @@ def _facetText(text, vertical=False, size="10pt", bold=False, align="center"):
                sizing_mode="stretch_height" if vertical else "stretch_width", disable_math=False)
 
 
-def _glyphColumns(glyph):
-    """The columns a glyph reads (its data specs given as fields)."""
-    columns = []
-    for name in glyph.dataspecs():
-        value = getattr(glyph, name)
-        try:
-            field = value["field"]
-        except (TypeError, KeyError, IndexError):
-            field = value if isinstance(value, str) and "color" not in name and "dash" not in name else None
-        if isinstance(field, str) and field not in columns:
-            columns.append(field)
-    return columns
+GLYPH_VISUAL_PREFIXES = ("line_", "fill_", "hatch_", "text_")
+
+
+def _glyphSpecs(glyph):
+    """A glyph's data specs as Bokeh sends them: {name: ("field", column) or ("value", its repr)}. Stage 6: Bokeh's own
+    serialisation tells a column from a value (a string like "dash", "square" or "bevel" can be either)."""
+    from bokeh.core.serialization import Serializer
+    specs = {}
+    for name in sorted(glyph.dataspecs()):
+        encoded = Serializer().encode(glyph.lookup(name).property.to_serializable(glyph, name, getattr(glyph, name)))
+        if isinstance(encoded, dict) and encoded.get("type") == "field":
+            specs[name] = ("field", encoded["field"])
+        else:
+            specs[name] = ("value", repr(encoded))
+    return specs
+
+
+def _isVisualSpec(name):
+    return name.startswith(GLYPH_VISUAL_PREFIXES) or name == "marker"
 
 
 def _gridLegend(figures, sizing_mode):
@@ -319,16 +326,18 @@ def _gridLegend(figures, sizing_mode):
                    y_range=Range1d(0, 1), outline_line_color=None, min_border=0, name="facet_grid_legend")
     strip.axis.visible = False
     strip.grid.visible = False
-    items, seen = [], {}                                         # label -> the LegendRows of its stand-ins
+    items, seen = [], {}                                         # entry -> the LegendRows of its stand-ins
     for fig in figures:
         for legend in fig.legend:
             for item in legend.items:
-                key = repr(item.label)
+                # one entry per label and look: entries of differently drawn renderers (curves of other colours) stay
+                # apart (stage 6), those of the same label and look in several cells are one
+                key = repr(item.label) + repr([sorted((n, v) for n, v in _glyphSpecs(r.glyph).items() if _isVisualSpec(n))
+                                               for r in item.renderers if isinstance(r, GlyphRenderer)])
                 if key in seen:                                  # the same entry in another cell: its rows count too
                     glyph_renderers = [r for r in item.renderers if isinstance(r, GlyphRenderer)]
                     for rows, r in zip(seen[key], glyph_renderers):
-                        if rows.field is not None:
-                            rows.sources = rows.sources + [r.data_source]
+                        rows.sources = rows.sources + [r.data_source]
                     continue
                 if not item.renderers:
                     continue
@@ -341,9 +350,11 @@ def _gridLegend(figures, sizing_mode):
                         label_field = item.label["field"]
                     except (TypeError, KeyError, IndexError):
                         label_field = None
-                    names = [c for c in _glyphColumns(r.glyph) if c != label_field]
-                    rows = LegendRows(sources=[r.data_source] if label_field else [], field=label_field, names=names,
-                                      column_names=([label_field] if label_field else []) + names)
+                    fields = [(n, v[1]) for n, v in _glyphSpecs(r.glyph).items() if v[0] == "field" and v[1] != label_field]
+                    names = list(dict.fromkeys(c for n, c in fields if not _isVisualSpec(n)))
+                    copied = list(dict.fromkeys(c for n, c in fields if _isVisualSpec(n) and c not in names))
+                    rows = LegendRows(sources=[r.data_source], field=label_field, names=names, copied=copied,
+                                      column_names=([label_field] if label_field else []) + names + copied)
                     seen[key].append(rows)
                     standin = GlyphRenderer(data_source=rows, glyph=r.glyph)
                     strip.renderers.append(standin)
@@ -2984,8 +2995,12 @@ def addQuantileLines(fig, histoHandle, options, colour, flipped):
     with flipped axes. The median solid, the other levels dashed, in the curve's colour; a legend entry per level
     ("median", "q=10%") and an optional text at the top ("10%: 0.2899"). Option keys: levels (required), method
     ("default": linear without weights, inverted_cdf with weights; or "linear", "inverted_cdf"), text ("none",
-    "level", "value", "both"), color, legend, width. Several curves of one histogram (a list of weights) are refused
-    by name: this first version draws one curve, and never pools curves."""
+    "level", "value", "both"), color, legend, width.
+    Stage 6 (FR-RI-3 (c)): a histogram of several curves (a stack, one histogram per weight or variable chosen by a
+    multiSelect) gets the lines of each curve, from its own rows, never of the pooled rows: one HistogramQuantiles per
+    curve, its labels and texts starting with the curve ("wa, median"), with no row while the curve is not selected;
+    its colour the option's color, else the figure's colour mapper on "_source_index" (the curve), else the
+    histogram's colour; a legend entry of its own per curve. Returns the renderers."""
     if not isinstance(options, dict):
         raise ValueError("quantile_lines must be a dict with the keys " + ", ".join(repr(k) for k in QUANTILE_LINES_DEFAULTS))
     for key in options:
@@ -3004,28 +3019,71 @@ def addQuantileLines(fig, histoHandle, options, colour, flipped):
         raise ValueError(f"quantile_lines: unknown text {o['text']!r}; the accepted texts are 'none', 'level', "
                          f"'value', 'both'")
     histogram = histoHandle["cdsOrig"]
-    if not isinstance(histogram, HistogramCDS):
-        raise ValueError(f"quantile_lines: the histogram {histoHandle.get('name', '?')!r} has several curves; this "
-                         f"first version draws the quantile lines of one curve and never pools curves")
-    colour = o["color"] or (colour if isinstance(colour, str) else "black")
-    source = HistogramQuantiles(histogram=histogram, levels=[float(q) for q in levels], method=o["method"],
-                                text=o["text"], x_range=fig.y_range if flipped else fig.x_range,
-                                edge_range=fig.x_range if flipped else fig.y_range, name=f"{histogram.name}#quantiles")
-    legend = {"legend_field": "label"} if o["legend"] else {}
-    if flipped:
-        renderer = fig.hspan(y="x", source=source, line_color=colour, line_dash="dash", line_width=o["width"], **legend)
+    if isinstance(histogram, HistogramCDS):
+        curves = [("", histogram)]
+    elif isinstance(histogram, CDSStack) and all(isinstance(h, HistogramCDS) for h in histogram.sources):
+        by_index = {i: key for key, i in histogram.mapping.items()}
+        curves = [(str(by_index[i]), h) for i, h in enumerate(histogram.sources)]
     else:
-        renderer = fig.vspan(x="x", source=source, line_color=colour, line_dash="dash", line_width=o["width"], **legend)
-    if o["text"] != "none":
-        if flipped:      # above the horizontal line, ending at the right edge
-            labels = LabelSet(y="x", x="edge", text="text", source=source, text_color=colour, text_font_size="9pt",
-                              text_align="right", text_baseline="bottom", x_offset=-4, y_offset=2)
-        else:            # left of the vertical line, read upwards, ending at the top
-            labels = LabelSet(x="x", y="edge", text="text", source=source, text_color=colour, text_font_size="9pt",
-                              angle=90, angle_units="deg", text_align="right", text_baseline="bottom",
-                              x_offset=-2, y_offset=-4)
-        fig.add_layout(labels)
-    return renderer
+        raise ValueError(f"quantile_lines: the histogram {histoHandle.get('name', '?')!r} is not a 1-D histogram "
+                         f"or a stack of 1-D histograms")
+    mapper = None                                    # the figure's colour mapper on the curves ("_source_index")
+    try:                                             # a dict or Bokeh's Field (what factor_cmap returns)
+        if colour["field"] == "_source_index" and isinstance(colour["transform"], CategoricalColorMapper):
+            mapper = colour["transform"]
+    except (TypeError, KeyError, IndexError):
+        pass
+    renderers = []
+    for prefix, h in curves:
+        if o["color"]:
+            curve_colour = o["color"]
+        elif mapper is not None:
+            factors = [str(f) for f in mapper.factors]
+            j = factors.index(prefix) if prefix in factors else -1
+            curve_colour = mapper.palette[j] if 0 <= j < len(mapper.palette) else mapper.nan_color
+        else:
+            curve_colour = colour if isinstance(colour, str) else "black"
+        source = HistogramQuantiles(histogram=h, levels=[float(q) for q in levels], method=o["method"],
+                                    text=o["text"], x_range=fig.y_range if flipped else fig.x_range, prefix=prefix,
+                                    active=prefix == "" or prefix in [str(a) for a in histogram.activeSources],
+                                    edge_range=fig.x_range if flipped else fig.y_range, name=f"{h.name}#quantiles")
+        legend = {"legend_field": "label"} if o["legend"] else {}
+        if flipped:
+            renderer = fig.hspan(y="x", source=source, line_color=curve_colour, line_dash="dash",
+                                 line_width=o["width"], **legend)
+        else:
+            renderer = fig.vspan(x="x", source=source, line_color=curve_colour, line_dash="dash",
+                                 line_width=o["width"], **legend)
+        renderers.append(renderer)
+        if o["text"] != "none":
+            if flipped:      # above the horizontal line, ending at the right edge
+                labels = LabelSet(y="x", x="edge", text="text", source=source, text_color=curve_colour,
+                                  text_font_size="9pt", text_align="right", text_baseline="bottom", x_offset=-4,
+                                  y_offset=2)
+            else:            # left of the vertical line, read upwards, ending at the top
+                labels = LabelSet(x="x", y="edge", text="text", source=source, text_color=curve_colour,
+                                  text_font_size="9pt", angle=90, angle_units="deg", text_align="right",
+                                  text_baseline="bottom", x_offset=-2, y_offset=-4)
+            fig.add_layout(labels)
+    if len(curves) > 1:
+        # a curve is selected or not: its lines follow (no row while it is not selected)
+        histogram.js_on_change("activeSources", CustomJS(args={"sources": [r.data_source for r in renderers]}, code="""
+            const active = this.activeSources.map(String)
+            for (const s of sources) s.active = active.includes(s.prefix)
+        """))
+        if o["legend"]:
+            # Bokeh puts every renderer with legend_field "label" in one entry, which lists only its first renderer's
+            # rows: each curve gets an entry of its own, in its colour
+            from bokeh.models import LegendItem
+            for legend in fig.legend:
+                for item in list(legend.items):
+                    ours = [r for r in item.renderers if r in renderers]
+                    if not ours or len(item.renderers) == 1:
+                        continue
+                    rest = [r for r in item.renderers if r not in ours]
+                    item.renderers = rest or ours[:1]
+                    legend.items.extend(LegendItem(label=item.label, renderers=[r]) for r in (ours if rest else ours[1:]))
+    return renderers
 
 
 def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label,

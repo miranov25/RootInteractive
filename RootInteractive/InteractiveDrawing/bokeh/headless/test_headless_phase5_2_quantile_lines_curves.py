@@ -46,7 +46,6 @@ def regression(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
-STAGE_6_TODAY = pytest.mark.xfail(**STRICT, reason="stage 6: quantile lines per curve and in a facet grid are missing")
 UNIT = pytest.mark.headless_unit
 LEVELS = [0.1, 0.5, 0.9]
 CURVES = ["wa", "wb"]
@@ -90,7 +89,7 @@ def _several_refused(df, figures, **kw) -> bool:
 
 def _page(tmp_path, tag, df, figures, **kw):
     from bokeh.document import Document
-    known_defect(_several_refused(df, figures, **kw), "FR-RI-3 (c): several curves are refused")
+    regression(_several_refused(df, figures, **kw), "FR-RI-3 (c): several curves are refused")
     doc = Document()
     doc.add_root(_from_array(df, figures, [_hist()], params=PARAMS, widgets=WIDGETS, **kw).pAll)
     out = tmp_path / f"qcurves_{tag}.json"
@@ -124,7 +123,6 @@ def _want(df, lo, hi, curve):
 # ------------------------------------------------------------------ Node: each curve its own numbers
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_6_TODAY
 def test_each_curve_has_the_quantiles_of_its_own_rows_not_of_the_pooled_rows(node_session, tmp_path):
     """Two curves (weights wa, wb). Each curve's levels equal dfdraw's weighted inverted_cdf of its own selected rows,
     at two slider positions; each median differs from the median of the pooled selected rows by more than 0.05. The
@@ -153,7 +151,6 @@ def test_each_curve_has_the_quantiles_of_its_own_rows_not_of_the_pooled_rows(nod
 
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_6_TODAY
 def test_a_curve_deselected_draws_no_line_and_comes_back(node_session, tmp_path):
     """The multiSelect of the curves: with only wa selected, wb has no line (no row, so no text and no legend entry)
     and wa is unchanged; with both selected again, wb's lines are back with its own values."""
@@ -178,7 +175,6 @@ def _spans(page):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_6_TODAY
 def test_the_colour_of_each_curves_lines_and_one_legend_entry_per_curve():
     """With the figure's colour mapper on _source_index, each curve's lines take its colour; with the option's own
     color, every line takes it; with neither, the histogram's colour. One legend entry per curve (on the column label
@@ -186,7 +182,7 @@ def test_the_colour_of_each_curves_lines_and_one_legend_entry_per_curve():
     from bokeh.models import Legend
     from bokeh.transform import factor_cmap
     df = _two_groups(500)
-    known_defect(_several_refused(df, [_figure()]), "FR-RI-3 (c): several curves are refused")
+    regression(_several_refused(df, [_figure()]), "FR-RI-3 (c): several curves are refused")
     cases = [(_figure(color=factor_cmap("_source_index", OWN, CURVES)), OWN),
              (_figure(quantile_lines={"color": "black"}), ["black", "black"]),
              (_figure(color="#9467bd"), ["#9467bd", "#9467bd"])]
@@ -251,7 +247,6 @@ def _dash_missing(page) -> bool:
 @pytest.mark.feature("DISPLAY.quantile_lines")
 @pytest.mark.feature("DISPLAY.facet_grid")
 @pytest.mark.parametrize("curves", [False, True], ids=["one_curve", "two_curves"])
-@STAGE_6_TODAY
 def test_browser_quantile_lines_in_a_facet_grid_legend(headless_session, tmp_path, curves):
     """Chromium, two cells with quantile lines. The grid legend lists each curve's levels once (both cells' entries
     of a curve are one entry), in the curve's colour, with the dash of the level (the median solid, the others
@@ -261,9 +256,9 @@ def test_browser_quantile_lines_in_a_facet_grid_legend(headless_session, tmp_pat
     from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_display import _open_browser_page
     df = _two_groups(2000)
     if curves:
-        known_defect(_several_refused(df, [_figure()]), "FR-RI-3 (c): several curves are refused")
+        regression(_several_refused(df, [_figure()]), "FR-RI-3 (c): several curves are refused")
     page_model = _grid_page(df, curves)
-    known_defect(_dash_missing(page_model), "stage 5: the grid legend's entry of a quantile line has no dash column")
+    regression(_dash_missing(page_model), "stage 5: the grid legend's entry of a quantile line has no dash column")
     p = tmp_path / "qcurves_grid.html"
     save(page_model.pAll, filename=str(p), resources=INLINE, title="quantile lines in a facet grid")
     ctx, page, errors = _open_browser_page(headless_session, p)
