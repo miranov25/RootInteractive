@@ -28,23 +28,12 @@ import pandas as pd
 import pytest
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect or missing feature."""
-
-
-def known_defect(condition: bool, message: str) -> None:
-    if condition:
-        raise KnownDefect(message)
-
-
 def regression(condition: bool, message: str) -> None:
     """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
         raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
-STRICT = dict(strict=True, raises=KnownDefect)
-FR_RI_4_TODAY = pytest.mark.xfail(**STRICT, reason="FR-RI-4: every {...} is replaced; TeX loses its braces")
 UNIT = pytest.mark.headless_unit
 
 
@@ -133,7 +122,7 @@ def test_the_cases_that_change_are_exactly_these():
 def _check_case(shown, template, want):
     old = _old_rule(template, OLD, {"B": "B title"})
     if old != want:
-        known_defect(shown == old, f"FR-RI-4: {template!r} is shown as {old!r}")
+        regression(shown == old, f"FR-RI-4: {template!r} is shown as {old!r}")
     assert shown == want, (template, shown, want)
 
 
@@ -150,7 +139,6 @@ def test_control_titles_that_do_not_change(template, want):
 @UNIT
 @pytest.mark.feature("DISPLAY.text_braces")
 @pytest.mark.parametrize("template,want", [c for c in CASES if c[0] in CHANGED])
-@FR_RI_4_TODAY
 def test_titles_and_axis_titles_show_braces_and_tex_as_written(template, want):
     page = _from_array([[["A"], ["B"], {"plotTitle": template, "xAxisTitle": template, "yAxisTitle": template}]])
     for shown in _shown(page)[0]:
@@ -159,14 +147,13 @@ def test_titles_and_axis_titles_show_braces_and_tex_as_written(template, want):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.text_braces")
-@FR_RI_4_TODAY
 def test_a_histogram_figure_shows_braces_and_tex_as_written():
     title = "$$p_{T}$$ {{GeV}}"
     page = _from_array([[["A"], ["hA"], {"xAxisTitle": title, "plotTitle": title}]],
                        histograms=[{"name": "hA", "variables": ["A"], "nbins": 8, "range": [0, 4]}])
     plot_title, x_title, _ = _shown(page)[0]
     for shown in (plot_title, x_title):
-        known_defect(shown == _old_rule(title), f"FR-RI-4: {title!r} is shown as {_old_rule(title)!r}")
+        regression(shown == _old_rule(title), f"FR-RI-4: {title!r} is shown as {_old_rule(title)!r}")
         assert shown == "$$p_{T}$$ {GeV}", shown
 
 
@@ -227,7 +214,6 @@ MIXED = "$$p_{T}$$ in {nBins} bins, {{raw}}"
 @_node
 @pytest.mark.feature("DISPLAY.text_braces")
 @pytest.mark.feature("DISPLAY.axis_label")
-@FR_RI_4_TODAY
 def test_a_parametric_title_with_tex_and_braces_follows_its_slider(node_session, tmp_path):
     _open(node_session, _page(tmp_path, "mixed", [[["A"], ["B"], {"plotTitle": MIXED, "xAxisTitle": MIXED}]]))
     for n in (10, 20, 7):
@@ -236,7 +222,7 @@ def test_a_parametric_title_with_tex_and_braces_follows_its_slider(node_session,
         title, x_title, _ = _eval(node_session, STATE)[0]
         old = _old_rule(MIXED, {"nBins": n})
         for shown in (title, x_title):
-            known_defect(shown == old, f"FR-RI-4: {MIXED!r} is shown as {old!r}")
+            regression(shown == old, f"FR-RI-4: {MIXED!r} is shown as {old!r}")
             assert shown == f"$$p_{{T}}$$ in {n} bins, {{raw}}", shown
 
 
@@ -256,7 +242,6 @@ TEX_TITLE, AXIS_TITLE = "$$p_{T,max}$$", "bins {nBins}, {{raw}}"
 
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.text_braces")
-@FR_RI_4_TODAY
 def test_browser_a_tex_title_and_a_braced_axis_title_are_drawn_and_follow_the_slider(headless_session, tmp_path):
     """Chromium: the TeX title keeps its braces and is drawn by Bokeh's MathJax (the page becomes idle, with no
     console error); the axis title with a written brace follows the slider, and the plot is redrawn.
@@ -273,7 +258,7 @@ def test_browser_a_tex_title_and_a_braced_axis_title_are_drawn_and_follow_the_sl
     ctx, page, errors = _open_browser_page(headless_session, p)
     try:
         state = page.evaluate(STATE)[0]
-        known_defect(state[0] == _old_rule(TEX_TITLE), f"FR-RI-4: {TEX_TITLE!r} is shown as {_old_rule(TEX_TITLE)!r}")
+        regression(state[0] == _old_rule(TEX_TITLE), f"FR-RI-4: {TEX_TITLE!r} is shown as {_old_rule(TEX_TITLE)!r}")
         assert state[:2] == [TEX_TITLE, "bins 10, {raw}"], state
         canvas = page.locator("canvas").first
         before = hashlib.sha256(canvas.screenshot()).hexdigest()

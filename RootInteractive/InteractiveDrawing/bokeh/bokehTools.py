@@ -2439,8 +2439,52 @@ def getOrMakeCdsFull(cdsDict: dict, paramDict: dict, key: str):
         cdsDict[key]["cdsFull"] = CDSAlias(source=getOrMakeCdsOrig(cdsDict, paramDict, key), mapping={}, name=name_full)
         return cdsDict[key]["cdsFull"]
 
+RE_TEX_SEGMENT = re.compile(r"\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]", re.S)
+
+
+def splitTitleTemplate(template: str) -> list:
+    """PHASE_5_2 stage 2 (FR-RI-4): a title or axis title, split into [text, name, text, name, ..., text].
+
+    The rules (design D2 (a) of the PHASE_5_2 proposal, as in Python's str.format, plus TeX kept as written):
+    - {name} is a name: a parameter's value (which follows its widget), else the name's AxisTitle from the metadata,
+      else the name itself;
+    - {{ and }} are one written brace each;
+    - TeX ($$...$$, \\(...\\), \\[...\\]) is kept exactly as written, braces included;
+    - a brace without a partner stays as written.
+    Before, every {...} was replaced, so TeX lost its braces and a brace could not be written."""
+    texts, names, text, i, n = [], [], [], 0, len(template)
+    while i < n:
+        tex = RE_TEX_SEGMENT.match(template, i)
+        if tex:
+            text.append(tex.group(0))
+            i = tex.end()
+        elif template.startswith("{{", i):
+            text.append("{")
+            i += 2
+        elif template.startswith("}}", i):
+            text.append("}")
+            i += 2
+        elif template[i] == "{":
+            close, reopen = template.find("}", i + 1), template.find("{", i + 1)
+            if close != -1 and (reopen == -1 or reopen > close):
+                texts.append("".join(text))
+                names.append(template[i + 1:close])
+                text, i = [], close + 1
+            else:
+                text.append("{")
+                i += 1
+        else:
+            text.append(template[i])
+            i += 1
+    texts.append("".join(text))
+    out = [texts[0]]
+    for name, after in zip(names, texts[1:]):
+        out += [name, after]
+    return out
+
+
 def makeAxisLabelFromTemplate(template:str, paramDict:dict, meta: dict):
-    components = re.split(RE_CURLY_BRACE, template)
+    components = splitTitleTemplate(template)
     label = ConcatenatedString()
     has_tex= True
     for i in range(1, len(components), 2):
