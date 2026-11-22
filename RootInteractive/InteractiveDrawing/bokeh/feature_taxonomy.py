@@ -465,6 +465,18 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_phase5_2_quantile_lines.py, headless/test_headless_phase5_2_quantile_lines_curves.py",
     },
+    "DISPLAY.quantile_curves": {
+        "name": "Quantile curves on a 2-D heatmap with boxed labels (quantile_curves)",
+        "description": "Per level, the quantile of the second variable in each bin of the first over the selected rows "
+                       "(a profile with these levels; exact with unbinned_projections), drawn over the heatmap in "
+                       "dfdraw's colours and dashes, with a legend entry and a label in a white box at one X; wrong "
+                       "options, a 1-D histogram, another drawing and several curves refused by name (PHASE_5_2 "
+                       "stage 7, option (y))",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_quantile_curves.py",
+    },
     "DISPLAY.facet_grid": {
         "name": "A facet grid with its titles, one legend and a footer (facetGrid layout element)",
         "description": "Cells in rows and columns with shared ranges and equal frames; a title over the grid, a strip "
