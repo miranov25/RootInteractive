@@ -41,6 +41,9 @@ CS-D1, tested in Node). Targets node_display (Node) and browser_display (Chromiu
 
 import hashlib
 import json
+import os
+import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -220,6 +223,13 @@ def _from_array(kind, df, **settings):
         extra["layout"] = [[0, 1]]
         extra["sourceArray"] = [{"name": "h", "variables": ["x", "y"],
                                  "nbins": [4, 3], "range": [[0, 4], [0, 3]], "weights": "w"}]
+    elif kind == "alias_text":
+        # PHASE_5 Group 6c: an alias whose function is the text of a parameter, edited in a text widget (the form of
+        # the dashboard template's funCustomForm0)
+        params = [{"name": "funForm", "value": "return A * 2"}]
+        aliases = [{"name": "funA", "variables": ["A"], "func": "funForm"}]
+        widgets = [["text", ["funForm"], {"name": "funForm"}]]
+        plots = [[["A"], ["funA"], {"visualization_type": "scatter"}]]
     elif kind == "sample":
         plots = [[["x"], ["y"], {"visualization_type": "scatter"}]]
         widgets = [["range", ["gate", -2., 2.]], ["spinner", ["nRender"]]]
@@ -392,11 +402,16 @@ def _axis_state(page):
 def _browser_page(headless_session, tmp_path, kind, df):
     """Uses A3's pinned offline script route, not live internet assets."""
     from bokeh.plotting import output_file
-    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import vendor
-    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import HELPER_JS
     p = tmp_path / (kind + "_browser.html")
     output_file(str(p), mode="inline")
     _from_array(kind, df)
+    return _open_browser_page(headless_session, p)
+
+
+def _open_browser_page(headless_session, p):
+    """Open the saved page `p` in Chromium (PHASE_5 Group 6c: split from _browser_page, for the template page)."""
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine import vendor
+    from RootInteractive.InteractiveDrawing.bokeh.headless.engine.runner import HELPER_JS
     routes = {pat.replace("**/", "/"): path for pat, path in vendor.routes().items()}
     ctx = headless_session.browser.new_context()
     page = ctx.new_page()
@@ -1738,3 +1753,370 @@ def test_strict_after_the_selection_shrinks_every_column_has_get_length_entries(
     assert after["length"] == len(after["index"]) == len(after["x"]), after
     assert after["index"] == np.flatnonzero(gate_oracle(-1., 1.)).tolist(), after
     _assert_no_errors(report)
+
+
+# ======================================================= PHASE_5 Group 6c: the state of a text field (TQ-D3 and TQ-D4)
+# TQ-D3 (the Architect, 2026-11-21: "red frame or something similar"): a text that becomes a function (a text query,
+# or the text widget of an alias) shows its state on its field. Normal: unchanged. Orange: typed, not applied yet.
+# Red, with the reason in the title: the text cannot be built (the previous function is kept), the function is
+# refused, or computing it failed (the previous result is kept). Enter applies the text, Shift+Enter adds a new line;
+# leaving the field applies it, as before. A query switched off by its "disable" toggle shows no colour.
+# TQ-D4: a function that throws while computing, on row 3, left rows 0 to 2 with the new result and the rest with the
+# old one. The previous result is now kept whole.
+# Before the fix the field showed nothing: no class, the title unchanged, and the model had no property "problem".
+# In this commit the tests of the two defects are strict expected failures, each with today's exact result.
+FIELD_STATE = r"""(name) => {
+  const ms = window.__riH.models();
+  const area = ms.find(m => m.type === 'TextAreaInput' && (name == null || m.name === name));
+  const functions = ms.filter(m => m.type === 'CustomJSNAryFunction');
+  return {classes: [...area.css_classes], title: area.title, problems: functions.map(f => f.problem ?? null)};
+}"""
+KEPT_MASK = [False, True, True, True, True, False, True, True, True, True, True, True]          # return A > 0.5
+MIXED_MASK = [False, False, True, True, True, False, True, True, True, True, True, True]          # TQ-D4, before
+
+
+def _field(page, name=None):
+    state = page.evaluate(FIELD_STATE, name)
+    state["problem"] = next((p for p in state.pop("problems") if p), state.get("problem"))
+    return state
+
+
+def _shows_nothing(state) -> bool:
+    """Before the fix: no class, no title, and no property "problem" on the model (None)."""
+    return state["classes"] == [] and state["title"] == "" and state["problem"] is None
+
+
+def _is_red(state, start, end) -> bool:
+    return (state["classes"] == ["ri-problem"] and state["problem"].startswith(start)
+            and state["problem"].endswith(end) and state["title"] == state["problem"])
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_a_query_that_cannot_be_built_is_red_and_says_why(node_session, tmp_path):
+    """After `return A > 0.5`, the text `return A >`: the previous selection stays (group 6), and the field turns red
+    with the reason in its title: "not used: SyntaxError: ...; the previous one is kept"."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > 0.5")
+    _node_set(page, "TextAreaInput", "value", "return A >")
+    state = _field(page)
+    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    assert _hist_state(page)["mask"] == KEPT_MASK
+    assert _is_red(state, "not used: SyntaxError", "; the previous one is kept"), state
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_a_refused_query_is_red_and_says_why(node_session, tmp_path):
+    """A query that uses the column sigma-cut, whose name is not plain ASCII (group 6, F1): no row is selected, and
+    the field turns red: "refused: the column "sigma-cut" has no plain ASCII name; no result (NaN)"."""
+    df = _odd_column_frame(NON_ASCII)
+    page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
+    _node_set(page, "TextAreaInput", "value", f"return {NON_ASCII} > 1")
+    state = _field(page)
+    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    assert _hist_state(page)["mask"] == [False] * N
+    assert state["problem"] == f'refused: the column "{NON_ASCII}" has no plain ASCII name; no result (NaN)', state
+    assert state["classes"] == ["ri-problem"] and state["title"] == state["problem"], state
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_a_query_that_fails_while_computing_is_red_and_keeps_the_previous_selection(node_session, tmp_path):
+    """After `return A > 0.5`, the query `return Ax > 1`, with a column name that does not exist: it is built, and
+    computing it fails on the first row. The previous selection stays, and the field turns red: "error while
+    computing: ReferenceError: Ax is not defined; the previous result is kept"."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > 0.5")
+    _node_set(page, "TextAreaInput", "value", "return Ax > 1")
+    state = _field(page)
+    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    assert _hist_state(page)["mask"] == KEPT_MASK
+    assert state["problem"] == ("error while computing: ReferenceError: Ax is not defined; "
+                                "the previous result is kept"), state
+    assert state["classes"] == ["ri-problem"], state
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_a_query_that_fails_on_row_3_keeps_the_previous_selection_whole(node_session, tmp_path):
+    """TQ-D4: after `return A > 0.5`, a query that throws on row 3. The previous selection must stay whole. Before,
+    rows 0 to 2 had the new result and rows 3 to 11 the old one: a selection that is neither."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > 0.5")
+    _node_set(page, "TextAreaInput", "value", "if (A > 2) throw new Error('row ' + A); return A > 1")
+    mask = _hist_state(page)["mask"]
+    known_defect(mask == MIXED_MASK, f"TQ-D4: a mixed selection: {mask}")
+    assert mask == KEPT_MASK, mask
+    state = _field(page)
+    assert state["problem"] == "error while computing: Error: row 3; the previous result is kept", state
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_a_corrected_query_clears_the_red_field(node_session, tmp_path):
+    """After a text that cannot be built, a valid query: it selects, and the field is normal again (no class, the
+    title as before). Before the fix the field was never marked, so this checks only that it is not marked."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A >")
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+    state = _field(page)
+    assert state["classes"] == [] and state["title"] == "" and state["problem"] in ("", None), state
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+def test_control_a_valid_query_shows_no_state(node_session, tmp_path):
+    """The control, right before and after the fix: a valid query selects, and the field is not marked."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "query_parameter", df)
+    _node_set(page, "TextAreaInput", "value", "return A > 1")
+    assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+    state = _field(page)
+    assert state["classes"] == [] and state["title"] == "" and state["problem"] in ("", None), state
+    _assert_no_errors(report)
+
+
+ALIAS_VALUES = r"""() => Array.from(window.__riH.models()
+  .filter(m => m.type === 'CDSAlias' && m.mapping && m.mapping.funA)[0].get_column('funA'), Number)"""
+
+
+def _set_text(page, value):
+    """Set the page's one text widget (the alias_text page has no histogram for _node_set to wait on)."""
+    page.evaluate("""async v => { window.__riH.models().find(m => m.type === 'TextAreaInput').value = v;
+                                  await Promise.resolve(); }""", value)
+    _settle(page)
+
+
+@pytest.mark.node_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_the_text_widget_of_an_alias_is_red_when_its_text_cannot_be_built(node_session, tmp_path):
+    """The alias funA computes the text of the parameter funForm, edited in a text widget (the form of the dashboard
+    template's funCustomForm0). The text `return A *` cannot be built: the alias keeps its values (A * 2), and the text
+    widget turns red with the reason in its title, after the widget's own title."""
+    df = frame()
+    page, report = _node_page(node_session, tmp_path, "alias_text", df)
+    assert page.evaluate(ALIAS_VALUES) == [2 * a for a in df["A"]]
+    _set_text(page, "return A *")
+    state = _field(page, "funForm")
+    known_defect(state["classes"] == [] and state["title"] == "funForm" and state["problem"] is None,
+                 f"TQ-D3: the text widget shows nothing: {state}")
+    assert page.evaluate(ALIAS_VALUES) == [2 * a for a in df["A"]]
+    assert state["classes"] == ["ri-problem"], state
+    assert state["problem"].startswith("not used: SyntaxError") and state["title"] == "funForm: " + state["problem"]
+    _set_text(page, "return A + 1")
+    assert page.evaluate(ALIAS_VALUES) == [a + 1 for a in df["A"]]
+    assert _field(page, "funForm")["classes"] == []
+
+
+# --------------------------------------------- the browser: what the user sees (colours, pixels, keys, the template)
+RED_FRAME, RED_FILL, RED_TEXT = (211, 47, 47), (255, 235, 238), "rgb(211, 47, 47)"
+ORANGE_FRAME, ORANGE_FILL = (245, 124, 0), (255, 243, 224)
+AREA_OF = r"""(a) => {
+  const ms = window.__riH.models().filter(m => m.type === 'TextAreaInput' && (a.name == null || m.name === a.name));
+  const m = ms[a.index ?? 0];
+  return [...Bokeh.index.query((v) => v.model === m)][0].input_el;
+}"""
+PIXELS = r"""async (a) => {
+  const bytes = Uint8Array.from(atob(a.png), (c) => c.charCodeAt(0));
+  const bmp = await createImageBitmap(new Blob([bytes], {type: 'image/png'}));
+  const canvas = new OffscreenCanvas(bmp.width, bmp.height), g = canvas.getContext('2d');
+  g.drawImage(bmp, 0, 0);
+  const d = g.getImageData(0, 0, bmp.width, bmp.height).data, w = bmp.width, h = bmp.height;
+  const near = (x, y, rgb, tol) => { const i = 4 * (y * w + x);
+    return Math.abs(d[i] - rgb[0]) <= tol && Math.abs(d[i + 1] - rgb[1]) <= tol && Math.abs(d[i + 2] - rgb[2]) <= tol; };
+  // the frame: along each side, the share of positions with the frame colour among the 4 outermost pixels (the
+  // element may sit half a pixel off the screenshot's grid); the third best of the four sides, because a layout can
+  // hide one edge of a field (the dashboard template cuts the last 2 pixels of its text fields)
+  const side = (n, at) => { let hit = 0; for (let k = 6; k < n - 6; k++) if ([0, 1, 2, 3].some((j) => at(k, j))) hit++;
+    return hit / Math.max(1, n - 12); };
+  const sides = [side(w, (k, j) => near(k, j, a.frame, 16)), side(w, (k, j) => near(k, h - 1 - j, a.frame, 16)),
+                 side(h, (k, j) => near(j, k, a.frame, 16)), side(h, (k, j) => near(w - 1 - j, k, a.frame, 16))];
+  // the inside, 6 pixels in from the edge: the share with the light background (the text covers the rest)
+  let inner = 0, hit = 0;
+  for (let y = 6; y < h - 6; y++) for (let x = 6; x < w - 6; x++) { inner++; if (near(x, y, a.fill, 6)) hit++; }
+  return {frame: sides.sort((x, y) => y - x)[2], fill: hit / Math.max(1, inner)};
+}"""
+
+
+def _states_dir() -> Path:
+    """The screenshots and pages of these tests, for people to look at (in the test output folder)."""
+    d = Path(os.environ.get("RI_HEADLESS_OUT", Path(__file__).resolve().parent / "_out")) / "text_field_states"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _area(page, name=None, index=0):
+    return page.evaluate_handle(AREA_OF, {"name": name, "index": index}).as_element()
+
+
+def _seen(page, area, shot=None) -> dict:
+    """What the browser computes for the field, and what it draws: the share of the frame's pixels in red and in
+    orange, and of the inside in their light backgrounds. `shot` saves the screenshot under that name."""
+    import base64
+    png = area.screenshot()
+    if shot:
+        (_states_dir() / f"{shot}.png").write_bytes(png)
+    b64 = base64.b64encode(png).decode()
+    red = page.evaluate(PIXELS, {"png": b64, "frame": RED_FRAME, "fill": RED_FILL})
+    orange = page.evaluate(PIXELS, {"png": b64, "frame": ORANGE_FRAME, "fill": ORANGE_FILL})
+    style = area.evaluate("e => { const s = getComputedStyle(e); return [s.borderTopColor, s.backgroundColor] }")
+    return {"red": red, "orange": orange, "border": style[0], "background": style[1]}
+
+
+def _drawn(seen, colour) -> bool:
+    """The frame is drawn in `colour` on at least three of its four sides (at 3 of 4 positions of a side at least), and
+    the inside in its light background (at least half of the pixels; the text covers the rest)."""
+    return seen[colour]["frame"] >= 0.75 and seen[colour]["fill"] >= 0.5
+
+
+def _plain(seen) -> bool:
+    """Neither red nor orange is drawn."""
+    return max(seen["red"]["frame"], seen["orange"]["frame"], seen["red"]["fill"], seen["orange"]["fill"]) < 0.1
+
+
+def _title_colour(page, area) -> str:
+    return area.evaluate("e => getComputedStyle(e.closest('.bk-input-group')?.querySelector('label') ?? e).color")
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_browser_a_text_query_shows_typing_and_failure_in_colour_and_applies_with_enter(headless_session, tmp_path):
+    """In Chromium, with real keys: the field is normal at load; orange while the user types; Enter applies the text
+    (normal again, and the query selects); Shift+Enter adds a new line without applying; a text that cannot be built
+    turns the field red after Enter, with the reason in red in the title, and the previous selection stays; typing
+    again turns it orange; leaving the field applies the corrected text, and the field is normal. Each state is
+    checked as the browser computes it and as it draws it (pixels), and saved as a screenshot."""
+    df = frame()
+    ctx, page, errors = _browser_page(headless_session, tmp_path, "query", df)
+    try:
+        area = _area(page)
+        seen = _seen(page, area, "query_1_normal_at_load")
+        assert _plain(seen), seen
+        area.click()
+        area.press("Control+A")
+        area.type("return A > 1")
+        seen = _seen(page, area, "query_2_orange_typed_not_applied")
+        known_defect(_plain(seen), f"TQ-D3: typing shows nothing: {seen}")
+        assert _drawn(seen, "orange"), seen
+        area.press("Enter")
+        page.wait_for_function("() => window.__riH.models().some(m => m.type === 'TextAreaInput' && m.value === 'return A > 1')")
+        _settle(page, HIST_PROBES)
+        assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+        assert _plain(_seen(page, area, "query_3_normal_after_enter")), "after Enter the field must be normal"
+        area.press("End")
+        area.press("Shift+Enter")
+        area.type("&& B < 2")
+        assert page.evaluate("() => window.__riH.models().find(m => m.type === 'TextAreaInput').value") == "return A > 1"
+        area.press("Enter")
+        page.wait_for_function("() => window.__riH.models().some(m => m.type === 'TextAreaInput' && m.value === 'return A > 1\\n&& B < 2')")
+        _settle(page, HIST_PROBES)
+        assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2"))
+        area.press("Control+A")
+        area.type("return A >")
+        area.press("Enter")
+        page.wait_for_function("() => window.__riH.models().some(m => m.type === 'TextAreaInput' && m.value === 'return A >')")
+        _settle(page, HIST_PROBES)
+        assert_histogram(df, _hist_state(page), query_oracle("return A > 1 && B < 2"))
+        seen = _seen(page, area, "query_4_red_not_used")
+        assert _drawn(seen, "red"), seen
+        assert seen["border"] == "rgb(211, 47, 47)" and seen["background"] == "rgb(255, 235, 238)", seen
+        assert _title_colour(page, area) == RED_TEXT
+        title = page.evaluate("() => window.__riH.models().find(m => m.type === 'TextAreaInput').title")
+        assert title.startswith("not used: SyntaxError") and title.endswith("the previous one is kept"), title
+        area.type(" 1")
+        seen = _seen(page, area, "query_5_orange_typing_after_a_failure")
+        assert _drawn(seen, "orange"), seen
+        page.locator("body").click(position={"x": 2, "y": 2})          # leaving the field applies the text
+        page.wait_for_function("() => window.__riH.models().some(m => m.type === 'TextAreaInput' && m.value === 'return A > 1')")
+        _settle(page, HIST_PROBES)
+        assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
+        assert _plain(_seen(page, area, "query_6_normal_after_leaving_the_field")), "after a correction it must be normal"
+        assert page.evaluate("() => window.__riH.models().find(m => m.type === 'TextAreaInput').title") == ""
+        assert [e for e in errors if "cannot be built" not in e] == [], errors
+    finally:
+        ctx.close()
+
+
+def _template_page(headless_session, tmp_path):
+    """The default dashboard template (getDefaultVars) on 200 rows of 4 columns: its 3 text queries, switched off by
+    their "disable" toggles at load, and its 3 text fields of custom functions (funCustomForm0 to 2)."""
+    import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
+    from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVars
+    from bokeh.plotting import output_file
+    aliases, variables, parameters, widgets, widget_layout, histograms, figures, layout = getDefaultVars(
+        normalization=None, variables=["A", "B", "C", "D"])
+    rng = np.random.default_rng(20261121)
+    df = pd.DataFrame(rng.random(size=(200, 4)), columns=list("ABCD"))
+    p = tmp_path / "template_browser.html"
+    output_file(str(p), mode="inline")
+    sa.bokehDrawSA.fromArray(df, None, figures, widgets, layout=layout, parameterArray=parameters,
+                             widgetLayout=widget_layout, histogramArray=histograms, aliasArray=aliases)
+    shutil.copyfile(p, _states_dir() / "template_page.html")
+    return _open_browser_page(headless_session, p)
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.text_query")
+@pytest.mark.xfail(**STRICT)
+def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(headless_session, tmp_path):
+    """The default dashboard template, in Chromium, with real clicks and keys. In its tab "Custom" all 6 text fields
+    are normal at load.
+    The first query is switched on with its "disable" toggle, a text that cannot be built is typed and applied with
+    Enter: only that field turns red. The text field funCustomForm0 gets a text that cannot be built: it turns red
+    too, and the other fields stay normal. The query switched off again shows no colour. The template page and a
+    screenshot of each state are saved."""
+    ctx, page, errors = _template_page(headless_session, tmp_path)
+    try:
+        page.locator(".bk-tab", has_text="Custom").click()           # the template's tab of the six text fields
+        n = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').length")
+        assert n == 6, n
+        areas = [_area(page, index=i) for i in range(n)]
+        assert all(_plain(_seen(page, a)) for a in areas)
+        names = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').map(m => m.name)")
+        queries = [i for i, name in enumerate(names) if not (name or "").startswith("funCustomForm")]
+        forms = [i for i, name in enumerate(names) if (name or "").startswith("funCustomForm")]
+        assert len(queries) == 3 and len(forms) == 3, names
+        page.locator("button:has-text('disable')").first.click()
+        page.wait_for_function("() => window.__riH.models().filter(m => m.type === 'TextAreaInput' && !m.disabled).length === 4")
+        on = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').findIndex(m => !m.disabled && !(m.name || '').startsWith('funCustomForm'))")
+        query = areas[on]
+        query.click()
+        query.press("Control+A")
+        query.type("return A >")
+        seen = _seen(page, query, "template_1_query_orange_typed")
+        known_defect(_plain(seen), f"TQ-D3: typing in the template's query shows nothing: {seen}")
+        assert _drawn(seen, "orange"), seen
+        query.press("Enter")
+        page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].value === 'return A >'", arg=on)
+        _settle(page)
+        assert _drawn(_seen(page, query, "template_2_query_red"), "red")
+        form_index = names.index("funCustomForm0")
+        form = areas[form_index]
+        form.click()
+        form.press("Control+A")
+        form.type("return A *")
+        form.press("Enter")
+        page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].value === 'return A *'", arg=form_index)
+        _settle(page)
+        assert _drawn(_seen(page, form, "template_3_function_field_red"), "red")
+        others = [i for i in range(n) if i not in (on, form_index)]
+        assert all(_plain(_seen(page, areas[i])) for i in others), "only the two fields with a problem are red"
+        page.locator("button:has-text('disable')").first.click()
+        page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].disabled", arg=on)
+        assert _plain(_seen(page, query, "template_4_query_switched_off_no_colour")), "a query switched off shows no colour"
+        page.screenshot(path=str(_states_dir() / "template_5_whole_page.png"), full_page=True)
+        assert [e for e in errors if "cannot be built" not in e] == [], errors
+    finally:
+        ctx.close()
