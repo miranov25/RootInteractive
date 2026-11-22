@@ -400,6 +400,10 @@ export class CustomJSNAryFunction extends Model {
 
   connect_signals(): void {
     super.connect_signals()
+    // PHASE_5 Group 6c v0.3 (TQ-D6): a text that cannot be built when the page loads gets its problem in initialize(),
+    // before the page's listeners are connected, so its field was not marked until the text changed. The listeners
+    // are connected now: tell them once.
+    if(this.problem) this.properties.problem.change.emit()
   }
 
   update_func(){

@@ -76,9 +76,13 @@ RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
 # Red: the function could not be used, or computing it failed; the title says why, in red, wrapped within the field's
 # width. A field switched off by its "disable" toggle shows no colour. Orange is listed last, so it wins while the user
 # types again after a failure.
+# Group 6c v0.3 (TQ-D5): the title line is shown while the field is red. Bokeh hides that line when a field has no
+# title of its own at load (display: none, written on the element), and a later title changes only its text; so the
+# reason was not shown on the three text queries of the dashboard template. Only a rule marked !important wins over a
+# style written on the element. Back to normal, the rule no longer applies and the line is hidden again.
 TEXT_FUNCTION_CSS = """
 :host(.ri-problem:not(.ri-off)) .bk-input { border: 2px solid #d32f2f; background-color: #ffebee; }
-:host(.ri-problem:not(.ri-off)) label { color: #d32f2f; white-space: normal; overflow-wrap: anywhere; }
+:host(.ri-problem:not(.ri-off)) label { color: #d32f2f; white-space: normal; overflow-wrap: anywhere; display: block !important; }
 :host(.ri-pending:not(.ri-off)) .bk-input { border: 2px solid #f57c00; background-color: #fff3e0; }
 """
 

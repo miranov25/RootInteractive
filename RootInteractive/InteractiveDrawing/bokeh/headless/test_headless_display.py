@@ -2253,7 +2253,6 @@ def test_browser_the_dashboard_template_selects_with_a_slider_categories_and_a_q
 # title only changes the line's text. The reason must be shown while the field is red, and hidden again after.
 # TQ-D6: a page saved with a query text that cannot be built gave no result (NaN) and one console error at load, but
 # the field was not marked until the text was changed. It must be red at load, with the reason shown.
-# In this commit the tests of the two defects are strict expected failures, each with today's exact result.
 BROKEN_AT_LOAD = "return A >"
 REASON_LINE = r"""(i) => {
   const m = window.__riH.models().filter(m => m.type === 'TextAreaInput')[i];
@@ -2311,7 +2310,6 @@ def _shot_with_reason(page, line, name):
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_browser_a_red_field_without_a_title_shows_its_reason(headless_session, tmp_path):
     """TQ-D5, in Chromium with real keys: a text query without a title of its own. At load its title line is hidden.
     A text that cannot be built, applied with Enter: the field is red, and the reason is shown above it, in red, with
@@ -2329,7 +2327,7 @@ def test_browser_a_red_field_without_a_title_shows_its_reason(headless_session, 
         line = _reason_line(page, 0)
         _shot_with_reason(page, line, "query_7_red_with_its_reason")
         assert line["title"].startswith("not used: SyntaxError") and line["classes"] == ["ri-problem"], line
-        known_defect(_reason_hidden(line), f"TQ-D5: the reason is not shown: {line}")
+        regression(_reason_hidden(line), f"TQ-D5: the reason is not shown: {line}")
         assert _reason_shown(line), line
         area.press("Control+A")
         area.type("return A > 1")
@@ -2344,7 +2342,6 @@ def test_browser_a_red_field_without_a_title_shows_its_reason(headless_session, 
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_browser_the_template_query_shows_its_reason_and_hides_it_when_switched_off(headless_session,
                                                                                    template_page_file):
     """TQ-D5 on the dashboard template, in Chromium: its first text query (no title of its own) is switched on with
@@ -2366,7 +2363,7 @@ def test_browser_the_template_query_shows_its_reason_and_hides_it_when_switched_
         page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].css_classes.includes('ri-problem')", arg=on)
         line = _reason_line(page, on)
         _shot_with_reason(page, line, "template_8_query_red_with_its_reason")
-        known_defect(_reason_hidden(line), f"TQ-D5: the template's query does not show its reason: {line}")
+        regression(_reason_hidden(line), f"TQ-D5: the template's query does not show its reason: {line}")
         assert _reason_shown(line), line
         form = _reason_line(page, names.index("funCustomForm0"))
         assert form["text"] == "funCustomForm0" and form["display"] != "none", form
@@ -2381,7 +2378,6 @@ def test_browser_the_template_query_shows_its_reason_and_hides_it_when_switched_
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_query_that_cannot_be_built_when_the_page_loads_is_red_at_load(node_session, tmp_path):
     """TQ-D6: a page saved with the query `return A >`. At load it selects no row (no result, NaN) and logs one
     console error, as before; the field must be red at load, with the reason in its title: "not used: SyntaxError:
@@ -2391,7 +2387,7 @@ def test_a_query_that_cannot_be_built_when_the_page_loads_is_red_at_load(node_se
     state = _field(page)
     assert _hist_state(page)["mask"] == [False] * N
     assert state["problem"].startswith("not used: SyntaxError"), state
-    known_defect(state["classes"] == [] and state["title"] == "", f"TQ-D6: not marked at load: {state}")
+    regression(state["classes"] == [] and state["title"] == "", f"TQ-D6: not marked at load: {state}")
     assert _is_red(state, "not used: SyntaxError", "; no result (NaN)"), state
     _node_set(page, "TextAreaInput", "value", "return A > 1")
     assert_histogram(df, _hist_state(page), query_oracle("return A > 1"))
@@ -2401,7 +2397,6 @@ def test_a_query_that_cannot_be_built_when_the_page_loads_is_red_at_load(node_se
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_browser_a_query_that_cannot_be_built_when_the_page_loads_shows_red_and_its_reason(headless_session, tmp_path):
     """TQ-D6 in Chromium: the page saved with the query `return A >` shows the field red at load (frame and
     background, as drawn), and the reason above it."""
@@ -2411,7 +2406,7 @@ def test_browser_a_query_that_cannot_be_built_when_the_page_loads_shows_red_and_
         seen = _seen(page, area)
         line = _reason_line(page, 0)
         _shot_with_reason(page, line, "query_8_red_at_load_with_its_reason")
-        known_defect(_plain(seen), f"TQ-D6: not marked at load: {seen}, {line}")
+        regression(_plain(seen), f"TQ-D6: not marked at load: {seen}, {line}")
         assert _drawn(seen, "red"), seen
         assert line["title"].startswith("not used: SyntaxError") and _reason_shown(line), line
         assert len(errors) == 1 and "cannot be built" in errors[0], errors
