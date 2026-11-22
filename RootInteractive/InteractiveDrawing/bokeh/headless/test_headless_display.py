@@ -42,6 +42,7 @@ CS-D1, tested in Node). Targets node_display (Node) and browser_display (Chromiu
 import hashlib
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -2042,34 +2043,69 @@ def test_browser_a_text_query_shows_typing_and_failure_in_colour_and_applies_wit
         ctx.close()
 
 
-def _template_page(headless_session, tmp_path):
-    """The default dashboard template (getDefaultVars) on 200 rows of 4 columns: its 3 text queries, switched off by
-    their "disable" toggles at load, and its 3 text fields of custom functions (funCustomForm0 to 2)."""
+def _template_frame() -> pd.DataFrame:
+    """The table of the template page: 1000 rows; the float columns A to D, between 0 and 1; the integer category
+    cat (0 to 4); the text category DDC (A0 to A4, from D)."""
+    rng = np.random.default_rng(20261121)
+    df = pd.DataFrame(rng.random(size=(1000, 4)), columns=list("ABCD"))
+    df["cat"] = rng.integers(0, 5, size=len(df))
+    df["DDC"] = (df["D"] * 4).round(0).astype(int).map({0: "A0", 1: "A1", 2: "A2", 3: "A3", 4: "A4"})
+    return df
+
+
+def _selection_widgets(df, max_categories=30):
+    """The selection widgets a user's page puts in the template's tab "Select": a range slider for every float
+    column, a multi-select for every category column (text, categorical, boolean, or integer with at most
+    `max_categories` values). Returns the widgets and their names, in the order of the columns."""
+    widgets = []
+    for c in df.columns:
+        s = df[c]
+        category = (pd.api.types.is_bool_dtype(s) or isinstance(s.dtype, pd.CategoricalDtype)
+                    or pd.api.types.is_object_dtype(s)
+                    or (pd.api.types.is_integer_dtype(s) and s.nunique() <= max_categories))
+        widgets.append(['multiSelect' if category else 'range', [c], {"name": c}])
+    return widgets, list(df.columns)
+
+
+@pytest.fixture(scope="module")
+def template_page_file(tmp_path_factory):
+    """The default dashboard template (getDefaultVars) on the table of _template_frame, built once for the tests of
+    this module, as a user's page: its tab "Select" has a range slider for A to D and a multi-select for cat and
+    DDC; its tab "Custom" has the 3 text queries, switched off by their "disable" toggles at load, and the 3 text
+    fields of custom functions (funCustomForm0 to 2). A copy is saved as template_page.html, for people to open."""
     import RootInteractive.InteractiveDrawing.bokeh.bokehDrawSA as sa
     from RootInteractive.InteractiveDrawing.bokeh.bokehInteractiveTemplate import getDefaultVars
+    from RootInteractive.InteractiveDrawing.bokeh.bokehTools import mergeFigureArrays
     from bokeh.plotting import output_file
+    df = _template_frame()
     aliases, variables, parameters, widgets, widget_layout, histograms, figures, layout = getDefaultVars(
-        normalization=None, variables=["A", "B", "C", "D"])
-    rng = np.random.default_rng(20261121)
-    df = pd.DataFrame(rng.random(size=(200, 4)), columns=list("ABCD"))
-    p = tmp_path / "template_browser.html"
-    output_file(str(p), mode="inline")
+        normalization=None, variables=["A", "B", "C", "D", "cat"])
+    extra, names = _selection_widgets(df)
+    widgets = mergeFigureArrays(widgets, extra)
+    widget_layout["Select"] = [names[i:i + 3] for i in range(0, len(names), 3)]
+    p = tmp_path_factory.mktemp("template") / "template_browser.html"
+    output_file(str(p), mode="inline", title="RootInteractive template dashboard (test)")
     sa.bokehDrawSA.fromArray(df, None, figures, widgets, layout=layout, parameterArray=parameters,
                              widgetLayout=widget_layout, histogramArray=histograms, aliasArray=aliases)
     shutil.copyfile(p, _states_dir() / "template_page.html")
-    return _open_browser_page(headless_session, p)
+    return p
+
+
+def _template_page(headless_session, page_file):
+    """The template page of template_page_file, opened in a new browser context (nothing is kept between tests)."""
+    return _open_browser_page(headless_session, page_file)
 
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(headless_session, tmp_path):
+def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(headless_session, template_page_file):
     """The default dashboard template, in Chromium, with real clicks and keys. In its tab "Custom" all 6 text fields
     are normal at load.
     The first query is switched on with its "disable" toggle, a text that cannot be built is typed and applied with
     Enter: only that field turns red. The text field funCustomForm0 gets a text that cannot be built: it turns red
     too, and the other fields stay normal. The query switched off again shows no colour. The template page and a
     screenshot of each state are saved."""
-    ctx, page, errors = _template_page(headless_session, tmp_path)
+    ctx, page, errors = _template_page(headless_session, template_page_file)
     try:
         page.locator(".bk-tab", has_text="Custom").click()           # the template's tab of the six text fields
         n = page.evaluate("() => window.__riH.models().filter(m => m.type === 'TextAreaInput').length")
@@ -2109,6 +2145,83 @@ def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(h
         page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].disabled", arg=on)
         assert _plain(_seen(page, query, "template_4_query_switched_off_no_colour")), "a query switched off shows no colour"
         page.screenshot(path=str(_states_dir() / "template_5_whole_page.png"), full_page=True)
+        assert [e for e in errors if "cannot be built" not in e] == [], errors
+    finally:
+        ctx.close()
+
+
+TEMPLATE_SELECTED = """() => {
+  const hs = window.__riH.models().filter(m => m.type === 'HistoNdCDS' && m.filter);
+  if (!hs.length) throw Error('no histogram with a selection');
+  const raw = hs[0].filter.v_compute();
+  let k = 0; for (let i = 0; i < raw.length; i++) if (raw[i]) k++;
+  return k }"""
+
+VIEW_OF = """([type, title]) => {
+  const m = window.__riH.models().find(m => m.type === type && m.title === title);
+  if (!m) throw Error('no ' + type + ' with the title ' + title);
+  const v = [...Bokeh.index.query(v => v.model === m)][0];
+  if (!v) throw Error('no view of ' + type + ' ' + title);
+  return v }"""
+
+
+@pytest.mark.browser_display
+@pytest.mark.feature("FILTER.intersection")
+def test_browser_the_dashboard_template_selects_with_a_slider_categories_and_a_query_together(
+        headless_session, template_page_file):
+    """The default dashboard template as a user's page, in Chromium, with the mouse and the keys. Its tab "Select"
+    has a range slider for every float column (A to D) and a multi-select for every category column (cat, DDC). At
+    load all rows are selected. The lower end of slider A is dragged with the mouse to about the middle; then the
+    categories A1 and A2 of DDC are picked; then, in the tab "Custom", the first query is switched on with its
+    "disable" toggle and `return B < 0.5` is applied with Enter; then a text that cannot be built is applied. After
+    each step the rows selected are those that pandas selects with the same conditions together (the last text
+    keeps the selection). Screenshots of the tab "Select" are saved."""
+    df = _template_frame()
+    ctx, page, errors = _template_page(headless_session, template_page_file)
+
+    def selected():
+        _settle(page)
+        return page.evaluate(TEMPLATE_SELECTED)
+
+    try:
+        sliders = page.evaluate("() => window.__riH.models().filter(m => m.type === 'RangeSlider').map(m => m.title)")
+        multi = page.evaluate("() => window.__riH.models().filter(m => m.type === 'MultiSelect').map(m => m.title)")
+        assert sorted(sliders) == ["A", "B", "C", "D"], sliders
+        assert sorted(multi) == ["DDC", "cat"], multi
+        assert selected() == len(df)
+        box = page.evaluate(f"""a => {{ const v = ({VIEW_OF})(a);
+          const r = v.shadow_el.querySelector('.noUi-handle-lower').getBoundingClientRect();
+          const t = v.shadow_el.querySelector('.noUi-base').getBoundingClientRect();
+          return {{x: r.x + r.width / 2, y: r.y + r.height / 2, left: t.x, width: t.width}} }}""", ["RangeSlider", "A"])
+        page.mouse.move(box["x"], box["y"])
+        page.mouse.down()
+        page.mouse.move(box["left"] + box["width"] / 2, box["y"], steps=10)
+        page.mouse.up()
+        lo, hi = page.evaluate("() => window.__riH.models().find(m => m.type === 'RangeSlider' && m.title === 'A').value")
+        assert 0.3 < lo < 0.7 and hi > 0.99, (lo, hi)
+        keep = (df.A >= lo) & (df.A <= hi)
+        assert selected() == int(keep.sum()), ("slider A", lo, hi)
+        ddc = page.evaluate_handle(f"a => ({VIEW_OF})(a).input_el", ["MultiSelect", "DDC"]).as_element()
+        ddc.select_option(["A1", "A2"])
+        keep &= df.DDC.isin(["A1", "A2"])
+        assert selected() == int(keep.sum()), "slider A and DDC in A1, A2"
+        page.screenshot(path=str(_states_dir() / "template_6_select_tab_slider_and_categories.png"))
+        page.locator(".bk-tab", has_text="Custom").click()
+        page.locator("button:has-text('disable')").first.click()
+        query = page.locator("textarea:not([disabled])").first
+        query.click()
+        query.press("Control+A")
+        query.type("return B < 0.5")
+        query.press("Enter")
+        keep &= df.B < 0.5
+        assert selected() == int(keep.sum()), "slider A, DDC in A1, A2 and the query B < 0.5"
+        query.press("Control+A")
+        query.type("return B <")
+        query.press("Enter")
+        assert selected() == int(keep.sum()), "a text that cannot be built keeps the selection"
+        assert 0 < int(keep.sum()) < len(df)
+        page.locator(".bk-tab").filter(has_text=re.compile("^Select$")).click()
+        page.screenshot(path=str(_states_dir() / "template_7_select_tab_after_the_query.png"))
         assert [e for e in errors if "cannot be built" not in e] == [], errors
     finally:
         ctx.close()
