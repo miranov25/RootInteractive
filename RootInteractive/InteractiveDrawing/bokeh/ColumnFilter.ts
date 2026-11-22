@@ -8,6 +8,7 @@ export namespace ColumnFilter {
   export type Props = RIFilter.Props & {
     source: p.Property<ColumnarDataSource>
     field:p.Property<string>
+    value: p.Property<string | null>
   }
 }
 
@@ -23,9 +24,10 @@ export class ColumnFilter extends RIFilter {
   static __name__ = "ColumnFilter"
 
   static {
-    this.define<ColumnFilter.Props>(({Ref, String})=>({
+    this.define<ColumnFilter.Props>(({Ref, String, Nullable})=>({
       source:  [Ref(ColumnarDataSource)],
-      field: [String]
+      field: [String],
+      value: [Nullable(String), null]   // PHASE_5_2 stage 1: a row passes when String(column[i]) === value
     }))
   }
 
@@ -41,6 +43,7 @@ export class ColumnFilter extends RIFilter {
     super.connect_signals()
 
     this.connect(this.source.change, this.mark_dirty_source)
+    this.connect(this.properties.value.change, this.mark_dirty_source)
   }
 
   mark_dirty_source(){
@@ -71,9 +74,16 @@ export class ColumnFilter extends RIFilter {
       this.cached_vector = new_vector
       return new_vector
     }
-    for(let i=0; i<col.length; i++){
+    const {value} = this
+    if(value == null){
+      for(let i=0; i<col.length; i++){
         new_vector[i] = !!col[i]
       }
+    } else {
+      for(let i=0; i<col.length; i++){
+        new_vector[i] = String(col[i]) === value
+      }
+    }
     this.dirty_source = false
     this.cached_vector = new_vector
     return new_vector

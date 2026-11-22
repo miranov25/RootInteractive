@@ -65,6 +65,14 @@ defaultHisto2DTooltips = [
 
 BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY", "filter"]
 
+# PHASE_5_2 stage 1: the figure types of a figure entry (BR-RI-1: the histogram types are in the two histogram helpers)
+LINE_TYPES = ("line", "scatter+line")
+FIGURE_TYPES = ("scatter", "heatmap") + LINE_TYPES
+HISTOGRAM_1D_TYPES = ("points", "bars")
+HISTOGRAM_2D_TYPES = ("heatmap", "colZ")
+LINE_STYLE_DEFAULTS = {"dash": "solid", "width": 1, "color": None, "alpha": 1.0}
+LINE_DASHES = ("solid", "dashed", "dotted", "dotdash", "dashdot")      # Bokeh 3.3.2 DashPattern
+
 ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "multiSelectBitmask", "spinner", "spinnerRange"]
 
 RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
@@ -1168,6 +1176,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                         visualization_type = "heatmap"
                     else:
                         visualization_type = "scatter"
+                if visualization_type in LINE_TYPES:
+                    # PHASE_5_2 stage 1 (FR-RI-1): checked before anything is drawn
+                    lineStyleChecked = checkLineStyle(optionLocal.get("line_style"))
+                    checkLineSource(cdsDict, cds_name, visualization_type)
+                    if visualization_type == "line" and varColor is not None:
+                        raise ValueError("visualization_type 'line': a line has one colour; colorZvar is not supported, "
+                                         "use 'scatter+line' for markers coloured by a column")
+                    if visualization_type == "line" and optionLocal["legend_field"] is not None:
+                        raise ValueError("visualization_type 'line': legend_field is not supported, "
+                                         "use 'scatter+line' for a legend of the markers")
                 if visualization_type == "heatmap":
                     left = variables_dict["X"][0]["name"]
                     right = variables_dict["X"][1]["name"]
@@ -1194,7 +1212,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     else:
                         drawnGlyph = figureI.quad(top=dataSpecTop, bottom=dataSpecBottom, left=dataSpecLeft, right=dataSpecRight,
                         fill_alpha=1, source=cds_used, color=color, legend_label=''.join(legend_label.components))
-                elif visualization_type == "scatter":
+                elif visualization_type in ("scatter", "scatter+line"):
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
                     x_transform_modified = modify_2d_transform(x_transform_parsed, x_transform_customjs, variables_dict["Y"]["name"], cds_used) if x_transform else None
@@ -1249,8 +1267,34 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                 color=color, marker=marker, legend_label=''.join(legend_label.components))
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
+                elif visualization_type == "line":
+                    varNameX = variables_dict["X"]["name"]
+                    varNameY = variables_dict["Y"]["name"]
+                    x_transform_modified = modify_2d_transform(x_transform_parsed, x_transform_customjs, variables_dict["Y"]["name"], cds_used) if x_transform else None
+                    y_transform_modified = modify_2d_transform(y_transform_parsed, y_transform_customjs, variables_dict["X"]["name"], cds_used) if y_transform else None
+                    dataSpecX = {"field":varNameX, "transform":x_transform_modified} if x_transform else varNameX
+                    dataSpecY = {"field":varNameY, "transform":y_transform_modified} if y_transform else varNameY
+                    x_label = getHistogramAxisTitle(cdsDict, varNameX, cds_name)
+                    if x_transform:
+                        x_label = f"{{{x_transform}}} {x_label}"
+                    y_label = getHistogramAxisTitle(cdsDict, varNameY, cds_name)
+                    if y_transform:
+                        y_label = f"{{{y_transform}}} {y_label}"
                 else:
-                    raise NotImplementedError(f"Visualization type not supported: {visualization_type}")
+                    raise NotImplementedError(f"Visualization type not supported: {visualization_type}; the accepted "
+                                              f"types are " + ", ".join(repr(t) for t in FIGURE_TYPES))
+                lineRenderers = []
+                if visualization_type in LINE_TYPES:
+                    lineLegend = None
+                    if visualization_type == "line":
+                        lineLegend = makeAxisLabelFromTemplate(f"{y_label} vs {x_label}", paramDict, meta)
+                        if not isinstance(lineLegend, str):
+                            lineLegend = ''.join(lineLegend.components)
+                    lineRenderers = addLines(figureI, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY,
+                                             lineStyleChecked, color if isinstance(color, str) else colorAll[max(length, 4)][i],
+                                             list(colorAll[10]), lineLegend)
+                    if drawnGlyph is None:
+                        drawnGlyph = lineRenderers[0]
                 if varColor is not None and varColor["name"] in paramDict:
                     if len(color["transform"].domain) == 0:
                         color["transform"].domain = [(drawnGlyph, color["field"])]
@@ -1262,7 +1306,10 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     paramDict[varColor["name"]]["subscribed_events"].append(["value", CustomJS(args={"glyph": drawnGlyph.glyph}, code=colorMapperCallback)])
                 if cds_name not in hover_tool_renderers:
                     hover_tool_renderers[cds_name] = []
-                hover_tool_renderers[cds_name].append(drawnGlyph)
+                if visualization_type == "line":
+                    hover_tool_renderers[cds_name].extend(lineRenderers)
+                else:
+                    hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
                     if isinstance(variables_dict['errX'], dict):
                         if x_transform:
@@ -1541,6 +1588,7 @@ def addHisto2dGlyph(fig, histoHandle, marker, options):
     visualization_type = "heatmap"
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
+    checkHistogramType(visualization_type, HISTOGRAM_2D_TYPES, "2-D", histoHandle)
     cdsHisto = histoHandle["cdsSel"][None]
 
     tooltips = None
@@ -1589,6 +1637,7 @@ def addHistogramGlyph(fig, histoHandle, marker, colorHisto, size, options):
     histoGlyphRenderer = None
     if "visualization_type" in options:
         visualization_type = options["visualization_type"]
+    checkHistogramType(visualization_type, HISTOGRAM_1D_TYPES, "1-D", histoHandle)
     if visualization_type == "bars":
         if options['flip_histogram_axes']:
             histoGlyph = Quad(left=0, right="bin_count", bottom="bin_bottom", top="bin_top", fill_color=colorHisto)
@@ -2532,6 +2581,110 @@ def _tableRowCount(sent_data, data):
     if lengths:
         return lengths.pop()
     return len(data) if isinstance(data, pd.DataFrame) else 0
+
+
+def checkHistogramType(visualization_type, accepted, dimension, histoHandle):
+    """PHASE_5_2 stage 1 (BR-RI-1): an unknown type of a histogram figure is refused by name, before anything is drawn
+    (it used to fail with an error that did not name it, or to build a page without the histogram)."""
+    if visualization_type not in accepted:
+        raise ValueError(f"Histogram figure of {histoHandle.get('name', '?')!r}: visualization_type {visualization_type!r} "
+                         f"is not supported; a {dimension} histogram accepts " + " or ".join(repr(t) for t in accepted))
+
+
+def checkLineStyle(style):
+    """PHASE_5_2 stage 1 (FR-RI-1): the option line_style of a figure entry, checked; every wrong key or value is
+    refused by name. Returns the style with its defaults (dash solid, width 1, the series' colour, alpha 1)."""
+    if style is None:
+        style = {}
+    if not isinstance(style, dict):
+        raise ValueError(f"line_style must be a dict with the keys " + ", ".join(repr(k) for k in LINE_STYLE_DEFAULTS)
+                         + f"; got {style!r}")
+    for key in style:
+        if key not in LINE_STYLE_DEFAULTS:
+            raise ValueError(f"line_style: unknown key {key!r}; the accepted keys are "
+                             + ", ".join(repr(k) for k in LINE_STYLE_DEFAULTS))
+    out = {**LINE_STYLE_DEFAULTS, **style}
+    if out["dash"] not in LINE_DASHES:
+        raise ValueError(f"line_style: unknown dash {out['dash']!r}; the accepted dashes are "
+                         + ", ".join(repr(d) for d in LINE_DASHES))
+    width = out["width"]
+    if isinstance(width, bool) or not isinstance(width, (int, float)) or not np.isfinite(width) or width <= 0:
+        raise ValueError(f"line_style: the width must be a number above 0; got {width!r}")
+    alpha = out["alpha"]
+    if isinstance(alpha, bool) or not isinstance(alpha, (int, float)) or not 0 <= alpha <= 1:
+        raise ValueError(f"line_style: the alpha must be a number from 0 to 1; got {alpha!r}")
+    if out["color"] is not None and not isinstance(out["color"], str):
+        raise ValueError(f"line_style: the color must be a colour name or code; got {out['color']!r}")
+    return out
+
+
+def checkLineSource(cdsDict, cds_name, visualization_type):
+    """PHASE_5_2 stage 1 (FR-RI-1): a line is drawn only through the rows of a histogram projection (a profile): its
+    rows are the bins in order and are never downsampled. The rows of a table are downsampled when drawn, so a line
+    through them would silently skip rows."""
+    kind = (cdsDict.get(cds_name) or {}).get("type")
+    if kind != "projection":
+        name = "the main table" if cds_name is None else repr(cds_name)
+        raise ValueError(f"visualization_type {visualization_type!r}: a line is drawn only on a histogram projection "
+                         f"(a profile, whose rows are the bins in order); the source {name} is of type {kind!r}, "
+                         f"whose rows are downsampled when drawn, so a line through them would skip rows")
+
+
+def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label):
+    """PHASE_5_2 stage 1 (FR-RI-1): the line(s) of a figure entry, through the rows of `cds_used` in row order.
+
+    A profile of several weights holds its series as consecutive row blocks in one source; Bokeh 3.3.2 refuses a
+    filtered view on a line (validation error 1024), so each weight option gets its own small source: a
+    DownsamplerCDS that keeps all rows of `cds_used` (already filtered by the figure's filter) whose "weights" column
+    is that option (ColumnFilter with a value). The lines follow the weight selection: a line is shown while its
+    weight is selected, in the colour its markers get (the factor_cmap order: the k-th selected weight takes the k-th
+    colour of the palette), unless line_style gives a colour; a line-only figure lists the shown lines in its legend.
+    `legend_label` is None when the figure has markers too: the markers' legend stands. Returns the renderers."""
+    kw = {"line_dash": style["dash"], "line_width": style["width"], "line_alpha": style["alpha"]}
+    fixed = style["color"]
+    cdsOrig = cdsDict[cds_name]["cdsOrig"]
+    if not (isinstance(cdsOrig, HistoNdProfile) and isinstance(cdsOrig.weights, list)):
+        legend = {} if legend_label is None else {"legend_label": legend_label}
+        return [fig.line(x=dataSpecX, y=dataSpecY, source=cds_used, line_color=fixed or color, **kw, **legend)]
+    param = paramDict[cdsDict[cds_name]["weights"]]
+    series = [str(w) for w in param.get("options", param["value"])]
+    selected = [str(w) for w in param["value"]]
+    labels = cdsOrig.weights_labels or {}
+    nan_color = "gray"                                           # factor_cmap's colour of a factor beyond the palette
+    renderers = []
+    for w in series:
+        k = selected.index(w) if w in selected else -1
+        source = DownsamplerCDS(source=cds_used, nPoints=-1, name=f"{cds_used.name}#line {w}",
+                                filter=ColumnFilter(source=cds_used, field="weights", value=w))
+        legend = {} if legend_label is None else {"legend_label": labels.get(w, w)}
+        line_color = fixed or (palette[k] if 0 <= k < len(palette) else nan_color)
+        renderers.append(fig.line(x=dataSpecX, y=dataSpecY, source=source, line_color=line_color, visible=k >= 0,
+                                  **kw, **legend))
+    items = [None] * len(renderers)
+    if legend_label is not None:
+        for legend in fig.legend:
+            for item in legend.items:
+                for j, r in enumerate(renderers):
+                    if r in item.renderers:
+                        items[j] = item
+        for item in {id(it): it for it in items if it is not None}.values():
+            item.visible = any(r.visible for r in item.renderers)
+    param["subscribed_events"].append(["value", CustomJS(
+        args={"renderers": renderers, "series": series, "palette": palette, "fixed": fixed, "nan_color": nan_color,
+              "items": items}, code="""
+        // PHASE_5_2 stage 1: the line of each weight series follows the weight selection
+        const selected = this.value.map(String)
+        const shown = new Map()
+        for (let k = 0; k < renderers.length; k++) {
+            const j = selected.indexOf(series[k])
+            renderers[k].visible = j >= 0
+            if (fixed == null && j >= 0) renderers[k].glyph.line_color = j < palette.length ? palette[j] : nan_color
+            const item = items[k]
+            if (item != null) shown.set(item, (shown.get(item) ?? false) || j >= 0)
+        }
+        for (const [item, visible] of shown) item.visible = visible
+    """)])
+    return renderers
 
 
 def declareLegendColumn(cds, column):

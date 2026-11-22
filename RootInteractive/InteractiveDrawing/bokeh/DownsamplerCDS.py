@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, Int, Bool, Nullable, List, String
+from bokeh.core.properties import Either, Instance, Int, Bool, Nullable, List, String
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.CDSAlias import CDSAlias
 from RootInteractive.InteractiveDrawing.bokeh.RIFilter import RIFilter
@@ -15,7 +15,9 @@ class DownsamplerCDS(ColumnarDataSource):
     #
     #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
-    source = Instance(CDSAlias)
+    # PHASE_5_2 stage 1: the source is a table's CDSAlias, or another DownsamplerCDS (one line per weight series takes
+    # the rows of one series from the figure's downsampler). DownsamplerCDS.ts accepts any model.
+    source = Either(Instance(CDSAlias), Instance(ColumnarDataSource))
     nPoints = Int(default=300, help="Number of points to downsample CDS to")
     watched = Bool()
     filter = Nullable(Instance(RIFilter))

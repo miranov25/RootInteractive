@@ -3,8 +3,9 @@ profile (FR-RI-1).
 
 In plain words.
 - BR-RI-1. A histogram figure accepts the types "points" and "bars" (1-D) and "heatmap" and "colZ" (2-D). Any other
-  type is refused today with an error that does not name it (a HoverTool ValueError, or an UnboundLocalError for
-  histoGlyphRenderer), or, with the tooltips switched off, the page is built and the histogram is not drawn at all.
+  type was refused at the snapshot with an error that did not name it (a HoverTool ValueError, or an
+  UnboundLocalError for histoGlyphRenderer), or, with the tooltips switched off, the page was built without the
+  histogram.
   After the fix the page builder refuses it with a ValueError that names the type and the accepted ones.
 - FR-RI-1. A figure entry with "visualization_type": "line" draws each Y column as a line through its points, in row
   order; "scatter+line" draws the markers and the line. The option "line_style" gives the dash, width, colour and
@@ -13,9 +14,10 @@ In plain words.
   series, each with only its own points, never joining two series (Bokeh 3.3.2 refuses a filtered view on a line,
   validation error 1024). The lines follow the weight selection: shown, coloured as their markers, listed in the
   legend when the figure has no markers.
-- Before the fix, every line test fails with the exact signature of today: the build raises NotImplementedError
-  "Visualization type not supported: line" (or "scatter+line") in bokehTools.py bokehDrawArray. That signature is a
-  strict expected failure (KnownDefect) here; after the fix it is a regression that names it.
+- Before the fix (commit 1, the tests only), every line test failed with the exact signature of the snapshot: the
+  build raised NotImplementedError "Visualization type not supported: line" (or "scatter+line") in bokehTools.py
+  bokehDrawArray; every BR-RI-1 test failed with its signature. These were strict expected failures (KnownDefect).
+  Since the fix (commit 2) each signature is a regression that names it.
 Controls (pass before and after the fix): the markers of the same profiles equal the NumPy oracle, and the accepted
 histogram types still draw their glyphs.
 Author: Claude10.RI, 2026-11-22.
@@ -32,24 +34,12 @@ import pandas as pd
 import pytest
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect or missing feature."""
-
-
-def known_defect(condition: bool, message: str) -> None:
-    if condition:
-        raise KnownDefect(message)
-
-
 def regression(condition: bool, message: str) -> None:
     """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
         raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
-STRICT = dict(strict=True, raises=KnownDefect)
-BR_RI_1_TODAY = pytest.mark.xfail(**STRICT, reason="BR-RI-1: an unknown histogram type is not refused by name")
-FR_RI_1_TODAY = pytest.mark.xfail(**STRICT, reason="FR-RI-1: visualization_type line and scatter+line are not supported")
 UNIT = pytest.mark.headless_unit
 NBX, MIN_ENTRIES = 6, 3
 SPARSE = {(0, 2): 1, (0, 3): 0, (1, 4): 2}            # (group, A bin): rows; every other pair has 8 rows
@@ -148,14 +138,14 @@ BOTH_FILTERED = [["bin_center_0"], ["mean"], {"source": "hp_1", "visualization_t
 MARKERS_FILTERED = [["bin_center_0"], ["mean"], {"source": "hp_1", "filter": "entries >= 3"}]
 
 
-# ------------------------------------------------------------------ signatures (what production gives today)
+# ------------------------------------------------------------------ signatures (what production gave at the snapshot)
 def _is_missing_line(error, kind="line") -> bool:
-    """FR-RI-1 today, exact: NotImplementedError 'Visualization type not supported: <kind>' in bokehDrawArray."""
+    """FR-RI-1 at the snapshot, exact: NotImplementedError 'Visualization type not supported: <kind>' in bokehDrawArray."""
     return error == ("NotImplementedError", f"Visualization type not supported: {kind}", "bokehTools.py:bokehDrawArray")
 
 
 def _is_br_ri_1(error) -> bool:
-    """BR-RI-1 today, exact: the unknown type is not named. Either the HoverTool refuses the missing renderer
+    """BR-RI-1 at the snapshot, exact: the unknown type is not named. Either the HoverTool refuses the missing renderer
     (ValueError from Bokeh's property check), or histoGlyphRenderer is unbound in the 2-D helper."""
     if error is None:
         return False
@@ -166,8 +156,8 @@ def _is_br_ri_1(error) -> bool:
 
 
 def _line_or_defect(error, kind="line"):
-    """At the snapshot the line cannot be built: the strict expected failure. After the fix it builds."""
-    known_defect(_is_missing_line(error, kind), f"FR-RI-1: NotImplementedError 'Visualization type not supported: {kind}'")
+    """The line is built; the snapshot's NotImplementedError is a regression that names it."""
+    regression(_is_missing_line(error, kind), f"FR-RI-1: NotImplementedError 'Visualization type not supported: {kind}'")
     assert error is None, error
 
 
@@ -209,17 +199,16 @@ def _histo_figure(name, kind):
     (HISTO_1D, "lines", ("points", "bars")), (HISTO_1D, "line", ("points", "bars")),
     (HISTO_2D, "points", ("heatmap", "colZ")), (HISTO_2D, "contour", ("heatmap", "colZ"))])
 @pytest.mark.parametrize("tooltips", ["default", "none"])
-@BR_RI_1_TODAY
 def test_br_ri_1_an_unknown_histogram_type_is_refused_by_name(histogram, kind, accepted, tooltips):
     if tooltips == "none":
         histogram = dict(histogram, tooltips=None)            # the histogram's own tooltips switched off
     figure = _histo_figure(histogram["name"], kind)
     error = _build_error(_table(), [figure], histograms=[histogram], widgets=())
     if tooltips == "none":
-        # today the page is built and the histogram is silently not drawn; that is the defect's signature here
-        known_defect(error is None, f"BR-RI-1: the unknown type '{kind}' builds a page without the histogram")
+        # at the snapshot the page was built and the histogram silently not drawn: the defect's signature here
+        regression(error is None, f"BR-RI-1: the unknown type '{kind}' builds a page without the histogram")
     else:
-        known_defect(_is_br_ri_1(error), f"BR-RI-1: the unknown type '{kind}' is refused without its name: {error}")
+        regression(_is_br_ri_1(error), f"BR-RI-1: the unknown type '{kind}' is refused without its name: {error}")
     assert error is not None and error[0] == "ValueError", error
     assert f"'{kind}'" in error[1] and all(f"'{a}'" in error[1] for a in accepted), error
 
@@ -239,7 +228,6 @@ def test_control_br_ri_1_the_accepted_histogram_types_draw_their_glyph(histogram
 @UNIT
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.parametrize("weighted", [False, True])
-@FR_RI_1_TODAY
 def test_a_line_is_built_with_line_renderers_and_is_valid(weighted):
     """One Line per Y column; one per weight option for a profile of several weights; no marker; Bokeh's validation
     (error 1024 included) finds nothing."""
@@ -253,7 +241,6 @@ def test_a_line_is_built_with_line_renderers_and_is_valid(weighted):
 @UNIT
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.parametrize("weighted", [False, True])
-@FR_RI_1_TODAY
 def test_markers_and_line_are_built_together(weighted):
     error = _build_error(_table(), [BOTH_FILTERED], weighted=weighted)
     _line_or_defect(error, "scatter+line")
@@ -264,7 +251,6 @@ def test_markers_and_line_are_built_together(weighted):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.line")
-@FR_RI_1_TODAY
 def test_the_line_style_is_given_to_the_line():
     from bokeh.models import GlyphRenderer, Line
     figure = [["bin_center_0"], ["mean"], {"source": "hp_1", "visualization_type": "line",
@@ -284,23 +270,21 @@ def test_the_line_style_is_given_to_the_line():
     ({"dahs": "dashed"}, ["'dahs'", "'dash'", "'width'", "'color'", "'alpha'"]),
     ({"width": -1}, ["line_style", "width", "-1"]),
     ({"alpha": 2}, ["line_style", "alpha", "2"])])
-@FR_RI_1_TODAY
 def test_a_wrong_line_style_is_refused_by_name(style, named):
     figure = [["bin_center_0"], ["mean"], {"source": "hp_1", "visualization_type": "line", "line_style": style}]
     error = _build_error(_table(), [figure])
-    known_defect(_is_missing_line(error), "FR-RI-1: NotImplementedError 'Visualization type not supported: line'")
+    regression(_is_missing_line(error), "FR-RI-1: NotImplementedError 'Visualization type not supported: line'")
     assert error is not None and error[0] == "ValueError", error
     assert all(n in error[1] for n in named), error
 
 
 @UNIT
 @pytest.mark.feature("DISPLAY.line")
-@FR_RI_1_TODAY
 def test_a_line_on_a_table_is_refused_by_name():
     """The rows of a table are downsampled when drawn (1000 by default), so a line through them would silently skip
     rows: refused, naming the source and saying why."""
     error = _build_error(_table(), [[["A"], ["B"], {"visualization_type": "line"}]], widgets=())
-    known_defect(_is_missing_line(error), "FR-RI-1: NotImplementedError 'Visualization type not supported: line'")
+    regression(_is_missing_line(error), "FR-RI-1: NotImplementedError 'Visualization type not supported: line'")
     assert error is not None and error[0] == "ValueError", error
     assert "line" in error[1] and "projection" in error[1], error
 
@@ -388,7 +372,7 @@ def _set(session, name, value):
 
 
 def _page_or_defect(tmp_path, tag, df, figure, kind="line", **kw):
-    """Build the page; at the snapshot the line's NotImplementedError is the strict expected failure."""
+    """Build the page; the snapshot's NotImplementedError for the line is a regression that names it."""
     _line_or_defect(_build_error(df, [figure], **kw), kind)
     return _page(tmp_path, tag, df, [figure], **kw)
 
@@ -468,7 +452,6 @@ def test_control_the_markers_of_each_weight_equal_the_numpy_oracle(node_session,
 @_node
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.feature("HIST.profile")
-@FR_RI_1_TODAY
 def test_the_line_points_equal_the_projection_and_the_numpy_oracle(node_session, tmp_path):
     """The line goes through the bins that pass the filter, in bin order, equal to the projection's own rows and to
     the NumPy oracle, before and after the slider cuts A."""
@@ -490,7 +473,6 @@ def test_the_line_points_equal_the_projection_and_the_numpy_oracle(node_session,
 
 @_node
 @pytest.mark.feature("DISPLAY.line")
-@FR_RI_1_TODAY
 def test_a_line_without_a_filter_keeps_the_nan_of_an_empty_bin(node_session, tmp_path):
     """Without a filter the line has every bin, in order; the empty bin 3 of w0 is NaN, where Bokeh breaks the line
     into two segments (the drawing is checked in Chromium)."""
@@ -507,7 +489,6 @@ def test_a_line_without_a_filter_keeps_the_nan_of_an_empty_bin(node_session, tmp
 @_node
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.feature("HIST.profile")
-@FR_RI_1_TODAY
 def test_one_line_per_weight_series_with_only_its_own_points(node_session, tmp_path):
     """Two weights selected: two shown lines, each through only its own series' bins (w0 joins bins 1 and 4, w1
     skips bin 4), equal to the projection and to the oracle; w2's line is hidden. The weight selection is followed."""
@@ -538,7 +519,6 @@ def test_one_line_per_weight_series_with_only_its_own_points(node_session, tmp_p
 @_node
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.feature("HIST.profile")
-@FR_RI_1_TODAY
 def test_each_line_has_the_colour_of_its_markers_and_follows_the_selection(node_session, tmp_path):
     df = _table()
     _open(node_session, _page_or_defect(tmp_path, "both_w", df, BOTH_FILTERED, "scatter+line", weighted=True))
@@ -560,7 +540,6 @@ def test_each_line_has_the_colour_of_its_markers_and_follows_the_selection(node_
 @_node
 @pytest.mark.feature("DISPLAY.line")
 @pytest.mark.feature("DISPLAY.legend")
-@FR_RI_1_TODAY
 def test_a_line_only_figure_lists_the_shown_series_in_its_legend(node_session, tmp_path):
     df = _table()
     _open(node_session, _page_or_defect(tmp_path, "legend_w", df, LINE_FILTERED, weighted=True))
@@ -577,7 +556,6 @@ def test_a_line_only_figure_lists_the_shown_series_in_its_legend(node_session, t
 
 @_node
 @pytest.mark.feature("DISPLAY.line")
-@FR_RI_1_TODAY
 def test_markers_line_and_error_bars_draw_the_same_points(node_session, tmp_path):
     """Markers, a styled line and error bars on one figure: the line goes through the markers, the error bars are
     drawn on the same rows, and the style is the one asked for (Bokeh's "dotted" is the dash pattern [2, 4])."""
@@ -622,7 +600,6 @@ def _red_runs(png: bytes):
 
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.line")
-@FR_RI_1_TODAY
 def test_browser_a_nan_breaks_the_drawn_line_into_two_segments(headless_session, tmp_path):
     """Only w0 selected, no filter: its bins 0 to 5 with bin 3 empty (NaN). Chromium draws the solid red line in two
     pieces, bins 0 to 2 and bins 4 to 5, and nothing else red (the legend, whose sample is red, is hidden for the
