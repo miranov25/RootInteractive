@@ -31,23 +31,12 @@ import pytest
 from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_phase5_2_band import ref_quantile
 
 
-class KnownDefect(AssertionError):
-    """Raised only when production shows the exact signature of a registered defect or missing feature."""
-
-
-def known_defect(condition: bool, message: str) -> None:
-    if condition:
-        raise KnownDefect(message)
-
-
 def regression(condition: bool, message: str) -> None:
     """After the fix, the exact signature of a fixed defect is a regression: an ordinary failure that names it."""
     if condition:
         raise AssertionError("REGRESSION, a fixed defect is back: " + message)
 
 
-STRICT = dict(strict=True, raises=KnownDefect)
-STAGE_4_TODAY = pytest.mark.xfail(**STRICT, reason="FR-RI-3: the option quantile_lines is ignored")
 UNIT = pytest.mark.headless_unit
 LEVELS = [0.1, 0.5, 0.9]
 
@@ -116,7 +105,7 @@ def _ignored(df, figures, histograms, **kw) -> bool:
 
 def _page(tmp_path, tag, df, figures, histograms, **kw):
     from bokeh.document import Document
-    known_defect(_ignored(df, figures, histograms, **kw), "FR-RI-3: quantile_lines is ignored")
+    regression(_ignored(df, figures, histograms, **kw), "FR-RI-3: quantile_lines is ignored")
     doc = Document()
     doc.add_root(_from_array(df, figures, histograms, **kw).pAll)
     out = tmp_path / f"qlines_{tag}.json"
@@ -178,7 +167,6 @@ def _close(got, want):
 # ------------------------------------------------------------------ Node: the numbers
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_4_TODAY
 def test_the_feature_requests_example_all_selected_rows_not_the_bins(node_session, tmp_path):
     """Selected A >= 0.2: 10 % 0.2899 and the median 0.6038 drawn, 90 % (1.06) outside the shown range not drawn;
     the same values whatever the histogram's bins and range (2 or 10 bins, [0, 1] or [-1, 2])."""
@@ -201,7 +189,6 @@ def test_the_feature_requests_example_all_selected_rows_not_the_bins(node_sessio
 
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_4_TODAY
 def test_edge_cases_nan_inf_levels_0_and_1_one_row_empty_equal_values_duplicates(node_session, tmp_path):
     """Rows chosen by a slider on the row number s: all rows (NaN and infinite values left out, values outside the
     histogram's range kept), two equal values, one row, only non-finite values (empty: no line); levels 0 and 1 are
@@ -229,7 +216,6 @@ def test_edge_cases_nan_inf_levels_0_and_1_one_row_empty_equal_values_duplicates
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
 @pytest.mark.parametrize("method", ["default", "linear", "inverted_cdf"])
-@STAGE_4_TODAY
 def test_weighted_quantiles_follow_dfdraws_definitions(node_session, tmp_path, method):
     df = _gauss(2000)
     _open(node_session, _page(tmp_path, f"w_{method}", df, [_figure(method=method)], [_hist(weights="wr")]))
@@ -242,7 +228,6 @@ def test_weighted_quantiles_follow_dfdraws_definitions(node_session, tmp_path, m
 @_node
 @pytest.mark.feature("DISPLAY.quantile_lines")
 @pytest.mark.parametrize("bad", [-1.0, float("nan"), "none_positive"])
-@STAGE_4_TODAY
 def test_a_negative_or_non_finite_weight_or_no_positive_weight_draws_no_line(node_session, tmp_path, bad):
     df = _gauss(500)
     if bad == "none_positive":
@@ -263,24 +248,22 @@ def test_a_negative_or_non_finite_weight_or_no_positive_weight_draws_no_line(nod
     ({"levels": [0.5], "methd": "linear"}, ["'methd'", "'method'"]),
     ({"levels": [0.5], "method": "median"}, ["'median'", "'inverted_cdf'"]),
     ({"levels": [0.5], "text": "all"}, ["'all'", "'both'"])])
-@STAGE_4_TODAY
 def test_a_wrong_option_is_refused_by_name(quantile_lines, named):
     figure = [["A"], ["hA"], {"quantile_lines": quantile_lines}]
     error = _build_error(_gauss(200), [figure], [_hist()])
-    known_defect(error is None and _ignored(_gauss(200), [figure], [_hist()]), "FR-RI-3: quantile_lines is ignored")
+    regression(error is None and _ignored(_gauss(200), [figure], [_hist()]), "FR-RI-3: quantile_lines is ignored")
     assert error is not None and error[0] == "ValueError" and all(n in error[1] for n in named), error
 
 
 @UNIT
 @pytest.mark.feature("DISPLAY.quantile_lines")
-@STAGE_4_TODAY
 def test_several_curves_and_a_2d_histogram_are_refused_by_name():
     df = _gauss(300)
     df["w1"] = 1.0
     params = [{"name": "weights", "value": ["wr", "w1"], "options": ["wr", "w1"]}]
     several = _build_error(df, [_figure()], [_hist(weights="weights")], params=params,
                            widgets=(("multiSelect", ["weights"]),))
-    known_defect(several is None and _ignored(df, [_figure()], [_hist(weights="weights")], params=params,
+    regression(several is None and _ignored(df, [_figure()], [_hist(weights="weights")], params=params,
                                               widgets=(("multiSelect", ["weights"]),)),
                  "FR-RI-3: quantile_lines is ignored")
     assert several is not None and several[0] == "ValueError" and "several curves" in several[1], several
@@ -295,7 +278,7 @@ def _browser(headless_session, tmp_path, tag, df, figures, histograms, **kw):
     from bokeh.io import save
     from bokeh.resources import INLINE
     from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_display import _open_browser_page
-    known_defect(_ignored(df, figures, histograms, **kw), "FR-RI-3: quantile_lines is ignored")
+    regression(_ignored(df, figures, histograms, **kw), "FR-RI-3: quantile_lines is ignored")
     p = tmp_path / f"qlines_{tag}.html"
     save(_from_array(df, figures, histograms, **kw).pAll, filename=str(p), resources=INLINE, title=tag)
     return _open_browser_page(headless_session, p)
@@ -331,7 +314,6 @@ DRAWN = r"""() => {
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.quantile_lines")
 @pytest.mark.parametrize("flip", [False, True])
-@STAGE_4_TODAY
 def test_browser_the_lines_texts_legend_follow_the_slider_and_flip(headless_session, tmp_path, flip):
     df = _gauss()
     figure = [["A"], ["hA"], {"quantile_lines": {"levels": list(LEVELS), "text": "both", "color": "red"},

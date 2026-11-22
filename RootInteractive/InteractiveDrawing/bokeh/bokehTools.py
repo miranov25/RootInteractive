@@ -32,6 +32,8 @@ from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.BandPolygons import BandPolygons
+from RootInteractive.InteractiveDrawing.bokeh.HistogramQuantiles import HistogramQuantiles
+from bokeh.models import LabelSet
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
@@ -1163,7 +1165,13 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     x_label = f"{{{histoHandle['variables'][0]}}}"
                     y_label = "entries"
                     addHistogramGlyph(figureI, histoHandle, marker, colorHisto, markerSize, optionLocal)
+                    if optionLocal.get("quantile_lines") is not None:
+                        addQuantileLines(figureI, histoHandle, optionLocal["quantile_lines"],
+                                         optionLocal.get("color", colorHisto), optionLocal["flip_histogram_axes"])
                 elif histoHandle["type"] == "histo2d":
+                    if optionLocal.get("quantile_lines") is not None:
+                        raise ValueError(f"quantile_lines: the histogram {varY!r} is 2-D; quantile lines are drawn on a "
+                                         f"1-D histogram")
                     x_label = f"{{{histoHandle['variables'][0]}}}"
                     y_label = f"{{{histoHandle['variables'][1]}}}"
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
@@ -2773,6 +2781,60 @@ def checkLineSource(cdsDict, cds_name, visualization_type):
         raise ValueError(f"visualization_type {visualization_type!r}: a line or a band is drawn only on a histogram projection "
                          f"(a profile, whose rows are the bins in order); the source {name} is of type {kind!r}, "
                          f"whose rows are downsampled when drawn, so a line through them would skip rows")
+
+
+QUANTILE_LINES_DEFAULTS = {"levels": None, "method": "default", "text": "none", "color": None, "legend": True,
+                           "width": 1.5}
+
+
+def addQuantileLines(fig, histoHandle, options, colour, flipped):
+    """PHASE_5_2 stage 4 (FR-RI-3): vertical lines at the exact quantiles of a 1-D histogram's column over its
+    selected rows (HistogramQuantiles), drawn only when the value lies inside the shown range; a horizontal line
+    with flipped axes. The median solid, the other levels dashed, in the curve's colour; a legend entry per level
+    ("median", "q=10%") and an optional text at the top ("10%: 0.2899"). Option keys: levels (required), method
+    ("default": linear without weights, inverted_cdf with weights; or "linear", "inverted_cdf"), text ("none",
+    "level", "value", "both"), color, legend, width. Several curves of one histogram (a list of weights) are refused
+    by name: this first version draws one curve, and never pools curves."""
+    if not isinstance(options, dict):
+        raise ValueError("quantile_lines must be a dict with the keys " + ", ".join(repr(k) for k in QUANTILE_LINES_DEFAULTS))
+    for key in options:
+        if key not in QUANTILE_LINES_DEFAULTS:
+            raise ValueError(f"quantile_lines: unknown key {key!r}; the accepted keys are "
+                             + ", ".join(repr(k) for k in QUANTILE_LINES_DEFAULTS))
+    o = {**QUANTILE_LINES_DEFAULTS, **options}
+    levels = o["levels"]
+    if not isinstance(levels, (list, tuple)) or len(levels) == 0 or \
+            not all(isinstance(q, (int, float)) and not isinstance(q, bool) and 0 <= q <= 1 for q in levels):
+        raise ValueError(f"quantile_lines: levels must be a list of numbers from 0 to 1; got {levels!r}")
+    if o["method"] not in ("default", "linear", "inverted_cdf"):
+        raise ValueError(f"quantile_lines: unknown method {o['method']!r}; the accepted methods are 'default', "
+                         f"'linear', 'inverted_cdf'")
+    if o["text"] not in ("none", "level", "value", "both"):
+        raise ValueError(f"quantile_lines: unknown text {o['text']!r}; the accepted texts are 'none', 'level', "
+                         f"'value', 'both'")
+    histogram = histoHandle["cdsOrig"]
+    if not isinstance(histogram, HistogramCDS):
+        raise ValueError(f"quantile_lines: the histogram {histoHandle.get('name', '?')!r} has several curves; this "
+                         f"first version draws the quantile lines of one curve and never pools curves")
+    colour = o["color"] or (colour if isinstance(colour, str) else "black")
+    source = HistogramQuantiles(histogram=histogram, levels=[float(q) for q in levels], method=o["method"],
+                                text=o["text"], x_range=fig.y_range if flipped else fig.x_range,
+                                edge_range=fig.x_range if flipped else fig.y_range, name=f"{histogram.name}#quantiles")
+    legend = {"legend_field": "label"} if o["legend"] else {}
+    if flipped:
+        renderer = fig.hspan(y="x", source=source, line_color=colour, line_dash="dash", line_width=o["width"], **legend)
+    else:
+        renderer = fig.vspan(x="x", source=source, line_color=colour, line_dash="dash", line_width=o["width"], **legend)
+    if o["text"] != "none":
+        if flipped:      # above the horizontal line, ending at the right edge
+            labels = LabelSet(y="x", x="edge", text="text", source=source, text_color=colour, text_font_size="9pt",
+                              text_align="right", text_baseline="bottom", x_offset=-4, y_offset=2)
+        else:            # left of the vertical line, read upwards, ending at the top
+            labels = LabelSet(x="x", y="edge", text="text", source=source, text_color=colour, text_font_size="9pt",
+                              angle=90, angle_units="deg", text_align="right", text_baseline="bottom",
+                              x_offset=-2, y_offset=-4)
+        fig.add_layout(labels)
+    return renderer
 
 
 def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label,

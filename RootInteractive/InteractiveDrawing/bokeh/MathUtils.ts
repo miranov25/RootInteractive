@@ -244,27 +244,51 @@ export function solve(x:number[], y:number[]){
 // - a weight of 0 carries no mass; a negative or non-finite weight gives NaN (refused); no positive weight gives NaN.
 
 // The finite values with positive weight, sorted, with their weights (null when no weights are given); null when a
-// weight is negative or not finite.
+// weight is negative or not finite. `indices`: the rows to take, or null for all rows. Typed arrays, so that 10^7
+// selected rows stay affordable.
 export function sorted_with_weights(values: ArrayLike<number>, weights: ArrayLike<number> | null,
-                                    indices: Iterable<number>): {xs: number[], ws: number[] | null} | null {
-  const pairs: number[][] = []
-  for (const i of indices) {
-    const v = values[i]
-    if (!isFinite(v)) continue
-    if (weights == null) { pairs.push([v, 1]); continue }
-    const w = weights[i]
-    if (!isFinite(w) || w < 0) return null
-    if (w > 0) pairs.push([v, w])
+                                    indices: ArrayLike<number> | null): {xs: Float64Array, ws: Float64Array | null} | null {
+  // memory: 8 bytes per kept row without weights, 20 with weights (one typed array per column and the row order)
+  const n = indices == null ? values.length : indices.length
+  let count = 0
+  for (let j = 0; j < n; j++) {
+    const i = indices == null ? j : indices[j]
+    if (!isFinite(values[i])) continue
+    if (weights != null) {
+      const w = weights[i]
+      if (!isFinite(w) || w < 0) return null
+      if (w === 0) continue
+    }
+    count++
   }
-  pairs.sort((a, b) => a[0] - b[0])
-  return {xs: pairs.map(p => p[0]), ws: weights == null ? null : pairs.map(p => p[1])}
+  if (weights == null) {
+    const xs = new Float64Array(count)
+    let k = 0
+    for (let j = 0; j < n; j++) {
+      const v = values[indices == null ? j : indices[j]]
+      if (isFinite(v)) xs[k++] = v
+    }
+    xs.sort()
+    return {xs, ws: null}
+  }
+  const kept = new Uint32Array(count)
+  let k = 0
+  for (let j = 0; j < n; j++) {
+    const i = indices == null ? j : indices[j]
+    if (isFinite(values[i]) && weights[i] > 0) kept[k++] = i
+  }
+  kept.sort((a, b) => values[a] - values[b] || a - b)
+  const xs = new Float64Array(count)
+  const ws = new Float64Array(count)
+  for (let j = 0; j < count; j++) { xs[j] = values[kept[j]]; ws[j] = weights[kept[j]] }
+  return {xs, ws}
 }
 
 // One level q in [0, 1] of sorted values (see sorted_with_weights); NaN for an empty set or a level outside [0, 1].
-export function quantile_of_sorted(xs: number[], ws: number[] | null, q: number, method: string): number {
+export function quantile_of_sorted(xs: ArrayLike<number>, ws: ArrayLike<number> | null, q: number, method: string): number {
   const n = xs.length
   if (n === 0 || !(q >= 0 && q <= 1)) return NaN
-  if (ws == null || method === "linear" && ws.every(w => w === 1)) {
+  if (ws == null || method === "linear" && Array.prototype.every.call(ws, (w: number) => w === 1)) {
     if (method === "inverted_cdf") {
       const k = Math.max(Math.ceil(n * q) - 1, 0)
       return xs[k]
@@ -273,9 +297,9 @@ export function quantile_of_sorted(xs: number[], ws: number[] | null, q: number,
     const r0 = Math.floor(h)
     return h > r0 ? lerp(xs[r0], xs[r0 + 1], h - r0) : xs[r0]
   }
-  const cumulative: number[] = []
+  const cumulative = new Float64Array(n)
   let total = 0
-  for (const w of ws) { total += w; cumulative.push(total) }
+  for (let k = 0; k < n; k++) { total += ws[k]; cumulative[k] = total }
   if (method === "inverted_cdf") {
     for (let k = 0; k < n; k++) {
       if (cumulative[k] / total >= q) return xs[k]
