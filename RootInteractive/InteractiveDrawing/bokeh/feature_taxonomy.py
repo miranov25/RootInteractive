@@ -440,6 +440,18 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_phase5_2_braces.py",
     },
+    "DISPLAY.band": {
+        "name": "Filled band between two columns of a profile (visualization_type band)",
+        "description": "The area between the Y column and the option upper, at the X of the rows in row order; the "
+                       "filter drops bins, NaN breaks it; one band per weight series following the selection; "
+                       "band_style (colour, alpha, legend label); per-column types and styles so nested bands and a "
+                       "line share a figure, drawn in the order given; a wrong band refused by name "
+                       "(PHASE_5_2 stage 3)",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_band.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
