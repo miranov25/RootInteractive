@@ -45,7 +45,6 @@ def regression(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
-STAGE_7_TODAY = pytest.mark.xfail(**STRICT, reason="option (y): quantile_curves is ignored")
 UNIT = pytest.mark.headless_unit
 LEVELS = [0.05, 0.1, 0.5, 0.9, 0.95]
 TEXTS = ["5%", "10%", "50%", "90%", "95%"]
@@ -89,7 +88,7 @@ def _ignored(df, figures, histograms, **kw) -> bool:
 
 def _page(tmp_path, tag, df, figures, histograms, **kw):
     from bokeh.document import Document
-    known_defect(_ignored(df, figures, histograms, **kw), "option (y): quantile_curves is ignored")
+    regression(_ignored(df, figures, histograms, **kw), "option (y): quantile_curves is ignored")
     doc = Document()
     doc.add_root(_from_array(df, figures, histograms, widgets=WIDGETS, **kw).pAll)
     out = tmp_path / f"qcurves2d_{tag}.json"
@@ -125,7 +124,6 @@ def _oracle(df, lo, hi):
 # ------------------------------------------------------------------ Node: the numbers and the labels
 @_node
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_each_curve_is_the_levels_quantile_of_b_in_each_a_bin_of_the_selected_rows(node_session, tmp_path):
     """Five curves, one per level; each curve's value in an A bin equals NumPy's linear quantile of B over the
     selected rows of that bin, for all rows and after the slider on C selects [0.3, 0.8]."""
@@ -142,7 +140,6 @@ def test_each_curve_is_the_levels_quantile_of_b_in_each_a_bin_of_the_selected_ro
 
 @_node
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_the_boxed_labels_stand_at_one_x_on_their_curves(node_session, tmp_path):
     """With the shown X range [0, 6], all labels stand at the bin nearest 0.4 of it (2.4: the bin centre 2.5), each at
     its curve's value there, with its level and colour; with the range [3, 6] at 4.5 (4.2); after the slider on C
@@ -168,7 +165,6 @@ def test_the_boxed_labels_stand_at_one_x_on_their_curves(node_session, tmp_path)
 
 @_node
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_the_curves_follow_the_histograms_weights_chosen_by_a_select(node_session, tmp_path):
     """The histogram's weights chosen by a select (one value): w1 = 1 on all rows, wh = 1 where C > 0.5 and 0
     elsewhere. With wh the curves are the quantiles of the rows with C > 0.5 (a zero weight carries no mass)."""
@@ -178,7 +174,7 @@ def test_the_curves_follow_the_histograms_weights_chosen_by_a_select(node_sessio
     params = [{"name": "weights", "value": "w1", "options": ["w1", "wh"]}]
     widgets = WIDGETS + (("select", ["weights"]),)
     figure = _figure()
-    known_defect(_ignored(df, [figure], [_hist(weights="weights")], params=params),
+    regression(_ignored(df, [figure], [_hist(weights="weights")], params=params),
                  "option (y): quantile_curves is ignored")
     from bokeh.document import Document
     doc = Document()
@@ -205,13 +201,12 @@ def _lines(page):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_the_look_dfdraws_colours_dashes_legend_and_the_options():
     """By default dfdraw's look: tab10 from orange, the dash cycle dashed, dashdot, dotted, legend "q=5%" ... "median",
     a LabelSet in white boxes; the options colors, dashes, width, legend False and labels "none" are followed."""
     from bokeh.models import LabelSet, Legend
     df = _table(1000)
-    known_defect(_ignored(df, [_figure()], [_hist()]), "option (y): quantile_curves is ignored")
+    regression(_ignored(df, [_figure()], [_hist()]), "option (y): quantile_curves is ignored")
     page = _from_array(df, [_figure()], [_hist()], widgets=WIDGETS)
     lines = _lines(page)
     assert [r.glyph.line_color for r in lines] == TAB10_FROM_ORANGE and [r.glyph.line_dash for r in lines] == \
@@ -245,24 +240,22 @@ def test_the_look_dfdraws_colours_dashes_legend_and_the_options():
     ([["A"], ["h1"], {"quantile_curves": {"levels": [0.5]}}], {"name": "h1", "variables": ["A"], "nbins": 6,
                                                                "range": [0, 6]}, ["1-D", "quantile_lines"])],
     ids=["key", "levels", "method", "needs_unbinned", "colors", "labels", "label_x", "colZ", "1d"])
-@STAGE_7_TODAY
 def test_a_wrong_option_is_refused_by_name(figure, histogram, named):
     df = _table(500)
     error = _build_error(df, [figure], [histogram], widgets=WIDGETS)
-    known_defect(error is None, "option (y): quantile_curves is ignored")
+    regression(error is None, "option (y): quantile_curves is ignored")
     assert error is not None and error[0] == "ValueError" and all(n in error[1] for n in named), error
 
 
 @UNIT
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_a_histogram_of_several_curves_is_refused_by_name():
     df = _table(500)
     df["w1"], df["w2"] = 1.0, 2.0
     params = [{"name": "weights", "value": ["w1", "w2"], "options": ["w1", "w2"]}]
     error = _build_error(df, [_figure()], [_hist(weights="weights")], params=params,
                          widgets=(("multiSelect", ["weights"]),))
-    known_defect(error is None, "option (y): quantile_curves is ignored")
+    regression(error is None, "option (y): quantile_curves is ignored")
     assert error is not None and error[0] == "ValueError" and "several curves" in error[1], error
 
 
@@ -284,7 +277,6 @@ def _grid_of_quantile_lines(df):
 @UNIT
 @pytest.mark.feature("DISPLAY.facet_grid")
 @pytest.mark.feature("DISPLAY.quantile_curves")
-@STAGE_7_TODAY
 def test_in_a_facet_grid_every_cell_reads_the_shared_range():
     """A facet grid shares one X range among its cells. Stage 4's quantile lines and stage 7's curve labels draw only
     inside the shown range, so each cell's must read the shared range, not the cell's own one, which no plot computes
@@ -296,7 +288,7 @@ def test_in_a_facet_grid_every_cell_reads_the_shared_range():
     grid = [m for m in page.pAll.references() if isinstance(m, GridBox) and m.name == "facet_grid"][0]
     shared = [c[0] for c in grid.children if isinstance(c[0], Plot) and c[0].name != "facet_grid_legend"][0].x_range
     sources = [m for m in page.pAll.references() if isinstance(m, HistogramQuantiles)]
-    known_defect(len(sources) == 2 and sum(s.x_range is shared for s in sources) == 1,
+    regression(len(sources) == 2 and sum(s.x_range is shared for s in sources) == 1,
                  "stage 5: a cell's quantile lines read the cell's own range, not the grid's shared one")
     assert len(sources) == 2 and all(s.x_range is shared for s in sources), [s.x_range for s in sources]
     curves = _grid_page(df)
@@ -335,7 +327,6 @@ def _grid_page(df):
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.quantile_curves")
 @pytest.mark.parametrize("grid", [False, True], ids=["alone", "facet_grid"])
-@STAGE_7_TODAY
 def test_browser_curves_labels_and_legend_are_drawn(headless_session, tmp_path, grid):
     """Chromium: the heatmap with its five curves; each cell's LabelSet has five rows (the shown range is known once
     drawn); the legend (the cell's, or in a facet grid the grid's) lists the five levels once, each in its curve's
@@ -344,7 +335,7 @@ def test_browser_curves_labels_and_legend_are_drawn(headless_session, tmp_path, 
     from bokeh.resources import INLINE
     from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_display import _open_browser_page
     df = _table(3000)
-    known_defect(_ignored(df, [_figure()], [_hist()]), "option (y): quantile_curves is ignored")
+    regression(_ignored(df, [_figure()], [_hist()]), "option (y): quantile_curves is ignored")
     page_model = _grid_page(df) if grid else _from_array(df, [_figure()], [_hist()], widgets=WIDGETS)
     p = tmp_path / "qcurves2d.html"
     save(page_model.pAll, filename=str(p), resources=INLINE, title="quantile curves")

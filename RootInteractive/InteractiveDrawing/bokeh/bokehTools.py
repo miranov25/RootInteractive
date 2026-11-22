@@ -35,6 +35,7 @@ from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.BandPolygons import BandPolygons
 from RootInteractive.InteractiveDrawing.bokeh.HistogramQuantiles import HistogramQuantiles
 from RootInteractive.InteractiveDrawing.bokeh.LegendRows import LegendRows
+from RootInteractive.InteractiveDrawing.bokeh.QuantileCurveLabels import QuantileCurveLabels
 from bokeh.models import LabelSet
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
@@ -370,6 +371,22 @@ def _gridLegend(figures, sizing_mode):
     return strip, len(items)
 
 
+def _replaceRange(fig, old, new):
+    """Stage 7: a cell's range shared with the grid. The models of the cell that read its range (stage 4's quantile
+    lines, stage 7's curve labels: the shown range decides what they draw) read the shared one too; else they would
+    read a range no plot computes, and draw nothing."""
+    for model in fig.references():
+        if model is fig:
+            continue
+        for name in model.properties_with_refs():
+            if getattr(model, name, None) is old:
+                setattr(model, name, new)
+    if fig.x_range is old:
+        fig.x_range = new
+    if fig.y_range is old:
+        fig.y_range = new
+
+
 def buildFacetGrid(description, widgetArray, widgetDict):
     """PHASE_5_2 stage 5 (FR-RI-5): figures in a grid, as dfdraw draws a facet grid (its default page):
     - a title over the whole grid ("title", lines split at "\\n");
@@ -416,10 +433,10 @@ def buildFacetGrid(description, widgetArray, widgetDict):
     flat = [f for r in figures for f in r]
     first = flat[0]
     for f in flat:
-        if d.get("commonX", True):
-            f.x_range = first.x_range
-        if d.get("commonY", True):
-            f.y_range = first.y_range
+        if d.get("commonX", True) and f.x_range is not first.x_range:
+            _replaceRange(f, f.x_range, first.x_range)
+        if d.get("commonY", True) and f.y_range is not first.y_range:
+            _replaceRange(f, f.y_range, first.y_range)
         f.sizing_mode = "stretch_width"
         if d.get("plot_height") is not None:
             f.height = d["plot_height"]
@@ -1370,6 +1387,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     if optionLocal.get("quantile_lines") is not None:
                         addQuantileLines(figureI, histoHandle, optionLocal["quantile_lines"],
                                          optionLocal.get("color", colorHisto), optionLocal["flip_histogram_axes"])
+                    if optionLocal.get("quantile_curves") is not None:
+                        raise ValueError(f"quantile_curves: the histogram {varY!r} is 1-D; quantile curves are drawn "
+                                         f"on a 2-D histogram (quantile_lines on a 1-D one)")
                 elif histoHandle["type"] == "histo2d":
                     if optionLocal.get("quantile_lines") is not None:
                         raise ValueError(f"quantile_lines: the histogram {varY!r} is 2-D; quantile lines are drawn on a "
@@ -1377,6 +1397,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     x_label = f"{{{histoHandle['variables'][0]}}}"
                     y_label = f"{{{histoHandle['variables'][1]}}}"
                     addHisto2dGlyph(figureI, histoHandle, marker, optionLocal)
+                    if optionLocal.get("quantile_curves") is not None:
+                        addQuantileCurves(figureI, histoHandle, optionLocal["quantile_curves"], optionLocal)
             else:
                 drawnGlyph = None
                 colorMapperCallback = """
@@ -2987,6 +3009,85 @@ def checkLineSource(cdsDict, cds_name, visualization_type):
 
 QUANTILE_LINES_DEFAULTS = {"levels": None, "method": "default", "text": "none", "color": None, "legend": True,
                            "width": 1.5}
+QUANTILE_CURVES_DEFAULTS = {"levels": None, "method": "default", "colors": None, "dashes": None, "labels": "boxed",
+                            "label_x": 0.4, "legend": True, "width": 1.5}
+QUANTILE_CURVES_COLORS = ["#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22",
+                          "#17becf"]             # Matplotlib's tab10 from its 2nd colour, as dfdraw's curves
+QUANTILE_CURVES_DASHES = ["dashed", "dashdot", "dotted"]      # dfdraw's cycle
+
+
+def _percent(q):
+    return f"{float(f'{q * 100:.6g}'):g}%"
+
+
+def addQuantileCurves(fig, histoHandle, options, figure_options):
+    """PHASE_5_2 stage 7 (the Architect's option (y)): on a 2-D histogram drawn as a heatmap, a curve per level: the
+    level's quantile of the second variable in each bin of the first (a profile, HistoNdProfile, with these levels),
+    over the selected rows, as dfdraw draws a heatmap with quantile curves; a boxed label per curve ("5%", "50%") in
+    its colour, all at the X bin nearest label_x of the shown X range; a legend entry per level ("q=5%", "median").
+    Option keys: levels (required), method ("default": the histogram's quantile_method; "subbin"; "linear" and
+    "inverted_cdf" need unbinned_projections), colors, dashes (dfdraw's: tab10 from orange, and the cycle dashed,
+    dashdot, dotted), labels ("boxed" or "none"), label_x (0 to 1), legend, width. A heatmap only; a histogram of
+    several curves (a list of weights) is refused by name. Returns the line renderers."""
+    if not isinstance(options, dict):
+        raise ValueError("quantile_curves must be a dict with the keys "
+                         + ", ".join(repr(k) for k in QUANTILE_CURVES_DEFAULTS))
+    for key in options:
+        if key not in QUANTILE_CURVES_DEFAULTS:
+            raise ValueError(f"quantile_curves: unknown key {key!r}; the accepted keys are "
+                             + ", ".join(repr(k) for k in QUANTILE_CURVES_DEFAULTS))
+    o = {**QUANTILE_CURVES_DEFAULTS, **options}
+    levels = o["levels"]
+    if not isinstance(levels, (list, tuple)) or len(levels) == 0 or \
+            not all(isinstance(q, (int, float)) and not isinstance(q, bool) and 0 <= q <= 1 for q in levels):
+        raise ValueError(f"quantile_curves: levels must be a list of numbers from 0 to 1; got {levels!r}")
+    name = histoHandle.get("name", "?")
+    method = checkQuantileMethod(histoHandle) if o["method"] == "default" else o["method"]
+    if method not in QUANTILE_METHODS:
+        raise ValueError(f"quantile_curves: unknown method {method!r}; the accepted methods are 'default', "
+                         + ", ".join(repr(m) for m in QUANTILE_METHODS))
+    if method != "subbin" and not histoHandle.get("unbinned_projections", False):
+        raise ValueError(f"quantile_curves: the method {method!r} reads the rows of a cell, so the histogram {name!r} "
+                         f"needs \"unbinned_projections\": True")
+    if o["labels"] not in ("boxed", "none"):
+        raise ValueError(f"quantile_curves: unknown labels {o['labels']!r}; the accepted values are 'boxed', 'none'")
+    if not isinstance(o["label_x"], (int, float)) or isinstance(o["label_x"], bool) or not 0 <= o["label_x"] <= 1:
+        raise ValueError(f"quantile_curves: label_x must be a number from 0 to 1; got {o['label_x']!r}")
+    for key in ("colors", "dashes"):
+        if o[key] is not None and (not isinstance(o[key], list) or len(o[key]) != len(levels)):
+            raise ValueError(f"quantile_curves: {key} must be a list of {len(levels)} values, one per level; "
+                             f"got {o[key]!r}")
+    visualization_type = figure_options.get("visualization_type", "heatmap")
+    if visualization_type != "heatmap":
+        raise ValueError(f"quantile_curves are drawn on a heatmap; the figure's visualization_type is "
+                         f"{visualization_type!r}")
+    histogram = histoHandle["cdsOrig"]
+    if not isinstance(histogram, HistoNdCDS):
+        raise ValueError(f"quantile_curves: the histogram {name!r} has several curves; quantile curves are drawn on "
+                         f"a heatmap of one curve")
+    colors = o["colors"] or [QUANTILE_CURVES_COLORS[k % len(QUANTILE_CURVES_COLORS)] for k in range(len(levels))]
+    dashes = o["dashes"] or [QUANTILE_CURVES_DASHES[k % len(QUANTILE_CURVES_DASHES)] for k in range(len(levels))]
+    profile = HistoNdProfile(source=histogram, axis_idx=1, quantiles=[float(q) for q in levels], sum_range=[],
+                             weights=histogram.weights, unbinned=histoHandle.get("unbinned_projections", False),
+                             quantile_method=method, name=f"{histogram.name}#quantile_curves")
+    histogram.js_link("weights", profile, "weights")
+    # a renderer's source needs Bokeh's data property, which a profile does not have: drawn through a DownsamplerCDS
+    # of all its rows, as RootInteractive draws every profile
+    drawn = DownsamplerCDS(source=profile, nPoints=-1, name=f"{histogram.name}#quantile_curves_drawn")
+    renderers = []
+    for k, q in enumerate(levels):
+        legend = {"legend_label": "median" if q == 0.5 else f"q={_percent(q)}"} if o["legend"] else {}
+        renderers.append(fig.line(x="bin_center_0", y=f"quantile_{k}", source=drawn, line_color=colors[k],
+                                  line_dash=dashes[k], line_width=o["width"], **legend))
+    if o["labels"] == "boxed":
+        source = QuantileCurveLabels(source=profile, x="bin_center_0", curves=[f"quantile_{k}" for k in range(len(levels))],
+                                     texts=[_percent(q) for q in levels], colors=list(colors),
+                                     levels=[float(q) for q in levels], x_range=fig.x_range,
+                                     fraction=float(o["label_x"]), name=f"{histogram.name}#quantile_curve_labels")
+        fig.add_layout(LabelSet(x="x", y="y", text="text", source=source, text_color={"field": "color"},
+                                text_font_size="8pt", text_font_style="bold", text_align="center",
+                                text_baseline="middle", background_fill_color="white", background_fill_alpha=0.9))
+    return renderers
 
 
 def addQuantileLines(fig, histoHandle, options, colour, flipped):
