@@ -12,8 +12,9 @@ In plain words.
 - The drawing: a line only when the value is inside the shown range; the median solid, the other levels dashed, in
   the curve's colour; a legend entry per level ("median", "q=10%"); an optional text at the top ("10%: 0.2899");
   a horizontal line with RootInteractive's flipped histogram axes.
-- This first version draws one curve: a histogram of several curves (a list of weights) is refused by name, never
-  pooled. A 2-D histogram, a wrong key, level, method or text are refused by name.
+- Stage 4 drew one curve and refused several; since stage 6 a histogram of several curves (a list of weights) has
+  the lines of each curve (test_headless_phase5_2_quantile_lines_curves.py). A 2-D histogram, a wrong key, level,
+  method or text are refused by name.
 - Before the fix (commit 1 of stage 4, the tests only) the option was silently ignored: the page was built without
   any quantile line. Strict expected failures (KnownDefect); since the fix, regressions that name it.
 Author: Claude10.RI, 2026-11-22.
@@ -257,16 +258,9 @@ def test_a_wrong_option_is_refused_by_name(quantile_lines, named):
 
 @UNIT
 @pytest.mark.feature("DISPLAY.quantile_lines")
-def test_several_curves_and_a_2d_histogram_are_refused_by_name():
+def test_a_2d_histogram_is_refused_by_name():
+    """(Stage 4 also refused a histogram of several curves; stage 6 draws their lines, curve by curve.)"""
     df = _gauss(300)
-    df["w1"] = 1.0
-    params = [{"name": "weights", "value": ["wr", "w1"], "options": ["wr", "w1"]}]
-    several = _build_error(df, [_figure()], [_hist(weights="weights")], params=params,
-                           widgets=(("multiSelect", ["weights"]),))
-    regression(several is None and _ignored(df, [_figure()], [_hist(weights="weights")], params=params,
-                                              widgets=(("multiSelect", ["weights"]),)),
-                 "FR-RI-3: quantile_lines is ignored")
-    assert several is not None and several[0] == "ValueError" and "several curves" in several[1], several
     df["B"] = df.A * 2
     two_d = _build_error(df, [[["A"], ["h2"], {"quantile_lines": {"levels": [0.5]}}]],
                          [{"name": "h2", "variables": ["A", "B"], "nbins": [4, 4], "range": [[0, 1], [0, 2]]}])

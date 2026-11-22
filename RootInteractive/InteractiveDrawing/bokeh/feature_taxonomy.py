@@ -457,11 +457,13 @@ FEATURE_TAXONOMY = {
         "description": "Vertical lines at dfdraw's quantiles (linear; weighted inverted_cdf or linear) of all the "
                        "selected finite rows, independent of the histogram's bins and range; only inside the shown "
                        "range; median solid, others dashed; legend per level; optional text; horizontal with "
-                       "flipped axes; several curves, 2-D and wrong options refused by name (PHASE_5_2 stage 4)",
+                       "flipped axes; 2-D and wrong options refused by name (PHASE_5_2 stage 4); the lines of each "
+                       "curve of a histogram of several curves, from its own rows, while it is selected, in its "
+                       "colour, and in a facet grid's legend (stage 6)",
         "priority": "P2",
         "backends": ["node", "browser"],
         "layer": "integration",
-        "proof": "headless/test_headless_phase5_2_quantile_lines.py",
+        "proof": "headless/test_headless_phase5_2_quantile_lines.py, headless/test_headless_phase5_2_quantile_lines_curves.py",
     },
     "DISPLAY.facet_grid": {
         "name": "A facet grid with its titles, one legend and a footer (facetGrid layout element)",
