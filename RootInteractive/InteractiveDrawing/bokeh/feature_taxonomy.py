@@ -452,6 +452,17 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_phase5_2_band.py",
     },
+    "DISPLAY.quantile_lines": {
+        "name": "Lines at the exact quantiles of a histogram's selected rows (quantile_lines)",
+        "description": "Vertical lines at dfdraw's quantiles (linear; weighted inverted_cdf or linear) of all the "
+                       "selected finite rows, independent of the histogram's bins and range; only inside the shown "
+                       "range; median solid, others dashed; legend per level; optional text; horizontal with "
+                       "flipped axes; several curves, 2-D and wrong options refused by name (PHASE_5_2 stage 4)",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_quantile_lines.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
