@@ -31,6 +31,7 @@ from RootInteractive.InteractiveDrawing.bokeh.MultiSelectFilter import MultiSele
 from RootInteractive.InteractiveDrawing.bokeh.LazyTabs import LazyTabs
 from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
+from RootInteractive.InteractiveDrawing.bokeh.BandPolygons import BandPolygons
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
 from RootInteractive.InteractiveDrawing.bokeh.CDSStack import CDSStack
@@ -63,11 +64,13 @@ defaultHisto2DTooltips = [
     ("count", "@bin_count")
 ]
 
-BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY", "filter"]
+BOKEH_DRAW_ARRAY_VAR_NAMES = ["X", "Y", "varZ", "colorZvar", "marker_field", "legend_field", "errX", "errY", "filter",
+                              "upper"]   # PHASE_5_2 stage 3: the upper edge of a band (the Y column is the lower edge)
 
 # PHASE_5_2 stage 1: the figure types of a figure entry (BR-RI-1: the histogram types are in the two histogram helpers)
 LINE_TYPES = ("line", "scatter+line")
-FIGURE_TYPES = ("scatter", "heatmap") + LINE_TYPES
+FIGURE_TYPES = ("scatter", "heatmap") + LINE_TYPES + ("band",)
+BAND_STYLE_DEFAULTS = {"color": None, "alpha": 0.25, "legend_label": None}
 HISTOGRAM_1D_TYPES = ("points", "bars")
 HISTOGRAM_2D_TYPES = ("heatmap", "colZ")
 LINE_STYLE_DEFAULTS = {"dash": "solid", "width": 1, "color": None, "alpha": 1.0, "legend_label": None}
@@ -1170,15 +1173,30 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 glyph.fill_color={...glyph.fill_color, field:this.value}
                 glyph.line_color={...glyph.line_color, field:this.value}
                 """
-                visualization_type = optionLocal.get("visualization_type")
+                # PHASE_5_2 stage 3: visualization_type, line_style and band_style may be lists, one per Y column, so
+                # that one figure holds bands (outer first) and a line on top
+                visualization_type = perColumn(optionLocal.get("visualization_type"), i)
                 if visualization_type is None:
                     if isinstance(variables_dict["X"], tuple):
                         visualization_type = "heatmap"
                     else:
                         visualization_type = "scatter"
+                if visualization_type == "band":
+                    # PHASE_5_2 stage 3 (FR-RI-2): checked before anything is drawn
+                    bandStyleChecked = checkBandStyle(perColumn(optionLocal.get("band_style"), i))
+                    checkLineSource(cdsDict, cds_name, visualization_type)
+                    checkLineSeries(cdsDict, cds_name, visualization_type, optionLocal["legend_field"], bandStyleChecked)
+                    if variables_dict["upper"] is None:
+                        raise ValueError("visualization_type 'band': the option upper (the upper edge's column) is "
+                                         "missing; the Y column is the lower edge")
+                    if varColor is not None:
+                        raise ValueError("visualization_type 'band': a band has one colour; colorZvar is not supported")
+                    if x_transform or y_transform:
+                        raise ValueError("visualization_type 'band': x_transform and y_transform are not supported on "
+                                         "a band; give the transformed columns")
                 if visualization_type in LINE_TYPES:
                     # PHASE_5_2 stage 1 (FR-RI-1): checked before anything is drawn
-                    lineStyleChecked = checkLineStyle(optionLocal.get("line_style"))
+                    lineStyleChecked = checkLineStyle(perColumn(optionLocal.get("line_style"), i))
                     checkLineSource(cdsDict, cds_name, visualization_type)
                     if visualization_type == "line" and varColor is not None:
                         raise ValueError("visualization_type 'line': a line has one colour; colorZvar is not supported, "
@@ -1265,7 +1283,7 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                                 color=color, marker=marker, legend_label=''.join(legend_label.components))
                     if optionLocal['size'] in paramDict:
                         paramDict[optionLocal['size']]["subscribed_events"].append(["value", drawnGlyph.glyph, "size"])
-                elif visualization_type == "line":
+                elif visualization_type in ("line", "band"):
                     varNameX = variables_dict["X"]["name"]
                     varNameY = variables_dict["Y"]["name"]
                     x_transform_modified = modify_2d_transform(x_transform_parsed, x_transform_customjs, variables_dict["Y"]["name"], cds_used) if x_transform else None
@@ -1282,6 +1300,12 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     raise NotImplementedError(f"Visualization type not supported: {visualization_type}; the accepted "
                                               f"types are " + ", ".join(repr(t) for t in FIGURE_TYPES))
                 lineRenderers = []
+                if visualization_type == "band":
+                    lineRenderers = addBands(figureI, cdsDict, paramDict, cds_name, cds_used, varNameX, varNameY,
+                                             variables_dict["upper"]["name"], bandStyleChecked,
+                                             color if isinstance(color, str) else colorAll[max(length, 4)][i],
+                                             list(colorAll[10]), optionLocal.get("color"))
+                    drawnGlyph = lineRenderers[0]
                 if visualization_type in LINE_TYPES:
                     lineLegend = None
                     if visualization_type == "line":
@@ -1308,6 +1332,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                     hover_tool_renderers[cds_name] = []
                 if visualization_type == "line":
                     hover_tool_renderers[cds_name].extend(lineRenderers)
+                elif visualization_type == "band":
+                    pass                                         # the band's polygons have no rows to hover over
                 else:
                     hover_tool_renderers[cds_name].append(drawnGlyph)
                 if variables_dict['errX'] is not None:
@@ -2161,7 +2187,8 @@ def makeCDSDict(sourceArray, paramDict, options={}):
                 if f"{cds_name}_{str(j)}" not in cdsDict:
                     cdsDict[f"{cds_name}_{str(j)}"] = {"type": "projection", "name": f"{cds_name}_{str(j)}", "source":cds_name, "weights":iSource.get("weights", None), 
                             "quantiles": iSource.get("quantiles", []), "sum_range": iSource.get("sum_range", []), "axis":j,
-                            "sources":iSource.get("sources", None), "unbinned":iSource.get("unbinned_projections", False)}
+                            "sources":iSource.get("sources", None), "unbinned":iSource.get("unbinned_projections", False),
+                            "quantile_method": checkQuantileMethod(iSource)}
 
     for cds_name, iSource in cdsDict.items():
         if iSource["type"] == "source":
@@ -2206,6 +2233,7 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             weightsOrig = cdsDict[source].get("weights", None)
             weightsNew = iCds.get("weights", None)
             unbinned = iCds.get("unbinned", False)
+            quantile_method = iCds.get("quantile_method", "subbin")
             quantiles = iCds.get("quantiles", [])
             sum_range = iCds.get("sum_range", [])
             axis_idx = iCds.get("axis", iCds.get("axis_idx", 0))
@@ -2220,7 +2248,8 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                     weightsLabels = getWeightsLabels(cdsDict, cdsDict[source].get("source", None),
                                                      paramDict[weightsOrig].get("options", weightsValue))
                     cdsProfile = HistoNdProfile(source=cdsOrig.sources[0], axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
-                            sum_range=sum_range, name=cdsName, unbinned=unbinned, weights_labels=weightsLabels)
+                            sum_range=sum_range, name=cdsName, unbinned=unbinned, weights_labels=weightsLabels,
+                            quantile_method=quantile_method)
                     paramDict[weightsOrig]["subscribed_events"].append(["value", CustomJS(args={"cds":cdsProfile}, code="""
                         cds.weights=this.value.map(x => x === "None" ? null : x)
                                                                                           """)])
@@ -2232,7 +2261,8 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
                     for i in cdsOrig.sources:
                         weights = i.weights if weightsOrig == weightsNew else weightsNew
                         cdsProfile = HistoNdProfile(source=i, axis_idx=axis_idx, quantiles=quantiles, weights=weights,
-                                                    sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned)
+                                                    sum_range=sum_range, name=f"{cdsName}_{i.name}", unbinned=unbinned,
+                                                    quantile_method=quantile_method)
                         if weightsOrig == weightsNew:
                             i.js_link("weights", cdsProfile, "weights")
                         projections.append(cdsProfile)
@@ -2246,7 +2276,8 @@ def getOrMakeCdsOrig(cdsDict: dict, paramDict: dict, key: str):
             else:
                 weightsValue = weightsNew if weightsNew not in paramDict else paramDict[weightsNew]["value"]
                 cdsProfile = HistoNdProfile(source=cdsOrig, axis_idx=axis_idx, quantiles=quantiles, weights=weightsValue,
-                                            sum_range=sum_range, name=cdsName, unbinned=unbinned)
+                                            sum_range=sum_range, name=cdsName, unbinned=unbinned,
+                                            quantile_method=quantile_method)
                 if weightsNew in paramDict:
                     paramDict[weightsNew]["subscribed_events"].append(("value", cdsProfile, "weights"))
                 iCds["cdsOrig"] = cdsProfile
@@ -2627,6 +2658,24 @@ def _tableRowCount(sent_data, data):
     return len(data) if isinstance(data, pd.DataFrame) else 0
 
 
+QUANTILE_METHODS = ("subbin", "linear", "inverted_cdf")
+
+
+def checkQuantileMethod(histogram):
+    """PHASE_5_2 stage 3: the option quantile_method of a histogram, for the quantiles of its projections (profiles).
+    "subbin" (the default) is RootInteractive's present method (DEC-10); "linear" and "inverted_cdf" are dfdraw's
+    estimators over all the rows of a cell (NumPy's linear without weights; with weights the weighted linear and the
+    weighted inverted_cdf), and need unbinned_projections, because they read the rows."""
+    method = histogram.get("quantile_method", "subbin")
+    if method not in QUANTILE_METHODS:
+        raise ValueError(f"histogram {histogram.get('name', '?')!r}: unknown quantile_method {method!r}; the accepted "
+                         f"methods are " + ", ".join(repr(m) for m in QUANTILE_METHODS))
+    if method != "subbin" and not histogram.get("unbinned_projections", False):
+        raise ValueError(f"histogram {histogram.get('name', '?')!r}: quantile_method {method!r} reads the rows of a "
+                         f"cell, so it needs \"unbinned_projections\": True")
+    return method
+
+
 def checkHistogramType(visualization_type, accepted, dimension, histoHandle):
     """PHASE_5_2 stage 1 (BR-RI-1): an unknown type of a histogram figure is refused by name, before anything is drawn
     (it used to fail with an error that did not name it, or to build a page without the histogram)."""
@@ -2664,6 +2713,34 @@ def checkLineStyle(style):
     return out
 
 
+def perColumn(value, i):
+    """PHASE_5_2 stage 3: an option given as a list holds one value per Y column of the figure entry (cycled)."""
+    return value[i % len(value)] if isinstance(value, list) and len(value) > 0 else value
+
+
+def checkBandStyle(style):
+    """PHASE_5_2 stage 3 (FR-RI-2): the option band_style of a band, checked; every wrong key or value is refused by
+    name. Returns it with its defaults (the series' colour, alpha 0.25 as dfdraw's band, no legend entry)."""
+    if style is None:
+        style = {}
+    if not isinstance(style, dict):
+        raise ValueError("band_style must be a dict with the keys " + ", ".join(repr(k) for k in BAND_STYLE_DEFAULTS)
+                         + f"; got {style!r}")
+    for key in style:
+        if key not in BAND_STYLE_DEFAULTS:
+            raise ValueError(f"band_style: unknown key {key!r}; the accepted keys are "
+                             + ", ".join(repr(k) for k in BAND_STYLE_DEFAULTS))
+    out = {**BAND_STYLE_DEFAULTS, **style}
+    alpha = out["alpha"]
+    if isinstance(alpha, bool) or not isinstance(alpha, (int, float)) or not 0 <= alpha <= 1:
+        raise ValueError(f"band_style: the alpha must be a number from 0 to 1; got {alpha!r}")
+    if out["color"] is not None and not isinstance(out["color"], str):
+        raise ValueError(f"band_style: the color must be a colour name or code; got {out['color']!r}")
+    if out["legend_label"] is not None and not isinstance(out["legend_label"], str):
+        raise ValueError(f"band_style: the legend_label must be a text; got {out['legend_label']!r}")
+    return out
+
+
 def isWeightSeries(cdsDict, cds_name):
     """True for a profile of several weights: its series are row blocks told apart by the column "weights"."""
     cdsOrig = (cdsDict.get(cds_name) or {}).get("cdsOrig")
@@ -2681,8 +2758,9 @@ def checkLineSeries(cdsDict, cds_name, visualization_type, legend_field, style):
                          f"would be joined by one line; lines are split only by the weights of a profile "
                          f"(give each group as a weight), or use 'scatter' for markers alone")
     if series and style["legend_label"] is not None:
-        raise ValueError(f"visualization_type {visualization_type!r}: line_style legend_label is for a single line; "
-                         f"each weight series takes its weight's label (the weight column's AxisTitle)")
+        raise ValueError(f"visualization_type {visualization_type!r}: a legend_label of one's own (line_style, "
+                         f"band_style) is for a single line or band; each weight series takes its weight's label "
+                         f"(the weight column's AxisTitle)")
 
 
 def checkLineSource(cdsDict, cds_name, visualization_type):
@@ -2692,7 +2770,7 @@ def checkLineSource(cdsDict, cds_name, visualization_type):
     kind = (cdsDict.get(cds_name) or {}).get("type")
     if kind != "projection":
         name = "the main table" if cds_name is None else repr(cds_name)
-        raise ValueError(f"visualization_type {visualization_type!r}: a line is drawn only on a histogram projection "
+        raise ValueError(f"visualization_type {visualization_type!r}: a line or a band is drawn only on a histogram projection "
                          f"(a profile, whose rows are the bins in order); the source {name} is of type {kind!r}, "
                          f"whose rows are downsampled when drawn, so a line through them would skip rows")
 
@@ -2700,23 +2778,48 @@ def checkLineSource(cdsDict, cds_name, visualization_type):
 def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, style, color, palette, legend_label,
              figure_color=None):
     """PHASE_5_2 stage 1 (FR-RI-1): the line(s) of a figure entry, through the rows of `cds_used` in row order.
+    One line per weight series of a profile (see addSeriesGlyphs). `legend_label` is None when the figure has markers
+    too: the markers' legend stands. Returns the renderers."""
+    kw = {"line_dash": style["dash"], "line_width": style["width"], "line_alpha": style["alpha"]}
+    return addSeriesGlyphs(fig, "line", ["line_color"], {"x": dataSpecX, "y": dataSpecY}, kw, style["color"],
+                           cdsDict, paramDict, cds_name, cds_used, color, palette, legend_label, figure_color)
+
+
+def addBands(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecLower, dataSpecUpper, style, color,
+             palette, figure_color=None):
+    """PHASE_5_2 stage 3 (FR-RI-2): the filled band(s) of a figure entry between a lower and an upper column, at the X
+    of its rows in row order; one band per weight series of a profile (see addSeriesGlyphs). Bands are drawn in the
+    order of the figure entries, so nested bands are given outer first; a NaN in either edge breaks a band: the band is
+    drawn as polygons (BandPolygons, Patches), because Bokeh 3.3.2's VArea joins the neighbours of a NaN. Returns
+    the renderers."""
+    kw = {"fill_alpha": style["alpha"], "line_alpha": 0}
+    make_source = lambda rows: BandPolygons(source=rows, x=dataSpecX, lower=dataSpecLower, upper=dataSpecUpper,
+                                            name=f"{rows.name}#band")
+    return addSeriesGlyphs(fig, "patches", ["fill_color"], {"xs": "xs", "ys": "ys"}, kw, style["color"], cdsDict,
+                           paramDict, cds_name, cds_used, color, palette, style["legend_label"], figure_color,
+                           make_source)
+
+
+def addSeriesGlyphs(fig, method, colour_props, specs, kw, fixed, cdsDict, paramDict, cds_name, cds_used, color,
+                    palette, legend_label, figure_color, make_source=lambda rows: rows):
+    """PHASE_5_2: glyphs of a connected kind (a line, a band) through the rows of `cds_used` in row order.
 
     A profile of several weights holds its series as consecutive row blocks in one source; Bokeh 3.3.2 refuses a
     filtered view on a line (validation error 1024), so each weight option gets its own small source: a
     DownsamplerCDS that keeps all rows of `cds_used` (already filtered by the figure's filter) whose "weights" column
-    is that option (ColumnFilter with a value). The lines follow the weight selection: a line is shown while its
-    weight is selected, in the colour its markers get, unless line_style gives a colour:
+    is that option (ColumnFilter with a value). The glyphs follow the weight selection: shown while their weight is
+    selected, in the colour its markers get, unless the style gives a colour (`fixed`):
     - with the figure option color given as a colour mapper on "weights" (the compiler's fixed factor_cmap), the
       weight's colour in that mapper, the same whatever is selected (stage 1b);
     - otherwise RootInteractive's own order: the k-th selected weight takes the k-th colour of the palette.
-    A line-only figure lists the shown lines in its legend. `legend_label` is None when the figure has markers too:
-    the markers' legend stands. Returns the renderers."""
-    kw = {"line_dash": style["dash"], "line_width": style["width"], "line_alpha": style["alpha"]}
-    fixed = style["color"]
+    Without weight series there is one glyph, in `fixed` or `color`. With a `legend_label`, a single glyph gets that
+    legend entry and each series its weight's label; the entries of hidden series are hidden."""
+    draw = getattr(fig, method)
+    colours = lambda c: {prop: c for prop in colour_props}
     cdsOrig = cdsDict[cds_name]["cdsOrig"]
     if not (isinstance(cdsOrig, HistoNdProfile) and isinstance(cdsOrig.weights, list)):
         legend = {} if legend_label is None else {"legend_label": legend_label}
-        return [fig.line(x=dataSpecX, y=dataSpecY, source=cds_used, line_color=fixed or color, **kw, **legend)]
+        return [draw(source=make_source(cds_used), **specs, **colours(fixed or color), **kw, **legend)]
     param = paramDict[cdsDict[cds_name]["weights"]]
     series = [str(w) for w in param.get("options", param["value"])]
     selected = [str(w) for w in param["value"]]
@@ -2733,17 +2836,16 @@ def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, 
     renderers = []
     for w in series:
         k = selected.index(w) if w in selected else -1
-        source = DownsamplerCDS(source=cds_used, nPoints=-1, name=f"{cds_used.name}#line {w}",
+        source = DownsamplerCDS(source=cds_used, nPoints=-1, name=f"{cds_used.name}#{method} {w}",
                                 filter=ColumnFilter(source=cds_used, field="weights", value=w))
         legend = {} if legend_label is None else {"legend_label": labels.get(w, w)}
         if mapper is not None:
             factors = [str(f) for f in mapper.factors]
             j = factors.index(w) if w in factors else -1
-            line_color = fixed or (mapper.palette[j] if 0 <= j < len(mapper.palette) else nan_color)
+            colour = fixed or (mapper.palette[j] if 0 <= j < len(mapper.palette) else nan_color)
         else:
-            line_color = fixed or (palette[k] if 0 <= k < len(palette) else nan_color)
-        renderers.append(fig.line(x=dataSpecX, y=dataSpecY, source=source, line_color=line_color, visible=k >= 0,
-                                  **kw, **legend))
+            colour = fixed or (palette[k] if 0 <= k < len(palette) else nan_color)
+        renderers.append(draw(source=make_source(source), **specs, **colours(colour), visible=k >= 0, **kw, **legend))
     items = [None] * len(renderers)
     if legend_label is not None:
         for legend in fig.legend:
@@ -2755,14 +2857,16 @@ def addLines(fig, cdsDict, paramDict, cds_name, cds_used, dataSpecX, dataSpecY, 
             item.visible = any(r.visible for r in item.renderers)
     param["subscribed_events"].append(["value", CustomJS(
         args={"renderers": renderers, "series": series, "palette": palette, "fixed": fixed, "nan_color": nan_color,
-              "items": items, "mapper": mapper}, code="""
-        // PHASE_5_2 stage 1: the line of each weight series follows the weight selection, in its markers' colour
+              "items": items, "mapper": mapper, "colour_props": colour_props}, code="""
+        // PHASE_5_2: the glyph of each weight series follows the weight selection, in its markers' colour
         const selected = this.value.map(String)
         const shown = new Map()
         for (let k = 0; k < renderers.length; k++) {
             const j = selected.indexOf(series[k])
             renderers[k].visible = j >= 0
-            if (fixed == null && j >= 0 && mapper == null) renderers[k].glyph.line_color = j < palette.length ? palette[j] : nan_color
+            if (fixed == null && j >= 0 && mapper == null) {
+                for (const prop of colour_props) renderers[k].glyph[prop] = j < palette.length ? palette[j] : nan_color
+            }
             const item = items[k]
             if (item != null) shown.set(item, (shown.get(item) ?? false) || j >= 0)
         }

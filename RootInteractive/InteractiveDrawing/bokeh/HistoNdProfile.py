@@ -1,4 +1,4 @@
-from bokeh.core.properties import Instance, List, Float, Int, Bool, String, Either, Dict
+from bokeh.core.properties import Instance, List, Float, Int, Bool, String, Either, Dict, Enum
 from bokeh.models import ColumnarDataSource
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
 
@@ -32,3 +32,6 @@ class HistoNdProfile(ColumnarDataSource):
     else:
         weights = Either(List(String), String(), default=None)
         weights_labels = Dict(String, String)
+    # PHASE_5_2 stage 3: the quantile of a cell. "subbin" is RootInteractive's present method (DEC-10); "linear" and
+    # "inverted_cdf" are dfdraw's estimators over all the cell's rows (unbinned projections only)
+    quantile_method = Enum("subbin", "linear", "inverted_cdf", default="subbin")

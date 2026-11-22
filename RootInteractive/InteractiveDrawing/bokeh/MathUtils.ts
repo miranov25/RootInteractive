@@ -232,3 +232,65 @@ export function solve(x:number[], y:number[]){
   }
   return y
 }
+
+// ------------------------------------------------------------------------------------------------------------------
+// PHASE_5_2: the quantile estimators of dfdraw (plots/_hist_quantiles.py, the Architect's decisions of 2026-11-10),
+// for profiles (quantile_method) and for the exact quantile lines of histograms.
+// - without weights: NumPy's method "linear", position (n-1) q among the sorted finite values;
+// - with weights, method "inverted_cdf" (dfdraw's default): the smallest value whose cumulative weight share reaches q,
+//   as NumPy 2 computes it (cumulative sum divided by the total, then the first index with share >= q);
+// - with weights, method "linear": h = q (W - w1) + w1, interpolated over the cumulative weights C_k of the sorted
+//   values (w1 the weight of the smallest value); with unit weights it equals NumPy's linear;
+// - a weight of 0 carries no mass; a negative or non-finite weight gives NaN (refused); no positive weight gives NaN.
+
+// The finite values with positive weight, sorted, with their weights (null when no weights are given); null when a
+// weight is negative or not finite.
+export function sorted_with_weights(values: ArrayLike<number>, weights: ArrayLike<number> | null,
+                                    indices: Iterable<number>): {xs: number[], ws: number[] | null} | null {
+  const pairs: number[][] = []
+  for (const i of indices) {
+    const v = values[i]
+    if (!isFinite(v)) continue
+    if (weights == null) { pairs.push([v, 1]); continue }
+    const w = weights[i]
+    if (!isFinite(w) || w < 0) return null
+    if (w > 0) pairs.push([v, w])
+  }
+  pairs.sort((a, b) => a[0] - b[0])
+  return {xs: pairs.map(p => p[0]), ws: weights == null ? null : pairs.map(p => p[1])}
+}
+
+// One level q in [0, 1] of sorted values (see sorted_with_weights); NaN for an empty set or a level outside [0, 1].
+export function quantile_of_sorted(xs: number[], ws: number[] | null, q: number, method: string): number {
+  const n = xs.length
+  if (n === 0 || !(q >= 0 && q <= 1)) return NaN
+  if (ws == null || method === "linear" && ws.every(w => w === 1)) {
+    if (method === "inverted_cdf") {
+      const k = Math.max(Math.ceil(n * q) - 1, 0)
+      return xs[k]
+    }
+    const h = (n - 1) * q
+    const r0 = Math.floor(h)
+    return h > r0 ? lerp(xs[r0], xs[r0 + 1], h - r0) : xs[r0]
+  }
+  const cumulative: number[] = []
+  let total = 0
+  for (const w of ws) { total += w; cumulative.push(total) }
+  if (method === "inverted_cdf") {
+    for (let k = 0; k < n; k++) {
+      if (cumulative[k] / total >= q) return xs[k]
+    }
+    return xs[n - 1]
+  }
+  // weighted linear
+  const h = q * (total - ws[0]) + ws[0]
+  let before = 0
+  for (let k = 0; k < n; k++) {
+    if (cumulative[k] >= h) {
+      if (k === 0) return xs[0]
+      return lerp(xs[k - 1], xs[k], (h - before) / (cumulative[k] - before))
+    }
+    before = cumulative[k]
+  }
+  return xs[n - 1]
+}

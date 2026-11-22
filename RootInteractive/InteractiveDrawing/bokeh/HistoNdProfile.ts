@@ -1,7 +1,7 @@
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Model} from "model"
 import * as p from "core/properties"
-import { quantile, weighted_kth_value } from "./MathUtils"
+import { quantile, weighted_kth_value, sorted_with_weights, quantile_of_sorted } from "./MathUtils"
 
 export namespace HistoNdProfile {
   export type Attrs = p.AttrsOf<Props>
@@ -14,6 +14,7 @@ export namespace HistoNdProfile {
     unbinned: p.Property<boolean>
     weights: p.Property<(string | null)[] | string | null>
     weights_labels: p.Property<{[key: string]: string} | null>
+    quantile_method: p.Property<string>
   }
 }
 
@@ -39,7 +40,10 @@ export class HistoNdProfile extends ColumnarDataSource {
       sum_range: [Array(Array(Number)), []],
       unbinned: [Boolean, false],
       weights: [Nullable(Or(Array(Nullable(String)), String)), null],
-      weights_labels: [Nullable(Dict(String)), null] // the display text of a weight column, for the legend
+      weights_labels: [Nullable(Dict(String)), null], // the display text of a weight column, for the legend
+      // PHASE_5_2 stage 3: "subbin" (RootInteractive's present method, DEC-10), or dfdraw's "linear" or "inverted_cdf"
+      // over all the rows of a cell (unbinned only); see MathUtils.quantile_of_sorted
+      quantile_method: [String, "subbin"]
     }))
   }
 
@@ -232,6 +236,19 @@ export class HistoNdProfile extends ColumnarDataSource {
                 // Invalid quantiles - negative
                 while(iq < order.length && quantiles[order[iq]] < 0){
                   iq++
+                }
+                if(unbinned && this.quantile_method !== "subbin"){
+                  // PHASE_5_2 stage 3: dfdraw's estimator over all the rows of the cell (finite values, weight > 0)
+                  const indices: number[] = []
+                  for (let y = 0; y < stride_high; y += stride_low) {
+                    const index_low = x+y+z ? global_cumulative_histogram![x+y+z-1] : 0
+                    for (let i = index_low; i < global_cumulative_histogram![x+y+z]; i++) indices.push(i)
+                  }
+                  const cell = sorted_with_weights(sorted_entries!, sorted_weights, indices)
+                  for (let i = 0; i < quantiles.length; i++) {
+                    cell_quantiles[i] = cell == null ? NaN : quantile_of_sorted(cell.xs, cell.ws, quantiles[i], this.quantile_method)
+                  }
+                  iq = order.length
                 }
                 for (let j = 0; j < cumulative_histogram.length && iq < order.length; j++) {
                   const y = j*stride_low
