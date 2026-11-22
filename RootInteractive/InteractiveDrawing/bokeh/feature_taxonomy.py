@@ -429,6 +429,17 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_phase5_2_lines.py",
     },
+    "DISPLAY.text_braces": {
+        "name": "Text with braces in titles and axis titles (as written)",
+        "description": "{name} is replaced as before (parameter value that follows its widget, AxisTitle, name); "
+                       "{{ and }} are written braces; TeX ($$...$$, \\(...\\), \\[...\\]) is kept as written; "
+                       "unpaired braces stay; figures, histogram figures, both axes, in Python, Node and Chromium "
+                       "(PHASE_5_2 stage 2)",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_braces.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
