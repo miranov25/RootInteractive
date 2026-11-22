@@ -42,7 +42,6 @@ def regression(condition: bool, message: str) -> None:
 
 
 STRICT = dict(strict=True, raises=KnownDefect)
-STAGE_5_TODAY = pytest.mark.xfail(**STRICT, reason="FR-RI-5: the layout element facetGrid is not known")
 UNIT = pytest.mark.headless_unit
 
 
@@ -105,9 +104,8 @@ def _no_grid(grid=None) -> bool:
 # ------------------------------------------------------------------ Python: the grid as built
 @UNIT
 @pytest.mark.feature("DISPLAY.facet_grid")
-@STAGE_5_TODAY
 def test_the_grid_is_built_with_its_titles_shared_ranges_and_one_legend():
-    known_defect(_no_grid(), "FR-RI-5: the layout element facetGrid is read as tabs")
+    regression(_no_grid(), "FR-RI-5: the layout element facetGrid is read as tabs")
     page = _from_array()
     grid = _grid_of(page)
     from bokeh.models import Div, Legend, Plot
@@ -139,10 +137,9 @@ def test_the_grid_is_built_with_its_titles_shared_ranges_and_one_legend():
     ({"cells": [[0, 1, 2], [3, 4, 9]]}, ["9", "not a figure"]),
     ({"cellTitles": [["a"], ["b"]]}, ["cellTitles", "shape"]),
     ({"legend": "right"}, ["'right'", "'top'", "'none'"])])
-@STAGE_5_TODAY
 def test_a_wrong_grid_is_refused_by_name(change, named):
     grid = {**GRID, **change}
-    known_defect(_no_grid(grid), "FR-RI-5: the layout element facetGrid is read as tabs")
+    regression(_no_grid(grid), "FR-RI-5: the layout element facetGrid is read as tabs")
     error = _build_error(grid)
     assert error is not None and error[0] == "ValueError" and all(n in error[1] for n in named), error
 
@@ -192,7 +189,6 @@ def _div(g, text):
 
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.facet_grid")
-@STAGE_5_TODAY
 def test_browser_the_grid_geometry_one_legend_and_shared_ranges(headless_session, tmp_path):
     """Chromium: the title above all cells and the strip legend between them; the X title under the cells and centred
     on them, the footer under it; the Y title left of the cells and vertical (its drawn text more than three times
@@ -203,7 +199,7 @@ def test_browser_the_grid_geometry_one_legend_and_shared_ranges(headless_session
     from bokeh.io import save
     from bokeh.resources import INLINE
     from RootInteractive.InteractiveDrawing.bokeh.headless.test_headless_display import _open_browser_page
-    known_defect(_no_grid(), "FR-RI-5: the layout element facetGrid is read as tabs")
+    regression(_no_grid(), "FR-RI-5: the layout element facetGrid is read as tabs")
     p = tmp_path / "facet_grid.html"
     save(_from_array().pAll, filename=str(p), resources=INLINE, title="facet grid")
     ctx, page, errors = _open_browser_page(headless_session, p)
@@ -274,7 +270,6 @@ def _weighted_page(kind):
 @pytest.mark.browser_display
 @pytest.mark.feature("DISPLAY.facet_grid")
 @pytest.mark.parametrize("kind", ["scatter+line", "line"])
-@STAGE_5_TODAY
 def test_browser_the_grid_legend_follows_the_weights_shown_in_the_cells(headless_session, tmp_path, kind):
     """Chromium: series given as weights, with markers and as lines alone. The strip lists the weights shown in the cells (w0, w1), once each although
     two cells draw them; after the weights selection changes to w1, w2 it lists w1, w2: an entry hidden in the cells
@@ -285,8 +280,8 @@ def test_browser_the_grid_legend_follows_the_weights_shown_in_the_cells(headless
     try:
         page_model = _weighted_page(kind)
     except KeyError as exc:
-        known_defect(True, f"FR-RI-5: the layout element facetGrid is read as tabs ({exc!r})")
-    known_defect(_grid_of(page_model) is None, "FR-RI-5: the layout element facetGrid is read as tabs")
+        regression(True, f"FR-RI-5: the layout element facetGrid is read as tabs ({exc!r})")
+    regression(_grid_of(page_model) is None, "FR-RI-5: the layout element facetGrid is read as tabs")
     p = tmp_path / "facet_grid_weights.html"
     save(page_model.pAll, filename=str(p), resources=INLINE, title="facet grid, weights")
     ctx, page, errors = _open_browser_page(headless_session, p)

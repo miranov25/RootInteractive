@@ -10,7 +10,8 @@ from bokeh.transform import factor_mark, factor_cmap
 from RootInteractive.InteractiveDrawing.bokeh.ConcatenatedString import ConcatenatedString
 from RootInteractive.InteractiveDrawing.bokeh.compileVarName import getOrMakeColumns
 from RootInteractive.Tools.pandaTools import initMetadata
-from bokeh.models.layouts import TabPanel
+from bokeh.models.layouts import TabPanel, GridBox
+from bokeh.models import Legend
 from bokeh.layouts import row, column, gridplot
 import logging
 from IPython import get_ipython
@@ -33,6 +34,7 @@ from RootInteractive.InteractiveDrawing.bokeh.RangeFilter import RangeFilter
 from RootInteractive.InteractiveDrawing.bokeh.ColumnFilter import ColumnFilter
 from RootInteractive.InteractiveDrawing.bokeh.BandPolygons import BandPolygons
 from RootInteractive.InteractiveDrawing.bokeh.HistogramQuantiles import HistogramQuantiles
+from RootInteractive.InteractiveDrawing.bokeh.LegendRows import LegendRows
 from bokeh.models import LabelSet
 from RootInteractive.InteractiveDrawing.bokeh.LazyIntersectionFilter import LazyIntersectionFilter
 from RootInteractive.InteractiveDrawing.bokeh.ClientLinearFitter import ClientLinearFitter
@@ -197,6 +199,10 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
             'sizing_mode': 'scale_width',
             'legend_visible': True
         }
+    if isinstance(widgetLayoutDesc, dict) and "facetGrid" in widgetLayoutDesc:
+        # PHASE_5_2 stage 5 (FR-RI-5): a facet grid with its titles, headings, one legend and a footer
+        grid, cells = buildFacetGrid(widgetLayoutDesc, widgetArray, widgetDict)
+        return grid, [i.data_source for f in cells for i in f.renderers if isinstance(i.data_source, DownsamplerCDS)]
     if isinstance(widgetLayoutDesc, dict):
         tabsModel = LazyTabs(sizing_mode=options.get("sizing_mode", "scale_width"))
         tabs = []
@@ -212,7 +218,7 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
     widgetRows = []
     nRows = len(widgetArray)
     # get/apply global options if exist
-    if len(widgetLayoutDesc) > 0 and isinstance(widgetLayoutDesc[-1], dict):
+    if len(widgetLayoutDesc) > 0 and isinstance(widgetLayoutDesc[-1], dict) and "facetGrid" not in widgetLayoutDesc[-1]:
         nRows -= 1
         optionLocal = options.copy()
         optionLocal.update(widgetLayoutDesc[-1])
@@ -266,6 +272,191 @@ def processBokehLayoutArrayRenderers(widgetLayoutDesc, widgetArray: list, widget
     if isHorizontal:
         return row(widgetRows, sizing_mode=options['sizing_mode']), renderers
     return column(widgetRows, sizing_mode=options['sizing_mode']), renderers  
+
+
+FACET_GRID_KEYS = ("cells", "title", "xTitle", "yTitle", "columnHeadings", "rowHeadings", "cellTitles", "legend",
+                   "commonX", "commonY", "footer", "plot_height", "sizing_mode", "min_border_left", "min_border_bottom")
+
+
+def _facetText(text, vertical=False, size="10pt", bold=False, align="center"):
+    """A text panel of a facet grid: a Div; vertical text reads upwards (as Matplotlib's Y title). The text is escaped
+    (TeX between $$ stays: Bokeh's Div draws it)."""
+    import html
+    lines = text if isinstance(text, list) else str(text).split("\n")
+    styles = {"font-size": size, "text-align": align, "white-space": "nowrap", "line-height": "1.3"}
+    if bold:
+        styles["font-weight"] = "bold"
+    if vertical:
+        styles.update({"writing-mode": "vertical-rl", "transform": "rotate(180deg)", "margin": "auto"})
+    return Div(text="<br>".join(html.escape(str(line)) for line in lines), styles=styles,
+               sizing_mode="stretch_height" if vertical else "stretch_width", disable_math=False)
+
+
+def _glyphColumns(glyph):
+    """The columns a glyph reads (its data specs given as fields)."""
+    columns = []
+    for name in glyph.dataspecs():
+        value = getattr(glyph, name)
+        try:
+            field = value["field"]
+        except (TypeError, KeyError, IndexError):
+            field = value if isinstance(value, str) and "color" not in name and "dash" not in name else None
+        if isinstance(field, str) and field not in columns:
+            columns.append(field)
+    return columns
+
+
+def _gridLegend(figures, sizing_mode):
+    """PHASE_5_2 stage 5: one legend for the grid, in a strip of its own above the cells. Its entries are the legend
+    entries of the cells, once per label (the first cell's, then those of other cells with another label), each drawn
+    by a stand-in renderer that shares the first such cell renderer's glyph (so the colours it is given later are the
+    same) and draws nothing in the strip: its rows (LegendRows) are one per value of a legend's column in all the
+    cells with that entry (a group missing in the first cell is listed too), following them, or one row for a fixed
+    text, with NaN positions. An entry follows the visibility of its cell entry (a weight series
+    hidden in the cells is hidden here). The cells' own legends are hidden."""
+    from bokeh.models import GlyphRenderer, LegendItem, Range1d
+    strip = figure(height=40, sizing_mode=sizing_mode, toolbar_location=None, x_range=Range1d(0, 1),
+                   y_range=Range1d(0, 1), outline_line_color=None, min_border=0, name="facet_grid_legend")
+    strip.axis.visible = False
+    strip.grid.visible = False
+    items, seen = [], {}                                         # label -> the LegendRows of its stand-ins
+    for fig in figures:
+        for legend in fig.legend:
+            for item in legend.items:
+                key = repr(item.label)
+                if key in seen:                                  # the same entry in another cell: its rows count too
+                    glyph_renderers = [r for r in item.renderers if isinstance(r, GlyphRenderer)]
+                    for rows, r in zip(seen[key], glyph_renderers):
+                        if rows.field is not None:
+                            rows.sources = rows.sources + [r.data_source]
+                    continue
+                if not item.renderers:
+                    continue
+                seen[key] = []
+                standins = []
+                for r in item.renderers:
+                    if not isinstance(r, GlyphRenderer):
+                        continue
+                    try:                                         # a dict or Bokeh's Field
+                        label_field = item.label["field"]
+                    except (TypeError, KeyError, IndexError):
+                        label_field = None
+                    names = [c for c in _glyphColumns(r.glyph) if c != label_field]
+                    rows = LegendRows(sources=[r.data_source] if label_field else [], field=label_field, names=names,
+                                      column_names=([label_field] if label_field else []) + names)
+                    seen[key].append(rows)
+                    standin = GlyphRenderer(data_source=rows, glyph=r.glyph)
+                    strip.renderers.append(standin)
+                    standins.append(standin)
+                if standins:
+                    copy = LegendItem(label=item.label, renderers=standins, visible=item.visible)
+                    item.js_link("visible", copy, "visible")    # an entry hidden in the cell (its series) is hidden here
+                    items.append(copy)
+            legend.visible = False
+    legend = Legend(items=items, orientation="horizontal", location="center", border_line_color=None,
+                    background_fill_alpha=0, click_policy="none", name="facet_grid_legend")
+    strip.add_layout(legend, "center")
+    return strip, len(items)
+
+
+def buildFacetGrid(description, widgetArray, widgetDict):
+    """PHASE_5_2 stage 5 (FR-RI-5): figures in a grid, as dfdraw draws a facet grid (its default page):
+    - a title over the whole grid ("title", lines split at "\\n");
+    - one legend for the grid, in a strip above the cells ("legend": "top", the default); with "none" no grid legend
+      and every cell keeps its own legend;
+    - column headings over the top row ("columnHeadings"), row headings left of each row ("rowHeadings", vertical), or
+      a title per cell ("cellTitles"); otherwise the cells have no title;
+    - one X title under the grid and one Y title left of it, vertical ("xTitle", "yTitle"); the cells show none;
+    - the same ranges in every cell ("commonX", "commonY", both on by default); tick labels only on the outer cells;
+    - an optional footer under the grid ("footer": a text or a list of lines, e.g. the meaning of each variable).
+    "cells" is the list of rows of figure indices (or names). Every key and count is checked; a wrong one is refused
+    by name. Returns the GridBox and its figures."""
+    d = description["facetGrid"]
+    if not isinstance(d, dict):
+        raise ValueError("facetGrid must be a dict with the keys " + ", ".join(repr(k) for k in FACET_GRID_KEYS))
+    for key in d:
+        if key not in FACET_GRID_KEYS:
+            raise ValueError(f"facetGrid: unknown key {key!r}; the accepted keys are "
+                             + ", ".join(repr(k) for k in FACET_GRID_KEYS))
+    cells = d.get("cells")
+    if not isinstance(cells, list) or not cells or not all(isinstance(r, list) and r for r in cells):
+        raise ValueError(f"facetGrid: cells must be a list of rows of figure indices; got {cells!r}")
+    nrows, ncols = len(cells), max(len(r) for r in cells)
+    figures = []
+    for r in cells:
+        row_figures = []
+        for c in r:
+            f = widgetArray[c] if isinstance(c, int) and 0 <= c < len(widgetArray) else widgetDict.get(c)
+            if not isinstance(f, Plot):
+                raise ValueError(f"facetGrid: the cell {c!r} is not a figure of the page")
+            row_figures.append(f)
+        figures.append(row_figures)
+    for key, n in (("columnHeadings", ncols), ("rowHeadings", nrows)):
+        if d.get(key) is not None and (not isinstance(d[key], list) or len(d[key]) != n):
+            raise ValueError(f"facetGrid: {key} must be a list of {n} texts; got {d[key]!r}")
+    cell_titles = d.get("cellTitles")
+    if cell_titles is not None and (not isinstance(cell_titles, list) or len(cell_titles) != nrows
+                                    or any(not isinstance(t, list) or len(t) != len(r) for t, r in zip(cell_titles, cells))):
+        raise ValueError(f"facetGrid: cellTitles must have the shape of cells; got {cell_titles!r}")
+    legend_mode = d.get("legend", "top")
+    if legend_mode not in ("top", "none"):
+        raise ValueError(f"facetGrid: unknown legend {legend_mode!r}; the accepted values are 'top', 'none'")
+    sizing_mode = d.get("sizing_mode", "stretch_width")
+    flat = [f for r in figures for f in r]
+    first = flat[0]
+    for f in flat:
+        if d.get("commonX", True):
+            f.x_range = first.x_range
+        if d.get("commonY", True):
+            f.y_range = first.y_range
+        f.sizing_mode = "stretch_width"
+        if d.get("plot_height") is not None:
+            f.height = d["plot_height"]
+        f.title.text = " "               # a title line in every cell (empty where none), so that the frames line up
+        for axis in f.xaxis + f.yaxis:
+            axis.axis_label = None
+    for i, r in enumerate(figures):
+        for j, f in enumerate(r):
+            # tick labels only on the bottom row and the left column; every cell keeps the same border for them
+            # (min_border_left, min_border_bottom), so that all frames have the same size
+            if i < nrows - 1:
+                f.xaxis.major_label_text_font_size = "0px"
+            if j > 0:
+                f.yaxis.major_label_text_font_size = "0px"
+            f.min_border_left = d.get("min_border_left", 60)
+            f.min_border_bottom = d.get("min_border_bottom", 40)
+            if cell_titles is not None:
+                f.title.text = str(cell_titles[i][j]) or " "
+            elif d.get("columnHeadings") is not None and i == 0:
+                f.title.text = str(d["columnHeadings"][j]) or " "
+            f.title.align = "center"
+    # the grid: column 0 the Y title, column 1 the row headings, columns 2.. the cells
+    children = []
+    row0 = 0
+    if d.get("title"):
+        children.append((_facetText(d["title"], size="12pt", bold=True), 0, 0, 1, ncols + 2))
+        row0 += 1
+    n_legend = 0
+    if legend_mode == "top":
+        strip, n_legend = _gridLegend(flat, "stretch_width")
+        if n_legend:
+            children.append((strip, row0, 2, 1, ncols))
+            row0 += 1
+    if d.get("yTitle"):
+        children.append((_facetText(d["yTitle"], vertical=True, size="11pt"), row0, 0, nrows, 1))
+    for i, r in enumerate(figures):
+        if d.get("rowHeadings") is not None:
+            children.append((_facetText(d["rowHeadings"][i], vertical=True), row0 + i, 1, 1, 1))
+        for j, f in enumerate(r):
+            children.append((f, row0 + i, 2 + j, 1, 1))
+    last = row0 + nrows
+    if d.get("xTitle"):
+        children.append((_facetText(d["xTitle"], size="11pt"), last, 2, 1, ncols))
+        last += 1
+    if d.get("footer"):
+        children.append((_facetText(d["footer"], size="8pt", align="left"), last, 0, 1, ncols + 2))
+    cols = ["30px" if d.get("yTitle") else "0px", "30px" if d.get("rowHeadings") is not None else "0px"] + ["1fr"] * ncols
+    return GridBox(children=children, cols=cols, sizing_mode=sizing_mode, name="facet_grid"), flat
 
 
 def gridplotRow(figList0, **options):
