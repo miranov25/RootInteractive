@@ -339,6 +339,7 @@ export namespace CustomJSNAryFunction {
     func: p.Property<string | null>
     v_func: p.Property<string | null>
     auto_fields:p.Property<boolean>
+    problem: p.Property<string>
   }
 }
 
@@ -360,7 +361,10 @@ export class CustomJSNAryFunction extends Model {
       func:    [ Nullable(String), null ],
       v_func:  [Nullable(String), null],
       auto_fields: [Boolean, false],
-      n_out: [Int, 1]
+      n_out: [Int, 1],
+      // PHASE_5 Group 6c (TQ-D3): why the text is not in force or computes nothing; "" when it works. The page shows
+      // it on the text field (bokehTools.py); it is set only here, without the change signal of the model.
+      problem: [String, ""]
     }))
   }
 
@@ -380,6 +384,11 @@ export class CustomJSNAryFunction extends Model {
   // Group 6 (F4): the functions in force, or undefined before a build in which every function could be built. Declared
   // only, with no value here: Bokeh builds the model from its constructor, before a class field would be set.
   in_force: InForce | undefined
+
+  // Group 6c (TQ-D3): the problem of the last build and of the last computation, and why refusal() refused
+  build_problem: string | undefined
+  compute_problem: string | undefined
+  refusal_reason: string | undefined
 
   // the names of the parameters when the functions were last built (Group 5a, F3; Group 5b: built together)
   parameter_keys: string
@@ -446,6 +455,7 @@ export class CustomJSNAryFunction extends Model {
         console.error(new Error(`CustomJSNAryFunction: a function cannot be built: ${cause}; the previous function ` +
           `is kept, and the result does not change; the function: "${body}"; the previous: ` +
           `"${body === this.v_func ? kept.v_func : kept.func}"`))
+      this.set_build_problem(`not used: ${not_built[0][1]}; the previous one is kept`)
       return
     }
     for(const [body, cause] of not_built)
@@ -456,7 +466,35 @@ export class CustomJSNAryFunction extends Model {
                        effective_fields: this.effective_fields, scalar_func: this.scalar_func,
                        vector_func: this.vector_func, refused_func: this.refused_func,
                        refused_vfunc: this.refused_vfunc}
+    // Group 6c (TQ-D3): what the page shows on the text field; a new function has not been computed yet
+    this.compute_problem = ""
+    if(not_built.length > 0)
+      this.set_build_problem(`not used: ${not_built[0][1]}; no result (NaN)`)
+    else if(this.refused_func != null || this.refused_vfunc != null)
+      this.set_build_problem(`refused: ${this.refusal_reason ?? "see the console"}; no result (NaN)`)
+    else
+      this.set_build_problem("")
     this.change.emit()
+  }
+
+  // Group 6c (TQ-D3, the Architect, 2026-11-21: "red frame or something similar"): the property problem, which the
+  // page shows on the text field, is the problem of the build, else that of the last computation. It is set without
+  // the change signal of the model (no_change), so that showing it does not compute the column again.
+  set_build_problem(text: string){
+    this.build_problem = text
+    this.show_problem()
+  }
+
+  set_compute_problem(error: unknown, kept: boolean){
+    this.compute_problem = error == null ? "" :
+      `error while computing: ${String(error)}; ${kept ? "the previous result is kept" : "no result (NaN)"}`
+    this.show_problem()
+  }
+
+  show_problem(){
+    const text = this.build_problem || this.compute_problem || ""
+    if(this.problem !== text)
+      this.setv({problem: text}, {no_change: true})
   }
 
   compute(x: any[]){
@@ -505,12 +543,14 @@ export class CustomJSNAryFunction extends Model {
       if(fields.has(k)){
         console.error(new Error(`CustomJSNAryFunction: the name "${k}" is both a column and a parameter of the ` +
           `function "${code}"; the function is refused and gives NaN; rename the column or the parameter`))
+        this.refusal_reason = `the name "${k}" is both a column and a parameter`
         return k
       }
       if(!is_bindable(k)){
         console.error(new Error(`CustomJSNAryFunction: the parameter "${k}" cannot be used in the function ` +
           `"${code}": a parameter used in a function needs a plain ASCII JavaScript name; the function is ` +
           `refused and gives NaN`))
+        this.refusal_reason = `the parameter "${k}" has no plain ASCII name`
         return k
       }
     }
@@ -522,6 +562,7 @@ export class CustomJSNAryFunction extends Model {
         console.error(new Error(`CustomJSNAryFunction: the column "${field}" cannot be used in the function ` +
           `"${code}": a column used in a function needs a plain ASCII name; the function is refused and gives NaN; ` +
           `rename the column`))
+        this.refusal_reason = `the column "${field}" has no plain ASCII name`
         return field
       }
     }

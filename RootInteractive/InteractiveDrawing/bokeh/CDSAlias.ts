@@ -204,36 +204,40 @@ export class CDSAlias extends ColumnarDataSource {
         }
         if(new_column != null){
             data[key] = new_column
-        } else if(data[key] != null){
-            new_column = data[key]
-            if(!Array.isArray(new_column) || new_column.length != len){
-                new_column = new Array(len).fill(.0)
-            }
+        } else {
+            // PHASE_5 Group 6c (TQ-D4): computed row by row into a new array; the column changes only when every row
+            // is computed. Before, the rows were written into the old column: an error on row k left rows 0 to k-1
+            // with the new result and the rest with the old one, a mixed selection; a column of another length was
+            // computed into an array that was then not used. Now an error keeps the previous column whole (the
+            // Architect, 2026-11-21: keep the previous selection), or, with no previous column of this length, gives
+            // NaN; the function shows the error on its text field (problem).
+            const previous = data[key]
+            const has_previous = previous != null && previous.length === len
+            const result = new Array(len)
             const nvars = fields.length
-            let row = new Array(nvars)
-	    try {
-            for (let i = 0; i < len; i++) {
-              for(let j=0; j < nvars; j++){
-                row[j] = fields[j][i]
+            const row = new Array(nvars)
+            let failed: unknown = null
+            try {
+              for (let i = 0; i < len; i++) {
+                for(let j=0; j < nvars; j++){
+                  row[j] = fields[j][i]
+                }
+                result[i] = column.transform.compute(row)
               }
-              new_column[i] = column.transform.compute(row)
-            }  
-  	    } catch (error) {
-		      console.error(error)
-	    }	    
-        } else{
-            new_column = new Array(len).fill(.0)
-	    try {
-
-            for (let i = 0; i < len; i++) {
-                const row = fields.map((x: any[]) => x[i])
-                // This will likely have very bad performance
-                new_column[i] = column.transform.compute(row)
+            } catch (error) {
+              failed = error
             }
-	    } catch (error){
-		    console.error(error)
-	    }
-            data[key] = new_column
+            if(failed == null){
+              if(has_previous && Array.isArray(previous)){
+                for (let i = 0; i < len; i++) previous[i] = result[i]
+              } else {
+                data[key] = result
+              }
+            } else {
+              console.error(failed)
+              if(!has_previous) data[key] = new Array(len).fill(NaN)
+            }
+            column.transform.set_compute_problem?.(failed, has_previous)
         }
         if(ri_debug()) console.timeEnd(key)
     } else if(Object.prototype.toString.call(column) === '[object String]'){

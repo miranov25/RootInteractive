@@ -15,7 +15,7 @@ from bokeh.layouts import row, column, gridplot
 import logging
 from IPython import get_ipython
 from bokeh.models.widgets import Select, Slider, RangeSlider, MultiSelect, TableColumn, TextAreaInput, Toggle, Spinner
-from bokeh.models import CustomJS, ColumnDataSource
+from bokeh.models import CustomJS, ColumnDataSource, InlineStyleSheet
 from RootInteractive.InteractiveDrawing.bokeh.bokehVisJS3DGraph import BokehVisJSGraph3D
 from RootInteractive.InteractiveDrawing.bokeh.HistogramCDS import HistogramCDS
 from RootInteractive.InteractiveDrawing.bokeh.HistoNdCDS import HistoNdCDS
@@ -70,6 +70,63 @@ ALLOWED_WIDGET_TYPES = ["slider", "range", "select", "multiSelect", "toggle", "m
 RE_CURLY_BRACE = re.compile(r"\{(.*?)\}")
 
 RE_VALID_NAME = re.compile(r"^[a-zA-Z_$][0-9a-zA-Z_$]*$")
+
+# PHASE_5 Group 6c (TQ-D3, the Architect, 2026-11-21): the state of a text field whose text becomes a function (a text
+# query, or the text widget of an alias), shown on the field. Normal: unchanged. Orange: typed, not applied yet.
+# Red: the function could not be used, or computing it failed; the title says why, in red, wrapped within the field's
+# width. A field switched off by its "disable" toggle shows no colour. Orange is listed last, so it wins while the user
+# types again after a failure.
+TEXT_FUNCTION_CSS = """
+:host(.ri-problem:not(.ri-off)) .bk-input { border: 2px solid #d32f2f; background-color: #ffebee; }
+:host(.ri-problem:not(.ri-off)) label { color: #d32f2f; white-space: normal; overflow-wrap: anywhere; }
+:host(.ri-pending:not(.ri-off)) .bk-input { border: 2px solid #f57c00; background-color: #fff3e0; }
+"""
+
+# Orange while the text typed differs from the text applied. Enter applies the text, Shift+Enter adds a new line; the
+# key listener is attached at the first keystroke, on the field's own view (Bokeh has no event for it). Leaving the
+# field applies the text too, as before.
+TEXT_FUNCTION_TYPING_JS = """
+const classes = this.css_classes.filter((c) => c !== "ri-pending")
+this.css_classes = this.value_input !== this.value ? [...classes, "ri-pending"] : classes
+if (!this.__ri_enter) {
+  this.__ri_enter = true
+  try {
+    for (const view of Bokeh.index.query((v) => v.model === this)) {
+      view.input_el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          event.preventDefault()
+          this.value = view.input_el.value
+        }
+      })
+    }
+  } catch (error) {
+    console.warn("RootInteractive: Enter cannot apply the text of this field; leaving the field applies it", error)
+  }
+}
+"""
+
+TEXT_FUNCTION_APPLIED_JS = """
+this.css_classes = this.css_classes.filter((c) => c !== "ri-pending")
+"""
+
+# Red, and the reason in the title, while one of the functions built from the field has a problem
+TEXT_FUNCTION_PROBLEM_JS = """
+const text = transforms.map((t) => t.problem).find((p) => p) ?? ""
+const classes = area.css_classes.filter((c) => c !== "ri-problem")
+area.css_classes = text ? [...classes, "ri-problem"] : classes
+area.title = text ? (title ? title + ": " : "") + text : title
+"""
+
+
+def markTextFunctionField(area, transforms):
+    """PHASE_5 Group 6c (TQ-D3): show on the text field `area` the state of the functions built from its text."""
+    # a style sheet of its own per field: a Bokeh model belongs to one page only
+    area.stylesheets = list(area.stylesheets) + [InlineStyleSheet(css=TEXT_FUNCTION_CSS)]
+    area.js_on_change("value_input", CustomJS(code=TEXT_FUNCTION_TYPING_JS))
+    area.js_on_change("value", CustomJS(code=TEXT_FUNCTION_APPLIED_JS))
+    for transform in transforms:
+        transform.js_on_change("problem", CustomJS(args={"area": area, "transforms": transforms, "title": area.title},
+                                                   code=TEXT_FUNCTION_PROBLEM_JS))
 
 RE_MATHFORMULA = re.compile(r"\$\$|\\\(|\\\[")
 
@@ -499,6 +556,8 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
         elif "func" in i:
             if i["func"] in paramDict:
                 transform = CustomJSNAryFunction(parameters=customJsArgList, fields=variables, func=paramDict[i["func"]]["value"])
+                # PHASE_5 Group 6c (TQ-D3): the text widget of this parameter shows the state of this function
+                paramDict[i["func"]].setdefault("text_function_transforms", []).append(transform)
                 paramDict[i["func"]]["subscribed_events"].append(["value", CustomJS(args={"mapper":transform}, code="""
         mapper.func = this.value
         mapper.update_func()
@@ -868,12 +927,16 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
             aliasDict[cds_used][widgetName] = {"fields": None, "transform": transform}
             memoized_columns[cds_used][widgetName] = {"type":"alias", "name":widgetName}
             widgetFilter = ColumnFilter(field=widgetName, name=widgetName)
+            markTextFunctionField(localWidget, [transform])   # PHASE_5 Group 6c (TQ-D3)
             if "toggleable" in optionWidget:
                 widgetToggle = Toggle(label="disable", active=True, width=70, sizing_mode="stretch_width")
                 localWidget.disabled = True
+                localWidget.css_classes = list(localWidget.css_classes) + ["ri-off"]    # Group 6c: no colour while off
                 widgetFilter.active = False
                 widgetToggle.js_on_change("active", CustomJS(args={"widget":localWidget, "filter":widgetFilter}, code="""
                     widget.disabled = this.active
+                    widget.css_classes = this.active ? [...widget.css_classes.filter((c) => c !== "ri-off"), "ri-off"]
+                                                     : widget.css_classes.filter((c) => c !== "ri-off")
                     filter.active = !this.active
                     widget.properties.value.change.emit()
                 """))
@@ -890,6 +953,9 @@ def bokehDrawArray(dataFrame, query, figureArray, histogramArray=[], parameterAr
                 optionWidget.update(variables[-1])
             value = paramDict[variables[1][0]]["value"]
             localWidget = TextAreaInput(value=value, sizing_mode="scale_width", **optionWidget)
+            # PHASE_5 Group 6c (TQ-D3): the state of the functions built from this text, if any
+            if paramDict[variables[1][0]].get("text_function_transforms"):
+                markTextFunctionField(localWidget, paramDict[variables[1][0]]["text_function_transforms"])
             plotArray.append(localWidget)
             if "name" in optionWidget:
                 plotDict[optionWidget["name"]] = localWidget

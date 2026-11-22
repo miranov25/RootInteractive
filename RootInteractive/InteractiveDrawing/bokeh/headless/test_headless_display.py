@@ -1764,7 +1764,6 @@ def test_strict_after_the_selection_shrinks_every_column_has_get_length_entries(
 # TQ-D4: a function that throws while computing, on row 3, left rows 0 to 2 with the new result and the rest with the
 # old one. The previous result is now kept whole.
 # Before the fix the field showed nothing: no class, the title unchanged, and the model had no property "problem".
-# In this commit the tests of the two defects are strict expected failures, each with today's exact result.
 FIELD_STATE = r"""(name) => {
   const ms = window.__riH.models();
   const area = ms.find(m => m.type === 'TextAreaInput' && (name == null || m.name === name));
@@ -1793,7 +1792,6 @@ def _is_red(state, start, end) -> bool:
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_query_that_cannot_be_built_is_red_and_says_why(node_session, tmp_path):
     """After `return A > 0.5`, the text `return A >`: the previous selection stays (group 6), and the field turns red
     with the reason in its title: "not used: SyntaxError: ...; the previous one is kept"."""
@@ -1802,14 +1800,13 @@ def test_a_query_that_cannot_be_built_is_red_and_says_why(node_session, tmp_path
     _node_set(page, "TextAreaInput", "value", "return A > 0.5")
     _node_set(page, "TextAreaInput", "value", "return A >")
     state = _field(page)
-    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    regression(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
     assert _hist_state(page)["mask"] == KEPT_MASK
     assert _is_red(state, "not used: SyntaxError", "; the previous one is kept"), state
 
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_refused_query_is_red_and_says_why(node_session, tmp_path):
     """A query that uses the column sigma-cut, whose name is not plain ASCII (group 6, F1): no row is selected, and
     the field turns red: "refused: the column "sigma-cut" has no plain ASCII name; no result (NaN)"."""
@@ -1817,7 +1814,7 @@ def test_a_refused_query_is_red_and_says_why(node_session, tmp_path):
     page, report = _node_page(node_session, tmp_path, "query_odd_column", df)
     _node_set(page, "TextAreaInput", "value", f"return {NON_ASCII} > 1")
     state = _field(page)
-    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    regression(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
     assert _hist_state(page)["mask"] == [False] * N
     assert state["problem"] == f'refused: the column "{NON_ASCII}" has no plain ASCII name; no result (NaN)', state
     assert state["classes"] == ["ri-problem"] and state["title"] == state["problem"], state
@@ -1825,7 +1822,6 @@ def test_a_refused_query_is_red_and_says_why(node_session, tmp_path):
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_query_that_fails_while_computing_is_red_and_keeps_the_previous_selection(node_session, tmp_path):
     """After `return A > 0.5`, the query `return Ax > 1`, with a column name that does not exist: it is built, and
     computing it fails on the first row. The previous selection stays, and the field turns red: "error while
@@ -1835,7 +1831,7 @@ def test_a_query_that_fails_while_computing_is_red_and_keeps_the_previous_select
     _node_set(page, "TextAreaInput", "value", "return A > 0.5")
     _node_set(page, "TextAreaInput", "value", "return Ax > 1")
     state = _field(page)
-    known_defect(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
+    regression(_shows_nothing(state), f"TQ-D3: the field shows nothing: {state}")
     assert _hist_state(page)["mask"] == KEPT_MASK
     assert state["problem"] == ("error while computing: ReferenceError: Ax is not defined; "
                                 "the previous result is kept"), state
@@ -1844,7 +1840,6 @@ def test_a_query_that_fails_while_computing_is_red_and_keeps_the_previous_select
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_a_query_that_fails_on_row_3_keeps_the_previous_selection_whole(node_session, tmp_path):
     """TQ-D4: after `return A > 0.5`, a query that throws on row 3. The previous selection must stay whole. Before,
     rows 0 to 2 had the new result and rows 3 to 11 the old one: a selection that is neither."""
@@ -1853,7 +1848,7 @@ def test_a_query_that_fails_on_row_3_keeps_the_previous_selection_whole(node_ses
     _node_set(page, "TextAreaInput", "value", "return A > 0.5")
     _node_set(page, "TextAreaInput", "value", "if (A > 2) throw new Error('row ' + A); return A > 1")
     mask = _hist_state(page)["mask"]
-    known_defect(mask == MIXED_MASK, f"TQ-D4: a mixed selection: {mask}")
+    regression(mask == MIXED_MASK, f"TQ-D4: a mixed selection: {mask}")
     assert mask == KEPT_MASK, mask
     state = _field(page)
     assert state["problem"] == "error while computing: Error: row 3; the previous result is kept", state
@@ -1899,7 +1894,6 @@ def _set_text(page, value):
 
 @pytest.mark.node_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_the_text_widget_of_an_alias_is_red_when_its_text_cannot_be_built(node_session, tmp_path):
     """The alias funA computes the text of the parameter funForm, edited in a text widget (the form of the dashboard
     template's funCustomForm0). The text `return A *` cannot be built: the alias keeps its values (A * 2), and the text
@@ -1909,8 +1903,8 @@ def test_the_text_widget_of_an_alias_is_red_when_its_text_cannot_be_built(node_s
     assert page.evaluate(ALIAS_VALUES) == [2 * a for a in df["A"]]
     _set_text(page, "return A *")
     state = _field(page, "funForm")
-    known_defect(state["classes"] == [] and state["title"] == "funForm" and state["problem"] is None,
-                 f"TQ-D3: the text widget shows nothing: {state}")
+    regression(state["classes"] == [] and state["title"] == "funForm" and state["problem"] is None,
+               f"TQ-D3: the text widget shows nothing: {state}")
     assert page.evaluate(ALIAS_VALUES) == [2 * a for a in df["A"]]
     assert state["classes"] == ["ri-problem"], state
     assert state["problem"].startswith("not used: SyntaxError") and state["title"] == "funForm: " + state["problem"]
@@ -1991,7 +1985,6 @@ def _title_colour(page, area) -> str:
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_browser_a_text_query_shows_typing_and_failure_in_colour_and_applies_with_enter(headless_session, tmp_path):
     """In Chromium, with real keys: the field is normal at load; orange while the user types; Enter applies the text
     (normal again, and the query selects); Shift+Enter adds a new line without applying; a text that cannot be built
@@ -2008,7 +2001,7 @@ def test_browser_a_text_query_shows_typing_and_failure_in_colour_and_applies_wit
         area.press("Control+A")
         area.type("return A > 1")
         seen = _seen(page, area, "query_2_orange_typed_not_applied")
-        known_defect(_plain(seen), f"TQ-D3: typing shows nothing: {seen}")
+        regression(_plain(seen), f"TQ-D3: typing shows nothing: {seen}")
         assert _drawn(seen, "orange"), seen
         area.press("Enter")
         page.wait_for_function("() => window.__riH.models().some(m => m.type === 'TextAreaInput' && m.value === 'return A > 1')")
@@ -2069,7 +2062,6 @@ def _template_page(headless_session, tmp_path):
 
 @pytest.mark.browser_display
 @pytest.mark.feature("FILTER.text_query")
-@pytest.mark.xfail(**STRICT)
 def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(headless_session, tmp_path):
     """The default dashboard template, in Chromium, with real clicks and keys. In its tab "Custom" all 6 text fields
     are normal at load.
@@ -2096,7 +2088,7 @@ def test_browser_the_dashboard_template_shows_the_state_of_its_six_text_fields(h
         query.press("Control+A")
         query.type("return A >")
         seen = _seen(page, query, "template_1_query_orange_typed")
-        known_defect(_plain(seen), f"TQ-D3: typing in the template's query shows nothing: {seen}")
+        regression(_plain(seen), f"TQ-D3: typing in the template's query shows nothing: {seen}")
         assert _drawn(seen, "orange"), seen
         query.press("Enter")
         page.wait_for_function("(i) => window.__riH.models().filter(m => m.type === 'TextAreaInput')[i].value === 'return A >'", arg=on)
