@@ -463,6 +463,18 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_phase5_2_quantile_lines.py",
     },
+    "DISPLAY.facet_grid": {
+        "name": "A facet grid with its titles, one legend and a footer (facetGrid layout element)",
+        "description": "Cells in rows and columns with shared ranges and equal frames; a title over the grid, a strip "
+                       "legend for the whole grid (cell legends hidden; entries follow the selection), column and "
+                       "row headings or cell titles, one X title under and one vertical Y title left of the grid, "
+                       "tick labels on the outer cells only, a footer; wrong keys and counts refused by name "
+                       "(PHASE_5_2 stage 5)",
+        "priority": "P2",
+        "backends": ["python", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_facet_grid.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
