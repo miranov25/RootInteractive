@@ -417,6 +417,18 @@ FEATURE_TAXONOMY = {
         "layer": "integration",
         "proof": "headless/test_headless_legend_computed_columns.py",
     },
+    "DISPLAY.line": {
+        "name": "Line through the points of a profile (visualization_type line, scatter+line)",
+        "description": "A line through the bins of a histogram projection in bin order, alone or with markers and "
+                       "error bars; the filter drops bins and the line joins the rest, NaN breaks it; one line per "
+                       "weight series that follows the weight selection, coloured as its markers; line_style (dash, "
+                       "width, colour, alpha); a wrong style or a line on a table is refused by name; also BR-RI-1, "
+                       "an unknown histogram type refused by name (PHASE_5_2 stage 1)",
+        "priority": "P2",
+        "backends": ["node", "browser"],
+        "layer": "integration",
+        "proof": "headless/test_headless_phase5_2_lines.py",
+    },
     "DISPLAY.axis_label": {
         "name": "Parametric axis label (ConcatenatedString)",
         "description": "Axis title from a template with a parameter, option metadata (AxisTitle) and None; follows "
