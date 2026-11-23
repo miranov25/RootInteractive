@@ -204,6 +204,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "browser_invariance_dashboards: target: the invariance and oracle tests of Group 7 - three live dashboards (the template, the template with weights, the ToyMC joins), 20 tests on one page each in Chromium, every state against numpy and pandas row by row and bin by bin, restore checked after each test (PHASE_5 Group 7)"
+    )
+    config.addinivalue_line(
+        "markers",
         "browser_oracle_dashboards: target: the oracle test dashboards - RootInteractive's own example dashboards (test_bokehClientHistogram.py) end to end in Chromium on a reproducible table - real widget input, every affected histogram against numpy, drawn plots and painted positions, live faults, restore (PHASE_4_7)"
     )
     config.addinivalue_line(

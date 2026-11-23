@@ -332,7 +332,7 @@ run_target() {
         cmd=(env -u DISPLAY RI_HEADLESS_OUT="$PROJECT_ROOT/$out/headless_out"
              RI_HEADLESS_BUNDLE="${RI_HEADLESS_BUNDLE:-$PROJECT_ROOT/$HEADLESS_DIR/_out}"
              RI_HEADLESS_REQUIRED=1 RI_HEADLESS_CHECK_REQUIRED=1 RI_HEADLESS_TARGET="$marker"
-             python3 -m pytest "$HEADLESS_DIR" -m "$marker" -n "$PARALLEL_WORKERS" --timeout=900 -q -p no:cacheprovider
+             python3 -m pytest "$HEADLESS_DIR" -m "$marker" -n "$PARALLEL_WORKERS" --dist loadgroup --timeout=900 -q -p no:cacheprovider
              --json-report --json-report-file="$PROJECT_ROOT/$out/report.json")
     else
         echo "unknown target: $name (see ./run_tests.sh --list-targets)" | tee "$out/test.log"
